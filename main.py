@@ -1,3 +1,4 @@
+# <editor-fold desc="Initiate env">
 from ai2thor.controller import Controller
 from PIL import Image
 
@@ -10,7 +11,7 @@ c = Controller(scene='FloorPlan28', gridSize=0.25, renderDepthImage=False, rende
 # Initialisation of a scene only
 c.reset(scene='FloorPlan28')
 
-# c.step('Initialize', gridSize=0.25, agentCount=1)
+# c.step('Initialize', gridSize=0.25, AgentCount=1)
 
 # Place randomly pickupable objects
 c.step(action='InitialRandomSpawn', randomSeed=RANDOM_SEED, numPlacementAttemps=5)
@@ -19,20 +20,27 @@ c.step(action='InitialRandomSpawn', randomSeed=RANDOM_SEED, numPlacementAttemps=
 c.step(action='RandomToggleStateOfAllObjects', randomSeed=RANDOM_SEED)
 
 # Randomize the state of all specific states that can have objects
-c.step(action='RandomToggleSpecificState', randomSeed=RANDOM_SEED,
-       StateChange=['CanOpen', 'CanToggleOnOff', 'CanBeSliced', 'CanBeCooked', 'CanBreak', 'CanBeDirty',
-                    'CanBeUsedUp'])
+event = c.step(action='RandomToggleSpecificState', randomSeed=RANDOM_SEED,
+               StateChange=['CanOpen', 'CanToggleOnOff', 'CanBeSliced', 'CanBeCooked', 'CanBreak', 'CanBeDirty',
+                            'CanBeUsedUp'])
+pos = event.metadata['agent']['position']
+# </editor-fold>
+
+event = c.step(action='AddThirdPartyCamera', position=dict(x=0, y=0, z=0), fieldOfView=90)
+
+event = c.step(action='Teleport', x=pos['x'], y=pos['y'] + 1, z=pos['z'] - 1)
+pos = event.metadata['agent']['position']
 
 event = c.step(action='MoveAhead')
-pos_agent = event.metadata['agent']['position']
-
-event2 = c.step(dict(action='AddThirdPartyCamera', rotation=dict(x=0, y=0, z=90), position=pos_agent))
-
-event = c.step(action='MoveAhead')
-sum(event2.third_party_camera_frames[0].flatten())
 
 # event = controller.step(action='GetReachablePositions')
 # e = event.metadata['actionReturn']
+
+for object_element in event.metadata['objects']:
+    print(f'\n\nObject : {object_element}')
+    for key, value in object_element.items():
+        print(f'Key : {key}, value : {value}')
+    break
 
 a = event.frame
 b = event.depth_frame
