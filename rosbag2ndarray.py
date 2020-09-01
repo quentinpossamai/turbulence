@@ -295,25 +295,6 @@ class Extractor(object):
         else:
             pass
 
-    def mavros_extract(self, get_topics_types=False, topic='', nb_msg=1):
-        """
-        Extract topic or convert data
-        :param get_topics_types: if get_topics_types=False converts .bag data to .npy format for mavros bags.
-        Else print topics and types of topics for all the bag found.
-        :param topic: The topic to extract if get_topics_types=false
-        :param nb_msg: Number of message to display per topic
-        :return: .npy file for all flights or a print
-
-        Known topics :
-        """
-        bags = [e for e in self.bags_n_flights if re.search('.*(/mavros.*)', e[0]) is not None]
-        # List of tuple (path to tara.bag file, path to tara.bag folder)
-
-        if get_topics_types:
-            self._print_topics_types([e[0] for e in bags], nb_msg)
-        else:
-            pass
-
     def imu_extract(self, get_topics_types=False, topic='', nb_msg=1):
         """
          Extract topic or convert data
@@ -362,7 +343,8 @@ class Extractor(object):
 
                     linear_acceleration[i, :] = [msg_raw.linear_acceleration.x, msg_raw.linear_acceleration.y,
                                                  msg_raw.linear_acceleration.z]
-                    linear_acceleration_cov[i, :, :] = np.array(msg_raw.linear_acceleration_covariance).reshape((3, 3))
+                    linear_acceleration_cov[i, :, :] = np.array(msg_raw.linear_acceleration_covariance).reshape(
+                        (3, 3))
 
                 data = {'time': time,
                         'orientation': orientation,
@@ -375,8 +357,78 @@ class Extractor(object):
                 # assert nans
                 for name, e in data.items():
                     assert not np.any(np.isnan(e)), '{} contains nan'.format(name)
-                assert np.all(np.sort(time) == time),  'Time array is not chronological'
+                assert np.all(np.sort(time) == time), 'Time array is not chronological'
                 pickle.dump(data, open(bag_file_path[:-4] + '.pkl', 'wb'))
+                bag.close()
+
+    def mavros_extract(self, get_topics_types=False, topic='', nb_msg=1):
+        """
+        Extract topic or convert data
+        :param get_topics_types: if get_topics_types=False converts .bag data to .npy format for mavros bags.
+        Else print topics and types of topics for all the bag found.
+        :param topic: The topic to extract if get_topics_types=false
+        :param nb_msg: Number of message to display per topic
+        :return: .npy file for all flights or a print
+
+        Known topics : mavros/imu/data, mavros/global_position/raw/gps_vel, mavros/rc/out,
+        mavros/global_position/compass_hdg, mavros/imu/temperature_imu, mavros/battery, mavros/global_position/rel_alt,
+        mavros/extended_state, mavros/global_position/raw/fix, mavros/imu/mag, mavros/local_position/odom,
+        mavros/imu/static_pressure, mavros/rc/in, mavros/state, mavros/imu/data_raw"""
+        bags = [e for e in self.bags_n_flights if re.search('.*(/mavros.*)', e[0]) is not None]
+        # List of tuple (path to tara.bag file, path to tara.bag folder)
+
+        if get_topics_types:
+            self._print_topics_types([e[0] for e in bags], nb_msg)
+        else:
+            for paths in bags:
+                bag_file_path = paths[0]
+                print(bag_file_path)
+
+                bag = rosbag.Bag(bag_file_path)
+                msg_n = bag.get_message_count(topic)
+                p = Progress(max_iter=msg_n, end_print='\n')
+                if topic=='mavros/imu/data':
+                    time = np.zeros(msg_n)
+                    orientation = np.zeros((msg_n, 4))  # quaternions
+                    orientation_cov = np.zeros((msg_n, 3, 3))
+                    angular_velocity = np.zeros((msg_n, 3))
+                    angular_velocity_cov = np.zeros((msg_n, 3, 3))
+                    linear_acceleration = np.zeros((msg_n, 3))
+                    linear_acceleration_cov = np.zeros((msg_n, 3, 3))
+                    for i, (topic, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
+                        time[i] = msg_raw.header.stamp.secs + msg_raw.header.stamp.nsecs * 1e-9
+
+                        orientation[i, :] = [msg_raw.orientation.x, msg_raw.orientation.y, msg_raw.orientation.z,
+                                             msg_raw.orientation.w]
+                        orientation_cov[i, :, :] = np.array(msg_raw.orientation_covariance).reshape((3, 3))
+
+                        angular_velocity[i, :] = [msg_raw.angular_velocity.x, msg_raw.angular_velocity.y,
+                                                  msg_raw.angular_velocity.z]
+                        angular_velocity_cov[i, :, :] = np.array(msg_raw.angular_velocity_covariance).reshape(
+                            (3, 3))
+
+                        linear_acceleration[i, :] = [msg_raw.linear_acceleration.x, msg_raw.linear_acceleration.y,
+                                                     msg_raw.linear_acceleration.z]
+                        linear_acceleration_cov[i, :, :] = np.array(msg_raw.linear_acceleration_covariance).reshape(
+                            (3, 3))
+                        # Progression
+                        p.update_pgr()
+                    data = {'time': time,
+                            'orientation': orientation,
+                            'orientation_cov': orientation_cov,
+                            'angular_velocity': angular_velocity,
+                            'angular_velocity_cov': angular_velocity_cov,
+                            'linear_acceleration': linear_acceleration,
+                            'linear_acceleration_cov': linear_acceleration_cov}
+
+                    # assert nans
+                    for name, e in data.items():
+                        assert not np.any(np.isnan(e)), '{} contains nan'.format(name)
+                    assert np.all(np.sort(time) == time), 'Time array is not chronological'
+                    name = bag_file_path[:-4].replace('mavros', topic.replace('/', '_')) + '.pkl'
+                    pickle.dump(data, open(name, 'wb'))
+
+                    # pickle.dump(data, open(bag_file_path[:-4] + '.pkl', 'wb'))
                 bag.close()
 
     def get_freq(self):
@@ -405,7 +457,6 @@ class Extractor(object):
 if __name__ == '__main__':
     def main():
         e = Extractor()
-        e.imu_extract(get_topics_types=False, topic='board_imu/imu')
-
+        e.mavros_extract(get_topics_types=False, topic='mavros/imu/data')
 
     main()

@@ -3,6 +3,7 @@ import os
 import pickle
 import sys
 import time
+import re
 from pathlib import Path
 
 import cv2
@@ -38,10 +39,11 @@ def aff3d(xyz_array, quat_array, video_path):
     prg = Progress(len(xyz_array))
 
     for xyz, quat in zip(xyz_array, quat_array):
-        tf_pos_ref = Transform().from_pos(xyz, quat).get_inv()
-        x_ref = tf_pos_ref.get_rot() @ x_pos
-        y_ref = tf_pos_ref.get_rot() @ y_pos
-        z_ref = tf_pos_ref.get_rot() @ z_pos
+        ref_tf_pos = Transform().from_pose(xyz, quat).get_inv()
+
+        x_ref = ref_tf_pos.get_rot() @ x_pos
+        y_ref = ref_tf_pos.get_rot() @ y_pos
+        z_ref = ref_tf_pos.get_rot() @ z_pos
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
@@ -64,7 +66,6 @@ def aff3d(xyz_array, quat_array, video_path):
 
         video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
         prg.update_pgr()
-
 
     video.release()
     cv2.destroyAllWindows()
@@ -93,44 +94,81 @@ class DataPreparation(object):
                         flight_files.append(filepath)
                     flight_files = sorted(flight_files)
                 i += 1
-        if pose_source == 'tubex_estimator':
-            self.camera_info_left = pickle.load(open(flight_files[1], 'rb'), encoding='latin1')
-            self.camera_info_right = pickle.load(open(flight_files[2], 'rb'), encoding='latin1')
-            self.left_frames = np.load(flight_files[3])
-            self.left_frames_time = np.load(flight_files[4])
-            self.right_frames = np.load(flight_files[5])
-            self.right_frames_time = np.load(flight_files[6])
-            self.poses_data = pickle.load(open(flight_files[7], 'rb'), encoding='latin1')
+                # print(day + '/' + flight_name + '/')
 
-        elif pose_source == 'imu':
-            self.camera_info_left = pickle.load(open(flight_files[1], 'rb'), encoding='latin1')
-            self.camera_info_right = pickle.load(open(flight_files[2], 'rb'), encoding='latin1')
-            self.left_frames = np.load(flight_files[3])
-            self.left_frames_time = np.load(flight_files[4])
-            self.right_frames = np.load(flight_files[5])
-            self.right_frames_time = np.load(flight_files[6])
-            imu = pickle.load(open(flight_files[0], 'rb'), encoding='latin1')
+        if pose_source == 'tubex_estimator':
+            name = [e for e in flight_files if re.search('.*tara_info_left.*.pkl', e) is not None][0]
+            self.camera_info_left = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_info_right.*.pkl', e) is not None][0]
+            self.camera_info_right = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_left.*.npy', e) is not None][0]
+            self.left_frames = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_left_time.*.npy', e) is not None][0]
+            self.left_frames_time = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_right.*.npy', e) is not None][0]
+            self.right_frames = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_right_time.*.npy', e) is not None][0]
+            self.right_frames_time = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tubex_estimator.*.pkl', e) is not None][0]
+            self.poses_data = pickle.load(open(name, 'rb'), encoding='latin1')
+
+        elif pose_source == 'board_imu':
+            name = [e for e in flight_files if re.search('.*board_imu.*.pkl', e) is not None][0]
+            imu = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_info_left.*.pkl', e) is not None][0]
+            self.camera_info_left = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_info_right.*.pkl', e) is not None][0]
+            self.camera_info_right = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_left.*.npy', e) is not None][0]
+            self.left_frames = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_left_time.*.npy', e) is not None][0]
+            self.left_frames_time = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_right.*.npy', e) is not None][0]
+            self.right_frames = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_right_time.*.npy', e) is not None][0]
+            self.right_frames_time = np.load(name)
 
             # angular velocity integration to quaternions
             quat = np.zeros((len(imu['orientation']), 4))
             quat[0][3] = 1
 
             ts = imu['time'][1:] - imu['time'][:-1]
-            for i, (wx, wy, wz) in enumerate(imu['angular_velocity'][:-1]):
+            for i, (wx, wy, wz) in enumerate(imu['angular_velocity'][1:]):
                 mat = np.eye(4) + 1 / 2 * ts[i] * np.array([[0, -wx, -wy, -wz],
                                                             [wx, 0, wz, -wy],
                                                             [wy, -wz, 0, wx],
                                                             [wz, wy, -wx, 0]])
-                quat[i + 1] = (mat @ quat[i].reshape((4, 1))).flatten()
-                quat[i+1] /= np.linalg.norm(quat[i+1])
+                quat[i + 1] = mat @ quat[i]
+                quat[i + 1] /= np.linalg.norm(quat[i + 1])
 
             # linear acceleration correction
+            # IMU orientated in drone = FLU = FLUi i in [0, T]
+            mat_a = np.array([[0.9930045566279224, -0.0007377157002538479, -0.007219469698671251],
+                              [-0.0007377157002538617, 0.9957519644937433, -0.0003710755696976209],
+                              [-0.007219469698671307, -0.0003710755696976209, 0.9959784223847098]])
+            drone_rot_imu = np.array([[0.9997849927500873, 0.011378000779108768, 0.014941846703305539],
+                                      [-0.01137537518424766, 0.9998406525646836, 0.006196493976405852],
+                                      [-0.014940204374346889, -0.00630934708287653, 0.9998219158560427]])
+            b = np.array([0.14347160191766697, 0.006715615184851986, -0.014026001440967934])
             g = 9.81
-            imu['linear_acceleration'] = -imu['linear_acceleration']  # gravity is positive
-            for i, xyz in enumerate(imu['linear_acceleration']):
-                tf_ref_drone = Transform().from_pos(np.zeros(3), quat[i])
-
-                pass
+            acc_g_in_global = np.array([0, 0, g])
+            for i, acc in enumerate(imu['linear_acceleration']):
+                acc = mat_a @ (imu['linear_acceleration'][i] - b)  # Remove noise
+                flu0_rot_drone = Transform().from_pose(np.zeros(3), quat[i]).get_inv().get_rot()
+                imu['linear_acceleration'][i] = flu0_rot_drone @ drone_rot_imu @ acc
+                imu['linear_acceleration'][i] = imu['linear_acceleration'][i] - acc_g_in_global
 
             # linear acceleration double integration to position
             velocity = np.zeros_like(imu['linear_acceleration'])
@@ -139,14 +177,113 @@ class DataPreparation(object):
                 velocity[:, i] = integrate.cumtrapz(y=imu['linear_acceleration'][:, i], x=imu['time'], initial=0.)
                 xyz[:, i] = integrate.cumtrapz(y=velocity[:, i], x=imu['time'], initial=0.)
 
-            name = ABSOLUTE_PATH + 'integration_videos/' + 'integration.mkv'
-            aff3d(xyz, quat, video_path=name)
-            sys.exit(0)
+            # Video creation
+            # part1, part2, _ = self.flight_name.split('/')
+            # name = ABSOLUTE_PATH + 'integration_videos/' + part1 + '_' + part2 + '_integration.mkv'
+            # aff3d(xyz, quat, video_path=name)
+            # sys.exit(0)
 
-            self.poses_data = {'time': new_imu_time,
-                               'xyz': xyz,
-                               'quaternions': quat,
-                               'cov': imu['linear_acceleration_cov']}
+            self.poses_data = {'time': imu['time'],
+                               'pose': {'xyz': xyz,
+                                        'quaternions': quat,
+                                        'cov': imu['linear_acceleration_cov']},
+                               'twist': {'dxyz': velocity,
+                                         'dquaternions': imu['angular_velocity'],
+                                         'cov': imu['angular_velocity_cov']}}
+
+        elif pose_source == 'mavros_imu':
+            name = [e for e in flight_files if re.search('.*mavros_imu.*.pkl', e) is not None][0]
+            imu = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_info_left.*.pkl', e) is not None][0]
+            self.camera_info_left = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_info_right.*.pkl', e) is not None][0]
+            self.camera_info_right = pickle.load(open(name, 'rb'), encoding='latin1')
+
+            name = [e for e in flight_files if re.search('.*tara_left.*.npy', e) is not None][0]
+            self.left_frames = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_left_time.*.npy', e) is not None][0]
+            self.left_frames_time = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_right.*.npy', e) is not None][0]
+            self.right_frames = np.load(name)
+
+            name = [e for e in flight_files if re.search('.*tara_right_time.*.npy', e) is not None][0]
+            self.right_frames_time = np.load(name)
+
+            quat = imu['orientation']
+            raw_acc = imu['linear_acceleration'].copy()
+
+            # linear acceleration correction
+            # IMU orientated in drone = FLU = FLUi i in [0, T]
+            mat_a = np.array([[1.0006205831082509, 0.0016298250067589282, -0.0008938592966822312],
+                              [0.0016298250067589282, 0.999657268350121, 0.00157881502930865],
+                              [-0.0008938592966822867, 0.0015788150293087333, 1.0001337579823208]])
+            drone_rot_imu = np.array([[0.9997857431831232, 0.01288008771845976, -0.010557797456369658],
+                                      [-0.012787554819759774, 0.9997241101787383, -0.012350706373651883],
+                                      [0.01022487186656836, 0.012584111856585653, 0.9998202351036332]])
+            b = np.array([-0.0036374953246893216, -0.030957561876831713, -0.007030521095834748])
+            g = 9.81
+            acc_g_in_global = np.array([0, 0, g])
+            for i, acc in enumerate(imu['linear_acceleration']):
+                acc = mat_a @ (imu['linear_acceleration'][i] - b)  # Remove noise
+                flu0_rot_drone = Transform().from_pose(np.zeros(3), quat[i]).get_inv().get_rot()
+                imu['linear_acceleration'][i] = flu0_rot_drone @ drone_rot_imu @ acc
+                imu['linear_acceleration'][i] = imu['linear_acceleration'][i] - acc_g_in_global
+                raw_acc[i] = flu0_rot_drone @ drone_rot_imu @ raw_acc[i]
+                raw_acc[i] = raw_acc[i] - acc_g_in_global
+
+            # linear acceleration double integration to position
+            velocity = np.zeros_like(imu['linear_acceleration'])
+            xyz = np.zeros_like(imu['linear_acceleration'])
+            raw_velocity = np.zeros_like(imu['linear_acceleration'])
+            raw_xyz = np.zeros_like(imu['linear_acceleration'])
+            for i in range(3):
+                velocity[:, i] = integrate.cumtrapz(y=imu['linear_acceleration'][:, i], x=imu['time'], initial=0.)
+                xyz[:, i] = integrate.cumtrapz(y=velocity[:, i], x=imu['time'], initial=0.)
+                raw_velocity[:, i] = integrate.cumtrapz(y=raw_acc[:, i], x=imu['time'], initial=0.)
+                raw_xyz[:, i] = integrate.cumtrapz(y=raw_velocity[:, i], x=imu['time'], initial=0.)
+
+            self.poses_data = {'time': imu['time'],
+                               'pose': {'xyz': xyz,
+                                        'quaternions': quat,
+                                        'cov': imu['linear_acceleration_cov']},
+                               'twist': {'dxyz': velocity,
+                                         'dquaternions': imu['angular_velocity'],
+                                         'cov': imu['angular_velocity_cov']}}
+
+            # fig = plt.figure(figsize=[2 * 6.4, 4.8])
+            # # fig.suptitle(self.flight_name[:-1].replace("/", "_"), fontsize=14)
+            # plt.subplot(121)
+            # xx = self.poses_data['time'] - np.min(self.poses_data['time'])
+            # plt.plot(xx, self.poses_data['pose']['xyz'][:, 0], label='x', color='tab:blue')
+            # plt.plot(xx, raw_xyz[:, 0], label='x_raw', linestyle='dashed', color='tab:blue')
+            # plt.plot(xx, self.poses_data['pose']['xyz'][:, 1], label='y', color='tab:orange')
+            # plt.plot(xx, raw_xyz[:, 1], label='y_raw', linestyle='dashed', color='tab:orange')
+            # plt.xlabel('Time (s)')
+            # plt.ylabel('Position (m)')
+            # plt.legend(loc=1, framealpha=0.5)
+            # plt.subplot(122)
+            # plt.plot(xx, self.poses_data['pose']['xyz'][:, 2], label='z', color='tab:blue')
+            # plt.plot(xx, raw_xyz[:, 2], label='z_raw', linestyle='dashed', color='tab:blue')
+            # plt.xlabel('Time (s)')
+            # plt.ylabel('Position (m)')
+            # plt.legend(loc=1, framealpha=0.5)
+            # fig.tight_layout()
+            # name = (ABSOLUTE_PATH[:-11] +
+            #         f'plots/mavros_imu_denoising_comparison/{self.flight_name[:-1].replace("/", "_")}.png')
+            # fig.savefig(name, dpi=fig.dpi)
+            # plt.show()
+
+        assert hasattr(self, 'camera_info_left')
+        assert hasattr(self, 'camera_info_right')
+        assert hasattr(self, 'left_frames')
+        assert hasattr(self, 'left_frames_time')
+        assert hasattr(self, 'right_frames')
+        assert hasattr(self, 'right_frames_time')
+        assert hasattr(self, 'poses_data')
 
         self.frames_height = self.left_frames.shape[1]
         self.frames_width = self.left_frames.shape[2]
@@ -236,9 +373,9 @@ class DataPreparation(object):
         self.toc = time.time()
 
         # Time normalization
-        assert np.min(self.frames_time) < np.min(poses_time)
+        # assert np.min(self.frames_time) < np.min(poses_time)
 
-        t0 = np.min(self.left_frames_time)
+        t0 = min(np.min(self.frames_time), np.min(poses_time))
         self.frames_time = self.frames_time - t0
         poses_time = poses_time - t0
 
@@ -254,8 +391,10 @@ class DataPreparation(object):
         new_left_frames = []
         new_right_frames = []
         new_cov = []
+
         frames_ids = []
         poses_ids = []
+
         for i, p_time in enumerate(poses_time):
             mini_ind = 0
             mini = abs(self.frames_time[0] - p_time)
@@ -365,17 +504,17 @@ class ErrorEstimation(object):
         self.frames_height = self.left_frames.shape[1]
         self.frames_width = self.left_frames.shape[2]
 
-        self.tf_enu_flu = Transform().from_pos(self.xyz[0], self.quaternions[0])
+        self.flu0_tf_enu = Transform().from_pose(self.xyz[0], self.quaternions[0])
 
         # Vincent input (0.105, 0, 0, -1.57, 0.0, -2.0943) (convention x, y, z, roll, pitch, yaw)
         quat = Rotation.from_euler('xyz', np.array([-120, 0, -90]), degrees=True).as_quat()
-        self.tf_drone_camera = Transform().from_pos(np.array([0.105, 0, 0]), quat)
+        self.camera_tf_drone = Transform().from_pose(np.array([0.105, 0, 0]), quat)
 
-        tf_flu_enu = self.tf_enu_flu.get_inv()
+        enu_tf_flu0 = self.flu0_tf_enu.get_inv()
         for i, (pos, quat) in enumerate(zip(self.xyz, self.quaternions)):
-            tf_enu_drone = Transform().from_pos(pos, quat)
-            tf_flu_drone = tf_flu_enu @ tf_enu_drone
-            self.xyz[i], self.quaternions[i] = tf_flu_drone.get_pose()
+            drone_tf_enu = Transform().from_pose(pos, quat)
+            drone_tf_flu0 = drone_tf_enu @ enu_tf_flu0
+            self.xyz[i], self.quaternions[i] = drone_tf_flu0.get_pose()
 
         self.tac = time.time()
         print(f'Primary import done | '
@@ -386,20 +525,20 @@ class ErrorEstimation(object):
     def get_camera_angle_to_horizontal_plane(self, iteration):
         z_camera_in_camera = np.array([0, 0, 1])  # Vector only rotation are important and NOT translations
 
-        tf_camera_drone = self.tf_drone_camera.get_inv()
-        rot_camera_drone = tf_camera_drone.get_rot()
-        z_camera_in_drone = rot_camera_drone @ z_camera_in_camera
+        drone_tf_camera = self.camera_tf_drone.get_inv()
+        drone_rot_camera = drone_tf_camera.get_rot()
+        z_camera_in_drone = drone_rot_camera @ z_camera_in_camera
 
-        tf_flu_drone = Transform().from_pos(self.xyz[iteration], self.quaternions[iteration])
-        tf_drone_flu = tf_flu_drone.get_inv()
-        rot_drone_flu = tf_drone_flu.get_rot()
-        z_camera_in_flu = (rot_drone_flu @ z_camera_in_drone)[:3]
+        drone_tf_flu0 = Transform().from_pose(self.xyz[iteration], self.quaternions[iteration])
+        flu0_tf_drone = drone_tf_flu0.get_inv()
+        flu0_rot_drone = flu0_tf_drone.get_rot()
+        z_camera_in_flu0 = flu0_rot_drone @ z_camera_in_drone
 
-        res = np.arcsin(np.abs(z_camera_in_flu[2]) / np.linalg.norm(z_camera_in_flu))
+        res = np.arcsin(np.abs(z_camera_in_flu0[2]) / np.linalg.norm(z_camera_in_flu0))
         return res
 
     def image23d(self, idx, image_point):
-        # self.xyz and self.quaternions are from FLU to Drone
+        # self.xyz and self.quaternions are from FLU0 to Drone
 
         p_left = self.camera_info_left['P']
         fx = p_left[0, 0]
@@ -447,7 +586,7 @@ class ErrorEstimation(object):
         return u / w, v / w
 
     def p3_generator(self):
-        r0 = {'xyz': self.xyz[0], 'quat': self.quaternions[0]}  # in Reference Frame flu to drone
+        r0 = {'xyz': self.xyz[0], 'quat': self.quaternions[0]}  # in Reference Frame flu0 to drone
         r1 = r0
         cx, cy = self.camera_info_left['P'][0, 2], self.camera_info_left['P'][1, 2]
         p = (cx, cy + cy / 2)
@@ -455,10 +594,10 @@ class ErrorEstimation(object):
         p3_list = []
         for i in range(len(self.time)):
             ri = {'xyz': self.xyz[i], 'quat': self.quaternions[i]}
-            tf_flu_r1cam = Transform().from_pos(r1['xyz'], r1['quat']) @ self.tf_drone_camera
-            tf_flu_ricam = Transform().from_pos(ri['xyz'], ri['quat']) @ self.tf_drone_camera
-            tf_r1cam_ricam = tf_flu_r1cam.get_inv() @ tf_flu_ricam
-            p2 = tf_r1cam_ricam @ p1
+            r1cam_tf_flu0 = self.camera_tf_drone @ Transform().from_pose(r1['xyz'], r1['quat'])
+            ricam_tf_flu0 = self.camera_tf_drone @ Transform().from_pose(ri['xyz'], ri['quat'])
+            ricam_tf_r1cam = ricam_tf_flu0 @ r1cam_tf_flu0.get_inv()
+            p2 = ricam_tf_r1cam @ p1
             p3 = self._space2image(p2)
             if self._is_out_of_image(p3):
                 r1 = {'xyz': self.xyz[i], 'quat': self.quaternions[i]}
@@ -490,7 +629,7 @@ class ErrorEstimation(object):
             plt.imshow(color_frame)
             angles = Rotation.from_quat(self.quaternions[i]).as_euler('xyz', degrees=True)
             plt.scatter(p[0], p[1], color='r')
-            legend = (f'Drone pose - FLU\n'
+            legend = (f'Drone pose - FLU0\n'
                       f'      x : {self.xyz[i][0]:8.3f}m\n'
                       f'      y : {self.xyz[i][1]:8.3f}m\n'
                       f'      z : {self.xyz[i][2]:8.3f}m\n'
@@ -514,22 +653,21 @@ class ErrorEstimation(object):
 
 if __name__ == '__main__':
     def main():
-        # pose_source possibilities : ['tubex_estimator, imu']
-        e = DataPreparation(flight_number=0, pose_source='imu')
+        # pose_source possibilities : ['tubex_estimator, 'board_imu', 'mavros_imu']
+        e = DataPreparation(flight_number=1, pose_source='mavros_imu')
         e.fusion()
-        # for flight_number in range(0, 12):
-        #     if flight_number == 1:
-        #         continue
-        #     print(flight_number)
-        #     e = DataPreparation(flight_number=flight_number)
-        #     e.fusion()
+        f = ErrorEstimation(flight_number=1)
+        f.p3_generator()
+        f.p32video()
 
         # for flight_number in range(0, 12):
+        #     print(flight_number)
         #     if flight_number == 1:
         #         continue
+        #     e = DataPreparation(flight_number=flight_number, pose_source='mavros_imu')
+        #     e.fusion()
         #     f = ErrorEstimation(flight_number=flight_number)
         #     f.p3_generator()
         #     f.p32video()
-
 
     main()
