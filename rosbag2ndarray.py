@@ -8,6 +8,7 @@ import sys
 import pickle
 from util2 import Progress, ABSOLUTE_PATH, FRAME_HEIGHT, FRAME_WIDTH
 from scipy.spatial.transform import Rotation
+from typing import List
 
 major, _, _, _, _ = sys.version_info
 assert major == 2
@@ -17,18 +18,12 @@ assert major == 2
 
 
 class Extractor(object):
-    def __init__(self):
+    def __init__(self, bag_files_path: List[str]):
         # Frame size for the Tara camera
         self.tara_frame_width = FRAME_WIDTH
         self.tara_frame_height = FRAME_HEIGHT
 
-        bags_n_flights = []
-        for day in sorted(next(os.walk(ABSOLUTE_PATH))[1]):
-            temp_path = ABSOLUTE_PATH + day + '/'
-            for flight_name in sorted(next(os.walk(temp_path))[1]):
-                flight_path = temp_path + flight_name + '/'
-                for bag in sorted(glob.glob(flight_path + '*.bag')):
-                    bags_n_flights.append((bag, flight_path))
+
         self.bags_n_flights = bags_n_flights
 
     def _print_topics_types(self, bags_paths, nb_msg=1):
@@ -456,6 +451,16 @@ class Extractor(object):
 
 if __name__ == '__main__':
     def main():
+        bag_files_path = ''
+
+        bags_n_flights = []
+        for day in sorted(next(os.walk(ABSOLUTE_PATH))[1]):
+            temp_path = ABSOLUTE_PATH + day + '/'
+            for flight_name in sorted(next(os.walk(temp_path))[1]):
+                flight_path = temp_path + flight_name + '/'
+                for bag in sorted(glob.glob(flight_path + '*.bag')):
+                    bags_n_flights.append((bag, flight_path))
+
         e = Extractor()
         e.mavros_extract(get_topics_types=False, topic='mavros/imu/data')
 

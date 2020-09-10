@@ -1,17 +1,32 @@
 from __future__ import print_function
 import sys
 import numpy as np
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, List
 from scipy.spatial.transform import Rotation
+
+import os
+import re
+import pathlib
+
+ABSOLUTE_PATH = '/Users/quentin/phd/turbulence/'
 
 
 class Progress(object):
-    def __init__(self, max_iter, end_print=''):
+    def __init__(self, max_iter: int, end_print: str = ''):
+        """
+        Initialise a progression printing object.
+        :param max_iter: The maximum number of iteration.
+        :param end_print: Print this string when the current iteration = max_iter.
+        """
         self.max_iter = max_iter
         self.end_print = end_print
         self.iter = 0
 
-    def update_pgr(self, iteration=None):
+    def update_pgr(self, iteration: int = None):
+        """
+        Update print of the progression percentage.
+        :param iteration: If the progress went more than 1 it is possible to specify the actual iteration number.
+        """
         if iteration is not None:
             self.iter = iteration
         # Progression
@@ -137,8 +152,134 @@ class Transform(object):
 
     def from_euler(self, trans: np.ndarray, seq: str,
                    angles: np.ndarray, degrees: Optional[bool] = False) -> 'Transform':
+        """
+        Return a Transform object from a translation, an angle convention, and 3 Euler angles.
+        :param trans: The translation of the Transform, must be of length 3
+        :param seq: Angle convention of the Euler angles, can be 'xyz' or any other order
+        :param angles: An array of the 3 Euler angles in the order of the convention
+        :param degrees: True if the unit of the Euler angles is degree or False for radian
+        :return:
+        """
         assert angles.shape == (3,)
         return self.from_pose(trans=trans, quat=Rotation.from_euler(seq=seq, angles=angles, degrees=degrees).as_quat())
+
+    def from_rot_matrix_n_trans_vect(self, trans: np.ndarray, rot: np.ndarray) -> 'Transform':
+        """
+        A reference frame.
+
+        B reference frame.
+
+        :param trans: A_D_B = translation from A origin to B origin described in A.
+
+        :param rot: A_R_B = numpy 3x3 rotation matrix, orientation of B relative to A.
+
+        P_A point described in A.
+
+        :return: B_T_A = tf = Transform object such as
+        P_B = Transform().from_rot_matrix_n_trans_vect(trans, quat) @ P_A.
+
+        Note: only work for 3D points, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
+
+        C reference frame.
+
+        D reference frame.
+
+        C_T_D = C_T_A @ A_T_B @ B_T_D.
+        Return the Transform object from a rotation matrix and a translation vector.
+        """
+        quat = Rotation.from_matrix(rot).as_quat()
+        self.from_pose(trans, quat)
+        return self
+
+
+class DataFolder(object):
+    """
+    Manages the data organisation.
+    """
+    def __init__(self, data_folder_name: str):
+        """
+        .folders attribute is a dict with folders[purpose_folder_names][data_folder_number]
+        purpose_folder_names: str. It is defined below.
+        :param data_folder_name the name of the data folder to use.
+        """
+        self.workspace_path = ABSOLUTE_PATH
+        self.data_path = ABSOLUTE_PATH + data_folder_name + '/'
+
+        # Add "purpose" folders
+        purpose_folder_names = ['raw', 'intermediate', 'results', 'plots']
+        self.folders = {e: self.data_path + e + '/' for e in purpose_folder_names}
+
+        # Add all of data folder in each purpose folders
+        raw_folder_to_imitate = purpose_folder_names[0]  # 'raw'
+        dirs = sorted(next(os.walk(self.data_path + raw_folder_to_imitate + '/'))[1])
+        for folder in purpose_folder_names:
+            self.folders[folder] = {i: self.folders[folder] + e + '/' for i, e in enumerate(dirs)}
+            self.folders[folder][''] = self.data_path + folder + '/'  # Add racine into dict
+
+        # Create all the folders
+        self.create_folder(self.folders)
+
+        # List all the folders to sort
+        folders_to_sort = sorted([e[0] for e in os.walk(self.data_path)])
+
+        # Sort by extension
+        pattern = '(?=\\.)(.*)'
+        raw_sorting_dict = {}
+        for fold in folders_to_sort:
+            for e in sorted(os.listdir(fold)):
+                a = re.search(pattern, e)
+                if a is None:
+                    continue
+                else:
+                    a = a.group(0)
+                if a not in raw_sorting_dict:
+                    raw_sorting_dict[a] = []
+                raw_sorting_dict[a].append(fold + '/' + e)
+
+        # Sort path
+        for key in raw_sorting_dict:
+            raw_sorting_dict[key] = sorted(raw_sorting_dict[key])
+        self.raw_sorting_dict = raw_sorting_dict
+
+    def create_folder(self, d: Union[list, dict]):
+        """
+        Creates folders given a list or dict of paths.
+        Can be a N nested dict/list of dict/list of paths.
+        :param d: The N nested dict/list of dict/list of paths.
+        """
+        tmp = d
+
+        def f(x):
+            return pathlib.Path(x).mkdir(parents=True, exist_ok=True)
+
+        if isinstance(d, dict):
+            tmp = d.values()
+        for v in tmp:
+            if isinstance(v, (dict, list)):
+                self.create_folder(v)
+            else:
+                f(v)
+
+    def get_data_by_extension(self, extension: str, specific_folder: Union[str, List[str]] = None) -> List[str]:
+        """
+        :param extension: The name of the extension.
+        :param specific_folder:
+        :return: List of paths of all raw data files that are named with this extension.
+        """
+        assert extension in self.raw_sorting_dict
+        if specific_folder is None:
+            return self.raw_sorting_dict[extension]
+        else:
+            to_keep = []
+            if type(specific_folder) is str:
+                specific_folder = [specific_folder]
+            nominee = self.raw_sorting_dict[extension].copy()
+            for fold in specific_folder:
+                for e in nominee:
+                    e_folder = '/'.join(e.split('/')[:-1]) + '/'
+                    if e_folder == fold:
+                        to_keep.append(e)
+            return to_keep
 
 
 def is_list_array_unique(list_arrays):

@@ -1,8 +1,7 @@
 from __future__ import print_function
 import sys
 
-# ABSOLUTE_PATH = '/Users/quentin/work/turbulence/data_drone/'
-ABSOLUTE_PATH = '/Users/quentin/work/turbulence/data_drone2/'
+# ABSOLUTE_PATH = '/Users/quentin/phd/turbulence/'
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 
