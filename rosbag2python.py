@@ -6,30 +6,72 @@ import re
 import numpy as np
 import sys
 import pickle
-from util2 import Progress, ABSOLUTE_PATH, FRAME_HEIGHT, FRAME_WIDTH
 from scipy.spatial.transform import Rotation
-from typing import List
 
 major, _, _, _, _ = sys.version_info
 assert major == 2
 
 
 # This code must be executed with python 2.7 because of the rosbag package.
+def main():
+    # Data to extract parameters
+    abs_path = '/Users/quentin/phd/turbulence/'
+    data_folder = 'data_drone2'
+    flight_number = 0
+    pattern = '.*(/tara.*)'
+
+    flights = []
+    if data_folder == 'data_drone':
+        flights = ['20200214_vol_1_Exterieur_MaintientPositionPX4',
+                   '20200214_vol_2_Exterieur_MaintientPositionPX4',
+                   '20200218_vol_1_Exterieur',
+                   '20200218_vol_2_Exterieur',
+                   '20200218_vol_3_Exterieur',
+                   '20200218_vol_4_Exterieur',
+                   '20200218_vol_5_Exterieur',
+                   '20200218_vol_6_Exterieur',
+                   '20200219_vol_1_Exterieur',
+                   '20200219_vol_2_Exterieur',
+                   '20200219_vol_3_Exterieur',
+                   '20200220_vol_1_Exterieur']
+    elif data_folder == 'data_drone2':
+        flights = ['vol_1', 'vol_2', 'vol_3', 'vol_4_poubelle', 'vol_5_poubelle']
+
+    # Locate the file to be extracted
+    flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
+    bags = []
+    for bag in sorted(glob.glob(flight_path + '*.bag')):
+        bags.append(bag)
+    file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
+    assert len(file_to_extract) == 1
+    file_to_extract = file_to_extract[0]
+
+    # Create saving path
+    filename = file_to_extract.split('/')[-1].split('.')[0]
+    saving_path = abs_path + data_folder + '/intermediate/' + flights[flight_number] + '/' + filename + '.pkl'
+
+    # Extract data
+    e = Extractor(file_to_extract)
+    data_extracted = e.extract()
+
+    # Saving file
+    print('Saving at : {}'.format(saving_path))
+    pickle.dump(data_extracted, open(saving_path, 'wb'))
 
 
 class Extractor(object):
-    def __init__(self, bag_files_path: List[str]):
-        # Frame size for the Tara camera
-        self.tara_frame_width = FRAME_WIDTH
-        self.tara_frame_height = FRAME_HEIGHT
-
-
-        self.bags_n_flights = bags_n_flights
+    def __init__(self, file_to_extract):
+        """
+        From a .bag file, extract all its messages in to a python object.
+        :param file_to_extract:
+        """
+        self.file_to_extract = file_to_extract
 
     def _print_topics_types(self, bags_paths, nb_msg=1):
         """
         Print topics and info of bags located in the bags_paths variable.
         :param bags_paths: List of string containing the paths of bags to be analyzed.
+        :param nb_msg: The number of messages to print. Useful to not spam the python console.
         """
 
         # For each bags and topics print info
@@ -200,6 +242,7 @@ class Extractor(object):
                             tf[:3, :3] = r
                             tf[:3, 3] = t
                             unique_tfs[name] = tf
+                    p.update_pgr()
                 bag.close()
 
                 with np.printoptions(precision=3, suppress=True):
@@ -340,6 +383,7 @@ class Extractor(object):
                                                  msg_raw.linear_acceleration.z]
                     linear_acceleration_cov[i, :, :] = np.array(msg_raw.linear_acceleration_covariance).reshape(
                         (3, 3))
+                p.update_pgr()
 
                 data = {'time': time,
                         'orientation': orientation,
@@ -382,7 +426,7 @@ class Extractor(object):
                 bag = rosbag.Bag(bag_file_path)
                 msg_n = bag.get_message_count(topic)
                 p = Progress(max_iter=msg_n, end_print='\n')
-                if topic=='mavros/imu/data':
+                if topic == 'mavros/imu/data':
                     time = np.zeros(msg_n)
                     orientation = np.zeros((msg_n, 4))  # quaternions
                     orientation_cov = np.zeros((msg_n, 3, 3))
@@ -448,20 +492,80 @@ class Extractor(object):
         for topic, freq in topic_freq.items():
             print('Topic : {} | Frequency : {:0.03f}'.format(topic, freq))
 
+    def extract(self):
+        """
+        Returns a dict of all the data from a rosbag object
+        :return: Dict[topic] = list[messages]
+        """
+        bag = rosbag.Bag(self.file_to_extract)
+        print('Extracting {}'.format(self.file_to_extract))
+        print('List of topic to be extracted :')
+        for topic, (msg_type, message_count, connections, frequency) in bag.get_type_and_topic_info()[1].items():
+            print('    - {} | Message count : {}'.format(topic, message_count))
+        print()
+
+        extracted_data = {}
+        for topic, (msg_type, message_count, connections, frequency) in bag.get_type_and_topic_info()[1].items():
+            print('Extracting : {}'.format(topic))
+            extracted_data[topic] = []
+            p = Progress(max_iter=message_count, end_print='\n')  # Progress print
+            for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
+                extracted_data[topic].append(msg_raw)
+                p.update_pgr()  # # Progress print
+        bag.close()
+        return extracted_data
+
+
+def object_analysis(obj):
+    """
+    Returns all attributes and methods of an object and classify them by
+    (variable, method, public, private, protected).
+    :param obj: object. The object to by analysed.
+    :return: Dict[str, Dict[str, List]]
+        Returns a dict of 2 dicts :
+        -'variable'= dict
+        -'method'= dict
+        and for each of those dicts 3 lists:
+        public, private, or protected.
+    """
+    res = {'variable': {'public': [], 'private': [], 'protected': []},
+           'method': {'public': [], 'private': [], 'protected': []}}
+    var_n_methods = sorted(dir(obj))
+    for e in var_n_methods:
+        try:
+            if callable(getattr(obj, e)):
+                attribute_or_method = 'method'
+            else:
+                attribute_or_method = 'variable'
+            if len(e) > 1:
+                if e[0] + e[1] == '__':
+                    res[attribute_or_method]['private'].append(e)
+                    continue
+            if e[0] == '_':
+                res[attribute_or_method]['protected'].append(e)
+            else:
+                res[attribute_or_method]['public'].append(e)
+        except AttributeError:
+            print('Attribute : {} of object {} is listed by dir() but cannot be accessed.'.format(e, type(obj)))
+    return res
+
+
+class Progress(object):
+    def __init__(self, max_iter, end_print=''):
+        self.max_iter = max_iter
+        self.end_print = end_print
+        self.iter = 0
+
+    def update_pgr(self, iteration=None):
+        if iteration is not None:
+            self.iter = iteration
+        # Progression
+        print('\rProgression : {:0.02f}%'.format((self.iter + 1) * 100 / self.max_iter), end='')
+        sys.stdout.flush()
+        if self.iter + 1 == self.max_iter:
+            print(self.end_print)
+        self.iter += 1
+
 
 if __name__ == '__main__':
-    def main():
-        bag_files_path = ''
-
-        bags_n_flights = []
-        for day in sorted(next(os.walk(ABSOLUTE_PATH))[1]):
-            temp_path = ABSOLUTE_PATH + day + '/'
-            for flight_name in sorted(next(os.walk(temp_path))[1]):
-                flight_path = temp_path + flight_name + '/'
-                for bag in sorted(glob.glob(flight_path + '*.bag')):
-                    bags_n_flights.append((bag, flight_path))
-
-        e = Extractor()
-        e.mavros_extract(get_topics_types=False, topic='mavros/imu/data')
-
     main()

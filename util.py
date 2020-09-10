@@ -206,7 +206,7 @@ class DataFolder(object):
         self.data_path = ABSOLUTE_PATH + data_folder_name + '/'
 
         # Add "purpose" folders
-        purpose_folder_names = ['raw', 'intermediate', 'results', 'plots']
+        purpose_folder_names = ['raw', 'intermediate', 'results' ,'plots']
         self.folders = {e: self.data_path + e + '/' for e in purpose_folder_names}
 
         # Add all of data folder in each purpose folders
@@ -281,6 +281,38 @@ class DataFolder(object):
                         to_keep.append(e)
             return to_keep
 
+def object_analysis(obj):
+    """
+    Returns all attributes and methods of an object and classify them by
+    (variable, method, public, private, protected).
+    :param obj: object. The object to by analysed.
+    :return: Dict[str, Dict[str, List]]
+        Returns a dict of 2 dicts :
+        -'variable'= dict
+        -'method'= dict
+        and for each of those dicts 3 lists:
+        public, private, or protected.
+    """
+    res = {'variable': {'public': [], 'private': [], 'protected': []},
+           'method': {'public': [], 'private': [], 'protected': []}}
+    var_n_methods = sorted(dir(obj))
+    for e in var_n_methods:
+        try:
+            if callable(getattr(obj, e)):
+                attribute_or_method = 'method'
+            else:
+                attribute_or_method = 'variable'
+            if len(e) > 1:
+                if e[0] + e[1] == '__':
+                    res[attribute_or_method]['private'].append(e)
+                    continue
+            if e[0] == '_':
+                res[attribute_or_method]['protected'].append(e)
+            else:
+                res[attribute_or_method]['public'].append(e)
+        except AttributeError:
+            print('Attribute : {} of object {} is listed by dir() but cannot be accessed.'.format(e, type(obj)))
+    return res
 
 def is_list_array_unique(list_arrays):
     """
