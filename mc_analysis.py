@@ -17,7 +17,7 @@ def main():
     f = DataFolder(data_folder_name='data_drone2')
 
     for vol_number in [3, 4]:
-        csv_paths = f.get_data_by_extension(extension='.csv', specific_folder=f.folders['raw'][vol_number])
+        csv_paths = f.get_unique_file(extension='.csv', specific_folder=f.folders['raw'][vol_number])
         assert len(csv_paths) == 1
         csv_paths = csv_paths[0]
 

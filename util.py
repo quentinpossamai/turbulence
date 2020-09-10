@@ -1,12 +1,13 @@
 from __future__ import print_function
-import sys
-import numpy as np
-from typing import Union, Tuple, Optional, List
-from scipy.spatial.transform import Rotation
 
+import numpy as np
+from scipy.spatial.transform import Rotation
+from typing import Union, Tuple, Optional, List
+import sys
 import os
 import re
 import pathlib
+import time
 
 ABSOLUTE_PATH = '/Users/quentin/phd/turbulence/'
 
@@ -21,6 +22,7 @@ class Progress(object):
         self.max_iter = max_iter
         self.end_print = end_print
         self.iter = 0
+        self.initial_time = time.time()
 
     def update_pgr(self, iteration: int = None):
         """
@@ -30,7 +32,8 @@ class Progress(object):
         if iteration is not None:
             self.iter = iteration
         # Progression
-        print('\rProgression : {:0.02f}%'.format((self.iter + 1) * 100 / self.max_iter), end='')
+        print(f'\rProgression : {(self.iter + 1) * 100 / self.max_iter:0.02f}% | '
+              f'Time passed : {time.time() - self.initial_time:.03f}s', end='')
         sys.stdout.flush()
         if self.iter + 1 == self.max_iter:
             print(self.end_print)
@@ -196,6 +199,7 @@ class DataFolder(object):
     """
     Manages the data organisation.
     """
+
     def __init__(self, data_folder_name: str):
         """
         .folders attribute is a dict with folders[purpose_folder_names][data_folder_number]
@@ -205,8 +209,8 @@ class DataFolder(object):
         self.workspace_path = ABSOLUTE_PATH
         self.data_path = ABSOLUTE_PATH + data_folder_name + '/'
 
-        # Add "purpose" folders
-        purpose_folder_names = ['raw', 'intermediate', 'results' ,'plots']
+        # Add "purpose" folders, first purpose folder will be the reference to construct the others.
+        purpose_folder_names = ['raw', 'raw_python', 'clean', 'results', 'plots']
         self.folders = {e: self.data_path + e + '/' for e in purpose_folder_names}
 
         # Add all of data folder in each purpose folders
@@ -260,10 +264,12 @@ class DataFolder(object):
             else:
                 f(v)
 
-    def get_data_by_extension(self, extension: str, specific_folder: Union[str, List[str]] = None) -> List[str]:
+    def get_files_paths(self, extension: str, specific_folder: Union[str, List[str]] = None,
+                        filename_begin_with: str = None) -> List[str]:
         """
         :param extension: The name of the extension.
-        :param specific_folder:
+        :param specific_folder: Path or list of paths to match the file's folder's path.
+        :param filename_begin_with: Beginning of the filename.
         :return: List of paths of all raw data files that are named with this extension.
         """
         assert extension in self.raw_sorting_dict
@@ -275,11 +281,57 @@ class DataFolder(object):
                 specific_folder = [specific_folder]
             nominee = self.raw_sorting_dict[extension].copy()
             for fold in specific_folder:
-                for e in nominee:
-                    e_folder = '/'.join(e.split('/')[:-1]) + '/'
-                    if e_folder == fold:
-                        to_keep.append(e)
+                for file_path in nominee:
+                    file_folder = '/'.join(file_path.split('/')[:-1]) + '/'
+                    if file_folder == fold:
+                        to_keep.append(file_path)
+            to_look = to_keep.copy()
+            for file_path in to_look:
+                filename = file_path.split('/')[-1]
+                res = re.search(filename_begin_with, filename)
+                if res is None:
+                    to_keep.remove(file_path)
+            if not to_keep:
+                print('Nothing found.')
             return to_keep
+
+    def get_unique_file(self, extension: str, specific_folder: Union[str, List[str]] = None,
+                        filename_begin_with: str = None) -> List[str]:
+        """
+        :param extension: The name of the extension.
+        :param specific_folder: Path or list of paths to match the file's folder's path.
+        :param filename_begin_with: Beginning of the filename.
+        :return: List of paths of all raw data files that are named with this extension.
+        """
+        assert extension in self.raw_sorting_dict
+        if specific_folder is None:
+            return self.raw_sorting_dict[extension]
+        else:
+            to_keep = []
+            if type(specific_folder) is str:
+                specific_folder = [specific_folder]
+            nominee = self.raw_sorting_dict[extension].copy()
+            for fold in specific_folder:
+                for file_path in nominee:
+                    file_folder = '/'.join(file_path.split('/')[:-1]) + '/'
+                    if file_folder == fold:
+                        to_keep.append(file_path)
+            to_look = to_keep.copy()
+            for file_path in to_look:
+                filename = file_path.split('/')[-1]
+                res = re.search(filename_begin_with, filename)
+                if res is None:
+                    to_keep.remove(file_path)
+            if not to_keep:
+                print('Nothing found.')
+                raise FileNotFoundError
+            elif len(to_keep) > 1:
+                print('Too much files founded :')
+                print(to_keep)
+            else:
+                return to_keep[0]
+
+
 
 def object_analysis(obj):
     """
@@ -313,6 +365,7 @@ def object_analysis(obj):
         except AttributeError:
             print('Attribute : {} of object {} is listed by dir() but cannot be accessed.'.format(e, type(obj)))
     return res
+
 
 def is_list_array_unique(list_arrays):
     """

@@ -6,6 +6,7 @@ import re
 import numpy as np
 import sys
 import pickle
+import time
 from scipy.spatial.transform import Rotation
 
 major, _, _, _, _ = sys.version_info
@@ -495,7 +496,7 @@ class Extractor(object):
     def extract(self):
         """
         Returns a dict of all the data from a rosbag object
-        :return: Dict[topic] = list[messages]
+        :return: Dict[topic][message_number] = dict of message data depending of its type.
         """
         bag = rosbag.Bag(self.file_to_extract)
         print('Extracting {}'.format(self.file_to_extract))
@@ -506,14 +507,58 @@ class Extractor(object):
 
         extracted_data = {}
         for topic, (msg_type, message_count, connections, frequency) in bag.get_type_and_topic_info()[1].items():
+            # Initialization
             print('Extracting : {}'.format(topic))
-            extracted_data[topic] = []
+            extracted_data[topic] = {}
             p = Progress(max_iter=message_count, end_print='\n')  # Progress print
+
+            # Choosing correct processing function according to data type
+            processing_func = None
+            if msg_type == 'sensor_msgs/Image':
+                processing_func = _process_sensor_msgs_image
+            elif msg_type == 'sensor_msgs/CameraInfo':
+                processing_func = _process_sensor_msgs_camera_info
+            assert processing_func is not None, 'Message type not not known.'
+
+            # Processing
             for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
-                extracted_data[topic].append(msg_raw)
+                extracted_data[topic][i] = processing_func(msg_raw)
+                extracted_data[topic][i]['t'] = t.to_sec()
+
                 p.update_pgr()  # # Progress print
         bag.close()
         return extracted_data
+
+
+def _process_sensor_msgs_image(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'sensor_msgs/Image'
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    # Getting image
+    msg_clear = repr(msg)
+    pixel_values = re.search('data: .(.*).', msg_clear).group(1)
+    data = np.fromstring(pixel_values, dtype=np.uint8, sep=', ')
+
+    # Size of the data
+    img = data.reshape((msg.height, msg.width))
+    return {'image': img}
+
+
+def _process_sensor_msgs_camera_info(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'sensor_msgs/CameraInfo'
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    # Getting matrices
+    return {'D': np.array(msg.D),
+            'K': np.array(msg.K).reshape((3, 3)),
+            'P': np.array(msg.P).reshape((3, 4)),
+            'R': np.array(msg.R).reshape((3, 3))}
 
 
 def object_analysis(obj):
@@ -552,15 +597,17 @@ def object_analysis(obj):
 
 class Progress(object):
     def __init__(self, max_iter, end_print=''):
-        self.max_iter = max_iter
+        self.max_iter = float(max_iter)
         self.end_print = end_print
-        self.iter = 0
+        self.iter = float(0)
+        self.initial_time = time.time()
 
     def update_pgr(self, iteration=None):
         if iteration is not None:
             self.iter = iteration
         # Progression
-        print('\rProgression : {:0.02f}%'.format((self.iter + 1) * 100 / self.max_iter), end='')
+        print('\rProgression : {:0.02f}% | Time passed : {:.03f}s'.format((self.iter + 1) * 100 / self.max_iter,
+                                                                          time.time() - self.initial_time), end='')
         sys.stdout.flush()
         if self.iter + 1 == self.max_iter:
             print(self.end_print)

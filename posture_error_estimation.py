@@ -22,6 +22,7 @@ assert major == 3
 frame_width = 640
 frame_height = 480
 
+
 def aff3d(xyz_array, quat_array, video_path):
     assert len(xyz_array) == len(quat_array)
     print(video_path)
@@ -270,5 +271,6 @@ if __name__ == '__main__':
         #     f = ErrorEstimation(flight_number=flight_number)
         #     f.p3_generator()
         #     f.p32video()
+
 
     main()

@@ -9,14 +9,21 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as integrate
 
-from util import Progress, Transform, angle_arccos
+from util import Transform, DataFolder
+
+
+def main():
+    f = DataFolder('data_drone2')
+    file_path = f.get_unique_file('.pkl', f.folders['raw_python'][0], 'tara')
+
+    data = pickle.load(open(file_path, 'rb'))
+    e = DataPreparation()
+    e.fusion()
 
 
 class DataPreparation(object):
     def __init__(self, flight_number: int, pose_source: str):
         self.tic = time.time()
-
-        # aff3d(np.zeros((1, 3)), np.array([0, 0, 0, 1]).reshape((1, 4)))
 
         self.flight_number = flight_number
         # Import data
@@ -377,9 +384,9 @@ class DataPreparation(object):
                       'camera_info_right': self.camera_info_right,
                       'camera_info_left': self.camera_info_left}
 
-        path = ABSOLUTE_PATH + self.flight_name + 'clean_data/'
-        Path(path).mkdir(parents=True, exist_ok=True)
-        pickle.dump(clean_data, open(path + 'data.pkl', 'wb'))
+        # path = ABSOLUTE_PATH + self.flight_name + 'clean_data/'
+        # Path(path).mkdir(parents=True, exist_ok=True)
+        # pickle.dump(clean_data, open(path + 'data.pkl', 'wb'))
         print()
 
         # poses_time = self.poses_data['time']
@@ -410,3 +417,7 @@ class DataPreparation(object):
         # plt.xlabel('Timestamp')
         # plt.ylabel('Time difference')
         # plt.show()
+
+
+if __name__ == '__main__':
+    main()
