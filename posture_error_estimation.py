@@ -1,11 +1,8 @@
 import glob
 import os
+from typing import Union, Iterable, Tuple, List
 import pickle
-import sys
 import time
-import re
-from pathlib import Path
-
 import cv2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -14,85 +11,54 @@ from cv2 import VideoWriter, VideoWriter_fourcc
 from scipy.spatial.transform import Rotation
 import scipy.integrate as integrate
 
-from util import Progress, Transform, angle_arccos
+from util import Progress, Transform, angle_arccos, DataFolder, \
+    get_file_name, get_folder_path, merge_two_arrays
 
-major, _, _, _, _ = sys.version_info
-assert major == 3
+
+def main():
+    f = DataFolder('data_drone2')
+    # tara preparation
+    tara_left = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'tara_left')
+    tara_time = []
+    for _, msg in tara_left['tara/left/image_raw'].items():
+        tara_time.append(msg['t'])
+    tara_time = np.array([msg['t'] for key, msg in tara_left['tara/left/image_raw'].items()])
+    tara_time = tara_time - tara_time[0]
+
+    # mc preparation
+    mc_poses = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'mc_poses')
+    mc_measure = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'mc_measure')
+    mc_time = np.array(range(len(mc_measure))) / 120
+
+    fig, axs = plt.subplots(3, 1)
+    x_inf = 0
+    x_sup = (len(mc_time) - 1) / 120
+    _, ind_inf = merge_two_arrays(x_inf, mc_time)
+    _, ind_sup = merge_two_arrays(x_sup, mc_time)
+    mc_time_zoomed = mc_time[ind_inf:ind_sup]
+    axs[0].plot(mc_time_zoomed, mc_measure['clapet_sup_2_x'][ind_inf:ind_sup], label='clapet_sup_2_x')
+    axs[0].plot(mc_time_zoomed, mc_measure['clapet_inf2_x'][ind_inf:ind_sup], label='clapet_inf2_x')
+
+    axs[1].plot(mc_time_zoomed, mc_measure['clapet_sup_2_y'][ind_inf:ind_sup], label='clapet_sup_2_y')
+    axs[1].plot(mc_time_zoomed, mc_measure['clapet_inf2_y'][ind_inf:ind_sup], label='clapet_inf2_y')
+
+    axs[2].plot(mc_time_zoomed, mc_measure['clapet_sup_2_z'][ind_inf:ind_sup], label='clapet_sup_2_z')
+    axs[2].plot(mc_time_zoomed, mc_measure['clapet_inf2_z'][ind_inf:ind_sup], label='clapet_inf2_z')
+    plt.show()
+
+    tara_ids, mc_ids = merge_two_arrays(tara_time, )
+
+    f = ErrorEstimation()
+    f.p3_generator()
+    f.p32video()
+
 
 frame_width = 640
 frame_height = 480
 
 
-def aff3d(xyz_array, quat_array, video_path):
-    assert len(xyz_array) == len(quat_array)
-    print(video_path)
-    x_pos = np.array([1, 0, 0])
-    y_pos = np.array([0, 1, 0])
-    z_pos = np.array([0, 0, 1])
-    # minx, miny, minz = np.min(xyz_array, axis=0) - 1
-    # maxx, maxy, maxz = np.max(xyz_array, axis=0) + 1
-
-    width = 640
-    height = 480
-
-    codec = VideoWriter_fourcc(*'H264')
-    fps = 30
-    video = VideoWriter(video_path, codec, float(fps), (width, height), True)
-    prg = Progress(len(xyz_array))
-
-    for xyz, quat in zip(xyz_array, quat_array):
-        ref_tf_pos = Transform().from_pose(xyz, quat).get_inv()
-
-        x_ref = ref_tf_pos.get_rot() @ x_pos
-        y_ref = ref_tf_pos.get_rot() @ y_pos
-        z_ref = ref_tf_pos.get_rot() @ z_pos
-
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-
-        ax.quiver(xyz[0], xyz[1], xyz[2], x_ref[0], x_ref[1], x_ref[2], length=1, normalize=False, color='r')
-        ax.quiver(xyz[0], xyz[1], xyz[2], y_ref[0], y_ref[1], y_ref[2], length=1, normalize=False, color='g')
-        ax.quiver(xyz[0], xyz[1], xyz[2], z_ref[0], z_ref[1], z_ref[2], length=1, normalize=False, color='b')
-
-        ax.scatter(xs=xyz[0] + 1, ys=xyz[1] + 1, zs=xyz[2] + 1, alpha=0)
-        ax.scatter(xs=xyz[0] - 1, ys=xyz[1] - 1, zs=xyz[2] - 1, alpha=0)
-
-        # ax.scatter(xs=minx, ys=miny, zs=minz, alpha=0)
-        # ax.scatter(xs=maxx, ys=maxy, zs=maxz, alpha=0)
-
-        fig.canvas.draw()
-        data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape((height, width, 3))
-
-        plt.close('all')
-        # plt.show()
-
-        video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
-        prg.update_pgr()
-
-    video.release()
-    cv2.destroyAllWindows()
-    print()
-
-
 class ErrorEstimation(object):
-    def __init__(self, flight_number):
-        self.tic = time.time()
-        self.flight_number = flight_number
-        # Import data
-        flight_files = []
-        i = 0
-        for day in sorted(next(os.walk(ABSOLUTE_PATH))[1]):
-            temp_path = ABSOLUTE_PATH + day + '/'
-            for flight_name in sorted(next(os.walk(temp_path))[1]):
-                flight_path = temp_path + flight_name + '/clean_data/'
-                if i == self.flight_number:
-                    self.flight_name = day + '/' + flight_name + '/'
-                    for filepath in sorted(glob.glob(flight_path + '*.pkl')):
-                        flight_files.append(filepath)
-                    flight_files = sorted(flight_files)
-                i += 1
-
-        self.data = pickle.load(open(flight_files[0], 'rb'))
+    def __init__(self, cameras, poses):
 
         self.time = self.data['time']
         self.xyz = self.data['xyz']
@@ -117,12 +83,6 @@ class ErrorEstimation(object):
             drone_tf_enu = Transform().from_pose(pos, quat)
             drone_tf_flu0 = drone_tf_enu @ enu_tf_flu0
             self.xyz[i], self.quaternions[i] = drone_tf_flu0.get_pose()
-
-        self.tac = time.time()
-        print(f'Primary import done | '
-              f'Time since beginning : {self.tac - self.tic:.03f}s | '
-              f'Time since last step : {self.tac - self.tic:.03f}s')
-        self.toc = time.time()
 
     def get_camera_angle_to_horizontal_plane(self, iteration):
         z_camera_in_camera = np.array([0, 0, 1])  # Vector only rotation are important and NOT translations
@@ -207,15 +167,15 @@ class ErrorEstimation(object):
                 p3 = (40, 40)
             p3_list.append(p3)
         self.data['p3'] = p3_list
-        pickle.dump(self.data, open(ABSOLUTE_PATH + self.flight_name + 'clean_data/data.pkl', 'wb'))
+        # pickle.dump(self.data, open(ABSOLUTE_PATH + self.flight_name + 'clean_data/data.pkl', 'wb'))
 
     def p32video(self):
         fps = 10
         codec = VideoWriter_fourcc(*'H264')
         part1, part2, _ = self.flight_name.split('/')
-        name = ABSOLUTE_PATH + 'error_estimation_videos/' + part1 + '_' + part2 + '_error_estimation.mkv'
-        video = VideoWriter(name, codec, float(fps), (self.frames_width, self.frames_height), True)
-        print(name)
+        # name = ABSOLUTE_PATH + 'error_estimation_videos/' + part1 + '_' + part2 + '_error_estimation.mkv'
+        # video = VideoWriter(name, codec, float(fps), (self.frames_width, self.frames_height), True)
+        # print(name)
 
         frames = self.left_frames
         prg = Progress(len(frames))
@@ -238,39 +198,83 @@ class ErrorEstimation(object):
                       f'Rot x : {angles[0]:8.3f}°\n'
                       f'Rot y : {angles[1]:8.3f}°\n'
                       f'Rot z : {angles[2]:8.3f}°')
-            plt.annotate(legend, (450, 335), xycoords='axes points', size=12, ha='right', va='top',
+            plt.annotate(legend, (450, 335), xycoords='axes points_name', size=12, ha='right', va='top',
                          bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
             ax.axis('off')
             fig.canvas.draw()
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)
             plt.close('all')
 
-            video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
+            # video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
             prg.update_pgr()
 
-        video.release()
+        # video.release()
         cv2.destroyAllWindows()
         # del video
 
 
+def aff3d(xyz_array, quat_array, video_path):
+    assert len(xyz_array) == len(quat_array)
+    print(video_path)
+    x_pos = np.array([1, 0, 0])
+    y_pos = np.array([0, 1, 0])
+    z_pos = np.array([0, 0, 1])
+    # minx, miny, minz = np.min(xyz_array, axis=0) - 1
+    # maxx, maxy, maxz = np.max(xyz_array, axis=0) + 1
+
+    width = 640
+    height = 480
+
+    codec = VideoWriter_fourcc(*'H264')
+    fps = 30
+    video = VideoWriter(video_path, codec, float(fps), (width, height), True)
+    prg = Progress(len(xyz_array))
+
+    for xyz, quat in zip(xyz_array, quat_array):
+        ref_tf_pos = Transform().from_pose(xyz, quat).get_inv()
+
+        x_ref = ref_tf_pos.get_rot() @ x_pos
+        y_ref = ref_tf_pos.get_rot() @ y_pos
+        z_ref = ref_tf_pos.get_rot() @ z_pos
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+
+        ax.quiver(xyz[0], xyz[1], xyz[2], x_ref[0], x_ref[1], x_ref[2], length=1, normalize=False, color='r')
+        ax.quiver(xyz[0], xyz[1], xyz[2], y_ref[0], y_ref[1], y_ref[2], length=1, normalize=False, color='g')
+        ax.quiver(xyz[0], xyz[1], xyz[2], z_ref[0], z_ref[1], z_ref[2], length=1, normalize=False, color='b')
+
+        ax.scatter(xs=xyz[0] + 1, ys=xyz[1] + 1, zs=xyz[2] + 1, alpha=0)
+        ax.scatter(xs=xyz[0] - 1, ys=xyz[1] - 1, zs=xyz[2] - 1, alpha=0)
+
+        # ax.scatter(xs=minx, ys=miny, zs=minz, alpha=0)
+        # ax.scatter(xs=maxx, ys=maxy, zs=maxz, alpha=0)
+
+        fig.canvas.draw()
+        data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape((height, width, 3))
+
+        plt.close('all')
+        # plt.show()
+
+        video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
+        prg.update_pgr()
+
+    video.release()
+    cv2.destroyAllWindows()
+    print()
+
+
+def keep_tara_left():
+    f = DataFolder('data_drone2')
+    tara_file = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'tara__', pickle_was_python2=True)
+    file_location = f.get_unique_file_path('.pkl', f.folders['raw_python'][0], 'tara__')
+
+    tara_left_saving_path = get_folder_path(file_location) + 'tara_left__2020-07-17-15-07-11.pkl'
+    tara_left = tara_file.copy()
+    tara_left.pop('tara/right/image_raw', None)
+    tara_left.pop('tara/right/camera_info', None)
+    pickle.dump(tara_left, open(tara_left_saving_path, 'wb'))
+
+
 if __name__ == '__main__':
-    def main():
-        # pose_source possibilities : ['tubex_estimator, 'board_imu', 'mavros_imu']
-        e = DataPreparation(flight_number=1, pose_source='mavros_imu')
-        e.fusion()
-        f = ErrorEstimation(flight_number=1)
-        f.p3_generator()
-        f.p32video()
-
-        # for flight_number in range(0, 12):
-        #     print(flight_number)
-        #     if flight_number == 1:
-        #         continue
-        #     e = DataPreparation(flight_number=flight_number, pose_source='mavros_imu')
-        #     e.fusion()
-        #     f = ErrorEstimation(flight_number=flight_number)
-        #     f.p3_generator()
-        #     f.p32video()
-
-
     main()

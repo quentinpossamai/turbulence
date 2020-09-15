@@ -14,7 +14,7 @@ from util import Transform, DataFolder
 
 def main():
     f = DataFolder('data_drone2')
-    file_path = f.get_unique_file('.pkl', f.folders['raw_python'][0], 'tara')
+    file_path = f.get_unique_file_path('.pkl', f.folders['raw_python'][0], 'tara')
 
     data = pickle.load(open(file_path, 'rb'))
     e = DataPreparation()

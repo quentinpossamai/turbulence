@@ -9,12 +9,15 @@ import pickle
 import time
 from scipy.spatial.transform import Rotation
 
+# This code must be executed with python 2.7 because of the rosbag package.
 major, _, _, _, _ = sys.version_info
 assert major == 2
 
 
-# This code must be executed with python 2.7 because of the rosbag package.
 def main():
+    """
+    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
+    """
     # Data to extract parameters
     abs_path = '/Users/quentin/phd/turbulence/'
     data_folder = 'data_drone2'
@@ -49,7 +52,7 @@ def main():
 
     # Create saving path
     filename = file_to_extract.split('/')[-1].split('.')[0]
-    saving_path = abs_path + data_folder + '/intermediate/' + flights[flight_number] + '/' + filename + '.pkl'
+    saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
 
     # Extract data
     e = Extractor(file_to_extract)
@@ -102,97 +105,6 @@ class Extractor(object):
                         print()
                     topic_msg_analysed.append(topic)
             bag.close()
-
-    def tara_extract(self, get_topics_types=False, topic='', nb_msg=1):
-        """
-        Extract topic or convert data
-        :param get_topics_types: if get_topics_types=False converts .bag data to .npy format for tara bags.
-        Else print topics and types of topics for all the bag found.
-        :param topic: The topic to extract if get_topics_types=false
-        :param nb_msg: Number of message to display per topic/
-        :return: .npy file for all flights or a print
-
-        Known topics : 'tara/left/image_raw', 'tara/right/image_raw', 'tara/right/camera_info', 'tara/left/camera_info'
-
-        By ros convention, 'tara/right/camera_info' contain the information of the stereo camera which seems to be
-        constant. 'tara/left/camera_info' is empty.
-        """
-        bags = [e for e in self.bags_n_flights if re.search('.*(/tara.*)', e[0]) is not None]
-        # List of tuple (path to tara.bag file, path to tara.bag folder)
-
-        if get_topics_types:
-            self._print_topics_types([e[0] for e in bags], nb_msg)
-        else:
-            assert topic != '', 'Please insert a valid topic (see docstring)'
-            for paths in bags:
-                bag_file_path = paths[0]
-                # bag_folder_path = paths[1]
-                # break
-
-                print(bag_file_path)
-
-                bag = rosbag.Bag(bag_file_path)
-                msg_n = bag.get_message_count(topic)
-                p = Progress(max_iter=msg_n, end_print='\n')
-
-                if topic in ['tara/left/image_raw', 'tara/right/image_raw']:
-                    bag_data = []
-                    time = np.zeros(msg_n)
-                    for i, (topic, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
-                        time[i] = msg_raw.header.stamp.secs + msg_raw.header.stamp.nsecs * 1e-9
-                        # Shaping data as a ndarray
-                        msg_encoded = repr(msg_raw)
-                        match = re.search('data: .(.*).', msg_encoded)
-                        data_string = match.group(1)
-                        data = np.fromstring(data_string, dtype=np.uint8, sep=', ')
-
-                        # Size of the data
-                        img = data.reshape((self.tara_frame_height, self.tara_frame_width))
-                        bag_data.append(img)
-
-                        p.update_pgr()
-                    array = np.stack(bag_data)
-                    path = bag_file_path[:-4]
-
-                    path_without_filename = path[:-25]
-                    end_filename = path[-21:]
-
-                    if topic == 'tara/right/image_raw':
-                        np.save(path_without_filename + 'tara_right_' + end_filename + '.npy', array)
-                        np.save(path_without_filename + 'tara_right_' + 'time' + end_filename + '.npy', time)
-                    if topic == 'tara/left/image_raw':
-                        np.save(path_without_filename + 'tara_left_' + end_filename + '.npy', array)
-                        np.save(path_without_filename + 'tara_left_' + 'time' + end_filename + '.npy', time)
-
-                elif topic in ['tara/right/camera_info', 'tara/left/camera_info']:
-                    camera_info = {}
-                    for i, (topic, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
-                        a = np.array(msg_raw.D)
-                        b = np.array(msg_raw.K)
-                        c = np.array(msg_raw.P)
-                        d = np.array(msg_raw.R)
-
-                        if ((not a.shape == (0,) and not np.sum(np.abs(b)) == 0) and
-                                (not np.sum(np.abs(c)) == 0 and not np.sum(np.abs(d)) == 0)):
-                            camera_info['D'] = np.array(msg_raw.D)
-                            camera_info['K'] = np.array(msg_raw.K).reshape((3, 3))
-                            camera_info['P'] = np.array(msg_raw.P).reshape((3, 4))
-                            camera_info['R'] = np.array(msg_raw.R).reshape((3, 3))
-                            break
-                    path = bag_file_path[:-4]
-                    path_without_filename = path[:-25]
-                    end_filename = path[-21:]
-
-                    assert camera_info != {}
-
-                    if topic == 'tara/right/camera_info':
-                        pickle.dump(camera_info, open(path_without_filename + 'tara_info_right_'
-                                                      + end_filename + '.pkl', 'wb'))
-                    if topic == 'tara/left/camera_info':
-                        pickle.dump(camera_info, open(path_without_filename + 'tara_info_left_'
-                                                      + end_filename + '.pkl', 'wb'))
-
-                bag.close()
 
     def tf_extract(self, get_topics_types=False, topic='', nb_msg=1):
         """
@@ -597,12 +509,21 @@ def object_analysis(obj):
 
 class Progress(object):
     def __init__(self, max_iter, end_print=''):
+        """
+        Easy way to progress print a for loop for example.
+        :param max_iter: Maximum iteration of the loop.
+        :param end_print: String that will be printed at the end of the file.
+        """
         self.max_iter = float(max_iter)
         self.end_print = end_print
         self.iter = float(0)
         self.initial_time = time.time()
 
     def update_pgr(self, iteration=None):
+        """
+        Update the print.
+        :param iteration: The actual iteration if there has been more iteration passed than 1.
+        """
         if iteration is not None:
             self.iter = iteration
         # Progression

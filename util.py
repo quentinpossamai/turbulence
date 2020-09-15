@@ -2,12 +2,13 @@ from __future__ import print_function
 
 import numpy as np
 from scipy.spatial.transform import Rotation
-from typing import Union, Tuple, Optional, List
+from typing import Union, Tuple, Optional, List, Iterable
 import sys
 import os
 import re
 import pathlib
 import time
+import pickle
 
 ABSOLUTE_PATH = '/Users/quentin/phd/turbulence/'
 
@@ -47,8 +48,11 @@ class Transform(object):
     def __matmul__(self, multiple: Union['Transform', np.ndarray]) -> Union['Transform', np.ndarray]:
         if type(multiple) is Transform:
             return Transform().from_matrix(self.matrix @ multiple.get_matrix())
-        else:
-            return self.matrix @ multiple
+        else:  # type(mutiple) np.ndarray
+            if multiple.shape == (4,):
+                return self.matrix @ multiple
+            elif multiple.shape == (3,):
+                return (self.matrix @ np.append(multiple, 1))[:3]
 
     def __repr__(self):
         return self.matrix.__repr__()
@@ -92,7 +96,7 @@ class Transform(object):
 
         :return: trans, quat.
 
-        Note: only work for 3D points, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
+        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
 
         C reference frame.
 
@@ -128,7 +132,7 @@ class Transform(object):
         :param quat: quaternions.
         :return: Transform object.
 
-        Note: only work for 3D points, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
+        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
 
         C reference frame.
 
@@ -181,7 +185,7 @@ class Transform(object):
         :return: B_T_A = tf = Transform object such as
         P_B = Transform().from_rot_matrix_n_trans_vect(trans, quat) @ P_A.
 
-        Note: only work for 3D points, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
+        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
 
         C reference frame.
 
@@ -191,6 +195,28 @@ class Transform(object):
         Return the Transform object from a rotation matrix and a translation vector.
         """
         quat = Rotation.from_matrix(rot).as_quat()
+        self.from_pose(trans, quat)
+        return self
+
+    def from_trans_n_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transform':
+        """
+
+        :param x: unit vector of B x-axis expressed in A.
+        :param y: unit vector of B y-axis expressed in A.
+        :param z: unit vector of B z-axis expressed in A.
+        :param trans: A_D_B = translation from A origin to B origin described in A.
+        :return: The corresponding Transform object
+        """
+        assert x.shape == (3,)
+        assert y.shape == (3,)
+        assert z.shape == (3,)
+        assert trans.shape == (3,)
+
+        # Inspired by https://stackoverflow.com/a/34392459/10054528
+        a_r_b = np.hstack([x.reshape((3, 1)),  # r = A_R_B
+                           y.reshape((3, 1)),
+                           z.reshape((3, 1))])
+        quat = Rotation.from_matrix(a_r_b).as_quat()
         self.from_pose(trans, quat)
         return self
 
@@ -264,7 +290,7 @@ class DataFolder(object):
             else:
                 f(v)
 
-    def get_files_paths(self, extension: str, specific_folder: Union[str, List[str]] = None,
+    def get_files_paths(self, extension: str = None, specific_folder: Union[str, List[str]] = None,
                         filename_begin_with: str = None) -> List[str]:
         """
         :param extension: The name of the extension.
@@ -273,64 +299,238 @@ class DataFolder(object):
         :return: List of paths of all raw data files that are named with this extension.
         """
         assert extension in self.raw_sorting_dict
-        if specific_folder is None:
-            return self.raw_sorting_dict[extension]
-        else:
+        if extension is None:
             to_keep = []
-            if type(specific_folder) is str:
-                specific_folder = [specific_folder]
-            nominee = self.raw_sorting_dict[extension].copy()
-            for fold in specific_folder:
-                for file_path in nominee:
-                    file_folder = '/'.join(file_path.split('/')[:-1]) + '/'
-                    if file_folder == fold:
-                        to_keep.append(file_path)
-            to_look = to_keep.copy()
-            for file_path in to_look:
-                filename = file_path.split('/')[-1]
-                res = re.search(filename_begin_with, filename)
-                if res is None:
-                    to_keep.remove(file_path)
-            if not to_keep:
-                print('Nothing found.')
-            return to_keep
+            for ext, paths in self.raw_sorting_dict.items():
+                to_keep += paths
+        else:
+            to_keep = self.raw_sorting_dict[extension]
 
-    def get_unique_file(self, extension: str, specific_folder: Union[str, List[str]] = None,
-                        filename_begin_with: str = None) -> List[str]:
-        """
-        :param extension: The name of the extension.
-        :param specific_folder: Path or list of paths to match the file's folder's path.
-        :param filename_begin_with: Beginning of the filename.
-        :return: List of paths of all raw data files that are named with this extension.
-        """
-        assert extension in self.raw_sorting_dict
+        # specific_folder search
+        to_look = to_keep.copy()
         if specific_folder is None:
-            return self.raw_sorting_dict[extension]
+            to_keep = to_look.copy()
         else:
             to_keep = []
             if type(specific_folder) is str:
                 specific_folder = [specific_folder]
-            nominee = self.raw_sorting_dict[extension].copy()
+            nominee = to_look.copy()
             for fold in specific_folder:
                 for file_path in nominee:
-                    file_folder = '/'.join(file_path.split('/')[:-1]) + '/'
+                    file_folder = get_folder_path(file_path)
                     if file_folder == fold:
                         to_keep.append(file_path)
-            to_look = to_keep.copy()
+
+        # filename_begin_with search
+        to_look = to_keep.copy()
+        if filename_begin_with is not None:
             for file_path in to_look:
-                filename = file_path.split('/')[-1]
+                filename = get_file_name(file_path)
                 res = re.search(filename_begin_with, filename)
                 if res is None:
                     to_keep.remove(file_path)
             if not to_keep:
                 print('Nothing found.')
                 raise FileNotFoundError
-            elif len(to_keep) > 1:
-                print('Too much files founded :')
-                print(to_keep)
-            else:
-                return to_keep[0]
+            return to_keep
+        else:
+            return to_keep
 
+    def get_unique_file_path(self, extension: str = None, specific_folder: Union[str, List[str]] = None,
+                             filename_begin_with: str = None) -> str:
+        """
+        :param extension: The name of the extension.
+        :param specific_folder: Path or list of paths to match the file's folder's path.
+        :param filename_begin_with: Beginning of the filename.
+        :return: List of paths of all raw data files that are named with this extension.
+        """
+        to_keep = self.get_files_paths(extension, specific_folder, filename_begin_with)
+        if len(to_keep) > 1:
+            print('Too much files founded :')
+            print(to_keep)
+            raise FileNotFoundError
+        else:
+            return to_keep[0]
+
+    def pickle_load_file(self, extension: str = None, specific_folder: Union[str, List[str]] = None,
+                         filename_begin_with: str = None, pickle_was_python2: bool = False):
+        """
+        :param extension: The name of the extension.
+        :param specific_folder: Path or list of paths to match the file's folder's path.
+        :param filename_begin_with: Beginning of the filename.
+        :param pickle_was_python2: If the file was pickle using python2 or not.
+        :return: List of paths of all raw data files that are named with this extension.
+        """
+
+        to_load = self.get_unique_file_path(extension, specific_folder, filename_begin_with)
+        if pickle_was_python2:
+            return pickle.load(open(to_load, 'rb'), encoding='latin1')
+        else:
+            return pickle.load(open(to_load, 'rb'))
+
+
+def get_file_name(file_path: Union[str, List[str]]) -> Union[str, List[str]]:
+    """
+    Return the files names from the files paths.
+    :param file_path: The paths of the files.
+    :return: The files names.
+    """
+    if type(file_path) == str:
+        assert file_path[-1] != '/', "file_path end with '/'. It is a folder path."
+        return file_path.split('/')[-1]
+    else:  # file_path is a list
+        for e in file_path:
+            assert e[-1] != '/', "file_path end with '/'. It is a folder path."
+        return [e.split('/')[-1] for e in file_path]
+
+
+def get_folder_path(file_path: Union[str, List[str]]) -> Union[str, List[str]]:
+    """
+    Remove the file name in the file path to ge the path of the folder containing the file.
+    :param file_path: The path of the file.
+    :return: Folder path.
+    """
+    if type(file_path) == str:
+        assert file_path[-1] != '/', "file_path end with '/'. It is a folder path."
+        return '/'.join(file_path.split('/')[:-1]) + '/'
+    else:  # file_path is a list
+        for e in file_path:
+            assert e[-1] != '/', "file_path end with '/'. It is a folder path."
+        return ['/'.join(e.split('/')[:-1]) + '/' for e in file_path]
+
+
+def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
+                     array2: Union[np.ndarray, Iterable, int, float]) -> Tuple[List[int], List[int]]:
+    """
+    From two sorted arrays of different length and uniques values : array1 and array2.
+    :param array1: An array of values to be compared to array2.
+    :param array2: An array of values to be compared to array1.
+    :return: Return one indices array for each that indicate the closest value.
+    """
+    is_array1_iterable = is_iterable(array1)
+    is_array2_iterable = is_iterable(array2)
+
+    input_vars = {'array1': array1, 'array2': array2}
+    for name, arr in input_vars.items():
+        if isinstance(arr, int) or isinstance(arr, float):
+            input_vars[name] = np.array([input_vars[name]])
+        elif not isinstance(arr, np.ndarray):
+            input_vars[name] = np.asarray(input_vars[name])
+    array1 = input_vars['array1']
+    array2 = input_vars['array2']
+
+    # Hypothesis verification
+    assert len(array1) > 0, 'array1 must not be empty'
+    assert len(array1) == len(np.unique(array1)), 'array1 must have unique elements.'
+    assert array1.any() == np.sort(array1).any(), 'array1 must be sorted.'
+
+    assert len(array2) > 0, 'array2 must not be empty'
+    assert len(array2) == len(np.unique(array2)), 'array2 must have unique elements.'
+    assert array2.any() == np.sort(array2).any(), 'array2 must be sorted.'
+
+    # Initialisation
+    little_ids = []
+    big_ids = []
+    if len(array1) < len(array2):
+        case = 0
+        little_array = array1.copy()
+        is_little_iterable = is_array1_iterable
+        big_array = array2.copy()
+        is_big_iterable = is_array2_iterable
+    else:
+        case = 1
+        little_array = array2.copy()
+        is_little_iterable = is_array2_iterable
+        big_array = array1.copy()
+        is_big_iterable = is_array1_iterable
+    little_array_remaining_id = {i: val for i, val in enumerate(little_array)}  # The remaining idx not taken
+    big_array_remaining_id = {i: val for i, val in enumerate(big_array)}  # The remaining idx not taken
+
+    # Algorithm begin
+    for little_id, e1 in enumerate(little_array):
+        # Find the closer to e1 in big_array
+        big_id, _ = find_nearest(big_array, e1)
+        if big_id in big_array_remaining_id:
+            little_ids.append(little_id)
+            big_ids.append(big_id)
+            del little_array_remaining_id[little_id]
+            del big_array_remaining_id[big_id]
+        else:
+            diff1 = np.abs(little_array[little_id - 1] - big_array[big_id])
+            diff2 = np.abs(little_array[little_id] - big_array[big_id])
+            if diff1 > diff2:
+                little_ids.append(little_id)
+                big_ids.append(big_id)
+                del little_array_remaining_id[little_id]
+                del big_array_remaining_id[big_id]
+                little_array_remaining_id[little_id - 1] = little_array[little_id - 1]
+                big_array_remaining_id[big_id - 1] = big_array[little_id - 1]
+
+    assert len(little_ids) > 0, 'No correspondence founded'
+    assert len(big_ids) > 0, 'No correspondence founded'
+
+    if (not is_little_iterable) or (not is_big_iterable):
+        little_ids = little_ids[0]
+        big_ids = big_ids[0]
+
+    if case == 0:
+        return little_ids, big_ids
+    else:
+        return big_ids, little_ids
+
+
+def plane_equation(p1: Union[np.ndarray, list], p2: Union[np.ndarray, list],
+                   p3: Union[np.ndarray, list]) -> np.ndarray:
+    """
+    Compute the equation of 2D plane from 3D points_name.
+    :param p1: Point in 3D space different from p2 and p3.
+    :param p2: Point in 3D space different from p1 and p3.
+    :param p3: Point in 3D space different from p2 and p1.
+    :return: The 4 parameters a, b, c, d of a plane equation in an array form.
+    """
+    # Type correction
+    input_vars = {'p1': p1, 'p2': p2, 'p3': p3}
+    for name, arr in input_vars.items():
+        if isinstance(arr, list) or isinstance(arr, float):
+            input_vars[name] = np.array(input_vars[name])
+        elif not isinstance(arr, np.ndarray):
+            raise TypeError('Points type must be list or np.ndarray')
+    p1 = input_vars['p1']
+    p2 = input_vars['p2']
+    p3 = input_vars['p3']
+
+    # Vector P
+    p2_p1 = (p2 - p1) / np.linalg.norm(p2 - p1)
+    p3_p1 = (p3 - p1) / np.linalg.norm(p3 - p1)
+    plane_normal = np.cross(p3_p1, p2_p1)
+    d = - plane_normal @ p1
+    return np.hstack([plane_normal, d])
+
+
+def find_nearest(array, value):
+    """
+    Find nearest index and value into an array according to an input value. Nearest i.e with the smaller absolute value.
+    :param array: The array to be analysed.
+    :param value: The input value.
+    :return: index and value.
+    """
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx, array[idx]
+
+
+def is_iterable(obj) -> bool:
+    """
+    Test if obj is an iterable or not.
+    :param obj: An object to be tested.
+    :return: True or False.
+    """
+    try:
+        iter(obj)
+    except TypeError:
+        return False
+    else:
+        return True
 
 
 def object_analysis(obj):
@@ -365,16 +565,6 @@ def object_analysis(obj):
         except AttributeError:
             print('Attribute : {} of object {} is listed by dir() but cannot be accessed.'.format(e, type(obj)))
     return res
-
-
-def is_list_array_unique(list_arrays):
-    """
-    Compare if two list of numpy arrays are equal element-wise.
-    :param list_arrays: List of numpy array
-    :return: boolean
-    """
-    a = list_arrays[0]
-    return all(np.array_equal(a, x) for x in list_arrays)
 
 
 def angle_arccos(x: np.ndarray, y: np.ndarray) -> float:
