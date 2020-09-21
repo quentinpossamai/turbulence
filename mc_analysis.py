@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import pickle
+import prettytable
 
 
 def main():
@@ -16,19 +17,20 @@ def main():
     # Path extraction of the MC data
     print('Processing data path.')
     f = util.DataFolder(data_folder_name='data_drone2')
+    print()
 
     for vol_number in [0, 1, 2, 3, 4]:
         csv_path = f.get_unique_file_path(extension='.csv', specific_folder=f.folders['raw'][vol_number])
-
         # Extract poses of the drone from the motion capture measures
         print(f'Importing flight located in {csv_path}\nCleaning raw data.')
         m = MCAnalysis(csv_path)  # Importing and cleaning data
         data = m.get_data()
-        pickle.dump(data.df, open(f.folders['raw_python'][vol_number] + 'mc_measure.pkl', 'wb'))  # Saving
         print('Computing poses from Motion Capture measures.')
         poses = m.get_pose()  # Extracting the pose from markers position
         print('Saving computed poses.')
-        pickle.dump(poses, open(f.folders['raw_python'][vol_number] + 'mc_poses.pkl', 'wb'))  # Saving
+        data.df['time'] = pd.Series([i / 120 for i in range(len(data))])
+        data.df['poses'] = pd.Series(poses)
+        pickle.dump(data.df, open(f.folders['raw_python'][vol_number] + 'mc_measure.pkl', 'wb'))  # Saving
         print('\n\n')
 
 
@@ -75,6 +77,17 @@ class MCAnalysis(object):
         if filename in to_cut:
             data_raw.drop(list(data_raw.index)[to_cut[filename]:], inplace=True)
 
+        # Nan drop of drone's markers
+        point_column = []
+        for point_name in self.points_name:
+            point_column += [point_name + '_x', point_name + '_y', point_name + '_z']
+        # Get the dataframe of drone's markers row that contains at list one nan
+        tmp = data_raw[point_column].loc[(data_raw[point_column].isna().sum(axis=1) > 0), :]
+        print(f'Found {len(tmp)} NaN in data at indexes : {[e for e in tmp.index]}.\n'
+              f'(last index of data is : {len(data_raw) - 1}).\n'
+              f'Proceeding by dropping them.')
+        data_raw = data_raw.drop(index=tmp.index)
+
         # From mm to m
         for e in self.columns[2:]:
             data_raw[[e]] = data_raw[[e]] * 1e-3
@@ -82,34 +95,111 @@ class MCAnalysis(object):
         self.data = MCData(data=data_raw)
         self.drone_tf_o = np.zeros((4, 4))  # Will be defined in self.c_reference_frame
 
-    def get_data(self) -> 'MCData':
+    def get_pose(self) -> List[util.Transform]:
         """
-        :return: Cleans imported data.
+        Saves the computed pose from markers position.
         """
-        return self.data
 
-    def object_reference_frame(self) -> Dict[str, np.ndarray]:
+        poses = []
+
+        # Compute Transformation between drone and motion capture reference frame for all data
+        # Inspired by :
+        # http://nghiaho.com/?page_id=671&fbclid=IwAR3ss4avz2OyZmGeQRe9ZhDFF5slMKDQa3LLaSGZttcggvzkCqBBjM7MKvA
+
+        # Initialisation
+        ai_mat = np.zeros((len(self.points_name), 3))
+        p = util.Progress(len(self.data))
+
+        # # Get ai'
+        # ai_prime_mat = np.zeros((len(self.points_name), 3))
+        # ai_prime = self.object_reference_frame(frame_number=0)
+        # for i, point_name in enumerate(self.points_name):
+        #     ai_prime_mat[i, :] = ai_prime[point_name]
+        # # Get ai' centroid
+        # centroid_ai_prime = np.mean(ai_prime_mat, axis=0)
+
+        # Get new ai'
+        ai_prime_framed = np.zeros((len(self.data), len(self.points_name), 3))
+        for frame_number in self.data.df.index:
+            ai_prime_framed[frame_number, :, :] = np.array(list(self.object_reference_frame(frame_number).values()))
+        ai_prime_mat = np.mean(ai_prime_framed, axis=0)
+        centroid_ai_prime = np.mean(ai_prime_mat, axis=0)
+
+        # TITLE : ai_prime_new analysis
+        test = ai_prime_framed.reshape((len(self.data), len(self.points_name)*3))
+        fig, ax = plt.subplots(1, 1)
+        im = ax.imshow(np.corrcoef(test.T), cmap='plasma')
+        ax.set_title('Normalized COV(point)')
+        for funcs in [(ax.set_xticklabels, ax.set_xticks), (ax.set_yticklabels, ax.set_yticks)]:
+            funcs[0]([e for tmp in self.points_name for e in [tmp+'_x', tmp+'_y', tmp+'_z']], rotation=45)
+            funcs[1](range(len(self.points_name*3)))
+        fig.colorbar(im, ax=ax)
+        plt.show()
+
+        # # Tab
+        # mean = np.mean(test, axis=0)
+        # std_dev = np.diag(np.cov(test.T))
+        # res = (mean - std_dev) / mean
+        # table = prettytable.PrettyTable(['Point Coordinate', '(Mean - std_dev) / Mean'])
+        # for i, point_name in enumerate([e for tmp in self.points_name for e in [tmp+'_x', tmp+'_y', tmp+'_z']]):
+        #     table.add_row([point_name, res[i]])
+        # print(table)
+
+        # Compute centroid for ai and then compute rotation matrix R and translation array T
+        for index in self.data.df.index:
+            # Get ai and their centroid
+            for i, point_name in enumerate(self.points_name):
+                ai_mat[i, :] = self.data.get_point(point_name, index)
+            centroid_ai = np.mean(ai_mat, axis=0)
+
+            # Compute rotation matrix
+            h = (ai_mat - centroid_ai).T @ (ai_prime_mat - centroid_ai_prime)
+            u, s, v = np.linalg.svd(h)
+            drone_r_origin = v.T @ u.T
+            if np.linalg.det(drone_r_origin) < 0:
+                u, s, v = np.linalg.svd(drone_r_origin)
+                v[:, 2] = -1 * v[:, 2]
+                drone_r_origin = v.T @ u.T
+
+            # Compute translation array
+            drone_t_origin = centroid_ai_prime - drone_r_origin @ centroid_ai
+
+            # Verification the result of the following calculus must be a matrix =  0
+            # ai_prime_mat - ((drone_r_origin @ ai_mat.T).T + drone_t_origin)
+
+            # Append drone_tf_origin
+            poses.append(util.Transform().from_rot_matrix_n_trans_vect(trans=drone_t_origin, rot=drone_r_origin))
+
+            p.update_pgr()
+        return poses
+
+    def object_reference_frame(self, frame_number: int) -> Dict[str, np.ndarray]:
         """
         Define the reference frame of the drone, C.
 
+        :param frame_number: The number of the frame to define C.
         :return: All the measured points_name expressed in C.
         """
         # Definition of C the reference frame of the drone.
         # First it's origin C through the computing of OC. With this definition it is almost the center of mass.
         oc = np.zeros(3)
         for i in range(4):
-            oc += self.data.get_point(f'b{i + 1}', 0)
+            oc += self.data.get_point(f'b{i + 1}', frame_number)
         oc = oc / 4
 
         # bi's plane equation
-        bis_eq = util.plane_equation(self.data.get_point('b1', 0),
-                                     self.data.get_point('b2', 0),
-                                     self.data.get_point('b3', 0))
+        bis_eq = util.plane_equation(self.data.get_point('b1', frame_number),
+                                     self.data.get_point('b3', frame_number),
+                                     self.data.get_point('b2', frame_number))
         plane_normal = bis_eq[0:3]
+        # plane_normal must be oriented from bottom to top of the drone
+        if (self.data.get_point('y1', frame_number) - oc) @ plane_normal < 0:
+            bis_eq = - bis_eq
+            plane_normal = bis_eq[0:3]
 
         # x axis definition
-        b1 = self.data.get_point('b1', 0)
-        y2 = self.data.get_point('y2', 0)
+        b1 = self.data.get_point('b1', frame_number)
+        y2 = self.data.get_point('y2', frame_number)
         y2proj = (y2 - b1) - ((y2 - b1) @ plane_normal) * plane_normal + b1
         x = (y2proj - oc) / np.linalg.norm(y2proj - oc)
 
@@ -123,17 +213,14 @@ class MCAnalysis(object):
         self.drone_tf_o = util.Transform().from_trans_n_axis(trans=oc, x=x, y=y, z=z)
         res = {}
         for point_name in self.points_name:
-            # TODO delete prints
-            # print(f'{point_name} in O : {self.data.get_point(point_name, 0)}')
-            res[point_name] = self.drone_tf_o @ self.data.get_point(point_name, 0)
-            # print(f'{point_name} in drone : {res[point_name]}')
+            res[point_name] = self.drone_tf_o @ self.data.get_point(point_name, frame_number)
 
-        # TITLE : Plotting ai and ai'
+        # # TITLE : Plotting ai and ai'
         # fig = plt.figure()
         # ax = fig.add_subplot(111, projection='3d')
         # for i, point_name in enumerate(self.points_name):
         #     # R0
-        #     point = self.data.get_point(point_name, 0)
+        #     point = self.data.get_point(point_name, frame_number)
         #     ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:blue')
         #     ax.text(x=point[0], y=point[1], z=point[2], s=point_name)
         #     # Drone
@@ -158,6 +245,10 @@ class MCAnalysis(object):
         #
         # # Plane normal
         # ax.quiver(oc[0], oc[1], oc[2], plane_normal[0], plane_normal[1], plane_normal[2], length=0.1)
+        # xx, yy = np.meshgrid(np.linspace(-0.15, 0.1, 100), np.linspace(0.3, 0.6, 100))
+        # d = bis_eq[3]
+        # z = (-plane_normal[0] * xx - plane_normal[1] * yy - d) / plane_normal[2]
+        # ax.plot_surface(xx, yy, z, alpha=0.2)
         #
         # ax.view_init(azim=0, elev=90)
         # ax.legend()
@@ -165,72 +256,11 @@ class MCAnalysis(object):
 
         return res
 
-    def get_pose(self) -> List[util.Transform]:
+    def get_data(self) -> 'MCData':
         """
-        Saves the computed pose from markers position.
+        :return: Cleans imported data.
         """
-        figsize = (10, 12)
-        # for e in ['b1', 'b2', 'b3', 'b4', 'x2', 'y1', 'y2']:
-        #     fig, axs = plt.subplots(3, figsize=figsize)
-        #     exec(f"self.self.df.df.plot(y='{e}_x', grid=True, legend=False, title='{e}_x', ax=axs[0])")
-        #     exec(f"self.self.df.df.plot(y='{e}_y', grid=True, legend=False, title='{e}_y', ax=axs[1])")
-        #     exec(f"self.self.df.df.plot(y='{e}_z', grid=True, legend=False, title='{e}_z', ax=axs[2])")
-        #     # plt.savefig(ABSOLUTE_PATH+f'plots/motion_capture_trajectory_comparison/{e}')
-        # plt.show()
-
-        # for axis in ['x', 'y', 'z']:
-        #     fig = plt.figure(figsize=figsize)
-        #     plt.title(axis)
-        #     # xx = np.linspace(0, len(self.df.df) - 1, len(self.df.df))
-        #     end_x = 3000
-        #     xx = np.linspace(0, end_x - 1, end_x)
-        #     for e in ['b1', 'b2', 'b3', 'b4', 'x2', 'y1', 'y2']:
-        #         plt.plot(xx, self.data.df[e + '_' + axis][0:end_x], label=e)
-        #         plt.legend()
-        # plt.show()
-
-        poses = []
-
-        # Compute Transformation between drone and motion capture reference frame for all data
-        # Inspired by :
-        # http://nghiaho.com/?page_id=671&fbclid=IwAR3ss4avz2OyZmGeQRe9ZhDFF5slMKDQa3LLaSGZttcggvzkCqBBjM7MKvA
-
-        # Initialisation
-        ai_mat = np.zeros((len(self.points_name), 3))
-        ai_prime_mat = np.zeros((len(self.points_name), 3))
-        p = util.Progress(len(self.data))
-
-        # Get ai'
-        ai_prime = self.object_reference_frame()
-        for i, point_name in enumerate(self.points_name):
-            ai_prime_mat[i, :] = ai_prime[point_name]
-        # Get ai' centroid
-        centroid_ai_prime = np.mean(ai_prime_mat, axis=0)
-
-        # Compute centroid for ai and then compute rotation matrix R and translation array T
-        for index in self.data.df.index:
-            # Get ai and their centroid
-            for i, point_name in enumerate(self.points_name):
-                ai_mat[i, :] = self.data.get_point(point_name, index)
-            centroid_ai = np.mean(ai_mat, axis=0)
-
-            # Compute rotation matrix
-            # h = np.transpose(ai_mat - centroid_ai) @ (ai_prime_mat - centroid_ai_prime)
-            h = np.transpose(ai_mat) @ ai_prime_mat
-            u, s, v = np.linalg.svd(h)
-            drone_r_origin = v.T @ u.T
-            if np.linalg.det(drone_r_origin) < 0:
-                u, s, v = np.linalg.svd(drone_r_origin)
-                v[:, 2] = -1 * v[:, 2]
-                drone_r_origin = v.T @ u.T
-
-            # Compute translation array
-            drone_t_origin = centroid_ai_prime - drone_r_origin @ centroid_ai
-
-            ai_prime_mat - (np.transpose(drone_r_origin @ np.transpose(ai_mat)) + drone_t_origin)
-            p.update_pgr()
-            pass
-        return poses
+        return self.data
 
 
 class MCData(object):

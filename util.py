@@ -503,6 +503,7 @@ def plane_equation(p1: Union[np.ndarray, list], p2: Union[np.ndarray, list],
     p2_p1 = (p2 - p1) / np.linalg.norm(p2 - p1)
     p3_p1 = (p3 - p1) / np.linalg.norm(p3 - p1)
     plane_normal = np.cross(p3_p1, p2_p1)
+    plane_normal /= np.linalg.norm(plane_normal)
     d = - plane_normal @ p1
     return np.hstack([plane_normal, d])
 

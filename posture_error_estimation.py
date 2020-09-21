@@ -1,8 +1,5 @@
-import glob
-import os
 from typing import Union, Iterable, Tuple, List
 import pickle
-import time
 import cv2
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -18,24 +15,21 @@ from util import Progress, Transform, angle_arccos, DataFolder, \
 def main():
     f = DataFolder('data_drone2')
     # tara preparation
-    tara_left = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'tara_left')
-    tara_time = []
-    for _, msg in tara_left['tara/left/image_raw'].items():
-        tara_time.append(msg['t'])
-    tara_time = np.array([msg['t'] for key, msg in tara_left['tara/left/image_raw'].items()])
-    tara_time = tara_time - tara_time[0]
+    vol_number = 0
+    tara_left = f.pickle_load_file('.pkl', f.folders['raw_python'][vol_number], 'tara_left')
+    topic = 'tara/left/image_raw'
+    for measure_number, msg in tara_left[topic].items():
+        tara_left[topic][measure_number]['t'] = tara_left[topic][vol_number]['t']
 
     # mc preparation
-    mc_poses = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'mc_poses')
-    mc_measure = f.pickle_load_file('.pkl', f.folders['raw_python'][0], 'mc_measure')
-    mc_time = np.array(range(len(mc_measure))) / 120
+    mc_measure = f.pickle_load_file('.pkl', f.folders['raw_python'][vol_number], 'mc_measure')
 
     fig, axs = plt.subplots(3, 1)
-    x_inf = 0
-    x_sup = (len(mc_time) - 1) / 120
-    _, ind_inf = merge_two_arrays(x_inf, mc_time)
-    _, ind_sup = merge_two_arrays(x_sup, mc_time)
-    mc_time_zoomed = mc_time[ind_inf:ind_sup]
+    x_inf = 4
+    x_sup = 4.2
+    _, ind_inf = merge_two_arrays(x_inf, mc_measure['time'])
+    _, ind_sup = merge_two_arrays(x_sup, mc_measure['time'])
+    mc_time_zoomed = mc_measure['time'][ind_inf:ind_sup]
     axs[0].plot(mc_time_zoomed, mc_measure['clapet_sup_2_x'][ind_inf:ind_sup], label='clapet_sup_2_x')
     axs[0].plot(mc_time_zoomed, mc_measure['clapet_inf2_x'][ind_inf:ind_sup], label='clapet_inf2_x')
 
@@ -44,9 +38,17 @@ def main():
 
     axs[2].plot(mc_time_zoomed, mc_measure['clapet_sup_2_z'][ind_inf:ind_sup], label='clapet_sup_2_z')
     axs[2].plot(mc_time_zoomed, mc_measure['clapet_inf2_z'][ind_inf:ind_sup], label='clapet_inf2_z')
+
+    for ax in axs:
+        ax.set_xlabel('(s)')
+        ax.set_ylabel('(m)')
+        ax.legend()
     plt.show()
 
-    tara_ids, mc_ids = merge_two_arrays(tara_time, )
+    synchro  = {0: {'mc': 4.125,
+                    'drone': np.nan}}
+
+    # tara_ids, mc_ids = merge_two_arrays(tara_time, )
 
     f = ErrorEstimation()
     f.p3_generator()
