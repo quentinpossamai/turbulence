@@ -21,46 +21,50 @@ def main():
     # Data to extract parameters
     abs_path = '/Users/quentin/phd/turbulence/'
     data_folder = 'data_drone2'
-    flight_number = 0
-    pattern = '.*(/tara.*)'
+    for flight_number in [3, 4]:
+        pattern = '.*(/tara.*)'
 
-    flights = []
-    if data_folder == 'data_drone':
-        flights = ['20200214_vol_1_Exterieur_MaintientPositionPX4',
-                   '20200214_vol_2_Exterieur_MaintientPositionPX4',
-                   '20200218_vol_1_Exterieur',
-                   '20200218_vol_2_Exterieur',
-                   '20200218_vol_3_Exterieur',
-                   '20200218_vol_4_Exterieur',
-                   '20200218_vol_5_Exterieur',
-                   '20200218_vol_6_Exterieur',
-                   '20200219_vol_1_Exterieur',
-                   '20200219_vol_2_Exterieur',
-                   '20200219_vol_3_Exterieur',
-                   '20200220_vol_1_Exterieur']
-    elif data_folder == 'data_drone2':
-        flights = ['vol_1', 'vol_2', 'vol_3', 'vol_4_poubelle', 'vol_5_poubelle']
+        flights = []
+        if data_folder == 'data_drone':
+            flights = ['20200214_vol_1_Exterieur_MaintientPositionPX4',
+                       '20200214_vol_2_Exterieur_MaintientPositionPX4',
+                       '20200218_vol_1_Exterieur',
+                       '20200218_vol_2_Exterieur',
+                       '20200218_vol_3_Exterieur',
+                       '20200218_vol_4_Exterieur',
+                       '20200218_vol_5_Exterieur',
+                       '20200218_vol_6_Exterieur',
+                       '20200219_vol_1_Exterieur',
+                       '20200219_vol_2_Exterieur',
+                       '20200219_vol_3_Exterieur',
+                       '20200220_vol_1_Exterieur']
+        elif data_folder == 'data_drone2':
+            flights = ['vol_1', 'vol_2', 'vol_3', 'vol_4_poubelle', 'vol_5_poubelle']
 
-    # Locate the file to be extracted
-    flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
-    bags = []
-    for bag in sorted(glob.glob(flight_path + '*.bag')):
-        bags.append(bag)
-    file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
-    assert len(file_to_extract) == 1
-    file_to_extract = file_to_extract[0]
+        # Locate the file to be extracted
+        flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
+        bags = []
+        for bag in sorted(glob.glob(flight_path + '*.bag')):
+            bags.append(bag)
+        file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
+        assert len(file_to_extract) == 1, FileNotFoundError
+        file_to_extract = file_to_extract[0]
 
-    # Create saving path
-    filename = file_to_extract.split('/')[-1].split('.')[0]
-    saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
+        # Create saving path
+        filename = file_to_extract.split('/')[-1].split('.')[0]
+        saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
 
-    # Extract data
-    e = Extractor(file_to_extract)
-    data_extracted = e.extract()
+        # Extract data
+        e = Extractor(file_to_extract)
+        data_extracted = e.extract()
 
-    # Saving file
-    print('Saving at : {}'.format(saving_path))
-    pickle.dump(data_extracted, open(saving_path, 'wb'))
+        # Saving file
+        print('Saving at : {}'.format(saving_path))
+        pickle.dump(data_extracted, open(saving_path, 'wb'))
+        if 'tara/left/image_raw' in data_extracted:
+            del data_extracted['tara/right/image_raw']
+            del data_extracted['tara/right/camera_info']
+            pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
 
 
 class Extractor(object):

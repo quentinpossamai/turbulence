@@ -9,21 +9,27 @@ import re
 import pathlib
 import time
 import pickle
+import pandas as pd
 
 ABSOLUTE_PATH = '/Users/quentin/phd/turbulence/'
 
 
 class Progress(object):
-    def __init__(self, max_iter: int, end_print: str = ''):
+    def __init__(self, max_iter: int, start_print: str = None, end_print: str = None):
         """
         Initialise a progression printing object.
         :param max_iter: The maximum number of iteration.
+        :param start_print: Print this string when initializing Progress.
         :param end_print: Print this string when the current iteration = max_iter.
         """
         self.max_iter = max_iter
+        self.start_print = start_print
         self.end_print = end_print
         self.iter = 0
         self.initial_time = time.time()
+
+        if start_print is not None:
+            print(start_print)
 
     def update_pgr(self, iteration: int = None):
         """
@@ -37,7 +43,10 @@ class Progress(object):
               f'Time passed : {time.time() - self.initial_time:.03f}s', end='')
         sys.stdout.flush()
         if self.iter + 1 == self.max_iter:
-            print(self.end_print)
+            if self.end_print is not None:
+                print(self.end_print)
+            else:
+                print('')
         self.iter += 1
 
 
@@ -48,10 +57,10 @@ class Transform(object):
     def __matmul__(self, multiple: Union['Transform', np.ndarray]) -> Union['Transform', np.ndarray]:
         if type(multiple) is Transform:
             return Transform().from_matrix(self.matrix @ multiple.get_matrix())
-        else:  # type(mutiple) np.ndarray
-            if multiple.shape == (4,):
+        else:  # type(multiple) is np.ndarray
+            if multiple.shape in [(4,), (4, 1)]:
                 return self.matrix @ multiple
-            elif multiple.shape == (3,):
+            elif multiple.shape in [(3,), (3, 1)]:
                 return (self.matrix @ np.append(multiple, 1))[:3]
 
     def __repr__(self):
@@ -66,9 +75,9 @@ class Transform(object):
     def get_matrix(self) -> np.ndarray:
         return self.matrix
 
-    def get_inv(self) -> 'Transform':
+    def inv(self) -> 'Transform':
         r = self.get_rot()
-        rt = np.transpose(r)
+        rt = r.T
 
         t = self.get_trans()
         t = - rt @ t
@@ -104,7 +113,7 @@ class Transform(object):
 
         C_T_D = C_T_A @ A_T_B @ B_T_D.
         """
-        tf = self.get_inv()
+        tf = self.inv()
         quat = Rotation.from_matrix(tf.get_rot()).as_quat()
         trans = tf.get_trans()
         return trans, quat
@@ -176,9 +185,9 @@ class Transform(object):
 
         B reference frame.
 
-        :param trans: A_D_B = translation from A origin to B origin described in A.
+        :param trans: B_D_A = translation from B origin to A origin described in B.
 
-        :param rot: A_R_B = numpy 3x3 rotation matrix, orientation of B relative to A.
+        :param rot: B_R_A = A 3x3 rotation matrix, orientation of A relative to B.
 
         P_A point described in A.
 
@@ -194,8 +203,14 @@ class Transform(object):
         C_T_D = C_T_A @ A_T_B @ B_T_D.
         Return the Transform object from a rotation matrix and a translation vector.
         """
-        quat = Rotation.from_matrix(rot).as_quat()
-        self.from_pose(trans, quat)
+        assert trans.shape == (3,)
+        assert rot.shape == (3, 3)
+
+        tf = np.eye(4)
+        tf[:3, :3] = rot
+        tf[:3, 3] = trans
+        self.matrix = tf
+
         return self
 
     def from_trans_n_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transform':
@@ -205,7 +220,7 @@ class Transform(object):
         :param y: unit vector of B y-axis expressed in A.
         :param z: unit vector of B z-axis expressed in A.
         :param trans: A_D_B = translation from A origin to B origin described in A.
-        :return: The corresponding Transform object
+        :return: The corresponding Transform object : B_tf_A
         """
         assert x.shape == (3,)
         assert y.shape == (3,)
@@ -236,11 +251,15 @@ class DataFolder(object):
         self.data_path = ABSOLUTE_PATH + data_folder_name + '/'
 
         # Add "purpose" folders, first purpose folder will be the reference to construct the others.
-        purpose_folder_names = ['raw', 'raw_python', 'clean', 'results', 'plots']
+        purpose_folder_names = ['raw', 'raw_python', 'intermediate', 'results', 'plots']
+
+        # self.folders[purpose_folder_names][vol_number] folders can be used like that
         self.folders = {e: self.data_path + e + '/' for e in purpose_folder_names}
 
         # Add all of data folder in each purpose folders
         raw_folder_to_imitate = purpose_folder_names[0]  # 'raw'
+        if not os.path.isdir(self.data_path + raw_folder_to_imitate + '/'):
+            raise FileNotFoundError(f"Folder 'raw' not defined at {self.data_path + raw_folder_to_imitate + '/'}")
         dirs = sorted(next(os.walk(self.data_path + raw_folder_to_imitate + '/'))[1])
         for folder in purpose_folder_names:
             self.folders[folder] = {i: self.folders[folder] + e + '/' for i, e in enumerate(dirs)}
@@ -317,8 +336,7 @@ class DataFolder(object):
             nominee = to_look.copy()
             for fold in specific_folder:
                 for file_path in nominee:
-                    file_folder = get_folder_path(file_path)
-                    if file_folder == fold:
+                    if fold + file_path[len(fold):] == file_path:
                         to_keep.append(file_path)
 
         # filename_begin_with search
@@ -400,7 +418,8 @@ def get_folder_path(file_path: Union[str, List[str]]) -> Union[str, List[str]]:
 
 
 def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
-                     array2: Union[np.ndarray, Iterable, int, float]) -> Tuple[List[int], List[int]]:
+                     array2: Union[np.ndarray, Iterable, int, float]) -> Tuple[Union[List[int], int],
+                                                                               Union[List[int], int]]:
     """
     From two sorted arrays of different length and uniques values : array1 and array2.
     :param array1: An array of values to be compared to array2.
@@ -414,6 +433,8 @@ def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
     for name, arr in input_vars.items():
         if isinstance(arr, int) or isinstance(arr, float):
             input_vars[name] = np.array([input_vars[name]])
+        elif isinstance(arr, pd.Series):
+            input_vars[name] = arr.to_numpy()
         elif not isinstance(arr, np.ndarray):
             input_vars[name] = np.asarray(input_vars[name])
     array1 = input_vars['array1']
@@ -449,22 +470,20 @@ def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
     # Algorithm begin
     for little_id, e1 in enumerate(little_array):
         # Find the closer to e1 in big_array
-        big_id, _ = find_nearest(big_array, e1)
+        big_id, big_val = find_nearest(big_array, e1)
         if big_id in big_array_remaining_id:
             little_ids.append(little_id)
             big_ids.append(big_id)
             del little_array_remaining_id[little_id]
             del big_array_remaining_id[big_id]
         else:
-            diff1 = np.abs(little_array[little_id - 1] - big_array[big_id])
-            diff2 = np.abs(little_array[little_id] - big_array[big_id])
+            diff1 = np.abs(little_array[little_id - 1] - big_val)
+            diff2 = np.abs(little_array[little_id] - big_val)
             if diff1 > diff2:
-                little_ids.append(little_id)
-                big_ids.append(big_id)
-                del little_array_remaining_id[little_id]
-                del big_array_remaining_id[big_id]
+                del little_ids[-1]  # remove little_id - 1
                 little_array_remaining_id[little_id - 1] = little_array[little_id - 1]
-                big_array_remaining_id[big_id - 1] = big_array[little_id - 1]
+                little_ids.append(little_id)
+                del little_array_remaining_id[little_id]
 
     assert len(little_ids) > 0, 'No correspondence founded'
     assert len(big_ids) > 0, 'No correspondence founded'

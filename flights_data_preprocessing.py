@@ -113,7 +113,7 @@ class DataPreparation(object):
             acc_g_in_global = np.array([0, 0, g])
             for i, acc in enumerate(imu['linear_acceleration']):
                 acc = mat_a @ (imu['linear_acceleration'][i] - b)  # Remove noise
-                flu0_rot_drone = Transform().from_pose(np.zeros(3), quat[i]).get_inv().get_rot()
+                flu0_rot_drone = Transform().from_pose(np.zeros(3), quat[i]).inv().get_rot()
                 imu['linear_acceleration'][i] = flu0_rot_drone @ drone_rot_imu @ acc
                 imu['linear_acceleration'][i] = imu['linear_acceleration'][i] - acc_g_in_global
 
@@ -176,7 +176,7 @@ class DataPreparation(object):
             acc_g_in_global = np.array([0, 0, g])
             for i, acc in enumerate(imu['linear_acceleration']):
                 acc = mat_a @ (imu['linear_acceleration'][i] - b)  # Remove noise
-                flu0_rot_drone = Transform().from_pose(np.zeros(3), quat[i]).get_inv().get_rot()
+                flu0_rot_drone = Transform().from_pose(np.zeros(3), quat[i]).inv().get_rot()
                 imu['linear_acceleration'][i] = flu0_rot_drone @ drone_rot_imu @ acc
                 imu['linear_acceleration'][i] = imu['linear_acceleration'][i] - acc_g_in_global
                 raw_acc[i] = flu0_rot_drone @ drone_rot_imu @ raw_acc[i]

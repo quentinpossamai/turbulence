@@ -29,7 +29,7 @@ def main():
         poses = m.get_pose()  # Extracting the pose from markers position
         print('Saving computed poses.')
         data.df['time'] = pd.Series([i / 120 for i in range(len(data))])
-        data.df['poses'] = pd.Series(poses)
+        data.df['pose'] = pd.Series(poses)
         pickle.dump(data.df, open(f.folders['raw_python'][vol_number] + 'mc_measure.pkl', 'wb'))  # Saving
         print('\n\n')
 
@@ -97,7 +97,8 @@ class MCAnalysis(object):
 
     def get_pose(self) -> List[util.Transform]:
         """
-        Saves the computed pose from markers position.
+        Saves the computed poses from markers position expressed as a util.Transform object such as
+        pose = drone_tf_origin.
         """
 
         poses = []
@@ -108,7 +109,6 @@ class MCAnalysis(object):
 
         # Initialisation
         ai_mat = np.zeros((len(self.points_name), 3))
-        p = util.Progress(len(self.data))
 
         # # Get ai'
         # ai_prime_mat = np.zeros((len(self.points_name), 3))
@@ -118,23 +118,26 @@ class MCAnalysis(object):
         # # Get ai' centroid
         # centroid_ai_prime = np.mean(ai_prime_mat, axis=0)
 
-        # Get new ai'
+        # Get new ai' robust to noise
+        print('    Compute ai prime')
+        p = util.Progress(len(self.data))
         ai_prime_framed = np.zeros((len(self.data), len(self.points_name), 3))
         for frame_number in self.data.df.index:
             ai_prime_framed[frame_number, :, :] = np.array(list(self.object_reference_frame(frame_number).values()))
+            p.update_pgr()
         ai_prime_mat = np.mean(ai_prime_framed, axis=0)
         centroid_ai_prime = np.mean(ai_prime_mat, axis=0)
 
-        # TITLE : ai_prime_new analysis
-        test = ai_prime_framed.reshape((len(self.data), len(self.points_name)*3))
-        fig, ax = plt.subplots(1, 1)
-        im = ax.imshow(np.corrcoef(test.T), cmap='plasma')
-        ax.set_title('Normalized COV(point)')
-        for funcs in [(ax.set_xticklabels, ax.set_xticks), (ax.set_yticklabels, ax.set_yticks)]:
-            funcs[0]([e for tmp in self.points_name for e in [tmp+'_x', tmp+'_y', tmp+'_z']], rotation=45)
-            funcs[1](range(len(self.points_name*3)))
-        fig.colorbar(im, ax=ax)
-        plt.show()
+        # # TITLE : ai_prime_new analysis
+        # test = ai_prime_framed.reshape((len(self.data), len(self.points_name)*3))
+        # fig, ax = plt.subplots(1, 1)
+        # im = ax.imshow(np.corrcoef(test.T), cmap='plasma')
+        # ax.set_title('Normalized COV(point)')
+        # for funcs in [(ax.set_xticklabels, ax.set_xticks), (ax.set_yticklabels, ax.set_yticks)]:
+        #     funcs[0]([e for tmp in self.points_name for e in [tmp+'_x', tmp+'_y', tmp+'_z']], rotation=45)
+        #     funcs[1](range(len(self.points_name*3)))
+        # fig.colorbar(im, ax=ax)
+        # plt.show()
 
         # # Tab
         # mean = np.mean(test, axis=0)
@@ -144,7 +147,8 @@ class MCAnalysis(object):
         # for i, point_name in enumerate([e for tmp in self.points_name for e in [tmp+'_x', tmp+'_y', tmp+'_z']]):
         #     table.add_row([point_name, res[i]])
         # print(table)
-
+        print('    Compute poses')
+        p = util.Progress(len(self.data))
         # Compute centroid for ai and then compute rotation matrix R and translation array T
         for index in self.data.df.index:
             # Get ai and their centroid
@@ -158,7 +162,7 @@ class MCAnalysis(object):
             drone_r_origin = v.T @ u.T
             if np.linalg.det(drone_r_origin) < 0:
                 u, s, v = np.linalg.svd(drone_r_origin)
-                v[:, 2] = -1 * v[:, 2]
+                v[2, :] = -1 * v[2, :]
                 drone_r_origin = v.T @ u.T
 
             # Compute translation array
@@ -168,7 +172,8 @@ class MCAnalysis(object):
             # ai_prime_mat - ((drone_r_origin @ ai_mat.T).T + drone_t_origin)
 
             # Append drone_tf_origin
-            poses.append(util.Transform().from_rot_matrix_n_trans_vect(trans=drone_t_origin, rot=drone_r_origin))
+            drone_tf_origin = util.Transform().from_rot_matrix_n_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
+            poses.append(drone_tf_origin)
 
             p.update_pgr()
         return poses
