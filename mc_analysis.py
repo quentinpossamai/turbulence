@@ -172,7 +172,7 @@ class MCAnalysis(object):
             # ai_prime_mat - ((drone_r_origin @ ai_mat.T).T + drone_t_origin)
 
             # Append drone_tf_origin
-            drone_tf_origin = util.Transform().from_rot_matrix_n_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
+            drone_tf_origin = util.Transform().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
             poses.append(drone_tf_origin)
 
             p.update_pgr()
@@ -215,7 +215,7 @@ class MCAnalysis(object):
         y = np.cross(z, x) / np.linalg.norm(np.cross(z, x))
 
         # Compute ai'
-        self.drone_tf_o = util.Transform().from_trans_n_axis(trans=oc, x=x, y=y, z=z)
+        self.drone_tf_o = util.Transform().from_trans_3_axis(trans=oc, x=x, y=y, z=z).inv()
         res = {}
         for point_name in self.points_name:
             res[point_name] = self.drone_tf_o @ self.data.get_point(point_name, frame_number)
@@ -251,8 +251,8 @@ class MCAnalysis(object):
         # # Plane normal
         # ax.quiver(oc[0], oc[1], oc[2], plane_normal[0], plane_normal[1], plane_normal[2], length=0.1)
         # xx, yy = np.meshgrid(np.linspace(-0.15, 0.1, 100), np.linspace(0.3, 0.6, 100))
-        # d = bis_eq[3]
-        # z = (-plane_normal[0] * xx - plane_normal[1] * yy - d) / plane_normal[2]
+        # distortion_coefficient = bis_eq[3]
+        # z = (-plane_normal[0] * xx - plane_normal[1] * yy - distortion_coefficient) / plane_normal[2]
         # ax.plot_surface(xx, yy, z, alpha=0.2)
         #
         # ax.view_init(azim=0, elev=90)

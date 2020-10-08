@@ -14,7 +14,45 @@ major, _, _, _, _ = sys.version_info
 assert major == 2
 
 
-def main():
+def main_vicon():
+    """
+    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
+    """
+    # Data to extract parameters
+    abs_path = '/Users/quentin/phd/turbulence/'
+    data_folder = 'euroc_mav'
+    for flight_number in [0]:
+        pattern = '.*(/V1_01_easy.*)'
+
+        flights = ['vicon_room_1_01']
+
+        # Locate the file to be extracted
+        flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
+        bags = []
+        for bag in sorted(glob.glob(flight_path + '*.bag')):
+            bags.append(bag)
+        file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
+        assert len(file_to_extract) == 1, FileNotFoundError
+        file_to_extract = file_to_extract[0]
+
+        # Create saving path
+        filename = file_to_extract.split('/')[-1].split('.')[0]
+        saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
+
+        # Extract data
+        e = Extractor(file_to_extract)
+        data_extracted = e.extract()
+
+        # Saving file
+        print('Saving at : {}'.format(saving_path))
+        pickle.dump(data_extracted, open(saving_path, 'wb'))
+        if 'tara/left/image_raw' in data_extracted:
+            del data_extracted['tara/right/image_raw']
+            del data_extracted['tara/right/camera_info']
+            pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
+
+
+def main_data_drones():
     """
     Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
     """
@@ -434,7 +472,7 @@ class Extractor(object):
                 processing_func = _process_sensor_msgs_image
             elif msg_type == 'sensor_msgs/CameraInfo':
                 processing_func = _process_sensor_msgs_camera_info
-            assert processing_func is not None, 'Message type not not known.'
+            assert processing_func is not None, 'Message type : {} not known.'.format(msg_type)
 
             # Processing
             for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
@@ -540,4 +578,5 @@ class Progress(object):
 
 
 if __name__ == '__main__':
-    main()
+    # main_data_drones()
+    main_vicon()

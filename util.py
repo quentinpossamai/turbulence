@@ -55,19 +55,34 @@ class Transform(object):
         self.matrix: np.ndarray = np.eye(4)
 
     def __matmul__(self, multiple: Union['Transform', np.ndarray]) -> Union['Transform', np.ndarray]:
-        if type(multiple) is Transform:
+        if isinstance(multiple, Transform):
             return Transform().from_matrix(self.matrix @ multiple.get_matrix())
         else:  # type(multiple) is np.ndarray
-            if multiple.shape in [(4,), (4, 1)]:
+            if multiple.shape[0] == 4:
                 return self.matrix @ multiple
-            elif multiple.shape in [(3,), (3, 1)]:
-                return (self.matrix @ np.append(multiple, 1))[:3]
+            elif multiple.shape in [(3,)]:
+                return (self.matrix @ np.append(multiple, 1))[:-1]
+            else:
+                if not len(multiple.shape) in [1, 2]:
+                    raise ArithmeticError(f"Multiplication between Transform object and object with "
+                                          f"{len(multiple.shape)}-axis is not defined. Only with "
+                                          f"shape =(4, n), (4,), (3,)")
+                else:
+                    raise ArithmeticError(f"Multiplication between Transform object and an object of shape "
+                                          f"{multiple.shape} is not defined. Only with "
+                                          f"shape =(4, n), (4,), (3,)")
 
     def __repr__(self):
         return self.matrix.__repr__()
 
     def get_rot(self) -> np.ndarray:
         return self.matrix[:3, :3]
+
+    def get_rot_euler(self, seq, degrees):
+        """
+        Cf doc scipy.spatial.transform.Rotation
+        """
+        return Rotation.from_matrix(self.get_rot()).as_euler(seq=seq, degrees=degrees)
 
     def get_trans(self) -> np.ndarray:
         return self.matrix[:3, 3]
@@ -99,13 +114,13 @@ class Transform(object):
 
         P_A point described in A.
 
-        B_T_A = tf = Transform object such as P_B = Transform().from_pose(trans, quat) @ P_A.
+        A_T_B = tf = Transform object such as P_A = Transform().from_pose(trans, quat) @ P_B.
 
         trans, quat = tf.get_pose().
 
         :return: trans, quat.
 
-        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
+        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A) while applying '@' operator.
 
         C reference frame.
 
@@ -113,15 +128,16 @@ class Transform(object):
 
         C_T_D = C_T_A @ A_T_B @ B_T_D.
         """
-        tf = self.inv()
-        quat = Rotation.from_matrix(tf.get_rot()).as_quat()
-        trans = tf.get_trans()
+        quat = Rotation.from_matrix(self.get_rot()).as_quat()
+        trans = self.get_trans()
         return trans, quat
 
     def from_pose(self, trans: np.ndarray, quat: np.ndarray) -> 'Transform':
         """
         Create a Transform object from the reference frame of (xyz, quat) to a new one at position xyz and oriented with
         quat.
+
+        quat = x, y, z, w
 
         A reference frame.
 
@@ -133,15 +149,15 @@ class Transform(object):
 
         P_A point described in A.
 
-        B_T_A = tf = Transform().from_pose(trans, quat).
+        A_T_B = tf = Transform().from_pose(trans, quat).
 
-        P_B = tf @ P_A.
+        P_A = tf @ P_B.
 
         :param trans: translation in 3d.
         :param quat: quaternions.
         :return: Transform object.
 
-        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
+        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A) while applying '@' operator.
 
         C reference frame.
 
@@ -154,11 +170,9 @@ class Transform(object):
         assert np.round(np.linalg.norm(quat), 3) == 1
 
         r = Rotation.from_quat(quat).as_matrix()
-        r = np.transpose(r)
-        t = - r @ trans
         tf = np.eye(4)
         tf[:3, :3] = r
-        tf[:3, 3] = t
+        tf[:3, 3] = trans
         self.matrix = tf
         return self
 
@@ -170,16 +184,22 @@ class Transform(object):
                    angles: np.ndarray, degrees: Optional[bool] = False) -> 'Transform':
         """
         Return a Transform object from a translation, an angle convention, and 3 Euler angles.
-        :param trans: The translation of the Transform, must be of length 3
+
+        :param trans: The translation of the Transform, must be of length 3 : A_D_B
+
         :param seq: Angle convention of the Euler angles, can be 'xyz' or any other order
-        :param angles: An array of the 3 Euler angles in the order of the convention
+
+        :param angles: An array of the 3 Euler angles in the order of the convention : A_R_B
+        Meaning where the euler angles describes the position of B relative to A.
+
         :param degrees: True if the unit of the Euler angles is degree or False for radian
-        :return:
+
+        :return: A_TF_B
         """
         assert angles.shape == (3,)
         return self.from_pose(trans=trans, quat=Rotation.from_euler(seq=seq, angles=angles, degrees=degrees).as_quat())
 
-    def from_rot_matrix_n_trans_vect(self, trans: np.ndarray, rot: np.ndarray) -> 'Transform':
+    def from_rot_matrix_trans_vect(self, trans: np.ndarray, rot: np.ndarray) -> 'Transform':
         """
         A reference frame.
 
@@ -192,7 +212,7 @@ class Transform(object):
         P_A point described in A.
 
         :return: B_T_A = tf = Transform object such as
-        P_B = Transform().from_rot_matrix_n_trans_vect(trans, quat) @ P_A.
+        P_B = Transform().from_rot_matrix_trans_vect(trans, quat) @ P_A.
 
         Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
 
@@ -213,14 +233,14 @@ class Transform(object):
 
         return self
 
-    def from_trans_n_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transform':
+    def from_trans_3_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transform':
         """
 
         :param x: unit vector of B x-axis expressed in A.
         :param y: unit vector of B y-axis expressed in A.
         :param z: unit vector of B z-axis expressed in A.
         :param trans: A_D_B = translation from A origin to B origin described in A.
-        :return: The corresponding Transform object : B_tf_A
+        :return: The corresponding Transform object : A_tf_B
         """
         assert x.shape == (3,)
         assert y.shape == (3,)
@@ -310,11 +330,11 @@ class DataFolder(object):
                 f(v)
 
     def get_files_paths(self, extension: str = None, specific_folder: Union[str, List[str]] = None,
-                        filename_begin_with: str = None) -> List[str]:
+                        path_contain: str = None) -> List[str]:
         """
         :param extension: The name of the extension.
         :param specific_folder: Path or list of paths to match the file's folder's path.
-        :param filename_begin_with: Beginning of the filename.
+        :param path_contain: Beginning of the filename.
         :return: List of paths of all raw data files that are named with this extension.
         """
         assert extension in self.raw_sorting_dict
@@ -339,17 +359,15 @@ class DataFolder(object):
                     if fold + file_path[len(fold):] == file_path:
                         to_keep.append(file_path)
 
-        # filename_begin_with search
+        # path_contain search
         to_look = to_keep.copy()
-        if filename_begin_with is not None:
+        if path_contain is not None:
             for file_path in to_look:
-                filename = get_file_name(file_path)
-                res = re.search(filename_begin_with, filename)
+                res = re.search(path_contain, file_path)
                 if res is None:
                     to_keep.remove(file_path)
             if not to_keep:
-                print('Nothing found.')
-                raise FileNotFoundError
+                raise FileNotFoundError('Nothing found.')
             return to_keep
         else:
             return to_keep
@@ -364,9 +382,7 @@ class DataFolder(object):
         """
         to_keep = self.get_files_paths(extension, specific_folder, filename_begin_with)
         if len(to_keep) > 1:
-            print('Too much files founded :')
-            print(to_keep)
-            raise FileNotFoundError
+            raise FileNotFoundError(f"Too much files founded : {to_keep}")
         else:
             return to_keep[0]
 
@@ -435,8 +451,10 @@ def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
             input_vars[name] = np.array([input_vars[name]])
         elif isinstance(arr, pd.Series):
             input_vars[name] = arr.to_numpy()
-        elif not isinstance(arr, np.ndarray):
+        elif isinstance(arr, list):
             input_vars[name] = np.asarray(input_vars[name])
+        else:
+            raise TypeError(f"{name} is not a usable type.")
     array1 = input_vars['array1']
     array2 = input_vars['array2']
 
@@ -505,7 +523,7 @@ def plane_equation(p1: Union[np.ndarray, list], p2: Union[np.ndarray, list],
     :param p1: Point in 3D space different from p2 and p3.
     :param p2: Point in 3D space different from p1 and p3.
     :param p3: Point in 3D space different from p2 and p1.
-    :return: The 4 parameters a, b, c, d of a plane equation in an array form.
+    :return: The 4 parameters a, b, c, distortion_coefficient of a plane equation in an array form.
     """
     # Type correction
     input_vars = {'p1': p1, 'p2': p2, 'p3': p3}
