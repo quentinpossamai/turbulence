@@ -37,14 +37,13 @@ def data_processing():
     # Load drone_tf_origin
     mc = f.pickle_load_file('.pkl', f.folders['raw_python'][flight_number], 'mc_measure')
 
-    # MC - ANALYSIS 1 : Finding first synchro
-    mc_scissors(mc, ind_inf=466, ind_sup=500,
-                saving_path=f.folders['intermediate'][flight_number])
+    # # MC - ANALYSIS 1 : Finding first synchro
+    # mc_scissors(mc, ind_inf=466, ind_sup=500, saving_path=f.folders['intermediate'][flight_number])
 
-    # MC - ANALYSIS 2 : Finding second synchro
-    mc_drone_flu0(mc, ind_inf=9000, ind_sup=9150, saving_path=f.folders['intermediate'][flight_number])
-    mc_drone_flu0(mc, ind_inf=0, ind_sup=len(mc) - 1,
-                  saving_path=f.folders['intermediate'][flight_number])
+    # # MC - ANALYSIS 2 : Finding second synchro
+    # mc_drone_flu0(mc, ind_inf=9000, ind_sup=9150, saving_path=f.folders['intermediate'][flight_number])
+    # mc_drone_flu0(mc, ind_inf=0, ind_sup=len(mc) - 1,
+    #               saving_path=f.folders['intermediate'][flight_number])
     mc = mc[['time', 'pose']].rename({'time': 'pose_time'}, axis=1)
 
     # tara preparation
@@ -55,11 +54,11 @@ def data_processing():
     images['image_time'] -= images['image_time'][0]
 
     # TARA - ANALYSIS 1 : Finding first synchro
-    tara_slider_plot(images, topic, ind_inf=0, ind_sup=len(images))
+    test = tara_slider_plot(images, ind_inf=0, ind_sup=len(images))
 
-    # TARA - ANALYSIS 2 : Finding first and second synchro
-    saving_path = f.folders['intermediate'][flight_number] + 'tara.mkv'
-    build_video(saving_path=saving_path, image_df=images, fps=30)
+    # # TARA - ANALYSIS 2 : Finding first and second synchro
+    # saving_path = f.folders['intermediate'][flight_number] + 'tara.mkv'
+    # build_video(saving_path=saving_path, image_df=images, fps=30)
 
     # Index of mc data and drone data
     print('Synchronizing data')
@@ -92,41 +91,77 @@ def data_processing():
     pickle.dump(camera_parameters, open(f.folders['intermediate'][flight_number] + 'camera_parameters.pkl', 'wb'))
 
 
-def tara_slider_plot(images: pd.DataFrame, topic: str, ind_inf: int, ind_sup: int):
-    """
-    Function to be used in main_data_drones with main_data_drones's variables as argument after tara import.
-    Plot's all tara images.
+class tara_slider_plot:
+    def __init__(self, image: pd.DataFrame, ind_inf: int, ind_sup: int):
+        """
+        Function to be used in main_data_drones with main_data_drones's variables as argument after tara import.
+        Plot's all tara images.
 
-    :param images: DataFrame with 'time' and 'image' columns.
-    :param topic: topic containing images.
-    :param ind_inf: Inf of the interval where the data will be plotted.
-    :param ind_sup: Sup of the interval where the data will be plotted.
-    """
-    # tara synchronizing plot
-    fig, ax = plt.subplots(1, 1)
-    plt.subplots_adjust(bottom=0.25)
-    i = 0
-    ax.imshow(images['image'][i])
-    # ax.axis('off')
-    legend = f'Index : {i}\nTime : {images["image"][i]}'
-    ann = ax.annotate(legend, (600, 50), xycoords='data', size=12, ha='right', va='top',
-                      bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
-    axcolor = 'lightgoldenrodyellow'
-    ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
-    index_slider = Slider(ax_slider, 'Frame Id', ind_inf, ind_sup, valinit=0, valstep=1)
+        :param image: DataFrame with 'time' and 'image' columns.
+        :param ind_inf: Inf of the interval where the data will be plotted.
+        :param ind_sup: Sup of the interval where the data will be plotted.
 
-    def update(val):
-        j = index_slider.val
-        ax.imshow(images['image'][j])
-        legend1 = f'Index : {j}\nTime : {images["image"][j]:0.3f}'
-        global ann
-        ann.remove()
-        ann = ax.annotate(legend1, (600, 50), xycoords='data', size=12, ha='right', va='top',
-                          bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
-        fig.canvas.draw()
+        Inspired by https://stackoverflow.com/questions/40126176/fast-live-plotting-in-matplotlib-pyplot
+        """
+        self.image = image
+        self.ind_inf = ind_inf
+        self.ind_sup = ind_sup
+        # tara synchronizing plot
+        self.fig, self.ax = plt.subplots(1, 1)
+        plt.subplots_adjust(bottom=0.25)
+        self.i = 0
+        height, width = self.image['image'][self.i].shape
+        self.img = self.ax.imshow(self.image['image'][self.i])
+        legend = f'Index : {self.i}\nTime : {self.image["image_time"][self.i]:0.3f}'
+        self.ann = self.ax.annotate(legend, (width - 40, 40), xycoords='data', size=12, ha='right', va='top',
+                                    bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
 
-    index_slider.on_changed(update)
-    plt.show()
+        axcolor = 'lightgoldenrodyellow'
+        slider_ax = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
+        self.slider = Slider(slider_ax, 'Frame Id', ind_inf, ind_sup, valinit=0, valstep=1)
+        self.fig.canvas.mpl_connect('key_press_event', self._on_press)
+        self.slider.on_changed(self._update)
+
+        self.fig.canvas.draw()
+        self.ax_background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
+        plt.show(block=False)
+
+        plt.figure()
+        plt.imshow(self.image['image'][1358])
+        plt.show()
+
+        self._aff(self.i)
+
+    def _aff(self, df_idx):
+        # Update data
+        self.img.set_data(self.image['image'][df_idx])
+        self.ann.set_text(f'Index : {df_idx}\nTime : {self.image["image_time"][df_idx]:0.3f}')
+
+        # Restore background
+        self.fig.canvas.restore_region(self.ax_background)
+
+        # redraw just what changed
+        self.ax.draw_artist(self.img)
+        self.ax.draw_artist(self.ann)
+
+        # fill in the axes rectangle
+        self.fig.canvas.blit(self.ax.bbox)
+        self.fig.canvas.flush_events()
+
+    def _update(self, val):
+        self.i = int(self.slider.val)
+        self._aff(self.i)
+        self.fig.canvas.draw()
+
+    def _on_press(self, event):
+        if (event.key == 'e') and (self.i + 1 < self.ind_sup):
+            self.i += 1
+            self._aff(self.i)
+        elif (event.key == 'a') and (self.i - 1 >= self.ind_inf):
+            self.i -= 1
+            self._aff(self.i)
+        self.slider.set_val(self.i)
+        self.fig.canvas.draw()
 
 
 def mc_scissors(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving_path: str = None):
@@ -153,6 +188,7 @@ def mc_scissors(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving_pat
     if len(xx) < 100:
         ax.set_xticks(xx)
         ax.set_xticklabels(xx, rotation=45)
+        ax.grid(True, axis='x')
     ax.set_ylabel('(m)')
     ax.legend()
     if saving_path is not None:

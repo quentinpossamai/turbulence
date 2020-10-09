@@ -37,6 +37,7 @@ class ErrorEstimation(object):
 
         https://docs.opencv.org/master/dc/dbb/tutorial_py_calibration.html
         """
+        assert input_data['image'][0].shape[2] == 3, 'Image must have 3rgb channels.'
 
         self.df = input_data
         self.k = calibration_matrix

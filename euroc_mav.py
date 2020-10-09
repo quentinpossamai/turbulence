@@ -10,7 +10,7 @@ import yaml
 
 def data_processing():
     f = util.DataFolder('euroc_mav')
-    for flight_number in [1, 2, 3, 4, 5]:
+    for flight_number in [0, 1, 2, 3, 4, 5]:
 
         # Camera parameters
         f.get_files_paths('.yaml', f.folders['raw'][flight_number], 'cam0')
