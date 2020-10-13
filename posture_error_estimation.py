@@ -86,24 +86,6 @@ class ErrorEstimation(object):
 
         self.distort_func = tmp
 
-    def get_camera_angle_to_horizontal_plane(self, iteration: int) -> float:
-        """
-        Compute the inclination of the camera.
-
-        :param iteration: The index in the data.
-
-        :return: The angle in radian.
-        """
-        # TODO Camera must see the floor !
-        z_camera_in_camera = np.array([0, 0, 1])  # Vector only rotation are important and NOT translations
-
-        origin_tf_camera = self.df['pose'][iteration].inv()
-        origin_rot_camera = origin_tf_camera.get_rot()
-        z_camera_in_origin = origin_rot_camera @ z_camera_in_camera
-
-        camera_angle_to_horizontal_plane = np.arcsin(z_camera_in_origin[2] / np.linalg.norm(z_camera_in_origin))
-        return camera_angle_to_horizontal_plane
-
     def image23d(self, idx: int, image_point: np.array) -> Tuple[np.array, Union[None, str]]:
         """
         From pixels coordinates, project a point in 3d on the floor relative to the camera reference frame.

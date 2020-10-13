@@ -14,7 +14,7 @@ major, _, _, _, _ = sys.version_info
 assert major == 2
 
 
-def main_vicon():
+def main_euroc_mav():
     """
     Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
     """
@@ -24,7 +24,7 @@ def main_vicon():
     for flight_number in [0]:
         pattern = '.*(/V1_01_easy.*)'
 
-        flights = ['vicon_room_1_01']
+        flights = ['V1_01_easy']
 
         # Locate the file to be extracted
         flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
@@ -456,7 +456,7 @@ class Extractor(object):
         print('Extracting {}'.format(self.file_to_extract))
         print('List of topic to be extracted :')
         for topic, (msg_type, message_count, connections, frequency) in bag.get_type_and_topic_info()[1].items():
-            print('    - {} | Message count : {}'.format(topic, message_count))
+            print('    - {} | Type : {} | Message count : {}'.format(topic, msg_type, message_count))
         print()
 
         extracted_data = {}
@@ -472,11 +472,18 @@ class Extractor(object):
                 processing_func = _process_sensor_msgs_image
             elif msg_type == 'sensor_msgs/CameraInfo':
                 processing_func = _process_sensor_msgs_camera_info
+            elif msg_type == 'geometry_msgs/TransformStamped':
+                processing_func = _process_geometry_msgs_transform_stamped
+            elif msg_type == 'asctec_hl_comm/MotorSpeed':
+                processing_func = _process_asctec_hl_comm_motor_speed
+            elif msg_type == 'sensor_msgs/Imu':
+                processing_func = _process_sensor_msgs_imu
             assert processing_func is not None, 'Message type : {} not known.'.format(msg_type)
 
             # Processing
             for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
                 extracted_data[topic][i] = processing_func(msg_raw)
+                assert extracted_data[topic][i].get('t') is None, "'t' key already used."
                 extracted_data[topic][i]['t'] = t.to_sec()
 
                 p.update_pgr()  # # Progress print
@@ -513,6 +520,53 @@ def _process_sensor_msgs_camera_info(msg):
             'K': np.array(msg.K).reshape((3, 3)),
             'P': np.array(msg.P).reshape((3, 4)),
             'R': np.array(msg.R).reshape((3, 3))}
+
+
+def _process_geometry_msgs_transform_stamped(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'geometry_msgs/TransformStamped'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {'translation': np.array([msg.transform.translation.x,
+                                     msg.transform.translation.y,
+                                     msg.transform.translation.z]),
+            'rotation': np.array([msg.transform.rotation.x,
+                                  msg.transform.rotation.y,
+                                  msg.transform.rotation.z,
+                                  msg.transform.rotation.w])}
+
+
+def _process_asctec_hl_comm_motor_speed(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'asctec_hl_comm/MotorSpeed'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {'motor_speed': np.array(msg.motor_speed)}
+
+
+def _process_sensor_msgs_imu(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'sensor_msgs/Imu'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {'angular_velocity': np.array([msg.angular_velocity.x,
+                                          msg.angular_velocity.y,
+                                          msg.angular_velocity.z]),
+            'angular_velocity_covariance': np.array(msg.angular_velocity_covariance).reshape((3, 3)),
+            'linear_acceleration': np.array([msg.linear_acceleration.x,
+                                             msg.linear_acceleration.y,
+                                             msg.linear_acceleration.z]),
+            'linear_acceleration_covariance': np.array(msg.linear_acceleration_covariance).reshape((3, 3)),
+            'orientation': np.array([msg.orientation.x,
+                                     msg.orientation.y,
+                                     msg.orientation.z]),
+            'orientation_covariance': np.array(msg.orientation_covariance).reshape((3, 3))}
 
 
 def object_analysis(obj):
@@ -579,4 +633,4 @@ class Progress(object):
 
 if __name__ == '__main__':
     # main_data_drones()
-    main_vicon()
+    main_euroc_mav()
