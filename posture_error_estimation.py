@@ -217,28 +217,28 @@ class ErrorEstimation(object):
         cx, cy = self.k[0, 2], self.k[1, 2]
         p = np.array([cx, cy + cy / 2])
         p1, error = self.image23d(0, p)  # Ref camera
-        reconstruction_succeeded = error is None
+        is_reconstructed = error is None
         camera_1_tf_origin = self.df['pose'][0]  # Describing drone in reference frame origin
         progress = Progress(len(self.df), 'Computing p3 points')
         for i in range(len(self.df)):
-            if reconstruction_succeeded:
+            if is_reconstructed:
                 camera_i_tf_origin = self.df['pose'][i]
                 camera_i_tf_camera_1 = camera_i_tf_origin @ camera_1_tf_origin.inv()
                 p2 = camera_i_tf_camera_1 @ p1
                 p3 = np.int32(np.round(self._space2image(p2)))
                 if self._is_out_of_image(p3):
                     p1, error = self.image23d(i, p)  # Ref camera
-                    reconstruction_succeeded = error is None
+                    is_reconstructed = error is None
                     camera_1_tf_origin = self.df['pose'][i]
-                    if reconstruction_succeeded:
+                    if is_reconstructed:
                         p3 = 'P3 out of image.'
                     else:
                         p3 = error + '\nP3 out of image.'
             else:
                 p1, error = self.image23d(i, p)  # Ref camera
-                reconstruction_succeeded = error is None
+                is_reconstructed = error is None
                 camera_1_tf_origin = self.df['pose'][i]
-                if reconstruction_succeeded:
+                if is_reconstructed:
                     p3 = p
                 else:
                     p3 = error  # Send the message of failure

@@ -109,6 +109,26 @@ def error_estimation():
         print()
 
 
+def excel_creation():
+    f = util.DataFolder('euroc_mav')
+    flight_number = 0
+
+    # Motor speed
+    data = f.pickle_load_file('.pkl', f.folders['raw_python'][flight_number], None, True)
+    tmp = {'motor_speed': [], 'motor_speed_time': []}
+    for idx, measure in data['/fcu/motor_speed'].items():
+        tmp['motor_speed'].append(measure['motor_speed'])
+        tmp['motor_speed_time'].append(measure['t'])
+    motor_speed = pd.DataFrame(tmp)
+    motor_speed['motor_speed_time'] = motor_speed['motor_speed_time'] - motor_speed['motor_speed_time'][0]
+
+    img_pose_data = pickle.load(open(f.folders['intermediate'][flight_number] + 'posture_error_input_data.pkl', 'rb'))
+
+    ids_pose, ids_ms = util.merge_two_arrays(img_pose_data['pose_time'], motor_speed['motor_speed_time'])
+
+
+
 if __name__ == '__main__':
     # data_processing()
-    error_estimation()
+    # error_estimation()
+    excel_creation()

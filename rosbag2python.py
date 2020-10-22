@@ -1,6 +1,5 @@
 from __future__ import print_function
 import rosbag
-import os
 import glob
 import re
 import numpy as np
@@ -21,13 +20,11 @@ def main_euroc_mav():
     # Data to extract parameters
     abs_path = '/Users/quentin/phd/turbulence/'
     data_folder = 'euroc_mav'
-    for flight_number in [0]:
-        pattern = '.*(/V1_01_easy.*)'
-
-        flights = ['V1_01_easy']
+    for flight_number, flight in enumerate(['V1_01_easy']):
+        pattern = '.*(/{}.*)'.format(flight)
 
         # Locate the file to be extracted
-        flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
+        flight_path = abs_path + data_folder + '/raw/' + flight + '/'
         bags = []
         for bag in sorted(glob.glob(flight_path + '*.bag')):
             bags.append(bag)
@@ -37,7 +34,7 @@ def main_euroc_mav():
 
         # Create saving path
         filename = file_to_extract.split('/')[-1].split('.')[0]
-        saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
+        saving_path = abs_path + data_folder + '/raw_python/' + flight + '/' + filename + '.pkl'
 
         # Extract data
         e = Extractor(file_to_extract)
