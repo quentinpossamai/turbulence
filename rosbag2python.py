@@ -20,7 +20,7 @@ def main_euroc_mav():
     # Data to extract parameters
     abs_path = '/Users/quentin/phd/turbulence/'
     data_folder = 'euroc_mav'
-    for flight_number, flight in enumerate(['V1_01_easy']):
+    for flight_number, flight in enumerate(['V1_03_difficult']):
         pattern = '.*(/{}.*)'.format(flight)
 
         # Locate the file to be extracted
@@ -460,7 +460,8 @@ class Extractor(object):
         for topic, (msg_type, message_count, connections, frequency) in bag.get_type_and_topic_info()[1].items():
             # Initialization
             print('Extracting : {}'.format(topic))
-            extracted_data[topic] = {}
+            main_key = topic + '__' + msg_type
+            extracted_data[main_key] = {}
             p = Progress(max_iter=message_count, end_print='\n')  # Progress print
 
             # Choosing correct processing function according to data type
@@ -479,9 +480,9 @@ class Extractor(object):
 
             # Processing
             for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
-                extracted_data[topic][i] = processing_func(msg_raw)
-                assert extracted_data[topic][i].get('t') is None, "'t' key already used."
-                extracted_data[topic][i]['t'] = t.to_sec()
+                extracted_data[main_key][i] = processing_func(msg_raw)
+                assert extracted_data[main_key][i].get('t') is None, "'t' key already used."
+                extracted_data[main_key][i]['t'] = t.to_sec()
 
                 p.update_pgr()  # # Progress print
         bag.close()

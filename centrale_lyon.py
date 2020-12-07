@@ -34,7 +34,7 @@ def data_processing():
     # Vincent input : (0.105, 0, 0, -1.57, 0.0, -2.0943) (convention x, y, z, roll, pitch, yaw)
     drone_d_camera = np.array([0.105, 0, 0])
     drone_rot_camera = Rotation.from_euler('xyz', np.array([-120, 0, -90]), degrees=True).as_quat()
-    camera_tf_drone = util.Transform().from_pose(drone_d_camera, drone_rot_camera).inv()
+    camera_tf_drone = util.Transformation().from_pose(drone_d_camera, drone_rot_camera).inv()
     mc['pose'] = mc['pose'].apply(lambda x: camera_tf_drone @ x)
     mc['pose_time'] = (mc['pose_time'] - mc['pose_time'][0])
 
@@ -310,7 +310,7 @@ def aff3d(xyz_array, quat_array, video_path):
     prg = util.Progress(len(xyz_array))
 
     for xyz, quat in zip(xyz_array, quat_array):
-        ref_tf_pos = util.Transform().from_pose(xyz, quat)
+        ref_tf_pos = util.Transformation().from_pose(xyz, quat)
 
         x_ref = ref_tf_pos.get_rot() @ x_pos
         y_ref = ref_tf_pos.get_rot() @ y_pos

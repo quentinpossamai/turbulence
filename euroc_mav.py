@@ -33,7 +33,7 @@ def data_processing():
 
         # drone_tf_camera
         tmp = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
-        camera_parameters['camera_tf_drone'] = util.Transform().from_matrix(tmp).inv()  # The extrinsic parameter of the
+        camera_parameters['camera_tf_drone'] = util.Transformation().from_matrix(tmp).inv()  # The extrinsic parameter of the
 
         # Vicon0 parameters
         # f.get_files_paths('.yaml', f.folders['raw'][vol_number], 'vicon0')
@@ -43,7 +43,7 @@ def data_processing():
             except yaml.YAMLError as exc:
                 print(exc)
         # drone_tf_vicon0 : Sensor extrinsic wrt. the body-frame
-        drone_tf_vicon0 = util.Transform().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
+        drone_tf_vicon0 = util.Transformation().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
         camera_parameters['camera_tf_vicon0'] = camera_parameters['camera_tf_drone'] @ drone_tf_vicon0
         del camera_parameters['camera_tf_drone']
 
@@ -55,8 +55,8 @@ def data_processing():
         tmp = {}
         for index, row in mc.iterrows():
             # vicon0_tf_origin
-            vicon0_tf_origin = util.Transform().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
-                                                          quat=row[['a', 'b', 'c', 'w']].to_numpy()).inv()
+            vicon0_tf_origin = util.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
+                                                               quat=row[['a', 'b', 'c', 'w']].to_numpy()).inv()
             camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
             tmp[index] = camera_tf_origin
             p.update_pgr()
@@ -111,21 +111,83 @@ def error_estimation():
 
 def excel_creation():
     f = util.DataFolder('euroc_mav')
-    flight_number = 0
+    flight_number = 2
 
     # Motor speed
     data = f.pickle_load_file('.pkl', f.folders['raw_python'][flight_number], None, True)
-    tmp = {'motor_speed': [], 'motor_speed_time': []}
-    for idx, measure in data['/fcu/motor_speed'].items():
-        tmp['motor_speed'].append(measure['motor_speed'])
-        tmp['motor_speed_time'].append(measure['t'])
-    motor_speed = pd.DataFrame(tmp)
-    motor_speed['motor_speed_time'] = motor_speed['motor_speed_time'] - motor_speed['motor_speed_time'][0]
 
-    img_pose_data = pickle.load(open(f.folders['intermediate'][flight_number] + 'posture_error_input_data.pkl', 'rb'))
+    renaming = {'/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped': 'vicon_pose',
+                '/fcu/motor_speed__asctec_hl_comm/MotorSpeed': 'motor_speed',
+                '/cam0/image_raw__sensor_msgs/Image': 'cam0_img',
+                '/cam1/image_raw__sensor_msgs/Image': 'cam1_img',
+                '/imu0__sensor_msgs/Imu': 'imu0',
+                '/fcu/imu__sensor_msgs/Imu': 'fcu_imu'}
 
-    ids_pose, ids_ms = util.merge_two_arrays(img_pose_data['pose_time'], motor_speed['motor_speed_time'])
+    correspondence = {}
+    for key in data:
+        _, msg_type = key.split('__')
+        correspondence[key] = [renaming[key], renaming[key] + '_time', msg_type]
 
+    to_synchro = []
+    for data_column, (name, _, msg_type) in correspondence.items():
+        if msg_type == 'sensor_msgs/Image':
+            tmp = {'time': [], name: []}
+            for measure in data[data_column].values():
+                tmp['time'].append(measure['t'])
+                tmp[name].append(measure['image'])
+        elif msg_type == 'geometry_msgs/TransformStamped':
+            tmp = {'time': [], name: []}
+            for measure in data[data_column].values():
+                tmp['time'].append(measure['t'])
+                trans, quat = measure['translation'], measure['rotation']
+                tmp[name].append(util.Transformation().from_pose(trans, quat).inv())
+        elif msg_type == 'asctec_hl_comm/MotorSpeed':
+            tmp = {'time': [], name: []}
+            for measure in data[data_column].values():
+                tmp['time'].append(measure['t'])
+                tmp[name].append(measure['motor_speed'])
+        elif msg_type == 'sensor_msgs/Imu':
+            tmp = {'time': [],
+                   name + '_angular_velocity': [],
+                   name + '_angular_velocity_covariance': [],
+                   name + '_linear_acceleration': [],
+                   name + '_linear_acceleration_covariance': [],
+                   name + '_orientation': [],
+                   name + '_orientation_covariance': []}
+            for measure in data[data_column].values():
+                tmp['time'].append(measure['t'])
+                tmp[name + '_angular_velocity'].append(measure['angular_velocity'])
+                tmp[name + '_angular_velocity_covariance'].append(measure['angular_velocity_covariance'])
+                tmp[name + '_linear_acceleration'].append(measure['linear_acceleration'])
+                tmp[name + '_linear_acceleration_covariance'].append(measure['linear_acceleration_covariance'])
+                tmp[name + '_orientation'].append(measure['orientation'])
+                tmp[name + '_orientation_covariance'].append(measure['orientation_covariance'])
+        else:
+            raise TypeError(f'ROS type not implemented : {msg_type}')
+        to_synchro.append(pd.DataFrame(tmp))
+
+    freq = []
+    for i in range(len(to_synchro)):
+        freq.append(len(to_synchro[i]) / (to_synchro[i]['time'].iloc[-1] - to_synchro[i]['time'].iloc[0]))
+    ind_freq = sorted(range(len(freq)), key=lambda k: freq[k])
+
+    ids_0 = list(range(len(to_synchro[ind_freq[0]])))
+    for i in ind_freq[1:]:
+        ids_0, ids_i = util.merge_two_arrays(to_synchro[ind_freq[0]]['time'], to_synchro[i]['time'])
+        to_synchro[ind_freq[0]] = to_synchro[ind_freq[0]].iloc[ids_0].reset_index(drop=True)
+        to_synchro[i] = to_synchro[i].iloc[ids_i].reset_index(drop=True)
+        to_synchro[i]['time'] = to_synchro[ind_freq[0]]['time']
+
+    for i in range(len(to_synchro)):
+        to_synchro[i] = to_synchro[i].iloc[ids_0].reset_index(drop=True)
+        if 0 != i:
+            to_synchro[i] = to_synchro[i].drop(['time'], axis=1)
+
+    data_clean = pd.concat(to_synchro, axis=1)
+    np.set_printoptions(threshold=np.inf)
+    data_clean.to_csv(f.folders["intermediate"][flight_number] + "sensors_synchronised.csv", sep=";")
+    data_clean.to_pickle(f.folders["intermediate"][flight_number] + "sensors_synchronised.pkl")
+    print(len(data_clean))
 
 
 if __name__ == '__main__':

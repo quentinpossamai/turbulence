@@ -50,13 +50,13 @@ class Progress(object):
         self.iter += 1
 
 
-class Transform(object):
+class Transformation(object):
     def __init__(self):
         self.matrix: np.ndarray = np.eye(4)
 
-    def __matmul__(self, multiple: Union['Transform', np.ndarray]) -> Union['Transform', np.ndarray]:
-        if isinstance(multiple, Transform):
-            return Transform().from_matrix(self.matrix @ multiple.get_matrix())
+    def __matmul__(self, multiple: Union['Transformation', np.ndarray]) -> Union['Transformation', np.ndarray]:
+        if isinstance(multiple, Transformation):
+            return Transformation().from_matrix(self.matrix @ multiple.get_matrix())
         else:  # type(multiple) is np.ndarray
             if multiple.shape[0] == 4:
                 return self.matrix @ multiple
@@ -64,11 +64,11 @@ class Transform(object):
                 return (self.matrix @ np.append(multiple, 1))[:-1]
             else:
                 if not len(multiple.shape) in [1, 2]:
-                    raise ArithmeticError(f"Multiplication between Transform object and object with "
+                    raise ArithmeticError(f"Multiplication between Transformation object and object with "
                                           f"{len(multiple.shape)}-axis is not defined. Only with "
                                           f"shape =(4, n), (4,), (3,)")
                 else:
-                    raise ArithmeticError(f"Multiplication between Transform object and an object of shape "
+                    raise ArithmeticError(f"Multiplication between Transformation object and an object of shape "
                                           f"{multiple.shape} is not defined. Only with "
                                           f"shape =(4, n), (4,), (3,)")
 
@@ -90,7 +90,7 @@ class Transform(object):
     def get_matrix(self) -> np.ndarray:
         return self.matrix
 
-    def inv(self) -> 'Transform':
+    def inv(self) -> 'Transformation':
         r = self.get_rot()
         rt = r.T
 
@@ -100,7 +100,7 @@ class Transform(object):
         new_tf = np.eye(4)
         new_tf[:3, :3] = rt
         new_tf[:3, 3] = t
-        return Transform().from_matrix(new_tf)
+        return Transformation().from_matrix(new_tf)
 
     def get_pose(self) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -114,7 +114,7 @@ class Transform(object):
 
         P_A point described in A.
 
-        A_T_B = tf = Transform object such as P_A = Transform().from_pose(trans, quat) @ P_B.
+        A_T_B = tf = Transformation object such as P_A = Transformation().from_pose(trans, quat) @ P_B.
 
         trans, quat = tf.get_pose().
 
@@ -132,10 +132,10 @@ class Transform(object):
         trans = self.get_trans()
         return trans, quat
 
-    def from_pose(self, trans: np.ndarray, quat: np.ndarray) -> 'Transform':
+    def from_pose(self, trans: np.ndarray, quat: np.ndarray) -> 'Transformation':
         """
-        Create a Transform object from the reference frame of (xyz, quat) to a new one at position xyz and oriented with
-        quat.
+        Create a Transformation object from the reference frame of (xyz, quat) to a new one at position xyz and oriented
+        with quat.
 
         quat = x, y, z, w
 
@@ -149,13 +149,13 @@ class Transform(object):
 
         P_A point described in A.
 
-        A_T_B = tf = Transform().from_pose(trans, quat).
+        A_T_B = tf = Transformation().from_pose(trans, quat).
 
         P_A = tf @ P_B.
 
         :param trans: translation in 3d.
         :param quat: quaternions.
-        :return: Transform object.
+        :return: Transformation object.
 
         Note: only work for 3D points_name, P_A = (x_A, y_A, z_A) while applying '@' operator.
 
@@ -176,16 +176,16 @@ class Transform(object):
         self.matrix = tf
         return self
 
-    def from_matrix(self, matrix: np.ndarray) -> 'Transform':
+    def from_matrix(self, matrix: np.ndarray) -> 'Transformation':
         self.matrix = matrix
         return self
 
     def from_euler(self, trans: np.ndarray, seq: str,
-                   angles: np.ndarray, degrees: Optional[bool] = False) -> 'Transform':
+                   angles: np.ndarray, degrees: Optional[bool] = False) -> 'Transformation':
         """
-        Return a Transform object from a translation, an angle convention, and 3 Euler angles.
+        Return a Transformation object from a translation, an angle convention, and 3 Euler angles.
 
-        :param trans: The translation of the Transform, must be of length 3 : A_D_B
+        :param trans: The translation of the Transformation, must be of length 3 : A_D_B
 
         :param seq: Angle convention of the Euler angles, can be 'xyz' or any other order
 
@@ -199,7 +199,7 @@ class Transform(object):
         assert angles.shape == (3,)
         return self.from_pose(trans=trans, quat=Rotation.from_euler(seq=seq, angles=angles, degrees=degrees).as_quat())
 
-    def from_rot_matrix_trans_vect(self, trans: np.ndarray, rot: np.ndarray) -> 'Transform':
+    def from_rot_matrix_trans_vect(self, trans: np.ndarray, rot: np.ndarray) -> 'Transformation':
         """
         A reference frame.
 
@@ -211,8 +211,8 @@ class Transform(object):
 
         P_A point described in A.
 
-        :return: B_T_A = tf = Transform object such as
-        P_B = Transform().from_rot_matrix_trans_vect(trans, quat) @ P_A.
+        :return: B_T_A = tf = Transformation object such as
+        P_B = Transformation().from_rot_matrix_trans_vect(trans, quat) @ P_A.
 
         Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
 
@@ -221,7 +221,7 @@ class Transform(object):
         D reference frame.
 
         C_T_D = C_T_A @ A_T_B @ B_T_D.
-        Return the Transform object from a rotation matrix and a translation vector.
+        Return the Transformation object from a rotation matrix and a translation vector.
         """
         assert trans.shape == (3,)
         assert rot.shape == (3, 3)
@@ -233,14 +233,14 @@ class Transform(object):
 
         return self
 
-    def from_trans_3_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transform':
+    def from_trans_3_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transformation':
         """
 
         :param x: unit vector of B x-axis expressed in A.
         :param y: unit vector of B y-axis expressed in A.
         :param z: unit vector of B z-axis expressed in A.
         :param trans: A_D_B = translation from A origin to B origin described in A.
-        :return: The corresponding Transform object : A_tf_B
+        :return: The corresponding Transformation object : A_tf_B
         """
         assert x.shape == (3,)
         assert y.shape == (3,)
@@ -505,6 +505,14 @@ def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
 
     assert len(little_ids) > 0, 'No correspondence founded'
     assert len(big_ids) > 0, 'No correspondence founded'
+
+    assert all((np.array(little_ids)[1:] - np.array(little_ids)[:-1]) > 0), "Indices order not increasing"
+    assert all((np.array(big_ids)[1:] - np.array(big_ids)[:-1]) > 0), "Indices order not increasing"
+
+    assert len(little_ids) == len(np.unique(little_ids)), 'little_ids must have unique elements.'
+    assert len(big_ids) == len(np.unique(big_ids)), 'little_ids must have unique elements.'
+
+    assert len(little_ids) == len(big_ids), "Two ids does not have the same length."
 
     if (not is_little_iterable) or (not is_big_iterable):
         little_ids = little_ids[0]

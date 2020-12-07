@@ -16,7 +16,7 @@ class ErrorEstimation(object):
 
         :param input_data: pandas.DataFrame with columns:
             'pose_time' : The time of the measured pose.
-            'pose' : Each pose correspond to camera_tf_origin, a util.Transform object. The z-axis origin MUST be
+            'pose' : Each pose correspond to camera_tf_origin, a util.Transformation object. The z-axis origin MUST be
              aligned vertical (aligned to -gravity). Unit must be meters.
             'image_time' : The time of the measured image.
             'image' : numpy.ndarray of shape (height, width, 3)

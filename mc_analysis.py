@@ -95,9 +95,9 @@ class MCAnalysis(object):
         self.data = MCData(data=data_raw)
         self.drone_tf_o = np.zeros((4, 4))  # Will be defined in self.c_reference_frame
 
-    def get_pose(self) -> List[util.Transform]:
+    def get_pose(self) -> List[util.Transformation]:
         """
-        Saves the computed poses from markers position expressed as a util.Transform object such as
+        Saves the computed poses from markers position expressed as a util.Transformation object such as
         pose = drone_tf_origin.
         """
 
@@ -172,7 +172,7 @@ class MCAnalysis(object):
             # ai_prime_mat - ((drone_r_origin @ ai_mat.T).T + drone_t_origin)
 
             # Append drone_tf_origin
-            drone_tf_origin = util.Transform().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
+            drone_tf_origin = util.Transformation().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
             poses.append(drone_tf_origin)
 
             p.update_pgr()
@@ -215,7 +215,7 @@ class MCAnalysis(object):
         y = np.cross(z, x) / np.linalg.norm(np.cross(z, x))
 
         # Compute ai'
-        self.drone_tf_o = util.Transform().from_trans_3_axis(trans=oc, x=x, y=y, z=z).inv()
+        self.drone_tf_o = util.Transformation().from_trans_3_axis(trans=oc, x=x, y=y, z=z).inv()
         res = {}
         for point_name in self.points_name:
             res[point_name] = self.drone_tf_o @ self.data.get_point(point_name, frame_number)
