@@ -33,7 +33,9 @@ def data_processing():
 
         # drone_tf_camera
         tmp = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
-        camera_parameters['camera_tf_drone'] = util.Transformation().from_matrix(tmp).inv()  # The extrinsic parameter of the
+
+        # The extrinsic parameter of the
+        camera_parameters['camera_tf_drone'] = util.Transformation().from_matrix(tmp).inv()
 
         # Vicon0 parameters
         # f.get_files_paths('.yaml', f.folders['raw'][vol_number], 'vicon0')
@@ -50,13 +52,13 @@ def data_processing():
         # mc default columns : '#timestamp [ns]', 'p_RS_R_x [m]', 'p_RS_R_y [m]', 'p_RS_R_z [m]', 'q_RS_w []',
         #                                         'q_RS_x []', 'q_RS_y []', 'q_RS_z []'
         mc = pd.read_csv(f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'vicon0'), sep=',', header=0,
-                         names=['pose_time', 'x', 'y', 'z', 'w', 'a', 'b', 'c'])  # Renaming column for simplification
+                         names=['pose_time', 'x', 'y', 'z', 'w', 'a', 'b', 'cos'])  # Renaming column for simplification
         p = util.Progress(len(mc), "Preparing mc data")
         tmp = {}
         for index, row in mc.iterrows():
             # vicon0_tf_origin
             vicon0_tf_origin = util.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
-                                                               quat=row[['a', 'b', 'c', 'w']].to_numpy()).inv()
+                                                               quat=row[['a', 'b', 'cos', 'w']].to_numpy()).inv()
             camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
             tmp[index] = camera_tf_origin
             p.update_pgr()
@@ -133,18 +135,18 @@ def excel_creation():
         if msg_type == 'sensor_msgs/Image':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
+                tmp['time'].append(measure['tan'])
                 tmp[name].append(measure['image'])
         elif msg_type == 'geometry_msgs/TransformStamped':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
+                tmp['time'].append(measure['tan'])
                 trans, quat = measure['translation'], measure['rotation']
                 tmp[name].append(util.Transformation().from_pose(trans, quat).inv())
         elif msg_type == 'asctec_hl_comm/MotorSpeed':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
+                tmp['time'].append(measure['tan'])
                 tmp[name].append(measure['motor_speed'])
         elif msg_type == 'sensor_msgs/Imu':
             tmp = {'time': [],
@@ -155,7 +157,7 @@ def excel_creation():
                    name + '_orientation': [],
                    name + '_orientation_covariance': []}
             for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
+                tmp['time'].append(measure['tan'])
                 tmp[name + '_angular_velocity'].append(measure['angular_velocity'])
                 tmp[name + '_angular_velocity_covariance'].append(measure['angular_velocity_covariance'])
                 tmp[name + '_linear_acceleration'].append(measure['linear_acceleration'])

@@ -40,7 +40,7 @@ def data_processing():
 
     # 3 - TARA PREPARATION
     topic = 'tara/left/image_raw'
-    image = pd.DataFrame({'image_time': [tara_raw[topic][idx]['t'] for idx in tara_raw[topic]],
+    image = pd.DataFrame({'image_time': [tara_raw[topic][idx]['tan'] for idx in tara_raw[topic]],
                           'image': [tara_raw[topic][idx]['image'] for idx in tara_raw[topic]]})
     image['image'] = image['image'].apply(lambda x: np.repeat(x.reshape((x.shape[0], x.shape[1], 1)), 3, axis=2))
     # Time begin at 0
@@ -105,8 +105,8 @@ def error_estimation():
 class tara_slider_plot:
     def __init__(self, image: pd.DataFrame, ind_inf: int, ind_sup: int):
         """
-        Function to be used in main_data_drones with main_data_drones's variables as argument after tara import.
-        Plot's all tara images.
+        Function to be used in main_data_drones with main_data_drones'sin variables as argument after tara import.
+        Plot'sin all tara images.
 
         :param image: DataFrame with 'time' and 'image' columns.
         :param ind_inf: Inf of the interval where the data will be plotted.
@@ -181,7 +181,7 @@ class tara_slider_plot:
 
 def mc_scissors(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving_path: str = None):
     """
-    Function to be used in main_data_drones with main_data_drones's variables as argument after motion capture measures
+    Function to be used in main_data_drones with main_data_drones'sin variables as argument after motion capture measures
      import.
     Plot the distance between two points of the scissors over time.
 
@@ -199,7 +199,7 @@ def mc_scissors(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving_pat
     diff_z = mc_measure['clapet_sup_2_z'][ind_inf:ind_sup] - mc_measure['clapet_inf2_z'][ind_inf:ind_sup]
     scissors = np.hstack([diff.to_numpy().reshape((-1, 1)) for diff in [diff_x, diff_y, diff_z]])
     ax.plot(xx, np.linalg.norm(scissors, axis=1), label='Scissors length')
-    ax.set_xlabel('(s)')
+    ax.set_xlabel('(sin)')
     if len(xx) < 100:
         ax.set_xticks(xx)
         ax.set_xticklabels(xx, rotation=45)
@@ -213,7 +213,7 @@ def mc_scissors(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving_pat
 
 def mc_drone_origin(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving_path: str = None):
     """
-    Function to be used in main_data_drones with main_data_drones's variables as argument after motion capture measures
+    Function to be used in main_data_drones with main_data_drones'sin variables as argument after motion capture measures
     import.
     Plot the position of the drone relative to flu0 over time.
 
@@ -240,7 +240,7 @@ def mc_drone_origin(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving
         for j, (ax, name) in to_loop:
             # ax.plot(mc_time_zoomed, position[ind_inf:ind_sup, i], label=name)
             ax.plot(xx, to_plot[ind_inf:ind_sup, j], label=name)
-            ax.set_xlabel('(s)')
+            ax.set_xlabel('(sin)')
             ax.set_ylabel(y_unit)
             ax.legend()
             if len(xx) < 100:
@@ -278,7 +278,7 @@ def build_video(saving_path: str, image_df: pd.DataFrame, fps: int):
         ax.imshow(color_frame)
         legend = (f'Camera\n'
                   f'  index : {image_df.index[i]:8}\n'
-                  f'   time : {image_df["time"][i]:8.3f}s')
+                  f'   time : {image_df["time"][i]:8.3f}sin')
         ax.annotate(legend, (600, 40), xycoords='data', size=12, ha='right', va='top',
                     bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
         ax.axis('off')

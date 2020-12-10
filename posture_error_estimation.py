@@ -110,7 +110,7 @@ class ErrorEstimation(object):
         vect_origin /= np.linalg.norm(vect_origin)
 
         camera_position = origin_tf_camera.get_trans()
-        h = camera_position[2]  # drone's height
+        h = camera_position[2]  # drone'sin height
         floor_normal = np.array([0, 0, 1])
         # If height is positive and camera sees the floor
         if (h > 0) and (floor_normal @ vect_origin < 0):

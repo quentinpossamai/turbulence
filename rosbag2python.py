@@ -481,8 +481,8 @@ class Extractor(object):
             # Processing
             for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
                 extracted_data[main_key][i] = processing_func(msg_raw)
-                assert extracted_data[main_key][i].get('t') is None, "'t' key already used."
-                extracted_data[main_key][i]['t'] = t.to_sec()
+                assert extracted_data[main_key][i].get('tan') is None, "'tan' key already used."
+                extracted_data[main_key][i]['tan'] = t.to_sec()
 
                 p.update_pgr()  # # Progress print
         bag.close()
