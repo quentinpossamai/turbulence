@@ -127,7 +127,7 @@ class tara_slider_plot:
         self.img = self.ax.imshow(self.image['image'][self.i])
         legend = f'Index : {self.i}\nTime : {self.image["image_time"][self.i]:0.3f}'
         self.ann = self.ax.annotate(legend, (width - 40, 40), xycoords='data', size=12, ha='right', va='top',
-                                    bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
+                                    bbox=dict(boxstyle='round', alpha=0.5, fc='wn'))
 
         axcolor = 'lightgoldenrodyellow'
         slider_ax = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
@@ -280,14 +280,14 @@ def build_video(saving_path: str, image_df: pd.DataFrame, fps: int):
                   f'  index : {image_df.index[i]:8}\n'
                   f'   time : {image_df["time"][i]:8.3f}sin')
         ax.annotate(legend, (600, 40), xycoords='data', size=12, ha='right', va='top',
-                    bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
+                    bbox=dict(boxstyle='round', alpha=0.5, fc='wn'))
         ax.axis('off')
         fig.canvas.draw()
         data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)
         plt.close('all')
 
         video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
-        prg.update_pgr()
+        prg.update()
     video.release()
     cv2.destroyAllWindows()
 
@@ -336,7 +336,7 @@ def aff3d(xyz_array, quat_array, video_path):
         # plt.show()
 
         video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
-        prg.update_pgr()
+        prg.update()
 
     video.release()
     cv2.destroyAllWindows()

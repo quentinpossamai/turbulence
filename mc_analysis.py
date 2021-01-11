@@ -12,7 +12,7 @@ import prettytable
 
 def main():
     """
-    This .py'sin goal is to extract drone pose (position + orientation) from MC (motion capture) data.
+    This .py's goal is to extract drone pose (position + orientation) from MC (motion capture) data.
     """
     # Path extraction of the MC data
     print('Processing data path.')
@@ -77,11 +77,11 @@ class MCAnalysis(object):
         if filename in to_cut:
             data_raw.drop(list(data_raw.index)[to_cut[filename]:], inplace=True)
 
-        # Nan drop of drone'sin markers
+        # Nan drop of drone's markers
         point_column = []
         for point_name in self.points_name:
             point_column += [point_name + '_x', point_name + '_y', point_name + '_z']
-        # Get the dataframe of drone'sin markers row that contains at list one nan
+        # Get the dataframe of drone's markers row that contains at list one nan
         tmp = data_raw[point_column].loc[(data_raw[point_column].isna().sum(axis=1) > 0), :]
         print(f'Found {len(tmp)} NaN in data at indexes : {[e for e in tmp.index]}.\n'
               f'(last index of data is : {len(data_raw) - 1}).\n'
@@ -124,7 +124,7 @@ class MCAnalysis(object):
         ai_prime_framed = np.zeros((len(self.data), len(self.points_name), 3))
         for frame_number in self.data.df.index:
             ai_prime_framed[frame_number, :, :] = np.array(list(self.object_reference_frame(frame_number).values()))
-            p.update_pgr()
+            p.update()
         ai_prime_mat = np.mean(ai_prime_framed, axis=0)
         centroid_ai_prime = np.mean(ai_prime_mat, axis=0)
 
@@ -175,7 +175,7 @@ class MCAnalysis(object):
             drone_tf_origin = util.Transformation().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
             poses.append(drone_tf_origin)
 
-            p.update_pgr()
+            p.update()
         return poses
 
     def object_reference_frame(self, frame_number: int) -> Dict[str, np.ndarray]:
@@ -186,13 +186,13 @@ class MCAnalysis(object):
         :return: All the measured points_name expressed in C.
         """
         # Definition of C the reference frame of the drone.
-        # First it'sin origin C through the computing of OC. With this definition it is almost the center of mass.
+        # First it's origin C through the computing of OC. With this definition it is almost the center of mass.
         oc = np.zeros(3)
         for i in range(4):
             oc += self.data.get_point(f'b{i + 1}', frame_number)
         oc = oc / 4
 
-        # bi'sin plane equation
+        # bi's plane equation
         bis_eq = util.plane_equation(self.data.get_point('b1', frame_number),
                                      self.data.get_point('b3', frame_number),
                                      self.data.get_point('b2', frame_number))
@@ -226,27 +226,27 @@ class MCAnalysis(object):
         # for i, point_name in enumerate(self.points_name):
         #     # R0
         #     point = self.data.get_point(point_name, frame_number)
-        #     ax.scatter(xs=point[0], ys=point[1], zs=point[2], cos='tab:blue')
-        #     ax.text(x=point[0], y=point[1], z=point[2], sin=point_name)
+        #     ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:blue')
+        #     ax.text(x=point[0], y=point[1], z=point[2], s=point_name)
         #     # Drone
         #     point = res[point_name]
-        #     ax.scatter(xs=point[0], ys=point[1], zs=point[2], cos='tab:orange')
-        #     ax.text(x=point[0], y=point[1], z=point[2], sin=point_name)
+        #     ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:orange')
+        #     ax.text(x=point[0], y=point[1], z=point[2], s=point_name)
         #     if i == 0:
-        #         ax.scatter(xs=point[0], ys=point[1], zs=point[2], cos='tab:blue', label='R0')
-        #         ax.scatter(xs=point[0], ys=point[1], zs=point[2], cos='tab:orange', label='Drone')
+        #         ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:blue', label='R0')
+        #         ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:orange', label='Drone')
         #
         # # y2 projected
         # point = y2proj
         # point_name = 'y2proj'
-        # ax.scatter(xs=point[0], ys=point[1], zs=point[2], cos='tab:green')
-        # ax.text(x=point[0], y=point[1], z=point[2], sin=point_name)
+        # ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:green')
+        # ax.text(x=point[0], y=point[1], z=point[2], s=point_name)
         #
         # # C
         # point = oc
         # point_name = 'C'
-        # ax.scatter(xs=point[0], ys=point[1], zs=point[2], cos='tab:green')
-        # ax.text(x=point[0], y=point[1], z=point[2], sin=point_name)
+        # ax.scatter(xs=point[0], ys=point[1], zs=point[2], c='tab:green')
+        # ax.text(x=point[0], y=point[1], z=point[2], s=point_name)
         #
         # # Plane normal
         # ax.quiver(oc[0], oc[1], oc[2], plane_normal[0], plane_normal[1], plane_normal[2], length=0.1)
@@ -310,7 +310,7 @@ class MCData(object):
 
     def get_point(self, point_name: str, index: Union[np.ndarray, Iterable, int, float]) -> np.ndarray:
         """
-        Get the 3 coordinates of the point in self.df giving the point name and it'sin index in the pd.DataFrame
+        Get the 3 coordinates of the point in self.df giving the point name and it's index in the pd.DataFrame
         :param point_name: The name of the point. Possible point name are :
 
         ['b1', 'b2', 'b3', 'b4', 'y1', 'y2', 'x2', 'clapet_inf1', 'clapet_inf2', 'clapet_sup_2']

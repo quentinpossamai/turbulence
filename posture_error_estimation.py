@@ -243,7 +243,7 @@ class ErrorEstimation(object):
                 else:
                     p3 = error  # Send the message of failure
             self.p3.append(p3)
-            progress.update_pgr()
+            progress.update()
 
     def p32video(self, fps: int, saving_path: str):
         codec = VideoWriter_fourcc(*'H264')
@@ -262,7 +262,7 @@ class ErrorEstimation(object):
                 ax.scatter(p[0], p[1], color='r')
             else:
                 ax.annotate(self.p3[i], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
-                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
+                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='wn'))
             xyz = self.df['pose'][i].inv().get_trans()
             angles = self.df['pose'][i].inv().get_rot_euler(seq='xyz', degrees=True)
             legend = (f'Camera position\n'
@@ -274,14 +274,14 @@ class ErrorEstimation(object):
                       f'   Rot z:{angles[2]:8.3f}°\n'
                       f'frame id:{i:9}')
             ax.annotate(legend, (self.frames_width - 40, 40), xycoords='data', size=12, ha='right', va='top',
-                        bbox=dict(boxstyle='round', alpha=0.5, fc='w'), family='monospace')
+                        bbox=dict(boxstyle='round', alpha=0.5, fc='wn'), family='monospace')
             ax.axis('off')
             fig.canvas.draw()
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)
             plt.close('all')
 
             video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
-            prg.update_pgr()
+            prg.update()
 
             # plt.imshow(data)
             # plt.show()

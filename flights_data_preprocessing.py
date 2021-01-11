@@ -209,13 +209,13 @@ class DataPreparation(object):
             # plt.plot(xx, raw_xyz[:, 0], label='x_raw', linestyle='dashed', color='tab:blue')
             # plt.plot(xx, self.poses_data['pose']['xyz'][:, 1], label='y', color='tab:orange')
             # plt.plot(xx, raw_xyz[:, 1], label='y_raw', linestyle='dashed', color='tab:orange')
-            # plt.xlabel('Time (sin)')
+            # plt.xlabel('Time (s)')
             # plt.ylabel('Position (m)')
             # plt.legend(loc=1, framealpha=0.5)
             # plt.subplot(122)
             # plt.plot(xx, self.poses_data['pose']['xyz'][:, 2], label='z', color='tab:blue')
             # plt.plot(xx, raw_xyz[:, 2], label='z_raw', linestyle='dashed', color='tab:blue')
-            # plt.xlabel('Time (sin)')
+            # plt.xlabel('Time (s)')
             # plt.ylabel('Position (m)')
             # plt.legend(loc=1, framealpha=0.5)
             # fig.tight_layout()
@@ -237,8 +237,8 @@ class DataPreparation(object):
         self.frames_time = None
 
         self.tac = time.time()
-        print(f'Primary import done | Time since beginning : {self.tac - self.tic:.03f}sin |'
-              f' Time since last step : {self.tac - self.tic:.03f}sin')
+        print(f'Primary import done | Time since beginning : {self.tac - self.tic:.03f}s |'
+              f' Time since last step : {self.tac - self.tic:.03f}s')
         self.toc = time.time()
 
     def time_analysis(self):
@@ -298,8 +298,8 @@ class DataPreparation(object):
         assert self.right_frames.shape[2] == self.frames_width
 
         self.tac = time.time()
-        print(f'Nan finished | Time since beginning : {self.tac - self.tic:.03f}sin |'
-              f' Time since last step : {self.tac - self.toc:.03f}sin')
+        print(f'Nan finished | Time since beginning : {self.tac - self.tic:.03f}s |'
+              f' Time since last step : {self.tac - self.toc:.03f}s')
         self.toc = time.time()
 
         # Intersection between time arrays and sorting them in chronological order FOLD
@@ -315,8 +315,8 @@ class DataPreparation(object):
         poses_quaternions = poses_quaternions[poses_ind]
 
         self.tac = time.time()
-        print(f'Chronological order & Left right merge | Time since beginning : {self.tac - self.tic:.03f}sin '
-              f'| Time since last step : {self.tac - self.toc:.03f}sin')
+        print(f'Chronological order & Left right merge | Time since beginning : {self.tac - self.tic:.03f}s '
+              f'| Time since last step : {self.tac - self.toc:.03f}s')
         self.toc = time.time()
 
         # Time normalization
@@ -327,8 +327,8 @@ class DataPreparation(object):
         poses_time = poses_time - t0
 
         self.tac = time.time()
-        print(f'Time normalization | Time since beginning : {self.tac - self.tic:.03f}sin |'
-              f' Time since last step : {self.tac - self.toc:.03f}sin')
+        print(f'Time normalization | Time since beginning : {self.tac - self.tic:.03f}s |'
+              f' Time since last step : {self.tac - self.toc:.03f}s')
         self.toc = time.time()
 
         # Merge poses time and frames time FOLD
@@ -371,8 +371,8 @@ class DataPreparation(object):
 
         self.tac = time.time()
         print(f'Fusion left & right frames with poses |'
-              f' Time since beginning : {self.tac - self.tic:.03f}sin |'
-              f' Time since last step : {self.tac - self.toc:.03f}sin')
+              f' Time since beginning : {self.tac - self.tic:.03f}s |'
+              f' Time since last step : {self.tac - self.toc:.03f}s')
         self.toc = time.time()
 
         clean_data = {'time': self.poses_data['time'],

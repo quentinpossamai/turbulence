@@ -31,7 +31,7 @@ class Progress(object):
         if start_print is not None:
             print(start_print)
 
-    def update_pgr(self, iteration: int = None):
+    def update(self, iteration: int = None):
         """
         Update print of the progression percentage.
         :param iteration: If the progress went more than 1 it is possible to specify the actual iteration number.
@@ -40,11 +40,11 @@ class Progress(object):
             self.iter = iteration
         # Progression
         print(f'\rProgression : {(self.iter + 1) * 100 / self.max_iter:0.02f}% | '
-              f'Time passed : {time.time() - self.initial_time:.03f}sin', end='')
+              f'Time passed : {time.time() - self.initial_time:.03f}s', end='')
         sys.stdout.flush()
         if self.iter + 1 == self.max_iter:
             if self.end_print is not None:
-                print(self.end_print)
+                print("\n"+self.end_print)
             else:
                 print('')
         self.iter += 1
@@ -126,7 +126,7 @@ class Transformation(object):
 
         D reference frame.
 
-        C_T_D = C_T_A @ A_T_B @ B_T_D.
+        C_T_D = C_T_A @ A_T_B @ B_T_D.                T_C_D = C_T_D
         """
         quat = Rotation.from_matrix(self.get_rot()).as_quat()
         trans = self.get_trans()
@@ -137,7 +137,7 @@ class Transformation(object):
         Create a Transformation object from the reference frame of (xyz, quat) to a new one at position xyz and oriented
         with quat.
 
-        quat = x, y, z, w
+        quat = x, y, z, wn
 
         A reference frame.
 
@@ -333,7 +333,7 @@ class DataFolder(object):
                         path_contain: str = None) -> List[str]:
         """
         :param extension: The name of the extension.
-        :param specific_folder: Path or list of paths to match the file'sin folder'sin path.
+        :param specific_folder: Path or list of paths to match the file's folder's path.
         :param path_contain: Beginning of the filename.
         :return: List of paths of all raw data files that are named with this extension.
         """
@@ -376,7 +376,7 @@ class DataFolder(object):
                              filename_begin_with: str = None) -> str:
         """
         :param extension: The name of the extension.
-        :param specific_folder: Path or list of paths to match the file'sin folder'sin path.
+        :param specific_folder: Path or list of paths to match the file's folder's path.
         :param filename_begin_with: Beginning of the filename.
         :return: List of paths of all raw data files that are named with this extension.
         """
@@ -390,7 +390,7 @@ class DataFolder(object):
                          filename_begin_with: str = None, pickle_was_python2: bool = False):
         """
         :param extension: The name of the extension.
-        :param specific_folder: Path or list of paths to match the file'sin folder'sin path.
+        :param specific_folder: Path or list of paths to match the file's folder's path.
         :param filename_begin_with: Beginning of the filename.
         :param pickle_was_python2: If the file was pickle using python2 or not.
         :return: List of paths of all raw data files that are named with this extension.
@@ -531,7 +531,7 @@ def plane_equation(p1: Union[np.ndarray, list], p2: Union[np.ndarray, list],
     :param p1: Point in 3D space different from p2 and p3.
     :param p2: Point in 3D space different from p1 and p3.
     :param p3: Point in 3D space different from p2 and p1.
-    :return: The 4 parameters a, b, cos, distortion_coefficient of a plane equation in an array form.
+    :return: The 4 parameters a, b, c, distortion_coefficient of a plane equation in an array form.
     """
     # Type correction
     input_vars = {'p1': p1, 'p2': p2, 'p3': p3}
