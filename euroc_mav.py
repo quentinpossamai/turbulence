@@ -106,7 +106,7 @@ def error_estimation():
                                                              distortion_coefficient=camera_parameters['D'],
                                                              max_distance=5)
         estimator.p3_generator()
-        saving_path = f.folders['results'][flight_number] + 'pose_camera_correspondence_video.mkv'
+        saving_path = f.folders['results'][flight_number] + 'raw_video.mkv'
         estimator.p32video(fps=camera_parameters['fps'], saving_path=saving_path)
         print()
 
@@ -193,5 +193,6 @@ def excel_creation():
 
 if __name__ == '__main__':
     # data_processing()
-    # error_estimation()
-    excel_creation()
+    error_estimation()
+
+    # excel_creation()
