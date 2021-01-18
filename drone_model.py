@@ -1,10 +1,14 @@
+"""
+This file contains a drone models to compute the turbulence forces and torques labels.
+"""
 import torch
 import torch.nn as nn
-# import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint  # https://github.com/rtqichen/torchdiffeq
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 import util
 
@@ -12,48 +16,48 @@ import util
 # 05 June 2020
 # DRONE MODEL
 
-# Every equations in this code are described in Francesco Sabatino's Thesis
-# Sabatino, Francesco. ‘Quadrotor Control: Modeling, Nonlinear Control Design, and Simulation’, 2015, 67.
 
 # noinspection PyAbstractClass
-class FSDroneModel(nn.Module):
-    def __init__(self, m: float, g: float, b: float, d: float, l_arm: float):
+class AscTecFireflyDroneModel(nn.Module):
+    """
+    AscTec Firefly drone model used in EuRoC MAV data implementing "f" the derivative of the state over time, "forward"
+    to compute the error between ground truth and model estimation.
+    Every equations in this code are described in:
+    -Sabatino, Francesco. ‘Quadrotor Control: Modeling, Nonlinear Control Design, and Simulation’, 2015, 67.
+    -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
+     Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
+
+    """
+
+    def __init__(self, m: float, g: float, kt: float, km: float, l_arm: float, inertia_matrix: np.ndarray):
         """
         Drone model base of Sabatino Francesco thesis adapted to an hexarotor.
 
         :param m: mass of the drone (scalar) (kg).
         :param g: gravity constant (scalar) (9.81m/s2).
-        :param b: Thrust factor (kg.m/rad2).
-        :param d: Drag factor (kg.m2/rad2).
+        :param kt: Thrust factor (scalar) (kg.m/rad2).
+        :param km: Moment factor (scalar) (kg.m2/rad2).
         :param l_arm: Drone's arm distance (scalar) (m).
+        :param inertia_matrix: (3x3 matrix) (kg.m2).
         """
         super().__init__()
-        # Parameters
-        self.m = torch.tensor(m, dtype=torch.float)  # masse
-        self.g = torch.tensor(g, dtype=torch.float)  # Newton's constant
-        self.b = torch.tensor(b, dtype=torch.float)  # Thrust factor
-        self.d = torch.tensor(d, dtype=torch.float)  # Drag factor
-        self.l_arm = torch.tensor(l_arm, dtype=torch.float)  # Drone's arm distance
-
-        self.inertia_matrix = torch.tensor([[1 / 6 * self.m * self.l_arm ** 2, 0, 0],
-                                            [0, 1 / 6 * self.m * self.l_arm ** 2, 0],
-                                            [0, 0, 1 / 6 * self.m * self.l_arm ** 2]], dtype=torch.float)
+        # Drone model parameters.
+        self.m = torch.tensor(m, dtype=torch.float)
+        self.g = torch.tensor(g, dtype=torch.float)
+        self.kt = torch.tensor(kt, dtype=torch.float)
+        self.km = torch.tensor(km, dtype=torch.float)
+        self.l_arm = torch.tensor(l_arm, dtype=torch.float)
+        self.inertia_matrix = torch.from_numpy(inertia_matrix)
 
         self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
 
-    # Differential equation
-    def f(self, time: torch.tensor, state: torch.tensor, w: torch.tensor, fa: torch.tensor) -> torch.tensor:
+    def f(self, time: torch.Tensor, state: torch.Tensor, w: torch.Tensor, fa: torch.Tensor) -> torch.Tensor:
         """
         Compute the derivative of the state. x_dot = f(x, u, fa)
-
-        :param time: scalar in seconds (tensor of shape (1,).
-
-        :param state: state of the drone torch.tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
-
+        :param time: scalar in seconds (Tensor of shape (1,)).
+        :param state: state of the drone torch.Tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
         :param w: Command: 6 rotors angular velocity in rad/s.
-
         :param fa: External perturbation in N=kg.m/s2.
-
         :return: Return the derivative of the state.
         """
         # # Quadrotor
@@ -68,19 +72,27 @@ class FSDroneModel(nn.Module):
         # tau_cmd_z = self.d * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
 
         # Hexarotor
-        w1 = w[0]
-        w2 = w[1]
-        w3 = w[2]
-        w4 = w[3]
-        w5 = w[4]
-        w6 = w[5]
+        u = w ** 2
 
-        f_cmd_t = self.b * (w1 ** 2 + w2 ** 2 + w3 ** 2 + w4 ** 2 + w5 ** 2 + w6 ** 2)
-        tau_cmd_x = self.b * self.l_arm * (- w2 ** 2 + w5 ** 2 + 1 / 2 * (- w1 ** 2 - w3 ** 2 + w4 ** 2 + w6 ** 2))
-        tau_cmd_y = 3. ** 0.5 / 2. * self.b * self.l_arm * (- w1 ** 2 + w3 ** 2 + w4 ** 2 - w6 ** 2)
-        tau_cmd_z = self.d * (- w1 ** 2 + w2 ** 2 - w3 ** 2 + w4 ** 2 - w5 ** 2 + w6 ** 2)
+        kt = self.kt
+        km = self.km
+        la = self.l_arm
+        c = 3 ** 0.5 / 2
+
+        f_cmd_t = self.kt * torch.sum(u)
+        b = torch.tensor([[-0.5 * la * kt, -la * kt, -0.5 * la * kt, 0.5 * la * kt, la * kt, 0.5 * la * kt],
+                          [-c * la * kt, 0, c * la * kt, c * la * kt, 0, -c * la * kt],
+                          [-km, km, -km, km, -km, km]])
+        moments = b @ u
+        tau_cmd_x = moments[0]
+        tau_cmd_y = moments[1]
+        tau_cmd_z = moments[2]
 
         # -----------------------------------------------------------
+
+        cos = torch.cos
+        sin = torch.sin
+        tan = torch.tan
 
         phi, theta, psi, p, q, r, u, v, w, x, y, z = state
 
@@ -114,8 +126,8 @@ class FSDroneModel(nn.Module):
         dstate = dstate + c * fa
         return dstate
 
-    def forward(self, xn1: torch.tensor, xn: torch.tensor, wn: torch.tensor,
-                dt: torch.tensor, tn: torch.tensor) -> torch.tensor:
+    def forward(self, xn1: torch.Tensor, xn: torch.Tensor, wn: torch.Tensor,
+                dt: torch.Tensor, tn: torch.Tensor) -> torch.Tensor:
         """
         Compute the norm of the difference between the state and a state estimate. fa derivable in pytorch.
 
@@ -129,26 +141,26 @@ class FSDroneModel(nn.Module):
 
         :param tn: time of the measure in s.
 
-        :return: torch.tensor of dimension (1,).
+        :return: torch.Tensor of dimension (1,).
         """
         return torch.norm(xn1 - (xn + dt * self.f(tn, xn, wn, self.fa)))
 
-    def fa_direct_subtract(self, xn1: torch.tensor, xn: torch.tensor, wn: torch.tensor,
-                           dt: torch.tensor, tn: torch.tensor) -> torch.tensor:
+    def forward_fa_direct_subtract(self, xn1: torch.Tensor, xn: torch.Tensor, wn: torch.Tensor,
+                                   dt: torch.Tensor, tn: torch.Tensor) -> torch.Tensor:
         """
-        A different forward to not used pytorch optimizers because computing fa is just a subtraction.
+        A different forward to not used pytorch optimizers because computing fa* is just a subtraction.
 
-        :param xn1:
+        :param xn1: state a step n+1.
 
-        :param xn:
+        :param xn: state a step n.
 
-        :param wn:
+        :param wn: command at time n.
 
-        :param dt:
+        :param dt: time step.
 
-        :param tn: (s)
+        :param tn: (s).
 
-        :return:
+        :return: fa, ground truth at step n+1, estimated state at step n+1.
         """
         ixx = self.inertia_matrix[0, 0]
         iyy = self.inertia_matrix[1, 1]
@@ -156,24 +168,25 @@ class FSDroneModel(nn.Module):
         c = torch.tensor([0., 0., 0., 1 / ixx, 1 / iyy, 1 / izz,
                           1 / self.m, 1 / self.m, 1 / self.m, 0., 0., 0.], dtype=torch.float)
 
-        return (xn1 - (xn + dt * self.f(tn, xn, wn, torch.tensor(12, dtype=torch.float)))) / (dt * c)
-
-
-def cos(var):
-    return torch.cos(var)
-
-
-def sin(var):
-    return torch.sin(var)
-
-
-def tan(var):
-    return torch.tan(var)
+        xn1_hat = xn + dt * self.f(tn, xn, wn, torch.tensor(12, dtype=torch.float))
+        fa = (xn1 - xn1_hat) / (dt * c)
+        return fa, xn1, xn1_hat
 
 
 def compute_fa():
+    """
+    Compute fa* using FSDroneModel integrated with Euler as an estimator. EuRoC MAV data are used (AscTec Firefly).
+
+    AscTec parameters:
+    -Achtelik, Michael, Klaus-Michael Doth, Daniel Gurdan, and Jan Stumpf. ‘Design of a Multi Rotor MAV with Regard to
+    Efficiency, Dynamics and Redundancy’. In AIAA Guidance, Navigation, and Control Conference. Guidance, Navigation,
+    and Control and Co-Located Conferences. American Institute of Aeronautics and Astronautics, 2012.
+    https://doi.org/10.2514/6.2012-4779.
+    -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
+    Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
+    """
     f = util.DataFolder("euroc_mav")
-    flight_number = 2
+    flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
     print(f"Loading: {data_path}")
     data = pd.read_pickle(data_path)
@@ -186,7 +199,7 @@ def compute_fa():
     # Now data["vicon_pose"] is tf_origin_drone
 
     data["trans"] = data["vicon_pose"].apply(lambda x: x.get_trans())
-    data["rot"] = data["vicon_pose"].apply(lambda x: x.get_rot())
+    data["quat"] = data["vicon_pose"].apply(lambda x: x.get_pose()[1])
 
     dt = pd.Series(data["time"][1:].values - data["time"][:len(data) - 1].values)
     dt.index = range(1, len(dt) + 1)
@@ -195,14 +208,26 @@ def compute_fa():
     # Linear speed in origin
     linear_speed = (data["trans"][1:].values - data["trans"][:len(data) - 1].values) / dt
     # Linear speed in drone
-    linear_speed = linear_speed.to_frame(0)\
+    linear_speed = linear_speed.to_frame(0) \
         .apply(lambda x: data["vicon_pose"][x.name].get_rot().T @ x.values[0], axis=1)
 
-    angular_velocity = ((data["rot"][1:].values - data["rot"][:len(data) - 1].values) / dt).to_frame(0) \
-        .apply(lambda x: data["rot"][1:][x.name].T @ x.values[0], axis=1) \
-        .apply(lambda x: np.array([(x[2, 1] - x[1, 2]) / 2,
-                                   (x[0, 2] - x[2, 0]) / 2,
-                                   (x[1, 0] - x[0, 1]) / 2]))
+    def angular_velocity_calc(x: pd.Series) -> np.ndarray:
+        """
+        :return: The angular velocity computed form 2 quaternions and a time difference. Used with DataFrame.apply().
+        """
+        qn1: np.ndarray = data["quat"][x.name]
+        qn: np.ndarray = data["quat"][x.name - 1]
+        delta_t: float = x.values[0]
+
+        dq_dt = (qn1 - qn) / delta_t
+        q0, q1, q2, q3 = qn1
+        g_matrix = np.array([[-q1, q0, q3, -q2],
+                             [-q2, -q3, q0, q1],
+                             [-q3, q2, -q1, q0]])
+
+        return (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
+
+    angular_velocity = dt.to_frame(0).apply(angular_velocity_calc, axis=1)
 
     data["linear_speed"] = linear_speed
     data["angular_velocity"] = angular_velocity
@@ -215,24 +240,41 @@ def compute_fa():
                                               data["linear_speed"][x.name],
                                               data["trans"][x.name]]).astype(np.float)), axis=1)
 
-    drone_model = FSDroneModel(m=3., g=9.81, b=0.01, d=0.01, l_arm=0.2)
-
+    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
+                                          inertia_matrix=np.array([[10.007e-3, 0., 0.],
+                                                                   [0., 10.2335e-3, 0],
+                                                                   [0., 0., 8.1e-3]]))
     # Direct computation
-    data["fa"] = np.nan
+    writer = SummaryWriter(f"{f.workspace_path}tensorboard_drone_model/")
+    fa_dict = {}
+    for index in tqdm(data.index):
+        if index < 2:
+            fa_dict[index] = np.nan
+            continue
+        fa, xn1, xn1_hat = drone_model.forward_fa_direct_subtract(xn1=data["state"][index],
+                                                                  xn=data["state"][index - 1],
+                                                                  wn=torch.from_numpy(
+                                                                      data["motor_speed"][index - 1]).float(),
+                                                                  dt=torch.tensor(data["dt"][index], dtype=float),
+                                                                  tn=torch.tensor(data["time"][index - 1],
+                                                                                  dtype=float))
+        _, _, _, tau_x, tau_y, tau_z, fx, fy, fz, _, _, _ = fa
+        phi, theta, psi, p, q, r, u, v, w, x, y, z = xn1
+        hphi, htheta, hpsi, hp, hq, hr, hu, hv, hw, hx, hy, hz = xn1_hat
+        fa_dict[index] = torch.tensor([fx, fy, fz, tau_x, tau_y, tau_z], dtype=torch.float)
 
-    def extract_fa(x):
-        fa = drone_model.fa_direct_subtract(xn1=data["state"][x.name],
-                                            xn=data["state"][x.name - 1],
-                                            wn=data["motor_speed"][x.name - 1],
-                                            dt=data["dt"][x.name],
-                                            tn=data["time"][x.name - 1])
-        _, _, _, tau_x, tau_y, tau_z, f_x, f_y, f_z, _, _, _ = fa
-        return torch.tensor([f_x, f_y, f_z, tau_x, tau_y, tau_z], dtype=torch.float)
+        writer.add_scalars("fa's forces", {"fx": fx, "fy": fy, "fz": fz}, data.loc[index, "time"])
+        writer.add_scalars("fa's moments", {"tau_x": tau_x, "tau_y": tau_y, "tau_z": tau_z}, data.loc[index, "time"])
 
-    data[["fa"]] = data[["fa"]][2:].apply(extract_fa, axis=1)
+        for var in ["phi", "theta", "psi", "p", "q", "r", "u", "v", "w", "x", "y", "z"]:
+            eval(f"""writer.add_scalars("{var}", {{"ground truth": {var},
+                                                   "estimator": h{var}}}, data.loc[index, "time"])""")
+    data["fa"] = pd.Series(fa_dict)
+
     new_data_path = util.get_folder_path(data_path) + "fa.pkl"
     print(f"Saving: {new_data_path}")
     data.to_pickle(new_data_path)
+    print()
 
     # # Adam optimization
     # optimizer = optim.Adam(drone_model.parameters(), lr=0.01)
@@ -300,6 +342,9 @@ def compute_fa():
 
         # First order(n=6 q=4) derivative plot
         def fo_differentiator_n6_q4_trans(x):
+            """
+            Differentiate the translation using a first order, 6 past measures, and 4 ?. Used with DataFrame.apply().
+            """
             array = x.values[0]
             ind = x.name
             if ind == 0:
@@ -317,6 +362,9 @@ def compute_fa():
         _linear_speed = data["trans"][1:].to_frame(0).apply(fo_differentiator_n6_q4_trans, axis=1)
 
         def fo_differentiator_n6_q4_rot(x):
+            """
+            Differentiate the rotation using a first order, 6 past measures, and 4 ?. Used with DataFrame.apply().
+            """
             array = x.values[0]
             ind = x.name
             if ind == 0:
@@ -352,7 +400,13 @@ def compute_fa():
 
 
 def ode_solving():
-    drone_model = FSDroneModel(m=3., g=9.81, b=0.01, d=0.01, l_arm=0.2)
+    """
+    Solve the FSDroneModel dot_x = FSDroneModel.f(x, u) using pytorch ODE solver.
+    """
+    drone_model = AscTecFireflyDroneModel(g=9.81, kt=0.01, km=0.01, l_arm=0.215,
+                                          inertia_matrix=np.array([[10.007e-3, 0., 0.],
+                                                                   [0., 10.2335e-3, 0.],
+                                                                   [0., 0., 8.1e-3]]))
 
     # phi, theta, psi, p, q, r, u, v, w, x, y, z
     initial_state = torch.tensor([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.], dtype=torch.float)

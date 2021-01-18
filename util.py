@@ -269,6 +269,7 @@ class DataFolder(object):
         """
         self.workspace_path = ABSOLUTE_PATH
         self.data_path = ABSOLUTE_PATH + data_folder_name + '/'
+        self.tensorboard = ABSOLUTE_PATH + "tensorboard/" + data_folder_name
 
         # Add "purpose" folders, first purpose folder will be the reference to construct the others.
         purpose_folder_names = ['raw', 'raw_python', 'intermediate', 'results', 'plots']
