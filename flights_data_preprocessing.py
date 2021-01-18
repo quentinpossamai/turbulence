@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as integrate
 
-from util import Transformation, DataFolder
+from utils import Transformation, DataFolder
 
 
 def main():

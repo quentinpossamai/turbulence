@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-import util
+import utils
 
 
 class ModelErrorNN(nn.Module):
@@ -52,7 +52,7 @@ def splitting_60_20_20(data: List[pd.DataFrame]) -> Tuple[pd.DataFrame, pd.DataF
 
 def training():
     # Data loading
-    f = util.DataFolder("euroc_mav")
+    f = utils.DataFolder("euroc_mav")
     # Run in terminal: tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/runs/
     log_dir = f.folders["results"][''] + "runs/"
     writer = SummaryWriter(log_dir=log_dir)
@@ -82,7 +82,7 @@ def training():
     iter_counter = 0
     epochs = 10
     loop_size = range(len(train))
-    progress = util.Progress(epochs * len(loop_size), "Training.", "Training done.")
+    progress = utils.Progress(epochs * len(loop_size), "Training.", "Training done.")
     for epoch in range(epochs):
         graph_data = np.zeros((len(loop_size), 2))
         for i in loop_size:

@@ -1,7 +1,7 @@
 import pickle
 
 import posture_error_estimation
-import util
+import utils
 import pandas as pd
 import imageio
 import numpy as np
@@ -9,7 +9,7 @@ import yaml
 
 
 def data_processing():
-    f = util.DataFolder('euroc_mav')
+    f = utils.DataFolder('euroc_mav')
     for flight_number in [0, 1, 2, 3, 4, 5]:
 
         # Camera parameters
@@ -35,7 +35,7 @@ def data_processing():
         tmp = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
 
         # The extrinsic parameter of the
-        camera_parameters['camera_tf_drone'] = util.Transformation().from_matrix(tmp).inv()
+        camera_parameters['camera_tf_drone'] = utils.Transformation().from_matrix(tmp).inv()
 
         # Vicon0 parameters
         # f.get_files_paths('.yaml', f.folders['raw'][vol_number], 'vicon0')
@@ -45,7 +45,7 @@ def data_processing():
             except yaml.YAMLError as exc:
                 print(exc)
         # drone_tf_vicon0 : Sensor extrinsic wrt. the body-frame
-        drone_tf_vicon0 = util.Transformation().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
+        drone_tf_vicon0 = utils.Transformation().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
         camera_parameters['camera_tf_vicon0'] = camera_parameters['camera_tf_drone'] @ drone_tf_vicon0
         del camera_parameters['camera_tf_drone']
 
@@ -53,12 +53,12 @@ def data_processing():
         #                                         'q_RS_x []', 'q_RS_y []', 'q_RS_z []'
         mc = pd.read_csv(f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'vicon0'), sep=',', header=0,
                          names=['pose_time', 'x', 'y', 'z', 'wn', 'a', 'b', 'c'])  # Renaming column for simplification
-        p = util.Progress(len(mc), "Preparing mc data")
+        p = utils.Progress(len(mc), "Preparing mc data")
         tmp = {}
         for index, row in mc.iterrows():
             # vicon0_tf_origin
-            vicon0_tf_origin = util.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
-                                                               quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
+            vicon0_tf_origin = utils.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
+                                                                quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
             camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
             tmp[index] = camera_tf_origin
             p.update()
@@ -68,8 +68,8 @@ def data_processing():
         file_path = f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'cam0')
         image = pd.read_csv(file_path, sep=',', header=0, names=['image_time', 'filename'])  # Renaming column for
         # simplification
-        p = util.Progress(len(image), "Preparing camera data")
-        image_path = util.get_folder_path(file_path) + 'data/'
+        p = utils.Progress(len(image), "Preparing camera data")
+        image_path = utils.get_folder_path(file_path) + 'data/'
         tmp = {}
         shape = np.array(imageio.imread(image_path + image['filename'][0])).shape
         for index, filename in image['filename'].items():
@@ -85,7 +85,7 @@ def data_processing():
         time_min = min(mc['pose_time'][0], image['image_time'][0])
         mc['pose_time'] = (mc['pose_time'] - time_min) * 1e-9
         image['image_time'] = (image['image_time'] - time_min) * 1e-9
-        mc_ids, image_ids = util.merge_two_arrays(mc['pose_time'], image['image_time'])
+        mc_ids, image_ids = utils.merge_two_arrays(mc['pose_time'], image['image_time'])
         input_data = pd.concat([mc.loc[mc_ids, ['pose_time', 'pose']].reset_index(drop=True),
                                 image.loc[image_ids, ['image_time', 'image']].reset_index(drop=True)],
                                axis=1)
@@ -94,7 +94,7 @@ def data_processing():
 
 
 def error_estimation():
-    f = util.DataFolder('euroc_mav')
+    f = utils.DataFolder('euroc_mav')
     for flight_number in [0, 1, 2, 3, 4, 5]:
         print(f"Flight : {flight_number}")
 
@@ -112,7 +112,7 @@ def error_estimation():
 
 
 def excel_creation():
-    f = util.DataFolder('euroc_mav')
+    f = utils.DataFolder('euroc_mav')
     flight_number = 2
 
     # Motor speed
@@ -142,7 +142,7 @@ def excel_creation():
             for measure in data[data_column].values():
                 tmp['time'].append(measure['t'])
                 trans, quat = measure['translation'], measure['rotation']
-                tmp[name].append(util.Transformation().from_pose(trans, quat).inv())
+                tmp[name].append(utils.Transformation().from_pose(trans, quat).inv())
         elif msg_type == 'asctec_hl_comm/MotorSpeed':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():
@@ -175,7 +175,7 @@ def excel_creation():
 
     ids_0 = list(range(len(to_synchro[ind_freq[0]])))
     for i in ind_freq[1:]:
-        ids_0, ids_i = util.merge_two_arrays(to_synchro[ind_freq[0]]['time'], to_synchro[i]['time'])
+        ids_0, ids_i = utils.merge_two_arrays(to_synchro[ind_freq[0]]['time'], to_synchro[i]['time'])
         to_synchro[ind_freq[0]] = to_synchro[ind_freq[0]].iloc[ids_0].reset_index(drop=True)
         to_synchro[i] = to_synchro[i].iloc[ids_i].reset_index(drop=True)
         to_synchro[i]['time'] = to_synchro[ind_freq[0]]['time']

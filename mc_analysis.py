@@ -1,4 +1,4 @@
-import util
+import utils
 
 from typing import Union, Iterable, List, Dict
 # Union[np.ndarray, Iterable, int, float]
@@ -16,7 +16,7 @@ def main():
     """
     # Path extraction of the MC data
     print('Processing data path.')
-    f = util.DataFolder(data_folder_name='data_drone2')
+    f = utils.DataFolder(data_folder_name='data_drone2')
     print()
 
     for vol_number in [0, 1, 2, 3, 4]:
@@ -95,7 +95,7 @@ class MCAnalysis(object):
         self.data = MCData(data=data_raw)
         self.drone_tf_o = np.zeros((4, 4))  # Will be defined in self.c_reference_frame
 
-    def get_pose(self) -> List[util.Transformation]:
+    def get_pose(self) -> List[utils.Transformation]:
         """
         Saves the computed poses from markers position expressed as a util.Transformation object such as
         pose = drone_tf_origin.
@@ -120,7 +120,7 @@ class MCAnalysis(object):
 
         # Get new ai' robust to noise
         print('    Compute ai prime')
-        p = util.Progress(len(self.data))
+        p = utils.Progress(len(self.data))
         ai_prime_framed = np.zeros((len(self.data), len(self.points_name), 3))
         for frame_number in self.data.df.index:
             ai_prime_framed[frame_number, :, :] = np.array(list(self.object_reference_frame(frame_number).values()))
@@ -148,7 +148,7 @@ class MCAnalysis(object):
         #     table.add_row([point_name, res[i]])
         # print(table)
         print('    Compute poses')
-        p = util.Progress(len(self.data))
+        p = utils.Progress(len(self.data))
         # Compute centroid for ai and then compute rotation matrix R and translation array T
         for index in self.data.df.index:
             # Get ai and their centroid
@@ -172,7 +172,7 @@ class MCAnalysis(object):
             # ai_prime_mat - ((drone_r_origin @ ai_mat.T).T + drone_t_origin)
 
             # Append drone_tf_origin
-            drone_tf_origin = util.Transformation().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
+            drone_tf_origin = utils.Transformation().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
             poses.append(drone_tf_origin)
 
             p.update()
@@ -193,9 +193,9 @@ class MCAnalysis(object):
         oc = oc / 4
 
         # bi's plane equation
-        bis_eq = util.plane_equation(self.data.get_point('b1', frame_number),
-                                     self.data.get_point('b3', frame_number),
-                                     self.data.get_point('b2', frame_number))
+        bis_eq = utils.plane_equation(self.data.get_point('b1', frame_number),
+                                      self.data.get_point('b3', frame_number),
+                                      self.data.get_point('b2', frame_number))
         plane_normal = bis_eq[0:3]
         # plane_normal must be oriented from bottom to top of the drone
         if (self.data.get_point('y1', frame_number) - oc) @ plane_normal < 0:
@@ -215,7 +215,7 @@ class MCAnalysis(object):
         y = np.cross(z, x) / np.linalg.norm(np.cross(z, x))
 
         # Compute ai'
-        self.drone_tf_o = util.Transformation().from_trans_3_axis(trans=oc, x=x, y=y, z=z).inv()
+        self.drone_tf_o = utils.Transformation().from_trans_3_axis(trans=oc, x=x, y=y, z=z).inv()
         res = {}
         for point_name in self.points_name:
             res[point_name] = self.drone_tf_o @ self.data.get_point(point_name, frame_number)

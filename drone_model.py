@@ -1,5 +1,6 @@
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
+# Run in terminal: tensorboard --logdir /Users/quentin/phd/turbulence/tensorboard/drone_model/
 """
 import torch
 import torch.nn as nn
@@ -9,8 +10,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import datetime
 
-import util
+import utils
 
 
 # 05 June 2020
@@ -185,7 +187,7 @@ def compute_fa():
     -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
     Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
     """
-    f = util.DataFolder("euroc_mav")
+    f = utils.DataFolder("euroc_mav")
     flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
     print(f"Loading: {data_path}")
@@ -245,7 +247,7 @@ def compute_fa():
                                                                    [0., 10.2335e-3, 0],
                                                                    [0., 0., 8.1e-3]]))
     # Direct computation
-    writer = SummaryWriter(f"{f.workspace_path}tensorboard_drone_model/")
+    writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/run_{}/")
     fa_dict = {}
     for index in tqdm(data.index):
         if index < 2:
@@ -271,7 +273,7 @@ def compute_fa():
                                                    "estimator": h{var}}}, data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
-    new_data_path = util.get_folder_path(data_path) + "fa.pkl"
+    new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
     print(f"Saving: {new_data_path}")
     data.to_pickle(new_data_path)
     print()

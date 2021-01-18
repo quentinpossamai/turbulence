@@ -10,12 +10,12 @@ from matplotlib.widgets import Slider, Button
 import cv2
 from cv2 import VideoWriter, VideoWriter_fourcc
 
-import util
+import utils
 import posture_error_estimation
 
 
 def data_processing():
-    f = util.DataFolder('data_drone2')
+    f = utils.DataFolder('data_drone2')
     flight_number = 1
 
     # 1 - CAMERA PARAMETERS
@@ -34,7 +34,7 @@ def data_processing():
     # Vincent input : (0.105, 0, 0, -1.57, 0.0, -2.0943) (convention x, y, z, roll, pitch, yaw)
     drone_d_camera = np.array([0.105, 0, 0])
     drone_rot_camera = Rotation.from_euler('xyz', np.array([-120, 0, -90]), degrees=True).as_quat()
-    camera_tf_drone = util.Transformation().from_pose(drone_d_camera, drone_rot_camera).inv()
+    camera_tf_drone = utils.Transformation().from_pose(drone_d_camera, drone_rot_camera).inv()
     mc['pose'] = mc['pose'].apply(lambda x: camera_tf_drone @ x)
     mc['pose_time'] = (mc['pose_time'] - mc['pose_time'][0])
 
@@ -78,7 +78,7 @@ def data_processing():
     time_bias = image['image_time'][i1] - time_coef * mc['pose_time'][j1]
     mc['pose_time'] = time_coef * mc['pose_time'] + time_bias
 
-    mc_ids, image_ids = util.merge_two_arrays(mc['pose_time'], image['image_time'])
+    mc_ids, image_ids = utils.merge_two_arrays(mc['pose_time'], image['image_time'])
     input_data = pd.concat([mc.loc[mc_ids],
                             image.loc[image_ids]],
                            axis=1)
@@ -87,7 +87,7 @@ def data_processing():
 
 
 def error_estimation():
-    f = util.DataFolder('data_drone2')
+    f = utils.DataFolder('data_drone2')
     flight_number = 1
 
     input_data = pickle.load(open(f.folders['intermediate'][flight_number] + 'posture_error_input_data.pkl', 'rb'))
@@ -267,7 +267,7 @@ def build_video(saving_path: str, image_df: pd.DataFrame, fps: int):
     video = VideoWriter(saving_path, codec, float(fps), (frames_width, frames_height), True)
     print(f'Video will be saved at : {saving_path}')
 
-    prg = util.Progress(len(image_df), 'Creating video')
+    prg = utils.Progress(len(image_df), 'Creating video')
     shape = (frames_height, frames_width, 3)
     for i, measure in enumerate(image_df['image']):
         color_frame = np.uint8(np.zeros(shape))
@@ -307,10 +307,10 @@ def aff3d(xyz_array, quat_array, video_path):
     codec = VideoWriter_fourcc(*'H264')
     fps = 30
     video = VideoWriter(video_path, codec, float(fps), (width, height), True)
-    prg = util.Progress(len(xyz_array))
+    prg = utils.Progress(len(xyz_array))
 
     for xyz, quat in zip(xyz_array, quat_array):
-        ref_tf_pos = util.Transformation().from_pose(xyz, quat)
+        ref_tf_pos = utils.Transformation().from_pose(xyz, quat)
 
         x_ref = ref_tf_pos.get_rot() @ x_pos
         y_ref = ref_tf_pos.get_rot() @ y_pos
