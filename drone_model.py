@@ -200,11 +200,11 @@ def compute_fa():
     data["time"] = (data["time"] - data["time"][0])
 
     # data["vicon_pose"] is tf_drone_origin
-    data["vicon_pose"] = data["vicon_pose"].apply(lambda x_: x_.inv())
+    data["vicon_pose"] = data["vicon_pose"].apply(lambda _x: _x.inv())
     # Now data["vicon_pose"] is tf_origin_drone
 
-    data["trans"] = data["vicon_pose"].apply(lambda x_: x_.get_trans())
-    data["quat"] = data["vicon_pose"].apply(lambda x_: x_.get_pose()[1])
+    data["trans"] = data["vicon_pose"].apply(lambda _x: _x.get_trans())
+    data["quat"] = data["vicon_pose"].apply(lambda _x: _x.get_pose()[1])
 
     dt = pd.Series(data["time"][1:].values - data["time"][:len(data) - 1].values)
     dt.index = range(1, len(dt) + 1)
@@ -214,17 +214,17 @@ def compute_fa():
     linear_speed = (data["trans"][1:].values - data["trans"][:len(data) - 1].values) / dt
     # Linear speed in drone
     linear_speed = linear_speed.to_frame(0) \
-        .apply(lambda x_: data["vicon_pose"][x_.name].get_rot().T @ x_.values[0], axis=1)
+        .apply(lambda _x: data["vicon_pose"][_x.name].get_rot().T @ _x.values[0], axis=1)
 
-    def angular_velocity_calc(x_: pd.Series) -> np.ndarray:
+    def angular_velocity_euler(_x: pd.Series) -> np.ndarray:
         """
         :return: The angular velocity computed form 2 quaternions and a time difference. Used with DataFrame.apply().
         """
-        qn1: np.ndarray = data["quat"][x_.name]
-        qn: np.ndarray = data["quat"][x_.name - 1]
-        delta_t: float = x_.values[0]
+        qn1: np.ndarray = data["quat"][_x.name]
+        qn: np.ndarray = data["quat"][_x.name - 1]
+        delta_t: float = _x.values[0]
 
-        dq_dt = (qn1 - qn) / delta_t
+        dq_dt = (qn1 - qn) / delta_t  # Euler differentiator
         q0, q1, q2, q3 = qn1
         g_matrix = np.array([[-q1, q0, q3, -q2],
                              [-q2, -q3, q0, q1],
@@ -232,7 +232,7 @@ def compute_fa():
 
         return (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
 
-    angular_velocity = dt.to_frame(0).apply(angular_velocity_calc, axis=1)
+    angular_velocity = dt.to_frame(0).apply(angular_velocity_euler, axis=1)
 
     data["linear_speed"] = linear_speed
     data["angular_velocity"] = angular_velocity
@@ -240,10 +240,10 @@ def compute_fa():
 
     data["state"] = np.zeros(len(data))
     data[["state"]] = data[["state"]].apply(
-        lambda x_: torch.from_numpy(np.hstack([data["vicon_pose"][x_.name].get_rot_euler("xyz", True),
-                                               data["angular_velocity"][x_.name],
-                                               data["linear_speed"][x_.name],
-                                               data["trans"][x_.name]]).astype(np.float)), axis=1)
+        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("xyz", True),
+                                               data["angular_velocity"][_x.name],
+                                               data["linear_speed"][_x.name],
+                                               data["trans"][_x.name]]).astype(np.float)), axis=1)
 
     drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
                                           inertia_matrix=np.array([[10.007e-3, 0., 0.],
@@ -269,19 +269,20 @@ def compute_fa():
         hphi, htheta, hpsi, hp, hq, hr, hu, hv, hw, hx, hy, hz = xn1_hat
         fa_dict[index] = torch.tensor([fx, fy, fz, tau_x, tau_y, tau_z], dtype=torch.float)
 
-        writer.add_scalars("fa's forces", {"fx": fx, "fy": fy, "fz": fz}, data.loc[index, "time"])
-        writer.add_scalars("fa's moments", {"tau_x": tau_x, "tau_y": tau_y, "tau_z": tau_z}, data.loc[index, "time"])
+        writer.add_scalars("fa's forces", {"fx": fx, "fy": fy, "fz": fz}, 1e3*data.loc[index, "time"])
+        writer.add_scalars("fa's moments", {"tau_x": tau_x, "tau_y": tau_y, "tau_z": tau_z},
+                           1e3*data.loc[index, "time"])
 
         for var in ["phi", "theta", "psi", "p", "q", "r", "u", "v", "w", "x", "y", "z"]:
             eval(f"""writer.add_scalars("{var}", {{"ground truth": {var},
-                                                   "estimator": h{var}}}, data.loc[index, "time"])""")
+                                                   "estimator": h{var}}}, 1e3*data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
-    # Saving data
-    new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
-    print(f"Saving: {new_data_path}")
-    data.to_pickle(new_data_path)
-    print()
+    # # Saving data
+    # new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
+    # print(f"Saving: {new_data_path}")
+    # data.to_pickle(new_data_path)
+    # print()
 
     # # Adam optimization
     # optimizer = optim.Adam(drone_model.parameters(), lr=0.01)
@@ -308,56 +309,52 @@ def compute_fa():
     # plt.plot(loss_tmp)
     # plt.show()
 
-    # Plots
-    def plot_position_6d():
-        """
-        Plots 6D position of data over time.
-        """
-        fig, axs = plt.subplots(3, 2)
-        euler_angles = data["vicon_pose"].apply(lambda x: x.get_rot_euler(seq="xyz", degrees=True))
-        axs[0, 0].plot(data["time"], [x[0] for x in data["trans"]], label="Position x")
-        axs[1, 0].plot(data["time"], [x[1] for x in data["trans"]], label="Position y")
-        axs[2, 0].plot(data["time"], [x[2] for x in data["trans"]], label="Position z")
-        axs[0, 1].plot(data["time"], [x[0] for x in euler_angles], label="Euler Phi")
-        axs[1, 1].plot(data["time"], [x[1] for x in euler_angles], label="Euler Theta")
-        axs[2, 1].plot(data["time"], [x[2] for x in euler_angles], label="Euler Psi")
-        for i in range(len(axs)):
-            for j in range(len(axs[0])):
-                axs[i, j].legend()
-        plt.show()
-
     def plot_compare_differentiators():
         """
         Plots the linear speed and the angular velocity over time for Euler and first order differentiation to compare
         them.
         """
+        # Run in terminal: tensorboard --logdir /Users/quentin/phd/turbulence/tensorboard/drone_model_differentiators/
+        _now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        _writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model_differentiators/{now}/")
+
         # Euler derivative compute
         _linear_speed = (data["trans"][1:].values - data["trans"][:len(data) - 1].values) / dt
-        _angular_velocity = ((data["rot"][1:].values - data["rot"][:len(data) - 1].values) / dt).to_frame(0) \
-            .apply(lambda x: x.values[0] @ data["rot"][1:][x.name].T, axis=1) \
-            .apply(lambda x: np.array([(x[1, 2] - x[2, 1]) / 2,
-                                       (x[2, 0] - x[0, 2]) / 2,
-                                       (x[0, 1] - x[1, 0]) / 2]))
 
-        fig, axs = plt.subplots(3, 2)
-        axs[0, 0].plot(data["time"][1:], [x[0] for x in _linear_speed], label="Euler")
-        axs[1, 0].plot(data["time"][1:], [x[1] for x in _linear_speed], label="Euler")
-        axs[2, 0].plot(data["time"][1:], [x[2] for x in _linear_speed], label="Euler")
-        axs[0, 1].plot(data["time"][1:], [x[0] for x in _angular_velocity], label="Euler")
-        axs[1, 1].plot(data["time"][1:], [x[1] for x in _angular_velocity], label="Euler")
-        axs[2, 1].plot(data["time"][1:], [x[2] for x in _angular_velocity], label="Euler")
+        def _angular_velocity_euler(_x: pd.Series) -> np.ndarray:
+            """
+            :return: The angular velocity computed form 2 quaternions and a time difference.
+            Used with DataFrame.apply().
+            """
+            qn1: np.ndarray = data["quat"][_x.name]
+            qn: np.ndarray = data["quat"][_x.name - 1]
+            delta_t: float = _x.values[0]
+
+            dq_dt = (qn1 - qn) / delta_t  # Euler differentiator
+            q0, q1, q2, q3 = qn1
+            g_matrix = np.array([[-q1, q0, q3, -q2],
+                                 [-q2, -q3, q0, q1],
+                                 [-q3, q2, -q1, q0]])
+
+            return (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
+
+        _angular_velocity = data["dt"][1:].to_frame(0).apply(_angular_velocity_euler, axis=1)
+
+        [_writer.add_scalars("Linear speed", {"Euler x": _x[0], "Euler y": _x[1], "Euler z": _x[2]},
+                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_linear_speed, _linear_speed.index)]
+        [_writer.add_scalars("Angular velocity", {"Euler x": _x[0], "Euler y": _x[1], "Euler z": _x[2]},
+                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity, _angular_velocity.index)]
 
         # First order(n=6 q=4) derivative plot
-        def fo_differentiator_n6_q4_trans(x):
+        def fo_differentiator_n6_q4_trans(row):
             """
             Differentiate the translation using a first order, 6 past measures, and 4 ?. Used with DataFrame.apply().
             """
-            array = x.values[0]
-            ind = x.name
+            ind = row.name
             if ind == 0:
                 return np.nan
             elif 0 < ind < 5:
-                return (array - data["trans"][ind - 1]) / dt[ind]
+                return (data["trans"][ind] - data["trans"][ind - 1]) / dt[ind]
             else:
                 return (1. / 3. * data["trans"][ind - 5]
                         - 17. / 12. * data["trans"][ind - 4]
@@ -368,51 +365,50 @@ def compute_fa():
 
         _linear_speed = data["trans"][1:].to_frame(0).apply(fo_differentiator_n6_q4_trans, axis=1)
 
-        def fo_differentiator_n6_q4_rot(x):
+        def fo_differentiator_n6_q4_rot(row):
             """
             Differentiate the rotation using a first order, 6 past measures, and 4 ?. Used with DataFrame.apply().
             """
-            array = x.values[0]
-            ind = x.name
+            ind = row.name
             if ind == 0:
                 return np.nan
-            elif 0 < ind < 5:
-                skew_sym_w = ((array - data["rot"][ind - 1]) / dt[ind]) @ data["rot"][x.name].T
+            qn1 = data["quat"][ind]
+            if 0 < ind < 5:
+                qn = data["quat"][ind - 1]
+                dq_dt = (qn1 - qn) / dt[ind]  # Euler differentiator
             else:
-                skew_sym_w = (1. / 3. * data["rot"][ind - 5]
-                              - 17. / 12. * data["rot"][ind - 4]
-                              + 2. * data["rot"][ind - 3]
-                              - 1. / 3. * data["rot"][ind - 2]
-                              - 7. / 3. * data["rot"][ind - 1]
-                              + 7. / 4. * data["rot"][ind]) / dt[ind] @ data["rot"][x.name].T
+                dq_dt = (1. / 3. * data["quat"][ind - 5]
+                         - 17. / 12. * data["quat"][ind - 4]
+                         + 2. * data["quat"][ind - 3]
+                         - 1. / 3. * data["quat"][ind - 2]
+                         - 7. / 3. * data["quat"][ind - 1]
+                         + 7. / 4. * data["quat"][ind]) / dt[ind]
+            q0, q1, q2, q3 = qn1
+            g_matrix = np.array([[-q1, q0, q3, -q2],
+                                 [-q2, -q3, q0, q1],
+                                 [-q3, q2, -q1, q0]])
 
-            return np.array([(skew_sym_w[1, 2] - skew_sym_w[2, 1]) / 2,
-                             (skew_sym_w[2, 0] - skew_sym_w[0, 2]) / 2,
-                             (skew_sym_w[0, 1] - skew_sym_w[1, 0]) / 2])
+            return (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
 
-        _angular_velocity = data["rot"][1:].to_frame(0).apply(fo_differentiator_n6_q4_rot, axis=1)
+        _angular_velocity = data["dt"][1:].to_frame(0).apply(fo_differentiator_n6_q4_rot, axis=1)
 
         # First order(n=6 q=4) derivative plot
-        axs[0, 0].plot(data["time"][1:], [x[0] for x in _linear_speed], label="FO n=6 q=4")
-        axs[1, 0].plot(data["time"][1:], [x[1] for x in _linear_speed], label="FO n=6 q=4")
-        axs[2, 0].plot(data["time"][1:], [x[2] for x in _linear_speed], label="FO n=6 q=4")
-        axs[0, 1].plot(data["time"][1:], [x[0] for x in _angular_velocity], label="FO n=6 q=4")
-        axs[1, 1].plot(data["time"][1:], [x[1] for x in _angular_velocity], label="FO n=6 q=4")
-        axs[2, 1].plot(data["time"][1:], [x[2] for x in _angular_velocity], label="FO n=6 q=4")
+        [_writer.add_scalars("Linear speed", {"FO n=6 q=4 x": _x[0], "FO n=6 q=4 y": _x[1], "FO n=6 q=4 z": _x[2]},
+                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_linear_speed, _linear_speed.index)]
+        [_writer.add_scalars("Angular velocity", {"FO n=6 q=4 x": _x[0], "FO n=6 q=4 y": _x[1], "FO n=6 q=4 z": _x[2]},
+                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity, _angular_velocity.index)]
 
-        for i in range(len(axs)):
-            for j in range(len(axs[0])):
-                axs[i, j].legend()
-        plt.show()
+    plot_compare_differentiators()
+    print()
 
 
 def ode_solving():
     """
     Solve the FSDroneModel dot_x = FSDroneModel.f(x, u) using pytorch ODE solver.
     """
-    drone_model = AscTecFireflyDroneModel(g=9.81, kt=0.01, km=0.01, l_arm=0.215,
+    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
                                           inertia_matrix=np.array([[10.007e-3, 0., 0.],
-                                                                   [0., 10.2335e-3, 0.],
+                                                                   [0., 10.2335e-3, 0],
                                                                    [0., 0., 8.1e-3]]))
 
     # phi, theta, psi, p, q, r, u, v, w, x, y, z
