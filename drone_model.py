@@ -62,6 +62,7 @@ class AscTecFireflyDroneModel(nn.Module):
         :param fa: External perturbation in N=kg.m/s2.
         :return: Return the derivative of the state.
         """
+        assert len(fa) == 12, "fa = _, _, _, tau_x, tau_y, tau_z, fx, fy, fz, _, _, _"
         # # Quadrotor
         # w1 = torch.tensor(0., dtype=torch.float)
         # w2 = torch.tensor(0., dtype=torch.float)
@@ -170,7 +171,7 @@ class AscTecFireflyDroneModel(nn.Module):
         c = torch.tensor([0., 0., 0., 1 / ixx, 1 / iyy, 1 / izz,
                           1 / self.m, 1 / self.m, 1 / self.m, 0., 0., 0.], dtype=torch.float)
 
-        xn1_hat = xn + dt * self.f(tn, xn, wn, torch.tensor(12, dtype=torch.float))
+        xn1_hat = xn + dt * self.f(tn, xn, wn, fa=torch.zeros(12))
         fa = (xn1 - xn1_hat) / (dt * c)
         return fa, xn1, xn1_hat
 
@@ -187,6 +188,7 @@ def compute_fa():
     -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
     Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
     """
+    # Loading data
     f = utils.DataFolder("euroc_mav")
     flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
@@ -194,14 +196,15 @@ def compute_fa():
     data = pd.read_pickle(data_path)
     data: pd.DataFrame
 
+    # Data cleaning
     data["time"] = (data["time"] - data["time"][0])
 
     # data["vicon_pose"] is tf_drone_origin
-    data["vicon_pose"] = data["vicon_pose"].apply(lambda x: x.inv())
+    data["vicon_pose"] = data["vicon_pose"].apply(lambda x_: x_.inv())
     # Now data["vicon_pose"] is tf_origin_drone
 
-    data["trans"] = data["vicon_pose"].apply(lambda x: x.get_trans())
-    data["quat"] = data["vicon_pose"].apply(lambda x: x.get_pose()[1])
+    data["trans"] = data["vicon_pose"].apply(lambda x_: x_.get_trans())
+    data["quat"] = data["vicon_pose"].apply(lambda x_: x_.get_pose()[1])
 
     dt = pd.Series(data["time"][1:].values - data["time"][:len(data) - 1].values)
     dt.index = range(1, len(dt) + 1)
@@ -211,15 +214,15 @@ def compute_fa():
     linear_speed = (data["trans"][1:].values - data["trans"][:len(data) - 1].values) / dt
     # Linear speed in drone
     linear_speed = linear_speed.to_frame(0) \
-        .apply(lambda x: data["vicon_pose"][x.name].get_rot().T @ x.values[0], axis=1)
+        .apply(lambda x_: data["vicon_pose"][x_.name].get_rot().T @ x_.values[0], axis=1)
 
-    def angular_velocity_calc(x: pd.Series) -> np.ndarray:
+    def angular_velocity_calc(x_: pd.Series) -> np.ndarray:
         """
         :return: The angular velocity computed form 2 quaternions and a time difference. Used with DataFrame.apply().
         """
-        qn1: np.ndarray = data["quat"][x.name]
-        qn: np.ndarray = data["quat"][x.name - 1]
-        delta_t: float = x.values[0]
+        qn1: np.ndarray = data["quat"][x_.name]
+        qn: np.ndarray = data["quat"][x_.name - 1]
+        delta_t: float = x_.values[0]
 
         dq_dt = (qn1 - qn) / delta_t
         q0, q1, q2, q3 = qn1
@@ -237,17 +240,18 @@ def compute_fa():
 
     data["state"] = np.zeros(len(data))
     data[["state"]] = data[["state"]].apply(
-        lambda x: torch.from_numpy(np.hstack([data["vicon_pose"][x.name].get_rot_euler("xyz", True),
-                                              data["angular_velocity"][x.name],
-                                              data["linear_speed"][x.name],
-                                              data["trans"][x.name]]).astype(np.float)), axis=1)
+        lambda x_: torch.from_numpy(np.hstack([data["vicon_pose"][x_.name].get_rot_euler("xyz", True),
+                                               data["angular_velocity"][x_.name],
+                                               data["linear_speed"][x_.name],
+                                               data["trans"][x_.name]]).astype(np.float)), axis=1)
 
     drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
                                           inertia_matrix=np.array([[10.007e-3, 0., 0.],
                                                                    [0., 10.2335e-3, 0],
                                                                    [0., 0., 8.1e-3]]))
-    # Direct computation
-    writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/run_{}/")
+    # Fa computation and plots
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/{now}/")
     fa_dict = {}
     for index in tqdm(data.index):
         if index < 2:
@@ -273,6 +277,7 @@ def compute_fa():
                                                    "estimator": h{var}}}, data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
+    # Saving data
     new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
     print(f"Saving: {new_data_path}")
     data.to_pickle(new_data_path)
