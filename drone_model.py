@@ -269,13 +269,12 @@ def compute_fa():
         hphi, htheta, hpsi, hp, hq, hr, hu, hv, hw, hx, hy, hz = xn1_hat
         fa_dict[index] = torch.tensor([fx, fy, fz, tau_x, tau_y, tau_z], dtype=torch.float)
 
-        writer.add_scalars("fa's forces", {"fx": fx, "fy": fy, "fz": fz}, 1e3*data.loc[index, "time"])
+        writer.add_scalars("fa's forces", {"fx": fx, "fy": fy, "fz": fz}, walltime=data.loc[index, "time"])
         writer.add_scalars("fa's moments", {"tau_x": tau_x, "tau_y": tau_y, "tau_z": tau_z},
-                           1e3*data.loc[index, "time"])
-
+                           walltime=data.loc[index, "time"])
         for var in ["phi", "theta", "psi", "p", "q", "r", "u", "v", "w", "x", "y", "z"]:
             eval(f"""writer.add_scalars("{var}", {{"ground truth": {var},
-                                                   "estimator": h{var}}}, 1e3*data.loc[index, "time"])""")
+                                                   "estimator": h{var}}}, walltime=data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
     # # Saving data
@@ -341,9 +340,10 @@ def compute_fa():
         _angular_velocity = data["dt"][1:].to_frame(0).apply(_angular_velocity_euler, axis=1)
 
         [_writer.add_scalars("Linear speed", {"Euler x": _x[0], "Euler y": _x[1], "Euler z": _x[2]},
-                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_linear_speed, _linear_speed.index)]
+                             walltime=data.loc[_i, "time"]) for _x, _i in zip(_linear_speed, _linear_speed.index)]
         [_writer.add_scalars("Angular velocity", {"Euler x": _x[0], "Euler y": _x[1], "Euler z": _x[2]},
-                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity, _angular_velocity.index)]
+                             walltime=data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity,
+                                                                              _angular_velocity.index)]
 
         # First order(n=6 q=4) derivative plot
         def fo_differentiator_n6_q4_trans(row):
@@ -356,16 +356,16 @@ def compute_fa():
             elif 0 < ind < 5:
                 return (data["trans"][ind] - data["trans"][ind - 1]) / dt[ind]
             else:
-                return (1. / 3. * data["trans"][ind - 5]
-                        - 17. / 12. * data["trans"][ind - 4]
-                        + 2. * data["trans"][ind - 3]
-                        - 1. / 3. * data["trans"][ind - 2]
-                        - 7. / 3. * data["trans"][ind - 1]
-                        + 7. / 4. * data["trans"][ind]) / dt[ind]
+                return 6 * (1. / 3. * data["trans"][ind - 5]
+                            - 17. / 12. * data["trans"][ind - 4]
+                            + 2. * data["trans"][ind - 3]
+                            - 1. / 3. * data["trans"][ind - 2]
+                            - 7. / 3. * data["trans"][ind - 1]
+                            + 7. / 4. * data["trans"][ind]) / (data.loc[ind, "time"] - data.loc[ind - 5, "time"])
 
         _linear_speed = data["trans"][1:].to_frame(0).apply(fo_differentiator_n6_q4_trans, axis=1)
 
-        def fo_differentiator_n6_q4_rot(row):
+        def fo_differentiator_n6_q4_quat(row):
             """
             Differentiate the rotation using a first order, 6 past measures, and 4 ?. Used with DataFrame.apply().
             """
@@ -377,12 +377,12 @@ def compute_fa():
                 qn = data["quat"][ind - 1]
                 dq_dt = (qn1 - qn) / dt[ind]  # Euler differentiator
             else:
-                dq_dt = (1. / 3. * data["quat"][ind - 5]
-                         - 17. / 12. * data["quat"][ind - 4]
-                         + 2. * data["quat"][ind - 3]
-                         - 1. / 3. * data["quat"][ind - 2]
-                         - 7. / 3. * data["quat"][ind - 1]
-                         + 7. / 4. * data["quat"][ind]) / dt[ind]
+                dq_dt = 6 * (1. / 3. * data["quat"][ind - 5]
+                             - 17. / 12. * data["quat"][ind - 4]
+                             + 2. * data["quat"][ind - 3]
+                             - 1. / 3. * data["quat"][ind - 2]
+                             - 7. / 3. * data["quat"][ind - 1]
+                             + 7. / 4. * data["quat"][ind]) / (data.loc[ind, "time"] - data.loc[ind - 5, "time"])
             q0, q1, q2, q3 = qn1
             g_matrix = np.array([[-q1, q0, q3, -q2],
                                  [-q2, -q3, q0, q1],
@@ -390,13 +390,14 @@ def compute_fa():
 
             return (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
 
-        _angular_velocity = data["dt"][1:].to_frame(0).apply(fo_differentiator_n6_q4_rot, axis=1)
+        _angular_velocity = data["dt"][1:].to_frame(0).apply(fo_differentiator_n6_q4_quat, axis=1)
 
         # First order(n=6 q=4) derivative plot
         [_writer.add_scalars("Linear speed", {"FO n=6 q=4 x": _x[0], "FO n=6 q=4 y": _x[1], "FO n=6 q=4 z": _x[2]},
-                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_linear_speed, _linear_speed.index)]
+                             walltime=data.loc[_i, "time"]) for _x, _i in zip(_linear_speed, _linear_speed.index)]
         [_writer.add_scalars("Angular velocity", {"FO n=6 q=4 x": _x[0], "FO n=6 q=4 y": _x[1], "FO n=6 q=4 z": _x[2]},
-                             1e3*data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity, _angular_velocity.index)]
+                             walltime=data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity,
+                                                                              _angular_velocity.index)]
 
     plot_compare_differentiators()
     print()
