@@ -1,6 +1,5 @@
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
-# Run in terminal: tensorboard --logdir /Users/quentin/phd/turbulence/tensorboard/drone_model/
 """
 import torch
 import torch.nn as nn
@@ -11,6 +10,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import datetime
+
+from typing import Iterable, Callable
 
 import utils
 
@@ -53,12 +54,12 @@ class AscTecFireflyDroneModel(nn.Module):
 
         self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
 
-    def f(self, time: torch.Tensor, state: torch.Tensor, w: torch.Tensor, fa: torch.Tensor) -> torch.Tensor:
+    def f(self, time: torch.Tensor, state: torch.Tensor, w_func: Callable, fa: torch.Tensor) -> torch.Tensor:
         """
         Compute the derivative of the state. x_dot = f(x, u, fa)
         :param time: scalar in seconds (Tensor of shape (1,)).
         :param state: state of the drone torch.Tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
-        :param w: Command: 6 rotors angular velocity in rad/s.
+        :param w_func: Command: 6 rotors angular velocity in rad/s.
         :param fa: External perturbation in N=kg.m/s2.
         :return: Return the derivative of the state.
         """
@@ -74,6 +75,9 @@ class AscTecFireflyDroneModel(nn.Module):
         # tau_cmd_y = self.b * self.l_arm * (w4 ** 2 - w2 ** 2)
         # tau_cmd_z = self.d * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
 
+        w = w_func(time.item())
+        # w=torch.zeros(6).float()
+
         # Hexarotor
         u = w ** 2
 
@@ -84,7 +88,7 @@ class AscTecFireflyDroneModel(nn.Module):
 
         f_cmd_t = self.kt * torch.sum(u)
         b = torch.tensor([[-0.5 * la * kt, -la * kt, -0.5 * la * kt, 0.5 * la * kt, la * kt, 0.5 * la * kt],
-                          [-c * la * kt, 0, c * la * kt, c * la * kt, 0, -c * la * kt],
+                          [c * la * kt, 0, -c * la * kt, -c * la * kt, 0, c * la * kt],
                           [-km, km, -km, km, -km, km]])
         moments = b @ u
         tau_cmd_x = moments[0]
@@ -205,6 +209,7 @@ def compute_fa():
 
     data["trans"] = data["vicon_pose"].apply(lambda _x: _x.get_trans())
     data["quat"] = data["vicon_pose"].apply(lambda _x: _x.get_pose()[1])
+    data.motor_speed = data.motor_speed.apply(lambda _x: torch.from_numpy(_x).float())
 
     dt = pd.Series(data["time"][1:].values - data["time"][:len(data) - 1].values)
     dt.index = range(1, len(dt) + 1)
@@ -252,6 +257,7 @@ def compute_fa():
     # Fa computation and plots
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/{now}/")
+    # Run in terminal: tensorboard --logdir /Users/quentin/phd/turbulence/tensorboard/drone_model/
     fa_dict = {}
     for index in tqdm(data.index):
         if index < 2:
@@ -259,8 +265,7 @@ def compute_fa():
             continue
         fa, xn1, xn1_hat = drone_model.forward_fa_direct_subtract(xn1=data["state"][index],
                                                                   xn=data["state"][index - 1],
-                                                                  wn=torch.from_numpy(
-                                                                      data["motor_speed"][index - 1]).float(),
+                                                                  wn=data,
                                                                   dt=torch.tensor(data["dt"][index], dtype=float),
                                                                   tn=torch.tensor(data["time"][index - 1],
                                                                                   dtype=float))
@@ -277,11 +282,10 @@ def compute_fa():
                                                    "estimator": h{var}}}, walltime=data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
-    # # Saving data
-    # new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
-    # print(f"Saving: {new_data_path}")
-    # data.to_pickle(new_data_path)
-    # print()
+    # Saving data
+    new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
+    print(f"Saving: {new_data_path}")
+    data.to_pickle(new_data_path)
 
     # # Adam optimization
     # optimizer = optim.Adam(drone_model.parameters(), lr=0.01)
@@ -399,44 +403,61 @@ def compute_fa():
                              walltime=data.loc[_i, "time"]) for _x, _i in zip(_angular_velocity,
                                                                               _angular_velocity.index)]
 
-    plot_compare_differentiators()
-    print()
+    # plot_compare_differentiators()
 
 
 def ode_solving():
     """
     Solve the FSDroneModel dot_x = FSDroneModel.f(x, u) using pytorch ODE solver.
     """
+    f = utils.DataFolder("euroc_mav")
+    flight_number = 0
+    data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
+    data = pd.read_pickle(data_path)
+
     drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
                                           inertia_matrix=np.array([[10.007e-3, 0., 0.],
                                                                    [0., 10.2335e-3, 0],
                                                                    [0., 0., 8.1e-3]]))
 
     # phi, theta, psi, p, q, r, u, v, w, x, y, z
-    initial_state = torch.tensor([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.], dtype=torch.float)
-    t_tab = torch.arange(0, 10, 0.1)  # temps
+    initial_state = data["state"][1]
+    t_tab = torch.tensor(list(data["time"][1:]), dtype=float)[500:2500]  # only when the drone is flying,
+    # no ground reaction
+
+    # Motor speed
+    def motor_speed(t: float) -> Iterable:
+        ms = torch.stack(list(data["motor_speed"])).numpy()
+        time_array = data["time"].to_numpy()
+        return torch.tensor([np.interp(t, time_array, ms[:, _i]) for _i in range(6)]).float()
 
     # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
-    states = odeint(lambda t, x: drone_model.f(time=t, state=x, w=torch.tensor([0, 0, 0, 0, 0, 0]),
-                                               fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
+    states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
+                                               fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
                     initial_state, t_tab)
 
     fig, axs = plt.subplots(3)
     axs[0].plot(t_tab, states[:, 9], 'r')
     axs[0].set_xlabel("temps")
     axs[0].set_ylabel("x")
-
     axs[1].plot(t_tab, states[:, 10], 'b')
     axs[1].set_xlabel("temps")
     axs[1].set_ylabel("y")
-
     axs[2].plot(t_tab, states[:, 11], 'g')
     axs[2].set_xlabel("temps")
     axs[2].set_ylabel("z")
-
+    plt.tight_layout()
     plt.show()
-    pass
+
+    fig, ax = plt.subplots(1, 1)
+    for i in range(6):
+        ax.plot(data["time"], [e[i] for e in data["motor_speed"]], label=f"{i}")
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
-    compute_fa()
+    # compute_fa()
+    ode_solving()
