@@ -25,10 +25,17 @@ class AscTecFireflyDroneModel(nn.Module):
     """
     AscTec Firefly drone model used in EuRoC MAV data implementing "f" the derivative of the state over time, "forward"
     to compute the error between ground truth and model estimation.
+
     Every equations in this code are described in:
     -Sabatino, Francesco. ‘Quadrotor Control: Modeling, Nonlinear Control Design, and Simulation’, 2015, 67.
+
     -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
      Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
+
+    -Achtelik, Michael, Klaus-Michael Doth, Daniel Gurdan, and Jan Stumpf. ‘Design of a Multi Rotor MAV with Regard to
+     Efficiency, Dynamics and Redundancy’. In AIAA Guidance, Navigation, and Control Conference. Guidance, Navigation,
+      and Control and Co-Located Conferences. American Institute of Aeronautics and Astronautics, 2012.
+      https://doi.org/10.2514/6.2012-4779.
 
     """
 
@@ -56,7 +63,7 @@ class AscTecFireflyDroneModel(nn.Module):
 
     def f(self, time: torch.Tensor, state: torch.Tensor, w_func: Callable, fa: torch.Tensor) -> torch.Tensor:
         """
-        Compute the derivative of the state. x_dot = f(x, u, fa)
+        Compute the derivative of the state. x_dot = f(x, u, fa).
         :param time: scalar in seconds (Tensor of shape (1,)).
         :param state: state of the drone torch.Tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
         :param w_func: Command: 6 rotors angular velocity in rad/s.
@@ -75,25 +82,34 @@ class AscTecFireflyDroneModel(nn.Module):
         # tau_cmd_y = self.b * self.l_arm * (w4 ** 2 - w2 ** 2)
         # tau_cmd_z = self.d * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
 
-        w = w_func(time.item())
-        # w=torch.zeros(6).float()
+        # constant = 1 / torch.mean(w_func(44.)) * (self.g * self.m / (6 * self.kt)) ** 0.5
+        # w = constant * w_func(time.item())
 
         # Hexarotor
-        u = w ** 2
-
-        kt = self.kt
         km = self.km
         la = self.l_arm
         c = 3 ** 0.5 / 2
+        b = torch.tensor([[-0.5 * la, -la, -0.5 * la, 0.5 * la, la, 0.5 * la],
+                          [c * la, 0, -c * la, -c * la, 0, c * la],
+                          [-km, km, -km, km, -km, km],
+                          [1, 1, 1, 1, 1, 1]])
 
-        f_cmd_t = self.kt * torch.sum(u)
-        b = torch.tensor([[-0.5 * la * kt, -la * kt, -0.5 * la * kt, 0.5 * la * kt, la * kt, 0.5 * la * kt],
-                          [c * la * kt, 0, -c * la * kt, -c * la * kt, 0, c * la * kt],
-                          [-km, km, -km, km, -km, km]])
-        moments = b @ u
-        tau_cmd_x = moments[0]
-        tau_cmd_y = moments[1]
-        tau_cmd_z = moments[2]
+        # Theoretic hovering command
+        body = torch.tensor([0, 0, 0, self.m * self.g]).reshape((4, 1))
+        b_inv = torch.pinverse(b)
+        w_hovering_model = (b_inv @ body / self.kt) ** 0.5
+
+        w_hovering_cmd = w_func(time.item())
+        print()
+        w = None
+
+        # Command to forces and torques
+        u = self.kt * w ** 2
+        drone_torsor = b @ u
+        tau_cmd_x = drone_torsor[0]
+        tau_cmd_y = drone_torsor[1]
+        tau_cmd_z = drone_torsor[2]
+        f_cmd_t = drone_torsor[3]
 
         # -----------------------------------------------------------
 
@@ -137,17 +153,11 @@ class AscTecFireflyDroneModel(nn.Module):
                 dt: torch.Tensor, tn: torch.Tensor) -> torch.Tensor:
         """
         Compute the norm of the difference between the state and a state estimate. fa derivable in pytorch.
-
         :param xn1: state at time tn+1.
-
         :param xn: state at time tn.
-
         :param wn: Rotors speed at time tn.
-
         :param dt: n+1 time step dt_n+1 = tn+1 - tn.
-
         :param tn: time of the measure in s.
-
         :return: torch.Tensor of dimension (1,).
         """
         return torch.norm(xn1 - (xn + dt * self.f(tn, xn, wn, self.fa)))
@@ -156,17 +166,11 @@ class AscTecFireflyDroneModel(nn.Module):
                                    dt: torch.Tensor, tn: torch.Tensor) -> torch.Tensor:
         """
         A different forward to not used pytorch optimizers because computing fa* is just a subtraction.
-
         :param xn1: state a step n+1.
-
         :param xn: state a step n.
-
         :param wn: command at time n.
-
         :param dt: time step.
-
         :param tn: (s).
-
         :return: fa, ground truth at step n+1, estimated state at step n+1.
         """
         ixx = self.inertia_matrix[0, 0]
@@ -422,13 +426,15 @@ def ode_solving():
 
     # phi, theta, psi, p, q, r, u, v, w, x, y, z
     initial_state = data["state"][1]
-    t_tab = torch.tensor(list(data["time"][1:]), dtype=float)[500:2500]  # only when the drone is flying,
+    initial_state = torch.zeros(12).float()
+    t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying,
     # no ground reaction
+    t_tab = t_tab - t_tab[0]
 
     # Motor speed
     def motor_speed(t: float) -> Iterable:
         ms = torch.stack(list(data["motor_speed"])).numpy()
-        time_array = data["time"].to_numpy()
+        time_array = t_tab.numpy()
         return torch.tensor([np.interp(t, time_array, ms[:, _i]) for _i in range(6)]).float()
 
     # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
@@ -436,28 +442,65 @@ def ode_solving():
                                                fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
                     initial_state, t_tab)
 
-    fig, axs = plt.subplots(3)
-    axs[0].plot(t_tab, states[:, 9], 'r')
-    axs[0].set_xlabel("temps")
-    axs[0].set_ylabel("x")
-    axs[1].plot(t_tab, states[:, 10], 'b')
-    axs[1].set_xlabel("temps")
-    axs[1].set_ylabel("y")
-    axs[2].plot(t_tab, states[:, 11], 'g')
-    axs[2].set_xlabel("temps")
-    axs[2].set_ylabel("z")
-    plt.tight_layout()
-    plt.show()
+    def plot_simulated_drone_position(x_start, x_end):
+        fig, axs = plt.subplots(3)
+        inds = [i for i, e in enumerate(t_tab) if x_start < e < x_end]
+        axs[0].plot(t_tab[inds], states[:, 9][inds], c='r')
+        axs[0].set_xlabel("temps")
+        axs[0].set_ylabel("x")
+        axs[1].plot(t_tab[inds], states[:, 10][inds], c='b')
+        axs[1].set_xlabel("temps")
+        axs[1].set_ylabel("y")
+        axs[2].plot(t_tab[inds], states[:, 11][inds], c='g')
+        axs[2].set_xlabel("temps")
+        axs[2].set_ylabel("z")
+        plt.tight_layout()
+        plt.show()
 
-    fig, ax = plt.subplots(1, 1)
-    for i in range(6):
-        ax.plot(data["time"], [e[i] for e in data["motor_speed"]], label=f"{i}")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.show()
+    def plot_motor_speed():
+        fig, ax = plt.subplots(1, 1)
+        for i in range(6):
+            ax.plot(data["time"], [e[i] for e in data["motor_speed"]], label=f"{i}")
+        ax.legend()
+        ax.grid()
+        plt.tight_layout()
+        plt.show()
+
+    print()
+    # plot_simulated_drone_position(0, 20)
+    # plot_motor_speed()
+
+
+def estimate_euroc_mav_parameters():
+    f = utils.DataFolder("euroc_mav")
+    data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
+    data = pd.read_pickle(data_path)
+
+    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
+                                          inertia_matrix=np.array([[10.007e-3, 0., 0.],
+                                                                   [0., 10.2335e-3, 0],
+                                                                   [0., 0., 8.1e-3]]))
+
+    # phi, theta, psi, p, q, r, u, v, w, x, y, z
+    initial_state = data["state"][1]
+    initial_state = torch.zeros(12).float()
+    t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying,
+    # no ground reaction
+    t_tab = t_tab - t_tab[0]
+
+    # Motor speed
+    def motor_speed(t: float) -> Iterable:
+        ms = torch.stack(list(data["motor_speed"])).numpy()
+        time_array = t_tab.numpy()
+        return torch.tensor([np.interp(t, time_array, ms[:, _i]) for _i in range(6)]).float()
+
+    # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
+    states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
+                                               fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
+                    initial_state, t_tab)
 
 
 if __name__ == '__main__':
     # compute_fa()
-    ode_solving()
+    # ode_solving()
+    estimate_euroc_mav_parameters()
