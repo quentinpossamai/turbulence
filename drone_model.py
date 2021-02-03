@@ -1,6 +1,7 @@
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
 """
+import pickle
 import torch
 import torch.nn as nn
 from torch.utils.tensorboard import SummaryWriter
@@ -10,7 +11,8 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import datetime
-
+import os
+from scipy.signal import savgol_filter
 from typing import Iterable, Callable
 
 import utils
@@ -517,89 +519,120 @@ def euroc_mav_ode_solving():
     plot_motor_speed()
 
 
-def estimate_euroc_mav_parameters():
+def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_previous: bool = None):
     """
     The purpose of this function is to estimate the drone parameters according to the EuRoC MAV data.
+    :param epochs: Number of epoch for training.
+    :param batch_size: Size of batch for training.
+    :param lr: Learning rate of Adam.
+    :param load_previous: If True load most recent computed drone parameters.
     :return: The parameters of the drone m, kt, km, l_arm, ixx, iyy, izz.
     """
+    # Loading dataset
     f = utils.DataFolder("euroc_mav")
     flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
+    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation/"
 
-    # Parameters initialization
-    m = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
-    kt = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
-    km = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
-    l_arm = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
-    ixx = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
-    iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
-    izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    # Plotting tools
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    writer = SummaryWriter(result_folder + now + "/")
 
-    k_m = torch.tensor(0.64)
-    k_kt = torch.tensor(6.546e-6)
-    k_km = torch.tensor(1.2864e-7)
-    k_l_arm = torch.tensor(0.215)
-    k_ixx = torch.tensor(10.007e-3)
-    k_iyy = torch.tensor(10.2335e-3)
-    k_izz = torch.tensor(8.1e-3)
+    # Parameter's scaling coefficients initialization
+    prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
 
-    drone_model = AscTecFireflyDroneModel(m=m, g=9.81, kt=kt, km=km, l_arm=l_arm,
-                                          ixx=ixx, iyy=iyy, izz=izz,
-                                          k_m=k_m, k_kt=k_kt, k_km=k_km, k_l_arm=k_l_arm,
-                                          k_ixx=k_ixx, k_iyy=k_iyy, k_izz=k_izz)
+    coef_m = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_kt = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_km = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_l_arm = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_ixx = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
 
-    mc_states = torch.stack(list(data["state"][500:2500]))
-    time_train = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying,
-    # no ground reaction
+    if load_previous is not True:
+        # First initialization of the parameters
+        m = torch.tensor(0.64)
+        kt = torch.tensor(6.546e-6)
+        km = torch.tensor(1.2864e-7)
+        l_arm = torch.tensor(0.215)
+        ixx = torch.tensor(10.007e-3)
+        iyy = torch.tensor(10.2335e-3)
+        izz = torch.tensor(8.1e-3)
+        to_plot = {"loss": [], "iteration": []}
+        for e in prm_name:
+            eval(f"to_plot[{e}] = [(coef_{e} * {e}).item()]")
+            eval(f"""writer.add_scalars("Parameters", {{"{e}": (coef_{e} * {e}).item()}},
+                     global_step=global_iteration)""")
+        global_iteration = 1
+        print(f"New training.")
+    else:
+        # Loading parameters from previous training
+        path = f.folders["results"][flight_number] + f"drone_parameters_estimation/"
+        # If the list is empty then there is no previous training file found.
+        last_filename = sorted([e for e in next(os.walk(path))[2] if (e[0] != ".") and (e[-1] == "l")])[-1]
+        to_plot = pickle.load(open(result_folder + last_filename, "rb"))
+
+        m = torch.tensor(to_plot["m"][-1])
+        kt = torch.tensor(to_plot["kt"][-1])
+        km = torch.tensor(to_plot["km"][-1])
+        l_arm = torch.tensor(to_plot["l_arm"][-1])
+        ixx = torch.tensor(to_plot["ixx"][-1])
+        iyy = torch.tensor(to_plot["iyy"][-1])
+        izz = torch.tensor(to_plot["izz"][-1])
+        global_iteration = to_plot["iteration"][-1]
+        print(f"Previous training loaded at {path}.")
+
+    drone_model = AscTecFireflyDroneModel(m=coef_m, g=9.81, kt=coef_kt, km=coef_km, l_arm=coef_l_arm,
+                                          ixx=coef_ixx, iyy=coef_iyy, izz=coef_izz,
+                                          k_m=m, k_kt=kt, k_km=km, k_l_arm=l_arm,
+                                          k_ixx=ixx, k_iyy=iyy, k_izz=izz)
+
+    dataset_start, dateset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
+    mc_states_train = torch.stack(list(data["state"][dataset_start:dateset_end]))
+    time_train = torch.tensor(list(data["time"])).float()[dataset_start:dateset_end]  # only when the drone is
+    # flying, no ground reaction
     time_train = time_train - time_train[0]
 
-    # Motor speed
+    # Continuous motor speed
     def motor_speed(t: float) -> Iterable:
-        ms = torch.stack(list(data["motor_speed"])).numpy()[500:2500]
-        time_array = time_train.numpy()
-        return torch.tensor([np.interp(t, time_array, ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
+        ms = torch.stack(list(data["motor_speed"])).numpy()[dataset_start:dateset_end]
+        return torch.tensor([np.interp(t, time_train.numpy(),
+                                       ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
 
     # Adam optimization
-    optimizer = torch.optim.Adam(drone_model.parameters(), lr=1e-2)
-    epochs = 2
-    batch_size = 32
+    optimizer = torch.optim.Adam(drone_model.parameters(), lr=lr)
+
     batch_nb = len(time_train) // batch_size
-    to_plot = {"loss": [],
-               "m": [m.item() * k_m],
-               "kt": [kt.item() * k_kt],
-               "km": [km.item() * k_km],
-               "l_arm": [l_arm.detach().item() * k_l_arm],
-               "ixx": [ixx.item() * k_ixx],
-               "iyy": [iyy.item() * k_iyy],
-               "izz": [izz.item() * k_izz]}
-    for epoch in tqdm(range(epochs)):
-        for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch}/{epochs}"):
+    for epoch in range(epochs):
+        for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
             # Dividing data by batch
             if batch_nb == batch_i:
                 time_batch = time_train[batch_i * batch_size:]
+                mc_states_batch = mc_states_train[batch_i * batch_size:]
             else:
                 time_batch = time_train[batch_i * batch_size:(batch_i + 1) * batch_size]
-            initial_state = mc_states[batch_i * batch_size]
+                mc_states_batch = mc_states_train[batch_i * batch_size:(batch_i + 1) * batch_size]
+            initial_state = mc_states_train[batch_i * batch_size]
 
             # Forward
             states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
                                                        fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
                             initial_state, time_batch, method="rk4")
 
-            loss = torch.abs(mc_states - states).sum()
+            loss = torch.sqrt((mc_states_batch - states) ** 2).mean()
             optimizer.zero_grad()  # zero the gradient buffers
             loss.backward()
             optimizer.step()  # Does the update
 
+            # Saving data
+            writer.add_scalars("Loss", {"Training loss": loss.item()}, global_step=global_iteration)
             to_plot["loss"].append(loss.item())
-            to_plot["m"].append(m.item() * k_m)
-            to_plot["kt"].append(kt.item() * k_kt)
-            to_plot["km"].append(km.item() * k_km)
-            to_plot["l_arm"].append(l_arm.item() * k_l_arm)
-            to_plot["ixx"].append(ixx.item() * k_ixx)
-            to_plot["iyy"].append(iyy.item() * k_iyy)
-            to_plot["izz"].append(izz.item() * k_izz)
+            for e in prm_name:
+                eval(f"to_plot[{e}].append(coef_{e} * {e}).item())")
+                eval(f"""writer.add_scalars("Parameters", {{"{e}": (coef_{e} * {e}).item()}},
+                         global_step=global_iteration)""")
+            global_iteration += 1
 
     def plot_loss_ov_epochs():
         fig, ax = plt.subplots(1, 1)
@@ -607,31 +640,40 @@ def estimate_euroc_mav_parameters():
         plt.tight_layout()
         plt.show()
 
-    def plot_parameters_ov_epochs(saving_path_name: str = None):
+    def plot_parameters_ov_epochs(window, degree, saving_path_name: str = None):
         fig, axs = plt.subplots(2, 4, figsize=[19.20, 10.80], dpi=200)
         i = 0
         for ax_row in axs:
             for ax in ax_row:
                 name = list(to_plot.keys())[i]
-                ax.scatter(range(len(to_plot[name])), to_plot[name])
+                if name == "loss":
+                    # ax.plot(np.arange(len(to_plot[name])) + 1,to_plot[name])  # Loss starts at 1
+                    # Loss starts at 1
+                    ax.plot(np.arange(len(to_plot[name])) + 1, savgol_filter(to_plot["loss"], window, degree))
+                else:
+                    ax.plot(range(len(to_plot[name])), to_plot[name])  # Parameters start at 0
                 ax.set_ylabel(name)
                 ax.set_xlabel("Iterations")
                 ax.grid()
+                [ax.axvline(run_iteration - 1, c="r") for run_iteration in to_plot["iteration"]]
                 i += 1
-                if i > 7:
-                    break
         plt.tight_layout()
-        plt.show()
-
         if saving_path_name is not None:
             plt.savefig(saving_path_name)
+        plt.show()
 
-    plot_loss_ov_epochs()
-    plot_parameters_ov_epochs()
-    plot_parameters_ov_epochs(saving_path_name=f.folders["plots"][0] + "test.png")
+    print()
+    # plot_loss_ov_epochs()
+    plot_parameters_ov_epochs(101, 3)
+
+    # plot_parameters_ov_epochs(window=101, 3, saving_path_name=result_folder + f"{now}.png")
+    to_plot["iteration"].append(len(to_plot["m"]))
+
+    pickle.dump(to_plot, open(result_folder + f"{now}.pkl", "wb"))
+    print()
 
 
 if __name__ == '__main__':
     # euroc_mav_compute_fa()
     # euroc_mav_ode_solving()
-    estimate_euroc_mav_parameters()
+    estimate_euroc_mav_parameters(epochs=20, batch_size=32, lr=1e-2, load_previous=False)
