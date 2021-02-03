@@ -550,46 +550,56 @@ def estimate_euroc_mav_parameters():
                                           k_ixx=k_ixx, k_iyy=k_iyy, k_izz=k_izz)
 
     mc_states = torch.stack(list(data["state"][500:2500]))
-    t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying,
+    time_train = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying,
     # no ground reaction
-    t_tab = t_tab - t_tab[0]
-    initial_state = data["state"][500]
+    time_train = time_train - time_train[0]
 
     # Motor speed
     def motor_speed(t: float) -> Iterable:
         ms = torch.stack(list(data["motor_speed"])).numpy()[500:2500]
-        time_array = t_tab.numpy()
+        time_array = time_train.numpy()
         return torch.tensor([np.interp(t, time_array, ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
 
     # Adam optimization
     optimizer = torch.optim.Adam(drone_model.parameters(), lr=1e-2)
-    epochs = 10
+    epochs = 2
+    batch_size = 32
+    batch_nb = len(time_train) // batch_size
     to_plot = {"loss": [],
-               "m": [m.item()*k_m],
-               "kt": [kt.item()*k_kt],
-               "km": [km.item()*k_km],
-               "l_arm": [l_arm.detach().item()*k_l_arm],
-               "ixx": [ixx.item()*k_ixx],
-               "iyy": [iyy.item()*k_iyy],
-               "izz": [izz.item()*k_izz]}
+               "m": [m.item() * k_m],
+               "kt": [kt.item() * k_kt],
+               "km": [km.item() * k_km],
+               "l_arm": [l_arm.detach().item() * k_l_arm],
+               "ixx": [ixx.item() * k_ixx],
+               "iyy": [iyy.item() * k_iyy],
+               "izz": [izz.item() * k_izz]}
     for epoch in tqdm(range(epochs)):
-        # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
-        optimizer.zero_grad()  # zero the gradient buffers
-        states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
-                                                   fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
-                        initial_state, t_tab, method="rk4")
-        loss = torch.abs(mc_states - states).sum()
-        loss.backward()
-        optimizer.step()  # Does the update
+        for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch}/{epochs}"):
+            # Dividing data by batch
+            if batch_nb == batch_i:
+                time_batch = time_train[batch_i * batch_size:]
+            else:
+                time_batch = time_train[batch_i * batch_size:(batch_i + 1) * batch_size]
+            initial_state = mc_states[batch_i * batch_size]
 
-        to_plot["loss"].append(loss.item())
-        to_plot["m"].append(m.item() * k_m)
-        to_plot["kt"].append(kt.item() * k_kt)
-        to_plot["km"].append(km.item() * k_km)
-        to_plot["l_arm"].append(l_arm.item() * k_l_arm)
-        to_plot["ixx"].append(ixx.item() * k_ixx)
-        to_plot["iyy"].append(iyy.item() * k_iyy)
-        to_plot["izz"].append(izz.item() * k_izz)
+            # Forward
+            states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
+                                                       fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
+                            initial_state, time_batch, method="rk4")
+
+            loss = torch.abs(mc_states - states).sum()
+            optimizer.zero_grad()  # zero the gradient buffers
+            loss.backward()
+            optimizer.step()  # Does the update
+
+            to_plot["loss"].append(loss.item())
+            to_plot["m"].append(m.item() * k_m)
+            to_plot["kt"].append(kt.item() * k_kt)
+            to_plot["km"].append(km.item() * k_km)
+            to_plot["l_arm"].append(l_arm.item() * k_l_arm)
+            to_plot["ixx"].append(ixx.item() * k_ixx)
+            to_plot["iyy"].append(iyy.item() * k_iyy)
+            to_plot["izz"].append(izz.item() * k_izz)
 
     def plot_loss_ov_epochs():
         fig, ax = plt.subplots(1, 1)
@@ -597,8 +607,8 @@ def estimate_euroc_mav_parameters():
         plt.tight_layout()
         plt.show()
 
-    def plot_parameters_ov_epochs():
-        fig, axs = plt.subplots(3, 3)
+    def plot_parameters_ov_epochs(saving_path_name: str = None):
+        fig, axs = plt.subplots(2, 4, figsize=[19.20, 10.80], dpi=200)
         i = 0
         for ax_row in axs:
             for ax in ax_row:
@@ -613,10 +623,12 @@ def estimate_euroc_mav_parameters():
         plt.tight_layout()
         plt.show()
 
-    print()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
 
     plot_loss_ov_epochs()
     plot_parameters_ov_epochs()
+    plot_parameters_ov_epochs(saving_path_name=f.folders["plots"][0] + "test.png")
 
 
 if __name__ == '__main__':
