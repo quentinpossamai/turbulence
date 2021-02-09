@@ -41,41 +41,54 @@ class AscTecFireflyDroneModel(nn.Module):
 
     """
 
-    def __init__(self, m: torch.tensor, g: torch.tensor, kt: torch.tensor, km: torch.tensor, l_arm: torch.tensor,
-                 ixx: torch.tensor, iyy: torch.tensor, izz: torch.tensor,
-                 k_m: torch.tensor = 1., k_kt: torch.tensor = 1., k_km: torch.tensor = 1., k_l_arm: torch.tensor = 1.,
-                 k_ixx: torch.tensor = 1., k_iyy: torch.tensor = 1., k_izz: torch.tensor = 1.):
+    def __init__(self,
+                 g: torch.tensor,
+                 m: torch.tensor,
+                 kt: torch.tensor,
+                 km: torch.tensor,
+                 l_arm: torch.tensor,
+                 ixx: torch.tensor,
+                 iyy: torch.tensor,
+                 izz: torch.tensor,
+
+                 coef_m: torch.tensor = torch.tensor(1.),
+                 coef_kt: torch.tensor = torch.tensor(1.),
+                 coef_km: torch.tensor = torch.tensor(1.),
+                 coef_l_arm: torch.tensor = torch.tensor(1.),
+                 coef_ixx: torch.tensor = torch.tensor(1.),
+                 coef_iyy: torch.tensor = torch.tensor(1.),
+                 coef_izz: torch.tensor = torch.tensor(1.)):
         """
         Drone model base of Sabatino Francesco thesis adapted to an hexarotor.
 
-        :param m: mass of the drone (scalar) (kg).
+        :param coef_m: mass of the drone (scalar) (kg).
         :param g: gravity constant (scalar) (9.81m/s2).
-        :param kt: Thrust factor (scalar) (kg.m/rad2).
-        :param km: Moment factor (scalar) (kg.m2/rad2).
-        :param l_arm: Drone's arm distance (scalar) (m).
-        :param ixx: x-axis component of the inertia matrix (kg.m2).
-        :param iyy: x-axis component of the inertia matrix (kg.m2).
-        :param izz: x-axis component of the inertia matrix (kg.m2).
+        :param coef_kt: Thrust factor (scalar) (kg.m/rad2).
+        :param coef_km: Moment factor (scalar) (kg.m2/rad2).
+        :param coef_l_arm: Drone's arm distance (scalar) (m).
+        :param coef_ixx: x-axis component of the inertia matrix (kg.m2).
+        :param coef_iyy: x-axis component of the inertia matrix (kg.m2).
+        :param coef_izz: x-axis component of the inertia matrix (kg.m2).
 
         """
         super().__init__()
         # Drone model parameters.
 
-        self.scaled_m = m
-        self.scaled_kt = kt
-        self.scaled_km = km
-        self.scaled_l_arm = l_arm
-        self.scaled_ixx = ixx
-        self.scaled_iyy = iyy
-        self.scaled_izz = izz
+        self.coef_m = coef_m
+        self.coef_kt = coef_kt
+        self.coef_km = coef_km
+        self.coef_l_arm = coef_l_arm
+        self.coef_ixx = coef_ixx
+        self.coef_iyy = coef_iyy
+        self.coef_izz = coef_izz
 
-        self.k_m = k_m
-        self.k_kt = k_kt
-        self.k_km = k_km
-        self.k_l_arm = k_l_arm
-        self.k_ixx = k_ixx
-        self.k_iyy = k_iyy
-        self.k_izz = k_izz
+        self.m = m
+        self.kt = kt
+        self.km = km
+        self.l_arm = l_arm
+        self.ixx = ixx
+        self.iyy = iyy
+        self.izz = izz
 
         self.g = g
         self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
@@ -90,13 +103,13 @@ class AscTecFireflyDroneModel(nn.Module):
         :return: Return the derivative of the state.
         """
 
-        m = self.k_m * self.scaled_m
-        kt = self.k_kt * self.scaled_kt
-        km = self.k_km * self.scaled_km
-        l_arm = self.k_l_arm * self.scaled_l_arm
-        ixx = self.k_ixx * self.scaled_ixx
-        iyy = self.k_iyy * self.scaled_iyy
-        izz = self.k_izz * self.scaled_izz
+        m = self.m * self.coef_m
+        kt = self.kt * self.coef_kt
+        km = self.km * self.coef_km
+        l_arm = self.l_arm * self.coef_l_arm
+        ixx = self.ixx * self.coef_ixx
+        iyy = self.iyy * self.coef_iyy
+        izz = self.izz * self.coef_izz
 
         assert len(fa) == 12, "fa len > 12 fa supposed to be = _, _, _, tau_x, tau_y, tau_z, fx, fy, fz, _, _, _"
         # # Quadrotor
@@ -227,10 +240,10 @@ class AscTecFireflyDroneModel(nn.Module):
         :param tn: (s).
         :return: fa, ground truth at step n+1, estimated state at step n+1.
         """
-        m = self.k_m * self.scaled_m
-        ixx = self.k_ixx * self.scaled_ixx
-        iyy = self.k_iyy * self.scaled_iyy
-        izz = self.k_izz * self.scaled_izz
+        m = self.m * self.coef_m
+        ixx = self.ixx * self.coef_ixx
+        iyy = self.iyy * self.coef_iyy
+        izz = self.izz * self.coef_izz
         c = torch.tensor([0., 0., 0., 1 / ixx, 1 / iyy, 1 / izz,
                           1 / m, 1 / m, 1 / m, 0., 0., 0.], dtype=torch.float)
 
@@ -309,8 +322,8 @@ def euroc_mav_compute_fa():
                                                data["linear_speed"][_x.name],
                                                data["trans"][_x.name]]).astype(np.float)), axis=1)
 
-    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
-                                          ixx=10.007e-3, iyy=10.2335e-3, izz=8.1e-3)
+    drone_model = AscTecFireflyDroneModel(coef_m=0.64, g=9.81, coef_kt=6.546e-6, coef_km=1.2864e-7, coef_l_arm=0.215,
+                                          coef_ixx=10.007e-3, coef_iyy=10.2335e-3, coef_izz=8.1e-3)
     # Fa computation and plots
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/{now}/")
@@ -335,7 +348,7 @@ def euroc_mav_compute_fa():
         writer.add_scalars("fa's moments", {"tau_x": tau_x, "tau_y": tau_y, "tau_z": tau_z},
                            walltime=data.loc[index, "time"])
         for var in ["phi", "theta", "psi", "p", "q", "r", "u", "v", "w", "x", "y", "z"]:
-            eval(f"""writer.add_scalars("{var}", {{"ground truth": {var},
+            exec(f"""writer.add_scalars("{var}", {{"ground truth": {var},
                                                    "estimator": h{var}}}, walltime=data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
@@ -463,7 +476,7 @@ def euroc_mav_compute_fa():
     # plot_compare_differentiators()
 
 
-def euroc_mav_ode_solving():
+def euroc_mav_ode_solving(load_previous=True):
     """
     Solve the FSDroneModel dot_x = FSDroneModel.f(x, u) using pytorch ODE solver.
     """
@@ -471,9 +484,46 @@ def euroc_mav_ode_solving():
     flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
+    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation/"
 
-    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
-                                          ixx=10.007e-3, iyy=10.2335e-3, izz=8.1e-3)
+    # Parameter's scaling coefficients initialization
+    prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
+
+    coef_m = torch.tensor(1., dtype=torch.float, requires_grad=True)
+    coef_kt = torch.tensor(1., dtype=torch.float, requires_grad=True)
+    coef_km = torch.tensor(1., dtype=torch.float, requires_grad=True)
+    coef_l_arm = torch.tensor(1., dtype=torch.float, requires_grad=True)
+    coef_ixx = torch.tensor(1., dtype=torch.float, requires_grad=True)
+    coef_iyy = torch.tensor(1., dtype=torch.float, requires_grad=True)
+    coef_izz = torch.tensor(1., dtype=torch.float, requires_grad=True)
+
+    if load_previous is not True:
+        # First initialization of the parameters
+        m = torch.tensor(0.64)
+        kt = torch.tensor(6.546e-6)
+        km = torch.tensor(1.2864e-7)
+        l_arm = torch.tensor(0.215)
+        ixx = torch.tensor(10.007e-3)
+        iyy = torch.tensor(10.2335e-3)
+        izz = torch.tensor(8.1e-3)
+    else:
+        # Loading parameters from previous training
+        # If the list is empty then there is no previous training file found.
+        last_filename = sorted([e for e in next(os.walk(result_folder))[2] if (e[0] != ".") and (e[-1] == "l")])[-1]
+        to_plot = pickle.load(open(result_folder + last_filename, "rb"))
+
+        m = torch.tensor(to_plot["m"][-1])
+        kt = torch.tensor(to_plot["kt"][-1])
+        km = torch.tensor(to_plot["km"][-1])
+        l_arm = torch.tensor(to_plot["l_arm"][-1])
+        ixx = torch.tensor(to_plot["ixx"][-1])
+        iyy = torch.tensor(to_plot["iyy"][-1])
+        izz = torch.tensor(to_plot["izz"][-1])
+        print(f"Previous training loaded at {result_folder + last_filename}.")
+
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km, coef_l_arm=coef_l_arm,
+                                          coef_ixx=coef_ixx, coef_iyy=coef_iyy, coef_izz=coef_izz,
+                                          m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
 
     t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying, no ground reaction
     t_tab = t_tab - t_tab[0]
@@ -491,7 +541,7 @@ def euroc_mav_ode_solving():
                     initial_state, t_tab)
 
     def plot_simulated_drone_position(x_start, x_end):
-        fig, axs = plt.subplots(3)
+        fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
         inds = [i for i, e in enumerate(t_tab) if x_start < e < x_end]
         axs[0].plot(t_tab[inds], states[:, 9][inds].detach(), c='r')
         axs[0].set_xlabel("temps")
@@ -506,7 +556,7 @@ def euroc_mav_ode_solving():
         plt.show()
 
     def plot_motor_speed():
-        fig, ax = plt.subplots(1, 1)
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
         for i in range(6):
             ax.plot(data["time"], [e[i] for e in data["motor_speed"]], label=f"{i}")
         ax.legend()
@@ -536,6 +586,7 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
     result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation/"
 
     # Plotting tools
+    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation/
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(result_folder + now + "/")
 
@@ -561,16 +612,14 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
         izz = torch.tensor(8.1e-3)
         to_plot = {"loss": [], "iteration": []}
         for e in prm_name:
-            eval(f"to_plot[{e}] = [(coef_{e} * {e}).item()]")
-            eval(f"""writer.add_scalars("Parameters", {{"{e}": (coef_{e} * {e}).item()}},
-                     global_step=global_iteration)""")
+            exec(f"""to_plot["{e}"] = [(coef_{e} * {e}).item()]""")
+            exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=0)""")
         global_iteration = 1
         print(f"New training.")
     else:
         # Loading parameters from previous training
-        path = f.folders["results"][flight_number] + f"drone_parameters_estimation/"
         # If the list is empty then there is no previous training file found.
-        last_filename = sorted([e for e in next(os.walk(path))[2] if (e[0] != ".") and (e[-1] == "l")])[-1]
+        last_filename = sorted([e for e in next(os.walk(result_folder))[2] if (e[0] != ".") and (e[-1] == "l")])[-1]
         to_plot = pickle.load(open(result_folder + last_filename, "rb"))
 
         m = torch.tensor(to_plot["m"][-1])
@@ -581,12 +630,14 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
         iyy = torch.tensor(to_plot["iyy"][-1])
         izz = torch.tensor(to_plot["izz"][-1])
         global_iteration = to_plot["iteration"][-1]
-        print(f"Previous training loaded at {path}.")
+        print(f"Previous training loaded at {result_folder + last_filename}.")
 
-    drone_model = AscTecFireflyDroneModel(m=coef_m, g=9.81, kt=coef_kt, km=coef_km, l_arm=coef_l_arm,
-                                          ixx=coef_ixx, iyy=coef_iyy, izz=coef_izz,
-                                          k_m=m, k_kt=kt, k_km=km, k_l_arm=l_arm,
-                                          k_ixx=ixx, k_iyy=iyy, k_izz=izz)
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
+                                          coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | k: {{drone_model.{e}}}")""")
 
     dataset_start, dateset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
     mc_states_train = torch.stack(list(data["state"][dataset_start:dateset_end]))
@@ -605,6 +656,7 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
 
     batch_nb = len(time_train) // batch_size
     for epoch in range(epochs):
+        losses = []
         for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
             # Dividing data by batch
             if batch_nb == batch_i:
@@ -619,7 +671,6 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
             states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
                                                        fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
                             initial_state, time_batch, method="rk4")
-
             loss = torch.sqrt((mc_states_batch - states) ** 2).mean()
             optimizer.zero_grad()  # zero the gradient buffers
             loss.backward()
@@ -629,10 +680,13 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
             writer.add_scalars("Loss", {"Training loss": loss.item()}, global_step=global_iteration)
             to_plot["loss"].append(loss.item())
             for e in prm_name:
-                eval(f"to_plot[{e}].append(coef_{e} * {e}).item())")
-                eval(f"""writer.add_scalars("Parameters", {{"{e}": (coef_{e} * {e}).item()}},
+                exec(f"""to_plot["{e}"].append((coef_{e} * {e}).item())""")
+                exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
                          global_step=global_iteration)""")
             global_iteration += 1
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | k: {{drone_model.{e}}}")""")
 
     def plot_loss_ov_epochs():
         fig, ax = plt.subplots(1, 1)
@@ -662,18 +716,16 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
             plt.savefig(saving_path_name)
         plt.show()
 
-    print()
     # plot_loss_ov_epochs()
-    plot_parameters_ov_epochs(101, 3)
-
+    # plot_parameters_ov_epochs(101, 3)
     # plot_parameters_ov_epochs(window=101, 3, saving_path_name=result_folder + f"{now}.png")
-    to_plot["iteration"].append(len(to_plot["m"]))
 
+    to_plot["iteration"].append(len(to_plot["m"]))
     pickle.dump(to_plot, open(result_folder + f"{now}.pkl", "wb"))
     print()
 
 
 if __name__ == '__main__':
     # euroc_mav_compute_fa()
-    # euroc_mav_ode_solving()
-    estimate_euroc_mav_parameters(epochs=20, batch_size=32, lr=1e-2, load_previous=False)
+    euroc_mav_ode_solving(load_previous=True)
+    # estimate_euroc_mav_parameters(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
