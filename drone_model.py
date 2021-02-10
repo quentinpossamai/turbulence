@@ -484,7 +484,7 @@ def euroc_mav_ode_solving(load_previous=True):
     flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
-    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation/"
+    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation_h1/"
 
     # Parameter's scaling coefficients initialization
     prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
@@ -521,9 +521,9 @@ def euroc_mav_ode_solving(load_previous=True):
         izz = torch.tensor(to_plot["izz"][-1])
         print(f"Previous training loaded at {result_folder + last_filename}.")
 
-    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km, coef_l_arm=coef_l_arm,
-                                          coef_ixx=coef_ixx, coef_iyy=coef_iyy, coef_izz=coef_izz,
-                                          m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
+                                          coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
 
     t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying, no ground reaction
     t_tab = t_tab - t_tab[0]
@@ -538,40 +538,45 @@ def euroc_mav_ode_solving(load_previous=True):
     # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
     states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
                                                fa=drone_model.fa),
-                    initial_state, t_tab)
+                    initial_state, t_tab, method="rk4")
 
-    def plot_simulated_drone_position(x_start, x_end):
+    def plot_simulated_drone_position(x_start, x_end, saving_path_name: str = None):
         fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
         inds = [i for i, e in enumerate(t_tab) if x_start < e < x_end]
         axs[0].plot(t_tab[inds], states[:, 9][inds].detach(), c='r')
-        axs[0].set_xlabel("temps")
-        axs[0].set_ylabel("x")
+        axs[0].set_ylabel("x(m)")
         axs[1].plot(t_tab[inds], states[:, 10][inds].detach(), c='b')
-        axs[1].set_xlabel("temps")
-        axs[1].set_ylabel("y")
+        axs[1].set_ylabel("y(m)")
         axs[2].plot(t_tab[inds], states[:, 11][inds].detach(), c='g')
-        axs[2].set_xlabel("temps")
-        axs[2].set_ylabel("z")
+        axs[2].set_ylabel("z(m)")
+        for ax in axs:
+            ax.grid()
+            ax.set_xlabel("Time(s)")
         plt.tight_layout()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
         plt.show()
 
-    def plot_motor_speed():
+    def plot_motor_speed(saving_path_name: str = None):
         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
         for i in range(6):
             ax.plot(data["time"], [e[i] for e in data["motor_speed"]], label=f"{i}")
         ax.legend()
         ax.grid()
         plt.tight_layout()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
         plt.show()
 
     print()
-    plot_simulated_drone_position(0, 200)
-    plot_motor_speed()
+    plot_simulated_drone_position(0, 200, result_folder + "20210207_200913_xyz_0_40.png")
+    plot_motor_speed(result_folder + "motor_speed.png")
 
 
-def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_previous: bool = None):
+def estimate_euroc_mav_params_hinf(epochs: int, batch_size: int, lr: float, load_previous: bool = None):
     """
     The purpose of this function is to estimate the drone parameters according to the EuRoC MAV data.
+    Training is done using infinite horizon.
     :param epochs: Number of epoch for training.
     :param batch_size: Size of batch for training.
     :param lr: Learning rate of Adam.
@@ -583,10 +588,10 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
     flight_number = 0
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
-    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation/"
+    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation_hinf/"
 
     # Plotting tools
-    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation/
+    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_hinf/
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(result_folder + now + "/")
 
@@ -656,7 +661,6 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
 
     batch_nb = len(time_train) // batch_size
     for epoch in range(epochs):
-        losses = []
         for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
             # Dividing data by batch
             if batch_nb == batch_i:
@@ -725,7 +729,178 @@ def estimate_euroc_mav_parameters(epochs: int, batch_size: int, lr: float, load_
     print()
 
 
+def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_previous: bool = None):
+    """
+    The purpose of this function is to estimate the drone parameters according to the EuRoC MAV data.
+    Training is done using 1 step horizon.
+    :param epochs: Number of epoch for training.
+    :param batch_size: Size of batch for training.
+    :param lr: Learning rate of Adam.
+    :param load_previous: If True load most recent computed drone parameters.
+    :return: The parameters of the drone m, kt, km, l_arm, ixx, iyy, izz.
+    """
+    # Loading dataset
+    f = utils.DataFolder("euroc_mav")
+    flight_number = 0
+    data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
+    data = pd.read_pickle(data_path)
+    result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation_h1/"
+
+    # Plotting tools
+    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    writer = SummaryWriter(result_folder + now + "/")
+
+    # Parameter's scaling coefficients initialization
+    prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
+
+    coef_m = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_kt = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_km = torch.tensor(1., dtype=torch.float)
+    coef_l_arm = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_ixx = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+
+    if load_previous is not True:
+        # First initialization of the parameters
+        m = torch.tensor(0.64)
+        kt = torch.tensor(6.546e-6)
+        km = torch.tensor(1.2864e-7)
+        l_arm = torch.tensor(0.215)
+        ixx = torch.tensor(10.007e-3)
+        iyy = torch.tensor(10.2335e-3)
+        izz = torch.tensor(8.1e-3)
+        to_plot = {"loss": [], "iteration": []}
+        for e in prm_name:
+            exec(f"""to_plot["{e}"] = [(coef_{e} * {e}).item()]""")
+            exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=0)""")
+        global_iteration = 1
+        print(f"New training.")
+    else:
+        # Loading parameters from previous training
+        # If the list is empty then there is no previous training file found.
+        last_filename = sorted([e for e in next(os.walk(result_folder))[2] if (e[0] != ".") and (e[-1] == "l")])[-1]
+        to_plot = pickle.load(open(result_folder + last_filename, "rb"))
+
+        m = torch.tensor(to_plot["m"][-1])
+        kt = torch.tensor(to_plot["kt"][-1])
+        km = torch.tensor(to_plot["km"][-1])
+        l_arm = torch.tensor(to_plot["l_arm"][-1])
+        ixx = torch.tensor(to_plot["ixx"][-1])
+        iyy = torch.tensor(to_plot["iyy"][-1])
+        izz = torch.tensor(to_plot["izz"][-1])
+        global_iteration = to_plot["iteration"][-1]
+        print(f"Previous training loaded at {result_folder + last_filename}.")
+
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
+                                          coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    dataset_start, dateset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
+    mc_states_train = torch.stack(list(data["state"][dataset_start:dateset_end]))
+    time_train = torch.tensor(list(data["time"])).float()[dataset_start:dateset_end]  # only when the drone is
+    # flying, no ground reaction
+    time_train = time_train - time_train[0]
+
+    # Continuous motor speed
+    def motor_speed(t: float) -> Iterable:
+        ms = torch.stack(list(data["motor_speed"])).numpy()[dataset_start:dateset_end]
+        return torch.tensor([np.interp(t, time_train.numpy(),
+                                       ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
+
+    # Adam optimization
+    optimizer = torch.optim.Adam(drone_model.parameters(), lr=lr)
+
+    batch_nb = len(time_train) // batch_size
+    dt = time_train.mean()
+    for epoch in range(epochs):
+        for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
+            # Dividing data by batch
+            start = batch_i * batch_size - 1
+            end = (batch_i + 1) * batch_size
+            if batch_i == batch_nb:
+                time_batch = time_train[start:]
+                mc_states_batch = mc_states_train[start:]
+            elif batch_i == 0:
+                time_batch = time_train[start + 1:end]
+                mc_states_batch = mc_states_train[start + 1:end]
+            else:
+                time_batch = time_train[start:end]
+                mc_states_batch = mc_states_train[start:end]
+
+            batch_loss = torch.zeros(1)
+            # Forward
+            for t, mc_n, mc_n1 in zip(time_batch, mc_states_batch[:-1], mc_states_batch[1:]):
+                state_n1 = drone_model.f(t, state=mc_n, w_func=motor_speed, fa=torch.zeros(12)) * dt + mc_n
+                loss = (mc_n1 - state_n1) ** 2
+                coef_learning = torch.tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
+                loss = (coef_learning / coef_learning.sum() * loss).sum()
+                batch_loss = loss + batch_loss
+
+            batch_loss = (batch_loss / (len(mc_states_batch) - 1))
+            batch_loss = batch_loss.sum()
+
+            optimizer.zero_grad()  # zero the gradient buffers
+            batch_loss.backward()  # And learning rate
+            optimizer.step()  # Does the update
+
+            # Saving data
+            writer.add_scalars("Loss", {"Training loss": batch_loss.item()}, global_step=global_iteration)
+            to_plot["loss"].append(batch_loss.item())
+            for e in prm_name:
+                exec(f"""to_plot["{e}"].append((coef_{e} * {e}).item())""")
+                exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
+                         global_step=global_iteration)""")
+            global_iteration += 1
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    def plot_loss_ov_epochs():
+        fig, ax = plt.subplots(1, 1)
+        ax.plot(to_plot["loss"])
+        plt.tight_layout()
+        plt.show()
+
+    def plot_parameters_ov_epochs(window, degree, saving_path_name: str = None):
+        fig, axs = plt.subplots(2, 4, figsize=[19.20, 10.80], dpi=200)
+        i = 0
+        for ax_row in axs:
+            for ax in ax_row:
+                name = list(to_plot.keys())[i]
+                if name == "loss":
+                    # ax.plot(np.arange(len(to_plot[name])) + 1,to_plot[name])  # Loss starts at 1
+                    # Loss starts at 1
+                    ax.plot(np.arange(len(to_plot[name])) + 1, savgol_filter(to_plot["loss"], window, degree))
+                else:
+                    ax.plot(range(len(to_plot[name])), to_plot[name])  # Parameters start at 0
+                ax.set_ylabel(name)
+                ax.set_xlabel("Iterations")
+                ax.grid()
+                [ax.axvline(run_iteration - 1, c="r") for run_iteration in to_plot["iteration"]]
+                i += 1
+        plt.tight_layout()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
+        plt.show()
+
+    to_plot["iteration"].append(len(to_plot["m"]))
+    pickle.dump(to_plot, open(result_folder + f"{now}.pkl", "wb"))
+    print()
+
+    # plot_loss_ov_epochs()
+    # plot_parameters_ov_epochs(101, 3)
+    # plot_parameters_ov_epochs(window=101, 3, saving_path_name=result_folder + f"{now}.png")
+
+
 if __name__ == '__main__':
     # euroc_mav_compute_fa()
-    euroc_mav_ode_solving(load_previous=True)
-    # estimate_euroc_mav_parameters(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
+    # euroc_mav_ode_solving(load_previous=True)
+    # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
+    estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-3, load_previous=True)
