@@ -476,7 +476,7 @@ def euroc_mav_compute_fa():
     # plot_compare_differentiators()
 
 
-def euroc_mav_ode_solving(load_previous=True):
+def euroc_mav_ode_solving(horizon: str, load_previous=True):
     """
     Solve the FSDroneModel dot_x = FSDroneModel.f(x, u) using pytorch ODE solver.
     """
@@ -527,6 +527,7 @@ def euroc_mav_ode_solving(load_previous=True):
 
     t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying, no ground reaction
     t_tab = t_tab - t_tab[0]
+    mc_states = torch.stack(list(data["state"][500:2500]))
     initial_state = data["state"][500]
 
     # Motor speed
@@ -535,10 +536,16 @@ def euroc_mav_ode_solving(load_previous=True):
         time_array = t_tab.numpy()
         return torch.tensor([np.interp(t, time_array, ms[:, i]) for i in range(6)]).float()
 
-    # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
-    states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
-                                               fa=drone_model.fa),
-                    initial_state, t_tab, method="rk4")
+    if horizon == "hinf":
+        # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
+        states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed, fa=drone_model.fa),
+                        initial_state, t_tab, method="rk4")
+    elif horizon == "h1":
+        states = []
+        for i, (t_iter, mc_n) in enumerate(zip(t_tab[1:], mc_states[1:])):
+            dt = t_iter - t_tab[i]
+            staten1 = drone_model.f(time=t_iter, state=mc_n, w_func=motor_speed, fa=torch.zeros(12)) * dt + mc_n
+            states.append(staten1)
 
     def plot_simulated_drone_position(x_start, x_end, saving_path_name: str = None):
         fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
@@ -901,6 +908,6 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
 
 if __name__ == '__main__':
     # euroc_mav_compute_fa()
-    # euroc_mav_ode_solving(load_previous=True)
+    euroc_mav_ode_solving(horizon="h1", load_previous=True)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
-    estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-3, load_previous=True)
+    # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-3, load_previous=True)
