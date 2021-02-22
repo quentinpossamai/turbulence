@@ -93,10 +93,10 @@ class AscTecFireflyDroneModel(nn.Module):
         self.g = g
         self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
 
-    def f(self, time: torch.Tensor, state: torch.Tensor, w_func: Callable, fa: torch.Tensor) -> torch.Tensor:
+    def f(self, t_time: torch.Tensor, state: torch.Tensor, w_func: Callable, fa: torch.Tensor) -> torch.Tensor:
         """
         Compute the derivative of the state. x_dot = f(x, u, fa).
-        :param time: scalar in seconds (Tensor of shape (1,)).
+        :param t_time: scalar in seconds (Tensor of shape (1,)).
         :param state: state of the drone torch.Tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
         :param w_func: Command: 6 rotors angular velocity in rad/s.
         :param fa: External perturbation in N=kg.m/s2.
@@ -124,12 +124,6 @@ class AscTecFireflyDroneModel(nn.Module):
         # tau_cmd_z = self.d * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
 
         # Hexarotor force generation -----------------------------------------------------------------------------------
-        # b = torch.tensor([[-0.5 * la, -la, -0.5 * la, 0.5 * la, la, 0.5 * la],
-        #                   [3. ** 0.5 / 2. * la, 0., -3. ** 0.5 / 2. * la,
-        #                   -3. ** 0.5 / 2. * la, 0., 3. ** 0.5 / 2. * la],
-        #                   [-km, km, -km, km, -km, km],
-        #                   [1., 1., 1., 1., 1., 1.]], dtype=torch.float)
-
         # make derivable to parameters
         l_arm_mat = torch.tensor([[-0.5, -1., -0.5, 0.5, 1., 0.5],
                                   [3. ** 0.5 / 2., 0., -3. ** 0.5 / 2., -3. ** 0.5 / 2., 0., 3. ** 0.5 / 2.],
@@ -145,12 +139,7 @@ class AscTecFireflyDroneModel(nn.Module):
                                   [1., 1., 1., 1., 1., 1.]])
         b = l_arm_mat + km_mat + const_mat
 
-        # Theoretic hovering command
-        # body = torch.tensor([0, 0, 0, m * self.g]).reshape((4, 1))
-        # b_inv = torch.pinverse(b)
-        # w_hovering_model = (b_inv @ body / kt) ** 0.5
-
-        w = w_func(time.item())
+        w = w_func(t_time.item()) * np.pi / (1000. * 180.)  # w by default in 1/1000 deg
 
         # Command converted to forces and torques
         cmd = kt * w ** 2
@@ -204,6 +193,15 @@ class AscTecFireflyDroneModel(nn.Module):
                                          [0., 0., 0., 0.],
                                          [0., 0., 0., 0.],
                                          [0., 0., 0., 0.]])
+        # Special command
+        fn = m * self.g
+        if 0 <= t_time.item() < 1.:
+            drone_torsor_1 = torch.tensor([1., 1., 1., fn / cos(theta)])
+        elif 1. <= t_time.item() < 2.:
+            drone_torsor_1 = torch.tensor([0., 0, 0., fn / cos(theta)])
+        elif 2. <= t_time.item():
+            drone_torsor_1 = torch.tensor([0., 0., 0., fn / cos(theta)])
+        # noinspection PyUnboundLocalVariable
         dstate = dstate + f_t_factor * (fa + drone_torsor_mat @ drone_torsor)
 
         # Angular velocity
@@ -521,6 +519,10 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
         izz = torch.tensor(to_plot["izz"][-1])
         print(f"Previous training loaded at {result_folder + last_filename}.")
 
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
                                           coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
@@ -529,6 +531,7 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
     t_tab = t_tab - t_tab[0]
     mc_states = torch.stack(list(data["state"][500:2500]))
     initial_state = data["state"][500]
+    # initial_state = torch.zeros(12)
 
     # Motor speed
     def motor_speed(t: float) -> Iterable:
@@ -536,16 +539,20 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
         time_array = t_tab.numpy()
         return torch.tensor([np.interp(t, time_array, ms[:, i]) for i in range(6)]).float()
 
+    # def motor_speed(t: float) -> Iterable:
+    #     return torch.zeros(6)
+
     if horizon == "hinf":
         # array solution(phi, theta, psi, p, q, r, u, v, wn, x, y, z)
-        states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed, fa=drone_model.fa),
+        states = odeint(lambda t, x: drone_model.f(t_time=t, state=x, w_func=motor_speed, fa=torch.zeros(12)),
                         initial_state, t_tab, method="rk4")
     elif horizon == "h1":
         states = []
         for i, (t_iter, mc_n) in enumerate(zip(t_tab[1:], mc_states[1:])):
             dt = t_iter - t_tab[i]
-            staten1 = drone_model.f(time=t_iter, state=mc_n, w_func=motor_speed, fa=torch.zeros(12)) * dt + mc_n
+            staten1 = drone_model.f(t_time=t_iter, state=mc_n, w_func=motor_speed, fa=torch.zeros(12)) * dt + mc_n
             states.append(staten1)
+        states = torch.stack(states)
 
     def plot_simulated_drone_position(x_start, x_end, saving_path_name: str = None):
         fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
@@ -556,6 +563,57 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
         axs[1].set_ylabel("y(m)")
         axs[2].plot(t_tab[inds], states[:, 11][inds].detach(), c='g')
         axs[2].set_ylabel("z(m)")
+        for ax in axs:
+            ax.grid()
+            ax.set_xlabel("Time(s)")
+        plt.tight_layout()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
+        plt.show()
+
+    def plot_simulated_drone_orientation(x_start, x_end, saving_path_name: str = None):
+        fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
+        inds = [i for i, e in enumerate(t_tab) if x_start < e < x_end]
+        axs[0].plot(t_tab[inds], states[:, 0][inds].detach(), c='r')
+        axs[0].set_ylabel("phi(rad)")
+        axs[1].plot(t_tab[inds], states[:, 1][inds].detach(), c='b')
+        axs[1].set_ylabel("theta(rad)")
+        axs[2].plot(t_tab[inds], states[:, 2][inds].detach(), c='g')
+        axs[2].set_ylabel("psi(rad)")
+        for ax in axs:
+            ax.grid()
+            ax.set_xlabel("Time(s)")
+        plt.tight_layout()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
+        plt.show()
+
+    def plot_simulated_drone_lin_spd(x_start, x_end, saving_path_name: str = None):
+        fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
+        inds = [i for i, e in enumerate(t_tab) if x_start < e < x_end]
+        axs[0].plot(t_tab[inds], states[:, 6][inds].detach(), c='r')
+        axs[0].set_ylabel("u(m/s)")
+        axs[1].plot(t_tab[inds], states[:, 7][inds].detach(), c='b')
+        axs[1].set_ylabel("v(m/s)")
+        axs[2].plot(t_tab[inds], states[:, 8][inds].detach(), c='g')
+        axs[2].set_ylabel("w(m/s)")
+        for ax in axs:
+            ax.grid()
+            ax.set_xlabel("Time(s)")
+        plt.tight_layout()
+        if saving_path_name is not None:
+            plt.savefig(saving_path_name)
+        plt.show()
+
+    def plot_simulated_drone_ang_vel(x_start, x_end, saving_path_name: str = None):
+        fig, axs = plt.subplots(3, figsize=(19.2, 10.8), dpi=200)
+        inds = [i for i, e in enumerate(t_tab) if x_start < e < x_end]
+        axs[0].plot(t_tab[inds], states[:, 3][inds].detach(), c='r')
+        axs[0].set_ylabel("p(rad/s)")
+        axs[1].plot(t_tab[inds], states[:, 4][inds].detach(), c='b')
+        axs[1].set_ylabel("q(rad/s)")
+        axs[2].plot(t_tab[inds], states[:, 5][inds].detach(), c='g')
+        axs[2].set_ylabel("r(rad/s)")
         for ax in axs:
             ax.grid()
             ax.set_xlabel("Time(s)")
@@ -576,7 +634,11 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
         plt.show()
 
     print()
-    plot_simulated_drone_position(0, 200, result_folder + "20210207_200913_xyz_0_40.png")
+    plot_simulated_drone_position(0, 100)
+    plot_simulated_drone_orientation(0, 100)
+    plot_simulated_drone_lin_spd(0, 100)
+    plot_simulated_drone_ang_vel(0, 100)
+
     plot_motor_speed(result_folder + "motor_speed.png")
 
 
@@ -679,7 +741,7 @@ def estimate_euroc_mav_params_hinf(epochs: int, batch_size: int, lr: float, load
             initial_state = mc_states_train[batch_i * batch_size]
 
             # Forward
-            states = odeint(lambda t, x: drone_model.f(time=t, state=x, w_func=motor_speed,
+            states = odeint(lambda t, x: drone_model.f(t_time=t, state=x, w_func=motor_speed,
                                                        fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
                             initial_state, time_batch, method="rk4")
             loss = torch.sqrt((mc_states_batch - states) ** 2).mean()
@@ -771,13 +833,13 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
 
     if load_previous is not True:
         # First initialization of the parameters
-        m = torch.tensor(0.64)
-        kt = torch.tensor(6.546e-6)
-        km = torch.tensor(1.2864e-7)
-        l_arm = torch.tensor(0.215)
-        ixx = torch.tensor(10.007e-3)
-        iyy = torch.tensor(10.2335e-3)
-        izz = torch.tensor(8.1e-3)
+        m = torch.tensor(0.64)  # Papier Asctec
+        kt = torch.tensor(6.546e-6)  # Papier 2
+        km = torch.tensor(1.2864e-7)  # Papier 2
+        l_arm = torch.tensor(0.215)  # Papier 2
+        ixx = torch.tensor(10.007e-3)  # Papier 2
+        iyy = torch.tensor(10.2335e-3)  # Papier 2
+        izz = torch.tensor(8.1e-3)  # Papier 2
         to_plot = {"loss": [], "iteration": []}
         for e in prm_name:
             exec(f"""to_plot["{e}"] = [(coef_{e} * {e}).item()]""")
@@ -908,6 +970,6 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
 
 if __name__ == '__main__':
     # euroc_mav_compute_fa()
-    euroc_mav_ode_solving(horizon="h1", load_previous=True)
+    euroc_mav_ode_solving(horizon="h1", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
-    # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-3, load_previous=True)
+    # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
