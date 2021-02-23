@@ -11,7 +11,8 @@ import time
 import pickle
 import pandas as pd
 
-ABSOLUTE_PATH = '/Users/quentin/phd/turbulence/'
+
+ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1])
 
 
 class Progress(object):
