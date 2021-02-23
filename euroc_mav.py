@@ -111,9 +111,9 @@ def error_estimation():
         print()
 
 
-def dataset_creation():
+def dataset_creation(flight_number: int):
     f = utils.DataFolder('euroc_mav')
-    flight_number = 1
+    flight_number = flight_number
 
     # Motor speed
     data = f.pickle_load_file('.pkl', f.folders['raw_python'][flight_number], None, True)
@@ -194,4 +194,6 @@ def dataset_creation():
 if __name__ == '__main__':
     # data_processing()
     # error_estimation()
-    dataset_creation()
+    dataset_creation(flight_number=0)
+    dataset_creation(flight_number=1)
+    dataset_creation(flight_number=2)
