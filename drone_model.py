@@ -273,6 +273,8 @@ def euroc_mav_compute_fa(flight_number: int):
     # Loading data
     f = utils.DataFolder("euroc_mav")
     flight_number = flight_number
+
+    # sensors_synchronised.pkl comes from euroc_mav.py dataset_creation
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
     print(f"Loading: {data_path}")
     data = pd.read_pickle(data_path)
@@ -1089,10 +1091,10 @@ def find_motor_speed_order(flight_number: int, load_previous: bool = False):
 
 
 if __name__ == '__main__':
-    # euroc_mav_compute_fa(0)
-    # euroc_mav_compute_fa(1)
-    # euroc_mav_compute_fa(2)
+    euroc_mav_compute_fa(0)
+    euroc_mav_compute_fa(1)
+    euroc_mav_compute_fa(2)
     # euroc_mav_ode_solving(horizon="h1", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
-    find_motor_speed_order(flight_number=0, load_previous=False)
+    # find_motor_speed_order(flight_number=0, load_previous=False)
