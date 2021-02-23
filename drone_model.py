@@ -14,6 +14,7 @@ import datetime
 import os
 from scipy.signal import savgol_filter
 from typing import Iterable, Callable
+import itertools
 
 import utils
 
@@ -139,7 +140,11 @@ class AscTecFireflyDroneModel(nn.Module):
                                   [1., 1., 1., 1., 1., 1.]])
         b = l_arm_mat + km_mat + const_mat
 
-        w = w_func(t_time.item()) * np.pi / (1000. * 180.)  # w by default in 1/1000 deg
+        kt = 11.100926399230957 * kt
+        if callable(w_func):
+            w = w_func(t_time.item())
+        else:
+            w = w_func
 
         # Command converted to forces and torques
         cmd = kt * w ** 2
@@ -193,14 +198,15 @@ class AscTecFireflyDroneModel(nn.Module):
                                          [0., 0., 0., 0.],
                                          [0., 0., 0., 0.],
                                          [0., 0., 0., 0.]])
-        # Special command
-        fn = m * self.g
-        if 0 <= t_time.item() < 1.:
-            drone_torsor_1 = torch.tensor([1., 1., 1., fn / cos(theta)])
-        elif 1. <= t_time.item() < 2.:
-            drone_torsor_1 = torch.tensor([0., 0, 0., fn / cos(theta)])
-        elif 2. <= t_time.item():
-            drone_torsor_1 = torch.tensor([0., 0., 0., fn / cos(theta)])
+        # # Special command
+        # fn = m * self.g
+        # if 0 <= t_time.item() < 1.:
+        #     drone_torsor_1 = torch.tensor([1., 1., 1., fn / cos(theta)])
+        # elif 1. <= t_time.item() < 2.:
+        #     drone_torsor_1 = torch.tensor([0., 0, 0., fn / cos(theta)])
+        # elif 2. <= t_time.item():
+        #     drone_torsor_1 = torch.tensor([0., 0., 0., fn / cos(theta)])
+
         # noinspection PyUnboundLocalVariable
         dstate = dstate + f_t_factor * (fa + drone_torsor_mat @ drone_torsor)
 
@@ -250,7 +256,7 @@ class AscTecFireflyDroneModel(nn.Module):
         return fa, xn1, xn1_hat
 
 
-def euroc_mav_compute_fa():
+def euroc_mav_compute_fa(flight_number: int):
     """
     Compute fa* using FSDroneModel integrated with Euler as an estimator. EuRoC MAV data are used (AscTec Firefly).
 
@@ -261,10 +267,12 @@ def euroc_mav_compute_fa():
     https://doi.org/10.2514/6.2012-4779.
     -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
     Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
+
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
     """
     # Loading data
     f = utils.DataFolder("euroc_mav")
-    flight_number = 0
+    flight_number = flight_number
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
     print(f"Loading: {data_path}")
     data = pd.read_pickle(data_path)
@@ -320,8 +328,8 @@ def euroc_mav_compute_fa():
                                                data["linear_speed"][_x.name],
                                                data["trans"][_x.name]]).astype(np.float)), axis=1)
 
-    drone_model = AscTecFireflyDroneModel(coef_m=0.64, g=9.81, coef_kt=6.546e-6, coef_km=1.2864e-7, coef_l_arm=0.215,
-                                          coef_ixx=10.007e-3, coef_iyy=10.2335e-3, coef_izz=8.1e-3)
+    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
+                                          ixx=10.007e-3, iyy=10.2335e-3, izz=8.1e-3)
     # Fa computation and plots
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/{now}/")
@@ -333,7 +341,7 @@ def euroc_mav_compute_fa():
             continue
         fa, xn1, xn1_hat = drone_model.forward_fa_direct_subtract(xn1=data["state"][index],
                                                                   xn=data["state"][index - 1],
-                                                                  wn=data,
+                                                                  wn=data["motor_speed"][index - 1],
                                                                   dt=torch.tensor(data["dt"][index], dtype=float),
                                                                   tn=torch.tensor(data["time"][index - 1],
                                                                                   dtype=float))
@@ -474,12 +482,19 @@ def euroc_mav_compute_fa():
     # plot_compare_differentiators()
 
 
-def euroc_mav_ode_solving(horizon: str, load_previous=True):
+def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
     """
     Solve the FSDroneModel dot_x = FSDroneModel.f(x, u) using pytorch ODE solver.
+
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
+    :param horizon: The method to determine the number of states to predict.
+        hinf: Infinite number of state (all the trajectory).
+        h1: Predict just the next state.
+    :param load_previous:
+
     """
     f = utils.DataFolder("euroc_mav")
-    flight_number = 0
+    flight_number = flight_number
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
     result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation_h1/"
@@ -519,18 +534,19 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
         izz = torch.tensor(to_plot["izz"][-1])
         print(f"Previous training loaded at {result_folder + last_filename}.")
 
-    for e in prm_name:
-        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
-             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
-
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
                                           coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
     t_tab = torch.tensor(list(data["time"][1:])).float()[500:2500]  # only when the drone is flying, no ground reaction
     t_tab = t_tab - t_tab[0]
     mc_states = torch.stack(list(data["state"][500:2500]))
     initial_state = data["state"][500]
+
     # initial_state = torch.zeros(12)
 
     # Motor speed
@@ -639,13 +655,15 @@ def euroc_mav_ode_solving(horizon: str, load_previous=True):
     plot_simulated_drone_lin_spd(0, 100)
     plot_simulated_drone_ang_vel(0, 100)
 
-    plot_motor_speed(result_folder + "motor_speed.png")
+    plot_motor_speed()
 
 
-def estimate_euroc_mav_params_hinf(epochs: int, batch_size: int, lr: float, load_previous: bool = None):
+def estimate_euroc_mav_params_hinf(flight_number: int, epochs: int, batch_size: int, lr: float,
+                                   load_previous: bool = None):
     """
     The purpose of this function is to estimate the drone parameters according to the EuRoC MAV data.
     Training is done using infinite horizon.
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
     :param epochs: Number of epoch for training.
     :param batch_size: Size of batch for training.
     :param lr: Learning rate of Adam.
@@ -654,7 +672,7 @@ def estimate_euroc_mav_params_hinf(epochs: int, batch_size: int, lr: float, load
     """
     # Loading dataset
     f = utils.DataFolder("euroc_mav")
-    flight_number = 0
+    flight_number = flight_number
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
     result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation_hinf/"
@@ -798,10 +816,12 @@ def estimate_euroc_mav_params_hinf(epochs: int, batch_size: int, lr: float, load
     print()
 
 
-def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_previous: bool = None):
+def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: int, lr: float,
+                                 load_previous: bool = None):
     """
     The purpose of this function is to estimate the drone parameters according to the EuRoC MAV data.
     Training is done using 1 step horizon.
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
     :param epochs: Number of epoch for training.
     :param batch_size: Size of batch for training.
     :param lr: Learning rate of Adam.
@@ -810,7 +830,7 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
     """
     # Loading dataset
     f = utils.DataFolder("euroc_mav")
-    flight_number = 0
+    flight_number = flight_number
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
     result_folder = f.folders["results"][flight_number] + "drone_parameters_estimation_h1/"
@@ -870,23 +890,21 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
         exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
              f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
-    dataset_start, dateset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
-    mc_states_train = torch.stack(list(data["state"][dataset_start:dateset_end]))
-    time_train = torch.tensor(list(data["time"])).float()[dataset_start:dateset_end]  # only when the drone is
+    dataset_start, dataset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
+    mc_states_train = torch.stack(list(data["state"][dataset_start:dataset_end]))
+    time_train = torch.tensor(list(data["time"])).float()[dataset_start:dataset_end]  # only when the drone is
     # flying, no ground reaction
     time_train = time_train - time_train[0]
 
     # Continuous motor speed
     def motor_speed(t: float) -> Iterable:
-        ms = torch.stack(list(data["motor_speed"])).numpy()[dataset_start:dateset_end]
+        ms = torch.stack(list(data["motor_speed"])).numpy()[dataset_start:dataset_end]
         return torch.tensor([np.interp(t, time_train.numpy(),
                                        ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
 
     # Adam optimization
     optimizer = torch.optim.Adam(drone_model.parameters(), lr=lr)
-
     batch_nb = len(time_train) // batch_size
-    dt = time_train.mean()
     for epoch in range(epochs):
         for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
             # Dividing data by batch
@@ -904,8 +922,9 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
 
             batch_loss = torch.zeros(1)
             # Forward
-            for t, mc_n, mc_n1 in zip(time_batch, mc_states_batch[:-1], mc_states_batch[1:]):
-                state_n1 = drone_model.f(t, state=mc_n, w_func=motor_speed, fa=torch.zeros(12)) * dt + mc_n
+            for tn, tn1, mc_n, mc_n1 in zip(time_batch[:-1], time_batch[1:], mc_states_batch[:-1], mc_states_batch[1:]):
+                dt = tn1 - tn
+                state_n1 = drone_model.f(tn, state=mc_n, w_func=motor_speed, fa=torch.zeros(12)) * dt + mc_n
                 loss = (mc_n1 - state_n1) ** 2
                 coef_learning = torch.tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
                 loss = (coef_learning / coef_learning.sum() * loss).sum()
@@ -968,8 +987,112 @@ def estimate_euroc_mav_params_h1(epochs: int, batch_size: int, lr: float, load_p
     # plot_parameters_ov_epochs(window=101, 3, saving_path_name=result_folder + f"{now}.png")
 
 
+def find_motor_speed_order(flight_number: int, load_previous: bool = False):
+    """
+    Estimates the assignation of the motors between the motor speed in the data w = [w0, w1, w2, w3, w4, w5] and the
+    motor speed in the mathematical model.
+
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
+    :param load_previous: If True load most recent computed drone parameters.
+    """
+    # Loading dataset
+    f = utils.DataFolder("euroc_mav")
+    flight_number = flight_number
+    data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
+    data = pd.read_pickle(data_path)
+    result_folder = f.folders["results"][flight_number] + "motor_speed_order/"
+
+    # Plotting tools
+    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Parameter's scaling coefficients initialization
+    prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
+
+    coef_m = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_kt = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_km = torch.tensor(1., dtype=torch.float)
+    coef_l_arm = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_ixx = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+
+    if load_previous is not True:
+        # First initialization of the parameters
+        m = torch.tensor(0.64)  # Papier Asctec
+        kt = torch.tensor(6.546e-6)  # Papier 2
+        km = torch.tensor(1.2864e-7)  # Papier 2
+        l_arm = torch.tensor(0.215)  # Papier 2
+        ixx = torch.tensor(10.007e-3)  # Papier 2
+        iyy = torch.tensor(10.2335e-3)  # Papier 2
+        izz = torch.tensor(8.1e-3)  # Papier 2
+        global_iteration = 1
+        print(f"New training.")
+    else:
+        # Loading parameters from previous training
+        # If the list is empty then there is no previous training file found.
+        last_filename = sorted([e for e in next(os.walk(result_folder))[2] if (e[0] != ".") and (e[-1] == "l")])[-1]
+        to_plot = pickle.load(open(result_folder + last_filename, "rb"))
+
+        m = torch.tensor(to_plot["m"][-1])
+        kt = torch.tensor(to_plot["kt"][-1])
+        km = torch.tensor(to_plot["km"][-1])
+        l_arm = torch.tensor(to_plot["l_arm"][-1])
+        ixx = torch.tensor(to_plot["ixx"][-1])
+        iyy = torch.tensor(to_plot["iyy"][-1])
+        izz = torch.tensor(to_plot["izz"][-1])
+        global_iteration = to_plot["iteration"][-1]
+        print(f"Previous training loaded at {result_folder + last_filename}.")
+
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
+                                          coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    dataset_start, dataset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
+    mc_train = torch.stack(list(data["state"][dataset_start:dataset_end]))
+    time_train = torch.tensor(list(data["time"])).float()[dataset_start:dataset_end]  # only when the drone is
+    # flying, no ground reaction
+    time_train = time_train - time_train[0]
+    initial_state = data["state"][dataset_start]
+
+    # Continuous motor speed
+
+    # Finding
+    combinations = list(itertools.permutations(range(6)))
+    result = []
+    for iter_combinations in tqdm(combinations):
+        def motor_speed(t: float) -> Iterable:
+            ms = torch.stack(list(data["motor_speed"])).numpy()[dataset_start:dataset_end]
+            w_interp = torch.tensor([np.interp(t, time_train.numpy(),
+                                               ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
+            return w_interp[torch.tensor(iter_combinations)]
+
+        states = odeint(lambda t, x: drone_model.f(t_time=t, state=x, w_func=motor_speed,
+                                                   fa=torch.tensor([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]).float()),
+                        initial_state, time_train, method="rk4")
+        loss_orientation = ((mc_train[:, 0:3] - states[:, 0:3]) ** 2).mean()
+        loss_angular_velocity = ((mc_train[:, 3:6] - states[:, 3:6]) ** 2).mean()
+        loss_linear_speed = ((mc_train[:, 6:9] - states[:, 6:9]) ** 2).mean()
+        loss_position = ((mc_train[:, 9:] - states[:, 9:]) ** 2).mean()
+        # a = [loss_orientation, loss_angular_velocity, loss_linear_speed, loss_position]
+        loss = (1. * loss_orientation +
+                1. * loss_angular_velocity +
+                1. * loss_linear_speed +
+                1. * loss_position)
+        result.append((iter_combinations, loss.item()))
+        print(f"Combination: {iter_combinations} | Loss: {loss.item():20.4f}")
+    pickle.dump(result, open(result_folder + "motor_combinations_losses.pkl", "wb"))
+
+
 if __name__ == '__main__':
-    # euroc_mav_compute_fa()
-    euroc_mav_ode_solving(horizon="h1", load_previous=False)
+    # euroc_mav_compute_fa(0)
+    # euroc_mav_compute_fa(1)
+    # euroc_mav_compute_fa(2)
+    # euroc_mav_ode_solving(horizon="h1", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
+    find_motor_speed_order(flight_number=0, load_previous=False)
