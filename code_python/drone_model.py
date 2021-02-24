@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
 """
