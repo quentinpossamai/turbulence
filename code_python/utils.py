@@ -12,7 +12,7 @@ import pickle
 import pandas as pd
 
 
-ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1])
+ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
 
 
 class Progress(object):

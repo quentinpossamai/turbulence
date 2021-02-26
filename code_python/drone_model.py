@@ -556,7 +556,8 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
     def motor_speed(t: float) -> Iterable:
         ms = torch.stack(list(data["motor_speed"])).numpy()[500:2500]
         time_array = t_tab.numpy()
-        return torch.tensor([np.interp(t, time_array, ms[:, i]) for i in range(6)]).float()
+        w_interp = torch.tensor([np.interp(t, time_array, ms[:, i]) for i in range(6)]).float()
+        return w_interp[torch.tensor((3, 1, 5, 2, 4, 0))]
 
     # def motor_speed(t: float) -> Iterable:
     #     return torch.zeros(6)
@@ -1055,7 +1056,7 @@ def find_motor_speed_order(flight_number: int, load_previous: bool = False):
         exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
              f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
-    dataset_start, dataset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
+    dataset_start, dataset_end = 500, 1000  # dataset_start > 0 because of nan angular and linear speed
     mc_train = torch.stack(list(data["state"][dataset_start:dataset_end]))
     time_train = torch.tensor(list(data["time"])).float()[dataset_start:dataset_end]  # only when the drone is
     # flying, no ground reaction
@@ -1082,20 +1083,51 @@ def find_motor_speed_order(flight_number: int, load_previous: bool = False):
         loss_linear_speed = ((mc_train[:, 6:9] - states[:, 6:9]) ** 2).mean()
         loss_position = ((mc_train[:, 9:] - states[:, 9:]) ** 2).mean()
         # a = [loss_orientation, loss_angular_velocity, loss_linear_speed, loss_position]
-        loss = (1. * loss_orientation +
+        loss = (0. * loss_orientation +
                 1. * loss_angular_velocity +
                 1. * loss_linear_speed +
-                1. * loss_position)
+                0. * loss_position)
         result.append((iter_combinations, loss.item()))
         print(f"Combination: {iter_combinations} | Loss: {loss.item():20.4f}")
     pickle.dump(result, open(result_folder + "motor_combinations_losses.pkl", "wb"))
 
 
+def analyze_motor_speed_order(flight_number):
+    # Loading dataset
+    f = utils.DataFolder("euroc_mav")
+    result_folder = f.folders["results"][flight_number] + "motor_speed_order/"
+    data_raw = pickle.load(open(result_folder + "motor_combinations_losses.pkl", "rb"))
+
+    data_cleaned = []
+    for e in data_raw:
+        if not np.isnan(e[1]):
+            if e[1] < 10000.:
+                data_cleaned.append(e)
+    data = sorted(data_cleaned, key=lambda element: element[1])
+
+    def plot_motor_speed_order(need_saving: bool):
+        fig, ax = plt.subplots(1, 1, figsize=[19.20, 10.80], dpi=200)
+        ax.plot([e[1] for e in data])
+        ax.grid()
+        ax.set_xlabel("Combination number")
+        ax.set_ylabel("Loss value")
+
+        if need_saving is not None:
+            plt.savefig(result_folder)
+        plt.show()
+
+    plot_motor_speed_order(need_saving=True)
+
+    best_combination = data[0][0]  # Is the best combination order that the motor speed data must have to enter the
+    # model
+
+
 if __name__ == '__main__':
-    euroc_mav_compute_fa(0)
-    euroc_mav_compute_fa(1)
-    euroc_mav_compute_fa(2)
-    # euroc_mav_ode_solving(horizon="h1", load_previous=False)
+    # euroc_mav_compute_fa(0)
+    # euroc_mav_compute_fa(1)
+    # euroc_mav_compute_fa(2)
+    euroc_mav_ode_solving(flight_number=0, horizon="hinf", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
     # find_motor_speed_order(flight_number=0, load_previous=False)
+    # analyze_motor_speed_order(flight_number=0)
