@@ -16,6 +16,7 @@ import os
 from scipy.signal import savgol_filter
 from typing import Iterable, Callable
 import itertools
+from pathlib import Path
 
 import utils
 
@@ -141,7 +142,7 @@ class AscTecFireflyDroneModel(nn.Module):
                                   [1., 1., 1., 1., 1., 1.]])
         b = l_arm_mat + km_mat + const_mat
 
-        kt = 11.100926399230957 * kt
+        # kt = 11.100926399230957 * kt
         if callable(w_func):
             w = w_func(t_time.item())
         else:
@@ -274,6 +275,8 @@ def euroc_mav_compute_fa(flight_number: int):
     # Loading data
     f = utils.DataFolder("euroc_mav")
     flight_number = flight_number
+    result_folder = f.folders["results"][flight_number] + "fa_computation_analysis/"
+    Path(result_folder).mkdir(parents=True, exist_ok=True)
 
     # sensors_synchronised.pkl comes from euroc_mav.py dataset_creation
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
@@ -326,16 +329,33 @@ def euroc_mav_compute_fa(flight_number: int):
 
     data["state"] = np.zeros(len(data))
     data[["state"]] = data[["state"]].apply(
-        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("xyz", True),
+        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("xyz", False),
                                                data["angular_velocity"][_x.name],
                                                data["linear_speed"][_x.name],
                                                data["trans"][_x.name]]).astype(np.float)), axis=1)
 
-    drone_model = AscTecFireflyDroneModel(m=0.64, g=9.81, kt=6.546e-6, km=1.2864e-7, l_arm=0.215,
-                                          ixx=10.007e-3, iyy=10.2335e-3, izz=8.1e-3)
+    coef_m = torch.tensor(1., dtype=torch.float)
+    coef_kt = torch.tensor(1., dtype=torch.float)
+    coef_km = torch.tensor(1., dtype=torch.float)
+    coef_l_arm = torch.tensor(1., dtype=torch.float)
+    coef_ixx = torch.tensor(1., dtype=torch.float)
+    coef_iyy = torch.tensor(1., dtype=torch.float)
+    coef_izz = torch.tensor(1., dtype=torch.float)
+
+    m = torch.tensor(1.56779)
+    kt = torch.tensor(8.54858e-6)
+    km = torch.tensor(1.6e-2)
+    l_arm = torch.tensor(0.215)
+    ixx = torch.tensor(0.0347563)
+    iyy = torch.tensor(0.0458929)
+    izz = torch.tensor(0.0977)
+
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
+                                          coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
     # Fa computation and plots
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    writer = SummaryWriter(f"{f.workspace_path}tensorboard/drone_model/{now}/")
     # Run in terminal: tensorboard --logdir /Users/quentin/phd/turbulence/tensorboard/drone_model/
     fa_dict = {}
     for index in tqdm(data.index):
@@ -345,51 +365,17 @@ def euroc_mav_compute_fa(flight_number: int):
         fa, xn1, xn1_hat = drone_model.forward_fa_direct_subtract(xn1=data["state"][index],
                                                                   xn=data["state"][index - 1],
                                                                   wn=data["motor_speed"][index - 1],
-                                                                  dt=torch.tensor(data["dt"][index], dtype=float),
-                                                                  tn=torch.tensor(data["time"][index - 1],
-                                                                                  dtype=float))
-        _, _, _, tau_x, tau_y, tau_z, fx, fy, fz, _, _, _ = fa
-        phi, theta, psi, p, q, r, u, v, w, x, y, z = xn1
-        hphi, htheta, hpsi, hp, hq, hr, hu, hv, hw, hx, hy, hz = xn1_hat
-        fa_dict[index] = torch.tensor([fx, fy, fz, tau_x, tau_y, tau_z], dtype=torch.float)
+                                                                  dt=torch.tensor(data["dt"][index]).float(),
+                                                                  tn=torch.tensor(data["time"][index - 1]).float())
+        _, _, _, taux, tauy, tauz, fx, fy, fz, _, _, _ = fa
+        fa_dict[index] = torch.tensor([fx, fy, fz, taux, tauy, tauz], dtype=torch.float)
 
-        writer.add_scalars("fa's forces", {"fx": fx, "fy": fy, "fz": fz}, walltime=data.loc[index, "time"])
-        writer.add_scalars("fa's moments", {"tau_x": tau_x, "tau_y": tau_y, "tau_z": tau_z},
-                           walltime=data.loc[index, "time"])
-        for var in ["phi", "theta", "psi", "p", "q", "r", "u", "v", "w", "x", "y", "z"]:
-            exec(f"""writer.add_scalars("{var}", {{"ground truth": {var},
-                                                   "estimator": h{var}}}, walltime=data.loc[index, "time"])""")
     data["fa"] = pd.Series(fa_dict)
 
     # Saving data
     new_data_path = utils.get_folder_path(data_path) + "fa.pkl"
     print(f"Saving: {new_data_path}")
     data.to_pickle(new_data_path)
-
-    # # Adam optimization
-    # optimizer = optim.Adam(drone_model.parameters(), lr=0.01)
-    # progress = util.Progress(len(data) - 2, "Computing fa", "fa computed")
-    # epochs = 5
-    # fas = []
-    # for i in range(1, len(data) - 1):
-    #     if i == 1:
-    #         loss_tmp = np.zeros(epochs)
-    #     for epoch in range(epochs):
-    #         optimizer.zero_grad()  # zero the gradient buffers
-    #         loss = drone_model(xn1=data["state"][i + 1],
-    #                            xn=data["state"][i],
-    #                            wn=data["motor_speed"][i],
-    #                            dt=data["dt"][i + 1],
-    #                            tn=data["time"][i])
-    #         if i == 1:
-    #             loss_tmp[epoch] = loss
-    #         loss.backward()
-    #         optimizer.step()  # Does the update
-    #     fas.append(drone_model.fa)
-    #     progress.update()
-    # plt.figure()
-    # plt.plot(loss_tmp)
-    # plt.show()
 
     def plot_compare_differentiators():
         """
@@ -484,6 +470,26 @@ def euroc_mav_compute_fa(flight_number: int):
 
     # plot_compare_differentiators()
 
+    def plot_fa_computation_analysis(saving_path=None):
+        fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8), dpi=200)
+
+        fa = list(data["fa"])
+
+        axs[0].plot()
+        axs[0].grid()
+        axs[0].set_xlabel("Time [s]")
+        axs[0].set_ylabel("fa x")
+        twin = axs[0].twiny()
+        twin.plot()
+        twin.set_xlabel("Iterations")
+
+        plt.tight_layout()
+        if saving_path is not None:
+            plt.savefig(saving_path)
+        plt.show()
+
+    plot_fa_computation_analysis(result_folder + "fa.png")
+
 
 def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
     """
@@ -515,13 +521,44 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
 
     if load_previous is not True:
         # First initialization of the parameters
-        m = torch.tensor(0.64)
-        kt = torch.tensor(6.546e-6)
-        km = torch.tensor(1.2864e-7)
+        # Firefly vehicle parameters
+
+        # TODO
+        # mass: 1.56779
+        # inertia: {xx: 0.0347563, xy: 0.0, xz: 0.0, yy: 0.0458929, yz: 0.0, zz: 0.0977}
+        #
+        # # angle should be expressed in rad
+        # # direction 1 means counter clockwise, -1 clockwise
+        # # The order of the rotors matters for the calculation of the allocation matrix.
+        # rotor_configuration:
+        # '0': {angle: 0.52359877559, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
+        #       direction: 1.0}
+        # '1': {angle: 1.57079632679, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
+        #       direction: -1.0}
+        # '2': {angle: 2.61799387799, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
+        #       direction: 1.0}
+        # '3': {angle: -2.61799387799, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
+        #       direction: -1.0}
+        # '4': {angle: -1.57079632679, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
+        #       direction: 1.0}
+        # '5': {angle: -0.52359877559, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
+        #       direction: -1.0}
+
+        m = torch.tensor(1.56779)
+        kt = torch.tensor(8.54858e-6)
+        km = torch.tensor(1.6e-2)
         l_arm = torch.tensor(0.215)
-        ixx = torch.tensor(10.007e-3)
-        iyy = torch.tensor(10.2335e-3)
-        izz = torch.tensor(8.1e-3)
+        ixx = torch.tensor(0.0347563)
+        iyy = torch.tensor(0.0458929)
+        izz = torch.tensor(0.0977)
+
+        # m = torch.tensor(0.64)
+        # kt = torch.tensor(6.546e-6)
+        # km = torch.tensor(1.2864e-7)
+        # l_arm = torch.tensor(0.215)
+        # ixx = torch.tensor(10.007e-3)
+        # iyy = torch.tensor(10.2335e-3)
+        # izz = torch.tensor(8.1e-3)
     else:
         # Loading parameters from previous training
         # If the list is empty then there is no previous training file found.
@@ -557,7 +594,9 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
         ms = torch.stack(list(data["motor_speed"])).numpy()[500:2500]
         time_array = t_tab.numpy()
         w_interp = torch.tensor([np.interp(t, time_array, ms[:, i]) for i in range(6)]).float()
-        return w_interp[torch.tensor((3, 1, 5, 2, 4, 0))]
+        # return w_interp[torch.tensor((3, 1, 5, 2, 4, 0))]
+        return w_interp[torch.tensor((0, 5, 1, 3, 4, 2))]
+        # return w_interp
 
     # def motor_speed(t: float) -> Iterable:
     #     return torch.zeros(6)
@@ -654,7 +693,7 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
         plt.show()
 
     print()
-    plot_simulated_drone_position(0, 100)
+    plot_simulated_drone_position(0, 10)
     plot_simulated_drone_orientation(0, 100)
     plot_simulated_drone_lin_spd(0, 100)
     plot_simulated_drone_ang_vel(0, 100)
@@ -1023,13 +1062,22 @@ def find_motor_speed_order(flight_number: int, load_previous: bool = False):
 
     if load_previous is not True:
         # First initialization of the parameters
-        m = torch.tensor(0.64)  # Papier Asctec
-        kt = torch.tensor(6.546e-6)  # Papier 2
-        km = torch.tensor(1.2864e-7)  # Papier 2
-        l_arm = torch.tensor(0.215)  # Papier 2
-        ixx = torch.tensor(10.007e-3)  # Papier 2
-        iyy = torch.tensor(10.2335e-3)  # Papier 2
-        izz = torch.tensor(8.1e-3)  # Papier 2
+        # m = torch.tensor(0.64)  # Papier Asctec
+        # kt = torch.tensor(6.546e-6)  # Papier 2
+        # km = torch.tensor(1.2864e-7)  # Papier 2
+        # l_arm = torch.tensor(0.215)  # Papier 2
+        # ixx = torch.tensor(10.007e-3)  # Papier 2
+        # iyy = torch.tensor(10.2335e-3)  # Papier 2
+        # izz = torch.tensor(8.1e-3)  # Papier 2
+
+        m = torch.tensor(1.56779)
+        kt = torch.tensor(8.54858e-6)
+        km = torch.tensor(1.6e-2)
+        l_arm = torch.tensor(0.215)
+        ixx = torch.tensor(0.0347563)
+        iyy = torch.tensor(0.0458929)
+        izz = torch.tensor(0.0977)
+
         global_iteration = 1
         print(f"New training.")
     else:
@@ -1120,14 +1168,126 @@ def analyze_motor_speed_order(flight_number):
 
     best_combination = data[0][0]  # Is the best combination order that the motor speed data must have to enter the
     # model
+    print(f"Best combination: {best_combination}.")
+
+
+def reverse_motor_speed_computation(flight_number):
+    """
+    Compute the motor speed by reversing drone equations and compare it with the motor speed given by EuRoC MAV
+
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
+    """
+    # Loading dataset
+    f = utils.DataFolder("euroc_mav")
+    flight_number = flight_number
+    data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
+    data = pd.read_pickle(data_path)
+    result_folder = f.folders["results"][flight_number] + "reverse_motor_speed_compute@/"
+    Path(result_folder).mkdir(parents=True, exist_ok=True)
+
+    # Plotting tools
+    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Parameter's scaling coefficients initialization
+    prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
+
+    coef_m = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_kt = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_km = torch.tensor(1., dtype=torch.float)
+    coef_l_arm = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_ixx = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    m = torch.tensor(1.56779)
+    kt = torch.tensor(8.54858e-6)
+    km = torch.tensor(1.6e-2)
+    l_arm = torch.tensor(0.215)
+    ixx = torch.tensor(0.0347563)
+    iyy = torch.tensor(0.0458929)
+    izz = torch.tensor(0.0977)
+    g = 9.81
+
+    l_arm_mat = torch.tensor([[-0.5, -1., -0.5, 0.5, 1., 0.5],
+                              [3. ** 0.5 / 2., 0., -3. ** 0.5 / 2., -3. ** 0.5 / 2., 0., 3. ** 0.5 / 2.],
+                              [0., 0., 0., 0., 0., 0.],
+                              [0., 0., 0., 0., 0., 0.]]) * l_arm
+    km_mat = torch.tensor([[0., 0., 0., 0., 0., 0.],
+                           [0., 0., 0., 0., 0., 0.],
+                           [-1., 1., -1., 1., -1., 1.],
+                           [0., 0., 0., 0., 0., 0.]]) * km
+    const_mat = torch.tensor([[0., 0., 0., 0., 0., 0.],
+                              [0., 0., 0., 0., 0., 0.],
+                              [0., 0., 0., 0., 0., 0.],
+                              [1., 1., 1., 1., 1., 1.]])
+    b = l_arm_mat + km_mat + const_mat
+    b_inv = torch.from_numpy(np.linalg.pinv(b))
+    # b_inv = torch.pinverse(b.detach())
+
+    dataset_start, dataset_end = 500, 2500  # only when the drone is flying, no ground reaction
+    data_exploited = data[dataset_start:dataset_end]
+    t_tab = torch.tensor(list(data_exploited["time"][1:])).float()
+    t_tab = t_tab - t_tab[0]
+    mc_states = torch.stack(list(data_exploited["state"])).float()
+
+    for tn, tn1, mc_n, mc_n1 in zip(t_tab[:-1], t_tab[1:], mc_states[:-1], mc_states[1:]):
+        dt = tn1 - tn
+        dstate = (mc_n1 - mc_n) / dt
+        phi, theta, psi, p, q, r, u, v, w, x, y, z = mc_n1
+
+        taux = ixx * (dstate[3] - (iyy - izz) / ixx * r * q)
+        tauy = iyy * (dstate[4] - (izz - ixx) / iyy * p * r)
+        tauz = izz * (dstate[5] - (ixx - iyy) / izz * p * q)
+        thrust = m * (dstate[8] - q * u + p * v + g * torch.cos(theta) * torch.cos(psi))
+
+        motor_speed = b_inv @ torch.tensor([taux, tauy, tauz, thrust])
+        # TODO correct sign of orientation by applying a rotation matrix. Error oc  curred when passing (-x, y,
+        #  z) to (x, y, z)
+        print()
+
+    def plot_states(index, time, states, saving_path=None):
+        """
+        Print states overtime.
+        :param index: 1d array of length n.
+        :param time: 1d array of length n.
+        :param states: 2d array of shape (n, 12)
+        :param saving_path: The path where to save the plot image.
+        """
+        assert len(index) == len(time)
+        assert states.shape == (len(index), 12)
+
+        y_labels = ["phi [rad]", "theta [rad]", "psi [rad]", "p [rad/s]", "q [rad/s]", "r [rad/s]",
+                    "u [m/s]", "v [m/s]", "w [m/s]", "x [m]", "y [m]", "z [m]"]
+        for i, y_label in enumerate(y_labels):
+            subplot_number = i % 3
+
+            if subplot_number == 0:
+                fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8), dpi=200)
+
+            twin = axs[subplot_number].twiny()
+            axs[subplot_number].plot(time, states[:, i])
+            twin.plot(index, states[:, i])
+            axs[subplot_number].grid()
+            twin.set_xlabel("Sample number")
+            axs[subplot_number].set_xlabel("Time [s]")
+            axs[subplot_number].set_ylabel(y_label)
+
+            if subplot_number == 2:
+                plt.tight_layout()
+                if saving_path is not None:
+                    plt.savefig(saving_path)
+                plt.show(block=False)
+
+    plot_states(index=data_exploited.index, time=t_tab, states=mc_states)
 
 
 if __name__ == '__main__':
-    # euroc_mav_compute_fa(0)
+    euroc_mav_compute_fa(0)
     # euroc_mav_compute_fa(1)
     # euroc_mav_compute_fa(2)
-    euroc_mav_ode_solving(flight_number=0, horizon="hinf", load_previous=False)
+    # euroc_mav_ode_solving(flight_number=0, horizon="hinf", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
     # find_motor_speed_order(flight_number=0, load_previous=False)
     # analyze_motor_speed_order(flight_number=0)
+    # reverse_motor_speed_computation(flight_number=0)
