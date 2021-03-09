@@ -105,7 +105,7 @@ class ErrorEstimation(object):
         vect_camera = np.array([x_prime, y_prime, 1])
 
         origin_tf_camera = self.df['pose'][idx].inv()
-        origin_rot_camera = origin_tf_camera.get_rot()
+        origin_rot_camera = origin_tf_camera.get_rot_matrix()
         vect_origin = origin_rot_camera @ vect_camera
         vect_origin /= np.linalg.norm(vect_origin)
 

@@ -17,10 +17,10 @@ ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
 
 def matplotlib_latex_font():
     rc('font', **{'family': 'serif',
-                  'serif': ['Computer Modern Roman'],
-                  'sans-serif': ['Computer Modern Sans serif'],
-                  "monospace": ["Computer Modern Typewriter"]})
-    rc('text', usetex=True)
+                  'serif': ['Computer Modern Roman']})
+                  # 'sans-serif': ['Computer Modern Sans serif'],
+                  # "monospace": ["Computer Modern Typewriter"]})
+    rc('text', usetex=False)
 
 
 class Progress(object):
@@ -84,14 +84,14 @@ class Transformation(object):
     def __repr__(self):
         return self.matrix.__repr__()
 
-    def get_rot(self) -> np.ndarray:
+    def get_rot_matrix(self) -> np.ndarray:
         return self.matrix[:3, :3]
 
     def get_rot_euler(self, seq, degrees):
         """
         Cf doc scipy.spatial.transform.Rotation
         """
-        return Rotation.from_matrix(self.get_rot()).as_euler(seq=seq, degrees=degrees)
+        return Rotation.from_matrix(self.get_rot_matrix()).as_euler(seq=seq, degrees=degrees)
 
     def get_trans(self) -> np.ndarray:
         return self.matrix[:3, 3]
@@ -99,8 +99,11 @@ class Transformation(object):
     def get_matrix(self) -> np.ndarray:
         return self.matrix
 
+    def get_quat(self) -> np.ndarray:
+        return Rotation.from_matrix(self.get_rot_matrix()).as_quat()
+
     def inv(self) -> 'Transformation':
-        r = self.get_rot()
+        r = self.get_rot_matrix()
         rt = r.T
 
         t = self.get_trans()
@@ -137,7 +140,7 @@ class Transformation(object):
 
         C_T_D = C_T_A @ A_T_B @ B_T_D.                T_C_D = C_T_D
         """
-        quat = Rotation.from_matrix(self.get_rot()).as_quat()
+        quat = Rotation.from_matrix(self.get_rot_matrix()).as_quat()
         trans = self.get_trans()
         return trans, quat
 

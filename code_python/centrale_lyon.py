@@ -312,9 +312,9 @@ def aff3d(xyz_array, quat_array, video_path):
     for xyz, quat in zip(xyz_array, quat_array):
         ref_tf_pos = utils.Transformation().from_pose(xyz, quat)
 
-        x_ref = ref_tf_pos.get_rot() @ x_pos
-        y_ref = ref_tf_pos.get_rot() @ y_pos
-        z_ref = ref_tf_pos.get_rot() @ z_pos
+        x_ref = ref_tf_pos.get_rot_matrix() @ x_pos
+        y_ref = ref_tf_pos.get_rot_matrix() @ y_pos
+        z_ref = ref_tf_pos.get_rot_matrix() @ z_pos
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')

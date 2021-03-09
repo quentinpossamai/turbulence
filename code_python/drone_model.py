@@ -303,7 +303,7 @@ def euroc_mav_compute_fa(flight_number: int):
     linear_speed = (data["trans"][1:].values - data["trans"][:len(data) - 1].values) / dt
     # Linear speed in drone
     linear_speed = linear_speed.to_frame(0) \
-        .apply(lambda _x: data["vicon_pose"][_x.name].get_rot().T @ _x.values[0], axis=1)
+        .apply(lambda _x: data["vicon_pose"][_x.name].get_rot_matrix().T @ _x.values[0], axis=1)
 
     def angular_velocity_euler(_x: pd.Series) -> np.ndarray:
         """
@@ -477,16 +477,14 @@ def euroc_mav_compute_fa(flight_number: int):
         index = data.index[2:]
         time = data["time"][2:]
 
-        # for i in enumerate()
+        for i in enumerate(["Tau x", "Tau y", "Tau z", "Fa x", "Fa y", "Fa z"])
         axs[0].plot(time, fa[:, 0])
         axs[0].grid()
         axs[0].set_xlabel("Time [s]")
-        axs[0].set_ylabel("Tau x")
+        axs[0].set_ylabel(r"Tau x")
         twin = axs[0].twiny()
         twin.plot(index, fa[:, 0])
-        twin.set_xlabel("Iterations")
-
-
+        # twin.set_xlabel(r"Iterations")
 
         plt.tight_layout()
         if saving_path is not None:
