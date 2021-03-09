@@ -10,9 +10,17 @@ import pathlib
 import time
 import pickle
 import pandas as pd
-
+from matplotlib import rc
 
 ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
+
+
+def matplotlib_latex_font():
+    rc('font', **{'family': 'serif',
+                  'serif': ['Computer Modern Roman'],
+                  'sans-serif': ['Computer Modern Sans serif'],
+                  "monospace": ["Computer Modern Typewriter"]})
+    rc('text', usetex=True)
 
 
 class Progress(object):
@@ -45,7 +53,7 @@ class Progress(object):
         sys.stdout.flush()
         if self.iter + 1 == self.max_iter:
             if self.end_print is not None:
-                print("\n"+self.end_print)
+                print("\n" + self.end_print)
             else:
                 print('')
         self.iter += 1

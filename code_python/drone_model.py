@@ -24,7 +24,7 @@ import utils
 # 05 June 2020
 # DRONE MODEL
 
-
+utils.matplotlib_latex_font()
 # noinspection PyAbstractClass
 class AscTecFireflyDroneModel(nn.Module):
     """
@@ -473,21 +473,27 @@ def euroc_mav_compute_fa(flight_number: int):
     def plot_fa_computation_analysis(saving_path=None):
         fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8), dpi=200)
 
-        fa = list(data["fa"])
+        fa = torch.stack(list(data["fa"])[2:])
+        index = data.index[2:]
+        time = data["time"][2:]
 
-        axs[0].plot()
+        # for i in enumerate()
+        axs[0].plot(time, fa[:, 0])
         axs[0].grid()
         axs[0].set_xlabel("Time [s]")
-        axs[0].set_ylabel("fa x")
+        axs[0].set_ylabel("Tau x")
         twin = axs[0].twiny()
-        twin.plot()
+        twin.plot(index, fa[:, 0])
         twin.set_xlabel("Iterations")
+
+
 
         plt.tight_layout()
         if saving_path is not None:
             plt.savefig(saving_path)
         plt.show()
 
+    print()
     plot_fa_computation_analysis(result_folder + "fa.png")
 
 
