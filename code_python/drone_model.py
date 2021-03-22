@@ -18,13 +18,12 @@ from typing import Iterable, Callable
 import itertools
 from pathlib import Path
 
-import utils
-
+import code_python.utils as utils
 
 # 05 June 2020
 # DRONE MODEL
 
-utils.matplotlib_latex_font()
+
 # noinspection PyAbstractClass
 class AscTecFireflyDroneModel(nn.Module):
     """
@@ -142,11 +141,14 @@ class AscTecFireflyDroneModel(nn.Module):
                                   [1., 1., 1., 1., 1., 1.]])
         b = l_arm_mat + km_mat + const_mat
 
-        # kt = 11.100926399230957 * kt
+        # kt = 4.558 * kt
+
         if callable(w_func):
             w = w_func(t_time.item())
         else:
             w = w_func
+
+        # w = torch.tensor([547.5904, 547.5904, 547.5904, 547.5904, 547.5904, 547.5904])
 
         # Command converted to forces and torques
         cmd = kt * w ** 2
@@ -276,7 +278,7 @@ def euroc_mav_compute_fa(flight_number: int):
     f = utils.DataFolder("euroc_mav")
     flight_number = flight_number
     result_folder = f.folders["results"][flight_number] + "fa_computation_analysis/"
-    Path(result_folder).mkdir(parents=True, exist_ok=True)
+    Path(result_folder).mkdir(parents=True, exist_ok=True)  # Checks if folder is created, and if not, creates it .
 
     # sensors_synchronised.pkl comes from euroc_mav.py dataset_creation
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "sensors_synchronised")
@@ -329,7 +331,7 @@ def euroc_mav_compute_fa(flight_number: int):
 
     data["state"] = np.zeros(len(data))
     data[["state"]] = data[["state"]].apply(
-        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("xyz", False),
+        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("zyx", False),
                                                data["angular_velocity"][_x.name],
                                                data["linear_speed"][_x.name],
                                                data["trans"][_x.name]]).astype(np.float)), axis=1)
@@ -470,21 +472,40 @@ def euroc_mav_compute_fa(flight_number: int):
 
     # plot_compare_differentiators()
 
-    def plot_fa_computation_analysis(saving_path=None):
+    def plot_fa_computation_analysis_fa(saving_path=None):
         fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8), dpi=200)
-
         fa = torch.stack(list(data["fa"])[2:])
         index = data.index[2:]
         time = data["time"][2:]
 
-        for i in enumerate(["Tau x", "Tau y", "Tau z", "Fa x", "Fa y", "Fa z"])
-        axs[0].plot(time, fa[:, 0])
-        axs[0].grid()
-        axs[0].set_xlabel("Time [s]")
-        axs[0].set_ylabel(r"Tau x")
-        twin = axs[0].twiny()
-        twin.plot(index, fa[:, 0])
-        # twin.set_xlabel(r"Iterations")
+        for i, ylabel in enumerate(["Fa x", "Fa y", "Fa z"]):
+            axs[i].plot(time, fa[:, i + 3])
+            axs[i].grid()
+            axs[i].set_xlabel("Time [s]")
+            axs[i].set_ylabel(ylabel, fontsize=14)
+            twin = axs[i].twiny()
+            twin.plot(index, fa[:, i + 3])
+            twin.set_xlabel("Iterations")
+
+        plt.tight_layout()
+        if saving_path is not None:
+            plt.savefig(saving_path)
+        plt.show()
+
+    def plot_fa_computation_analysis_tau_a(saving_path=None):
+        fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8), dpi=200)
+        fa = torch.stack(list(data["fa"])[2:])
+        index = data.index[2:]
+        time = data["time"][2:]
+
+        for i, ylabel in enumerate(["Tau x", "Tau y", "Tau z"]):
+            axs[i].plot(time, fa[:, i])
+            axs[i].grid()
+            axs[i].set_xlabel("Time [s]")
+            axs[i].set_ylabel(ylabel, fontsize=14)
+            twin = axs[i].twiny()
+            twin.plot(index, fa[:, i])
+            twin.set_xlabel("Iterations")
 
         plt.tight_layout()
         if saving_path is not None:
@@ -492,7 +513,8 @@ def euroc_mav_compute_fa(flight_number: int):
         plt.show()
 
     print()
-    plot_fa_computation_analysis(result_folder + "fa.png")
+    plot_fa_computation_analysis_fa(result_folder + "f_a.png")
+    plot_fa_computation_analysis_tau_a(result_folder + "tau_a.png")
 
 
 def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
@@ -527,7 +549,6 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
         # First initialization of the parameters
         # Firefly vehicle parameters
 
-        # TODO
         # mass: 1.56779
         # inertia: {xx: 0.0347563, xy: 0.0, xz: 0.0, yy: 0.0458929, yz: 0.0, zz: 0.0977}
         #
@@ -548,13 +569,13 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
         # '5': {angle: -0.52359877559, arm_length: 0.215, rotor_force_constant: 8.54858e-6, rotor_moment_constant: 1.6e-2,
         #       direction: -1.0}
 
-        m = torch.tensor(1.56779)
-        kt = torch.tensor(8.54858e-6)
+        m = torch.tensor(1.56779)  # kg
+        kt = torch.tensor(8.54858e-6)  # N / (rad/s)
         km = torch.tensor(1.6e-2)
-        l_arm = torch.tensor(0.215)
-        ixx = torch.tensor(0.0347563)
-        iyy = torch.tensor(0.0458929)
-        izz = torch.tensor(0.0977)
+        l_arm = torch.tensor(0.215)  # m
+        ixx = torch.tensor(0.0347563)  # kg m-2
+        iyy = torch.tensor(0.0458929)  # kg m-2
+        izz = torch.tensor(0.0977)  # kg m-2
 
         # m = torch.tensor(0.64)
         # kt = torch.tensor(6.546e-6)
@@ -1032,6 +1053,7 @@ def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: in
     # plot_loss_ov_epochs()
     # plot_parameters_ov_epochs(101, 3)
     # plot_parameters_ov_epochs(window=101, 3, saving_path_name=result_folder + f"{now}.png")
+    return to_plot
 
 
 def find_motor_speed_order(flight_number: int, load_previous: bool = False):
@@ -1186,11 +1208,10 @@ def reverse_motor_speed_computation(flight_number):
     flight_number = flight_number
     data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
     data = pd.read_pickle(data_path)
-    result_folder = f.folders["results"][flight_number] + "reverse_motor_speed_compute@/"
+    result_folder = f.folders["results"][flight_number] + "reverse_motor_speed_compute/"
     Path(result_folder).mkdir(parents=True, exist_ok=True)
 
     # Plotting tools
-    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Parameter's scaling coefficients initialization
@@ -1230,9 +1251,12 @@ def reverse_motor_speed_computation(flight_number):
 
     dataset_start, dataset_end = 500, 2500  # only when the drone is flying, no ground reaction
     data_exploited = data[dataset_start:dataset_end]
-    t_tab = torch.tensor(list(data_exploited["time"][1:])).float()
+    t_tab = torch.tensor(list(data_exploited["time"])).float()
     t_tab = t_tab - t_tab[0]
     mc_states = torch.stack(list(data_exploited["state"])).float()
+
+    motor_speeds = []
+    thrusts = []
 
     for tn, tn1, mc_n, mc_n1 in zip(t_tab[:-1], t_tab[1:], mc_states[:-1], mc_states[1:]):
         dt = tn1 - tn
@@ -1244,21 +1268,66 @@ def reverse_motor_speed_computation(flight_number):
         tauz = izz * (dstate[5] - (ixx - iyy) / izz * p * q)
         thrust = m * (dstate[8] - q * u + p * v + g * torch.cos(theta) * torch.cos(psi))
 
-        motor_speed = b_inv @ torch.tensor([taux, tauy, tauz, thrust])
-        # TODO correct sign of orientation by applying a rotation matrix. Error oc  curred when passing (-x, y,
-        #  z) to (x, y, z)
-        print()
+        thrust = b_inv @ torch.tensor([taux, tauy, tauz, thrust])
+        thrusts.append(thrust)
+        # motor_speed = np.sqrt(thrusts / kt)
+        # motor_speeds.append(motor_speed)
+    thrusts = torch.stack(thrusts)
+    motor_speeds = torch.stack(motor_speeds)
 
-    def plot_states(index, time, states, saving_path=None):
+    def plot_motor_speeds(iter_start=0, iter_end=1999, saving_path=None):
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        twin = ax.twiny()
+        ax.grid()
+        for i in range(6):
+            ax.plot(t_tab[1:][iter_start:iter_end], motor_speeds[:, i][iter_start:iter_end], label=f"Motor speed {i + 1}")
+            ax.set_xlabel("Time [s]")
+            ax.set_ylabel("Motor speed [rad/s]", fontsize=14)
+            twin.plot(np.arange(dataset_start + 1, dataset_end)[iter_start:iter_end],
+                      motor_speeds[:, i][iter_start:iter_end])
+            twin.set_xlabel("Iterations")
+        ax.legend()
+        plt.tight_layout()
+        if saving_path is not None:
+            plt.savefig(saving_path)
+        plt.show(block=False)
+
+    # plot_motor_speed(iter_start=500, iter_end=900, saving_path=result_folder + "reverse_motor_speed.png")
+    plot_motor_speeds(iter_start=0, iter_end=1999, saving_path=result_folder + "reverse_motor_speeds.png")
+
+    def plot_thrusts(iter_start=0, iter_end=1999, saving_path=None):
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        twin = ax.twiny()
+        ax.grid()
+        for i in range(6):
+            ax.plot(t_tab[1:][iter_start:iter_end], thrusts[:, i][iter_start:iter_end],
+                    label=f"Motor thrust {i + 1}")
+            ax.set_xlabel("Time [s]")
+            ax.set_ylabel("Thrusts [N]", fontsize=14)
+            twin.plot(np.arange(dataset_start + 1, dataset_end)[iter_start:iter_end],
+                      thrusts[:, i][iter_start:iter_end])
+            twin.set_xlabel("Iterations")
+        ax.legend()
+        plt.tight_layout()
+        if saving_path is not None:
+            plt.savefig(saving_path)
+        plt.show(block=False)
+
+    plot_thrusts(iter_start=0, iter_end=1999, saving_path=result_folder + "reverse_motor_thrusts.png")
+
+    def plot_states(index, time, states, saving_paths=None):
         """
         Print states overtime.
         :param index: 1d array of length n.
         :param time: 1d array of length n.
-        :param states: 2d array of shape (n, 12)
-        :param saving_path: The path where to save the plot image.
+        :param states: 2d array of shape (n, 12).
+        :param saving_paths: List of length 4 containing str. The paths where to save the plots' image. The order of
+        plots is orientation, angular velocity, linear speed, and position.
         """
         assert len(index) == len(time)
         assert states.shape == (len(index), 12)
+        if saving_paths is not None:
+            assert len(saving_paths) == 4
 
         y_labels = ["phi [rad]", "theta [rad]", "psi [rad]", "p [rad/s]", "q [rad/s]", "r [rad/s]",
                     "u [m/s]", "v [m/s]", "w [m/s]", "x [m]", "y [m]", "z [m]"]
@@ -1268,6 +1337,7 @@ def reverse_motor_speed_computation(flight_number):
             if subplot_number == 0:
                 fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8), dpi=200)
 
+            # noinspection PyUnboundLocalVariable
             twin = axs[subplot_number].twiny()
             axs[subplot_number].plot(time, states[:, i])
             twin.plot(index, states[:, i])
@@ -1278,17 +1348,21 @@ def reverse_motor_speed_computation(flight_number):
 
             if subplot_number == 2:
                 plt.tight_layout()
-                if saving_path is not None:
-                    plt.savefig(saving_path)
+                if saving_paths is not None:
+                    plt.savefig(saving_paths[i // 3])
                 plt.show(block=False)
 
-    plot_states(index=data_exploited.index, time=t_tab, states=mc_states)
+    plot_states(index=data_exploited.index, time=t_tab, states=mc_states,
+                saving_paths=[result_folder + "orientation.png",
+                              result_folder + "angular_velocity.png",
+                              result_folder + "linear_speed.png",
+                              result_folder + "position.png"])
 
 
 if __name__ == '__main__':
     euroc_mav_compute_fa(0)
-    # euroc_mav_compute_fa(1)
-    # euroc_mav_compute_fa(2)
+    euroc_mav_compute_fa(1)
+    euroc_mav_compute_fa(2)
     # euroc_mav_ode_solving(flight_number=0, horizon="hinf", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
