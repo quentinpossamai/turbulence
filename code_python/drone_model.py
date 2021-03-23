@@ -20,6 +20,7 @@ from pathlib import Path
 
 import code_python.utils as utils
 
+
 # 05 June 2020
 # DRONE MODEL
 
@@ -1056,6 +1057,109 @@ def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: in
     return to_plot
 
 
+def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_train: torch.tensor,
+                          initial_parameters, batch_size, epochs, lr, global_iteration, tensorboard_path: str = None):
+    """
+    Learn drone's parameters
+    :param u_func: Function that generate a command of the system, time as a parameter.
+    :param g_states: Ground truth states.
+    :param time_train: Time of the states.
+    :param initial_parameters: The initial parameters used to start the optimization.
+    :param batch_size: Number of data to mean over before a backpropagation.
+    :param epochs: Number of time data are optimized over.
+    :param lr: Learning rate used for Adam optimizer.
+    :param global_iteration: Iteration to use for plotting data on tensorboard.
+    :param tensorboard_path: The path to save tensorboard plotting data. TODO tensorboard func to cleaner code ?
+    :return: Drone's parameters identified to data.
+    """
+    m, kt, km, l_arm, ixx, iyy, izz = initial_parameters
+
+    # Plotting tools
+    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
+    if tensorboard_path is not None:
+        now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        writer = SummaryWriter(tensorboard_path + now + "/")
+
+    # Parameter's scaling coefficients initialization
+    prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
+
+    coef_m = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_kt = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_km = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_l_arm = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_ixx = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+
+    learned_prms = {"loss": [], "iteration": [global_iteration]}
+    for e in prm_name:
+        exec(f"""learned_prms["{e}"] = [(coef_{e} * {e}).item()]""")
+        if tensorboard_path is not None:
+            exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
+    drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
+                                          coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    # TODO use dataloader or shuffle data
+
+    # Adam optimization
+    optimizer = torch.optim.Adam(drone_model.parameters(), lr=lr)
+    batch_nb = len(time_train) // batch_size
+    for epoch in range(epochs):
+        for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
+            # Dividing data by batch
+            start = batch_i * batch_size - 1
+            end = (batch_i + 1) * batch_size
+            if batch_i == batch_nb:
+                time_batch = time_train[start:]
+                g_states_batch = g_states[start:]
+            elif batch_i == 0:
+                time_batch = time_train[start + 1:end]
+                g_states_batch = g_states[start + 1:end]
+            else:
+                time_batch = time_train[start:end]
+                g_states_batch = g_states[start:end]
+
+            batch_loss = torch.zeros(1)
+            # Forward
+            for tn, tn1, mc_n, mc_n1 in zip(time_batch[:-1], time_batch[1:], g_states_batch[:-1], g_states_batch[1:]):
+                dt = tn1 - tn
+                state_n1 = drone_model.f(tn, state=mc_n, w_func=u_func, fa=torch.zeros(12)) * dt + mc_n
+                loss = (mc_n1 - state_n1) ** 2
+                coef_learning = torch.tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
+                loss = (coef_learning / coef_learning.sum() * loss).sum()
+                batch_loss = loss + batch_loss
+
+            batch_loss = (batch_loss / (len(g_states_batch) - 1))
+            batch_loss = batch_loss.sum()
+
+            optimizer.zero_grad()  # zero the gradient buffers
+            batch_loss.backward()  # And learning rate
+            optimizer.step()  # Does the update
+
+            # Saving data
+            if tensorboard_path is not None:
+                writer.add_scalars("Loss", {"Training loss": batch_loss.item()}, global_step=global_iteration)
+            learned_prms["loss"].append(batch_loss.item())
+            for e in prm_name:
+                exec(f"""learned_prms["{e}"].append((coef_{e} * {e}).item())""")
+                if tensorboard_path is not None:
+                    exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
+                             global_step=global_iteration)""")
+            global_iteration += 1
+
+    for e in prm_name:
+        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    learned_prms["iteration"].append(len(learned_prms["m"]))
+    return learned_prms
+
+
 def find_motor_speed_order(flight_number: int, load_previous: bool = False):
     """
     Estimates the assignation of the motors between the motor speed in the data w = [w0, w1, w2, w3, w4, w5] and the
@@ -1280,7 +1384,8 @@ def reverse_motor_speed_computation(flight_number):
         twin = ax.twiny()
         ax.grid()
         for i in range(6):
-            ax.plot(t_tab[1:][iter_start:iter_end], motor_speeds[:, i][iter_start:iter_end], label=f"Motor speed {i + 1}")
+            ax.plot(t_tab[1:][iter_start:iter_end], motor_speeds[:, i][iter_start:iter_end],
+                    label=f"Motor speed {i + 1}")
             ax.set_xlabel("Time [s]")
             ax.set_ylabel("Motor speed [rad/s]", fontsize=14)
             twin.plot(np.arange(dataset_start + 1, dataset_end)[iter_start:iter_end],
