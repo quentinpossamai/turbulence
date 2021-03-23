@@ -13,6 +13,7 @@ import pandas as pd
 from matplotlib import rc
 
 ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
+TURBULENCE_PATH = ABSOLUTE_PATH + "turbulence/"
 
 
 def matplotlib_latex_font():

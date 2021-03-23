@@ -550,6 +550,7 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
         # First initialization of the parameters
         # Firefly vehicle parameters
 
+        # source https://github.com/ethz-asl/rotors_simulator/blob/master/rotors_gazebo/resource/iris.yaml
         # mass: 1.56779
         # inertia: {xx: 0.0347563, xy: 0.0, xz: 0.0, yy: 0.0458929, yz: 0.0, zz: 0.0977}
         #
@@ -1058,7 +1059,8 @@ def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: in
 
 
 def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_train: torch.tensor,
-                          initial_parameters, batch_size, epochs, lr, global_iteration, tensorboard_path: str = None):
+                          initial_parameters, batch_size, epochs, lr, global_iteration, tensorboard_path: str = None,
+                          verbose=True):
     """
     Learn drone's parameters
     :param u_func: Function that generate a command of the system, time as a parameter.
@@ -1070,6 +1072,7 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
     :param lr: Learning rate used for Adam optimizer.
     :param global_iteration: Iteration to use for plotting data on tensorboard.
     :param tensorboard_path: The path to save tensorboard plotting data. TODO tensorboard func to cleaner code ?
+    :paran verbose: True if you want console printed info.
     :return: Drone's parameters identified to data.
     """
     m, kt, km, l_arm, ixx, iyy, izz = initial_parameters
@@ -1077,8 +1080,7 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
     # Plotting tools
     # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
     if tensorboard_path is not None:
-        now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        writer = SummaryWriter(tensorboard_path + now + "/")
+        writer = SummaryWriter(tensorboard_path)
 
     # Parameter's scaling coefficients initialization
     prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
@@ -1100,9 +1102,10 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
                                           coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
 
-    for e in prm_name:
-        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
-             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+    if verbose:
+        for e in prm_name:
+            exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+                 f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
     # TODO use dataloader or shuffle data
 
@@ -1124,18 +1127,20 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
                 time_batch = time_train[start:end]
                 g_states_batch = g_states[start:end]
 
+            if len(time_batch) == 1:  # If batch is size 1 then pass.
+                continue
+
             batch_loss = torch.zeros(1)
             # Forward
-            for tn, tn1, mc_n, mc_n1 in zip(time_batch[:-1], time_batch[1:], g_states_batch[:-1], g_states_batch[1:]):
+            for tn, tn1, g_n, g_n1 in zip(time_batch[:-1], time_batch[1:], g_states_batch[:-1], g_states_batch[1:]):
                 dt = tn1 - tn
-                state_n1 = drone_model.f(tn, state=mc_n, w_func=u_func, fa=torch.zeros(12)) * dt + mc_n
-                loss = (mc_n1 - state_n1) ** 2
+                state_n1 = drone_model.f(tn, state=g_n, w_func=u_func, fa=torch.zeros(12)) * dt + g_n
+                loss = (g_n1 - state_n1) ** 2
                 coef_learning = torch.tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
                 loss = (coef_learning / coef_learning.sum() * loss).sum()
                 batch_loss = loss + batch_loss
 
-            batch_loss = (batch_loss / (len(g_states_batch) - 1))
-            batch_loss = batch_loss.sum()
+            batch_loss = batch_loss / (len(g_states_batch) - 1)
 
             optimizer.zero_grad()  # zero the gradient buffers
             batch_loss.backward()  # And learning rate
@@ -1152,9 +1157,10 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
                              global_step=global_iteration)""")
             global_iteration += 1
 
-    for e in prm_name:
-        exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
-             f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+    if verbose:
+        for e in prm_name:
+            exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+                 f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
     learned_prms["iteration"].append(len(learned_prms["m"]))
     return learned_prms
