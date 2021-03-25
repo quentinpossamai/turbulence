@@ -1059,7 +1059,7 @@ def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: in
 
 
 def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_train: torch.tensor,
-                          initial_parameters, batch_size, epochs, lr, global_iteration, tensorboard_path: str = None,
+                          initial_parameters, batch_size, epochs, lr, global_iteration, writer=None,
                           verbose=True):
     """
     Learn drone's parameters
@@ -1071,16 +1071,11 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
     :param epochs: Number of time data are optimized over.
     :param lr: Learning rate used for Adam optimizer.
     :param global_iteration: Iteration to use for plotting data on tensorboard.
-    :param tensorboard_path: The path to save tensorboard plotting data. TODO tensorboard func to cleaner code ?
-    :paran verbose: True if you want console printed info.
+    :param writer: tensorboard SummaryWriter
+    :param verbose: True if you want console printed info.
     :return: Drone's parameters identified to data.
     """
-    m, kt, km, l_arm, ixx, iyy, izz = initial_parameters
-
-    # Plotting tools
-    # tensorboard --logdir /Users/quentin/phd/turbulence/euroc_mav/results/V1_01_easy/drone_parameters_estimation_h1/
-    if tensorboard_path is not None:
-        writer = SummaryWriter(tensorboard_path)
+    m, kt, km, l_arm, ixx, iyy, izz = initial_parameters.values()
 
     # Parameter's scaling coefficients initialization
     prm_name = ["m", "kt", "km", "l_arm", "ixx", "iyy", "izz"]  # Parameters name
@@ -1096,7 +1091,7 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
     learned_prms = {"loss": [], "iteration": [global_iteration]}
     for e in prm_name:
         exec(f"""learned_prms["{e}"] = [(coef_{e} * {e}).item()]""")
-        if tensorboard_path is not None:
+        if writer is not None:
             exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
@@ -1113,7 +1108,8 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
     optimizer = torch.optim.Adam(drone_model.parameters(), lr=lr)
     batch_nb = len(time_train) // batch_size
     for epoch in range(epochs):
-        for batch_i in tqdm(range(batch_nb + 1), desc=f"Epoch nº{epoch + 1}/{epochs}"):
+        for batch_i in (tqdm(range(batch_nb + 1),
+                             desc=f"Epoch nº{epoch + 1}/{epochs}") if verbose else range(batch_nb + 1)):
             # Dividing data by batch
             start = batch_i * batch_size - 1
             end = (batch_i + 1) * batch_size
@@ -1147,22 +1143,22 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
             optimizer.step()  # Does the update
 
             # Saving data
-            if tensorboard_path is not None:
+            if writer is not None:
                 writer.add_scalars("Loss", {"Training loss": batch_loss.item()}, global_step=global_iteration)
             learned_prms["loss"].append(batch_loss.item())
             for e in prm_name:
                 exec(f"""learned_prms["{e}"].append((coef_{e} * {e}).item())""")
-                if tensorboard_path is not None:
+                if writer is not None:
                     exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
                              global_step=global_iteration)""")
             global_iteration += 1
+            learned_prms["iteration"].append(global_iteration)
 
     if verbose:
         for e in prm_name:
             exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
                  f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
-    learned_prms["iteration"].append(len(learned_prms["m"]))
     return learned_prms
 
 
