@@ -261,6 +261,210 @@ class AscTecFireflyDroneModel(nn.Module):
         return fa, xn1, xn1_hat
 
 
+class AscTecFireflyReducedDroneModel(nn.Module):
+    """
+    AscTec Firefly drone model used in EuRoC MAV data implementing "f" the derivative of the state over time, "forward"
+    to compute the error between ground truth and model estimation.
+
+    Every equations in this code are described in:
+    -Sabatino, Francesco. ‘Quadrotor Control: Modeling, Nonlinear Control Design, and Simulation’, 2015, 67.
+
+    -Akkinapalli, Venkata Sravan, Guillermo Falconí, and Florian Holzapfel. ‘Attitude Control of a Multicopter Using L1
+     Augmented Quaternion Based Backstepping’, 170–78, 2014. https://doi.org/10.1109/ICARES.2014.7024376.
+
+    -Achtelik, Michael, Klaus-Michael Doth, Daniel Gurdan, and Jan Stumpf. ‘Design of a Multi Rotor MAV with Regard to
+     Efficiency, Dynamics and Redundancy’. In AIAA Guidance, Navigation, and Control Conference. Guidance, Navigation,
+      and Control and Co-Located Conferences. American Institute of Aeronautics and Astronautics, 2012.
+      https://doi.org/10.2514/6.2012-4779.
+
+    This model has only 4 independent parameters making the system identifiable.
+    """
+
+    def __init__(self,
+                 g: torch.tensor,
+                 theta1: torch.tensor,
+                 theta2: torch.tensor,
+                 theta3: torch.tensor,
+                 theta4: torch.tensor,
+                 coef_theta1: torch.tensor = torch.tensor(1.),
+                 coef_theta2: torch.tensor = torch.tensor(1.),
+                 coef_theta3: torch.tensor = torch.tensor(1.),
+                 coef_theta4: torch.tensor = torch.tensor(1.)):
+        """
+        Drone model base of Sabatino Francesco thesis adapted to an hexarotor reduced to 4 parameters.
+
+        :param g: gravity constant (scalar) (9.81m/s2).
+        :param theta1, theta2, theta3, theta4: the 4 parameters of the drone.
+        :param coef_theta1, coef_theta2, coef_theta3, coef_theta4: The 4 coefficients that will be learned.
+
+        This model does not contain any fa.
+        """
+        super().__init__()
+        # Drone model parameters.
+
+        self.coef_theta1 = coef_theta1
+        self.coef_theta2 = coef_theta2
+        self.coef_theta3 = coef_theta3
+        self.coef_theta4 = coef_theta4
+
+        self.theta1 = theta1
+        self.theta2 = theta2
+        self.theta3 = theta3
+        self.theta4 = theta4
+
+        self.g = g
+        # self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
+
+    def f(self, t_time: torch.Tensor, state: torch.Tensor, w_func: Callable) -> torch.Tensor:
+        """
+        Compute the derivative of the state. x_dot = f(x, u, fa).
+        :param t_time: scalar in seconds (Tensor of shape (1,)).
+        :param state: state of the drone torch.Tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
+        :param w_func: Command: 6 rotors angular velocity in rad/s.
+        :return: Return the derivative of the state.
+        """
+
+        theta1 = self.theta1 * self.coef_theta1
+        theta2 = self.theta2 * self.coef_theta2
+        theta3 = self.theta3 * self.coef_theta3
+        theta4 = self.theta4 * self.coef_theta4
+
+        # assert len(fa) == 12, "fa len > 12 fa supposed to be = _, _, _, tau_x, tau_y, tau_z, fx, fy, fz, _, _, _"
+
+        # Hexarotor force generation -----------------------------------------------------------------------------------
+        # make derivable to parameters
+        l_arm_mat = torch.tensor([[-0.5, -1., -0.5, 0.5, 1., 0.5],
+                                  [3. ** 0.5 / 2., 0., -3. ** 0.5 / 2., -3. ** 0.5 / 2., 0., 3. ** 0.5 / 2.],
+                                  [0., 0., 0., 0., 0., 0.],
+                                  [0., 0., 0., 0., 0., 0.]])
+        km_mat = torch.tensor([[0., 0., 0., 0., 0., 0.],
+                               [0., 0., 0., 0., 0., 0.],
+                               [-1., 1., -1., 1., -1., 1.],
+                               [0., 0., 0., 0., 0., 0.]])
+        const_mat = torch.tensor([[0., 0., 0., 0., 0., 0.],
+                                  [0., 0., 0., 0., 0., 0.],
+                                  [0., 0., 0., 0., 0., 0.],
+                                  [1., 1., 1., 1., 1., 1.]])
+        b = l_arm_mat + km_mat + const_mat
+
+        if callable(w_func):
+            w = w_func(t_time.item())
+        else:
+            w = w_func
+
+        # w = torch.tensor([547.5904, 547.5904, 547.5904, 547.5904, 547.5904, 547.5904])
+
+        # Command converted to forces and torques
+        cmd = w ** 2
+        alphai_ui = b @ cmd
+
+        # Drone reaction -----------------------------------------------------------------------------------------------
+
+        cos = torch.cos
+        sin = torch.sin
+        tan = torch.tan
+
+        phi, theta, psi, p, q, r, u, v, w, x, y, z = state
+
+        dphi = p + r * cos(phi) * tan(theta) + q * sin(phi) * tan(theta)
+        dtheta = q * cos(phi) - r * sin(phi)
+        dpsi = r * cos(phi) / cos(theta) + q * sin(phi) / cos(theta)
+
+        dp = 0.
+        dq = 0.
+        dr = 0.
+
+        du = r * v - q * w + self.g * sin(theta)
+        dv = p * w - r * u - self.g * sin(phi) * cos(theta)
+        dw = q * u - p * v - self.g * cos(theta) * cos(phi)
+
+        dx = (w * (sin(phi) * sin(psi) + cos(phi) * cos(psi) * sin(theta))
+              - v * (cos(phi) * sin(psi) - cos(psi) * sin(phi) * sin(theta)) + u * cos(psi) * cos(theta))
+        dy = (v * (cos(phi) * cos(psi) + sin(phi) * sin(psi) * sin(theta))
+              - w * (cos(psi) * sin(phi) - cos(phi) * sin(psi) * sin(theta)) + u * cos(theta) * sin(psi))
+        dz = w * cos(phi) * cos(theta) - u * sin(theta) + v * cos(theta) * sin(phi)
+
+        dstate = torch.tensor([dphi, dtheta, dpsi, dp, dq, dr, du, dv, dw, dx, dy, dz], dtype=torch.float)
+
+        # Tensor writing -----------------------------------------------------------------------------------------------
+
+        # forces and torques
+        f_t_factor = (torch.tensor([0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0.]) * theta3 +
+                      torch.tensor([0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]) * theta3 +
+                      torch.tensor([0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.]) * theta4 +
+                      torch.tensor([0., 0., 0., 0., 0., 0., 1., 1., 1., 0., 0., 0.]) * theta1)
+
+        drone_torsor_mat = torch.tensor([[0., 0., 0., 0.],
+                                         [0., 0., 0., 0.],
+                                         [0., 0., 0., 0.],
+                                         [1., 0., 0., 0.],
+                                         [0., 1., 0., 0.],
+                                         [0., 0., 1., 0.],
+                                         [0., 0., 0., 0.],
+                                         [0., 0., 0., 0.],
+                                         [0., 0., 0., 1.],
+                                         [0., 0., 0., 0.],
+                                         [0., 0., 0., 0.],
+                                         [0., 0., 0., 0.]])
+        # # Special command
+        # fn = m * self.g
+        # if 0 <= t_time.item() < 1.:
+        #     drone_torsor_1 = torch.tensor([1., 1., 1., fn / cos(theta)])
+        # elif 1. <= t_time.item() < 2.:
+        #     drone_torsor_1 = torch.tensor([0., 0, 0., fn / cos(theta)])
+        # elif 2. <= t_time.item():
+        #     drone_torsor_1 = torch.tensor([0., 0., 0., fn / cos(theta)])
+
+        # noinspection PyUnboundLocalVariable
+        # dstate = dstate + f_t_factor * (fa + drone_torsor_mat @ alphai_ui)
+        dstate = dstate + f_t_factor * (drone_torsor_mat @ alphai_ui)
+
+        # Angular velocity
+        dp = (1 - theta2) * r * q
+        dq = -(1 - theta2) * p * r
+        dr = 0  # Hypothesis Ixx == Iyy
+        angular_velocity_mat = (torch.tensor([0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0., 0.]) * dp +
+                                torch.tensor([0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0., 0.]) * dq +
+                                torch.tensor([0., 0., 0., 0., 0., 1., 0., 0., 0., 0., 0., 0.]) * dr)
+        dstate = dstate + angular_velocity_mat
+        return dstate
+
+    # def forward(self, xn1: torch.Tensor, xn: torch.Tensor, wn: torch.Tensor,
+    #             dt: torch.Tensor, tn: torch.Tensor) -> torch.Tensor:
+    #     """
+    #     Compute the norm of the difference between the state and a state estimate. fa derivable in pytorch.
+    #     :param xn1: state at time tn+1.
+    #     :param xn: state at time tn.
+    #     :param wn: Rotors speed at time tn.
+    #     :param dt: n+1 time step dt_n+1 = tn+1 - tn.
+    #     :param tn: time of the measure in s.
+    #     :return: torch.Tensor of dimension (1,).
+    #     """
+    #     return torch.norm(xn1 - (xn + dt * self.f(tn, xn, wn, self.fa)))
+    #
+    # def forward_fa_direct_subtract(self, xn1: torch.Tensor, xn: torch.Tensor, wn: torch.Tensor,
+    #                                dt: torch.Tensor, tn: torch.Tensor) -> torch.Tensor:
+    #     """
+    #     A different forward to not used pytorch optimizers because computing fa* is just a subtraction.
+    #     :param xn1: state a step n+1.
+    #     :param xn: state a step n.
+    #     :param wn: command at time n.
+    #     :param dt: time step.
+    #     :param tn: (s).
+    #     :return: fa, ground truth at step n+1, estimated state at step n+1.
+    #     """
+    #     m = self.m * self.coef_m
+    #     ixx = self.ixx * self.coef_ixx
+    #     iyy = self.iyy * self.coef_iyy
+    #     izz = self.izz * self.coef_izz
+    #     c = torch.tensor([0., 0., 0., 1 / ixx, 1 / iyy, 1 / izz,
+    #                       1 / m, 1 / m, 1 / m, 0., 0., 0.], dtype=torch.float)
+    #
+    #     xn1_hat = xn + dt * self.f(tn, xn, wn, fa=torch.zeros(12))
+    #     fa = (xn1 - xn1_hat) / (dt * c)
+    #     return fa, xn1, xn1_hat
+
+
 def euroc_mav_compute_fa(flight_number: int):
     """
     Compute fa* using FSDroneModel integrated with Euler as an estimator. EuRoC MAV data are used (AscTec Firefly).
@@ -355,7 +559,8 @@ def euroc_mav_compute_fa(flight_number: int):
 
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
-                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,
+                                          izz=izz)
 
     # Fa computation and plots
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -603,7 +808,8 @@ def euroc_mav_ode_solving(flight_number: int, horizon: str, load_previous=True):
 
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
-                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,
+                                          izz=izz)
 
     for e in prm_name:
         exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
@@ -765,13 +971,13 @@ def estimate_euroc_mav_params_hinf(flight_number: int, epochs: int, batch_size: 
 
     if load_previous is not True:
         # First initialization of the parameters
-        m = torch.tensor(0.64)
-        kt = torch.tensor(6.546e-6)
-        km = torch.tensor(1.2864e-7)
-        l_arm = torch.tensor(0.215)
-        ixx = torch.tensor(10.007e-3)
-        iyy = torch.tensor(10.2335e-3)
-        izz = torch.tensor(8.1e-3)
+        m = torch.tensor(1.56779)  # kg
+        kt = torch.tensor(8.54858e-6)  # N / (rad/s)
+        km = torch.tensor(1.6e-2)
+        l_arm = torch.tensor(0.215)  # m
+        ixx = torch.tensor(0.0347563)  # kg m-2
+        iyy = torch.tensor(0.0458929)  # kg m-2
+        izz = torch.tensor(0.0977)  # kg m-2
         to_plot = {"loss": [], "iteration": []}
         for e in prm_name:
             exec(f"""to_plot["{e}"] = [(coef_{e} * {e}).item()]""")
@@ -796,7 +1002,8 @@ def estimate_euroc_mav_params_hinf(flight_number: int, epochs: int, batch_size: 
 
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
-                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,
+                                          izz=izz)
 
     for e in prm_name:
         exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | k: {{drone_model.{e}}}")""")
@@ -923,13 +1130,20 @@ def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: in
 
     if load_previous is not True:
         # First initialization of the parameters
-        m = torch.tensor(0.64)  # Papier Asctec
-        kt = torch.tensor(6.546e-6)  # Papier 2
-        km = torch.tensor(1.2864e-7)  # Papier 2
-        l_arm = torch.tensor(0.215)  # Papier 2
-        ixx = torch.tensor(10.007e-3)  # Papier 2
-        iyy = torch.tensor(10.2335e-3)  # Papier 2
-        izz = torch.tensor(8.1e-3)  # Papier 2
+        # m = torch.tensor(0.64)  # Papier Asctec
+        # kt = torch.tensor(6.546e-6)  # Papier 2
+        # km = torch.tensor(1.2864e-7)  # Papier 2
+        # l_arm = torch.tensor(0.215)  # Papier 2
+        # ixx = torch.tensor(10.007e-3)  # Papier 2
+        # iyy = torch.tensor(10.2335e-3)  # Papier 2
+        # izz = torch.tensor(8.1e-3)  # Papier 2
+        m = torch.tensor(1.56779)  # kg
+        kt = torch.tensor(8.54858e-6)  # N / (rad/s)
+        km = torch.tensor(1.6e-2)
+        l_arm = torch.tensor(0.215)  # m
+        ixx = torch.tensor(0.0347563)  # kg m-2
+        iyy = torch.tensor(0.0458929)  # kg m-2
+        izz = torch.tensor(0.0977)  # kg m-2
         to_plot = {"loss": [], "iteration": []}
         for e in prm_name:
             exec(f"""to_plot["{e}"] = [(coef_{e} * {e}).item()]""")
@@ -954,7 +1168,8 @@ def estimate_euroc_mav_params_h1(flight_number: int, epochs: int, batch_size: in
 
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
-                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,
+                                          izz=izz)
 
     for e in prm_name:
         exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
@@ -1095,7 +1310,8 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
             exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
-                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,
+                                          izz=izz)
 
     if verbose:
         for e in prm_name:
@@ -1131,6 +1347,107 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
             for tn, tn1, g_n, g_n1 in zip(time_batch[:-1], time_batch[1:], g_states_batch[:-1], g_states_batch[1:]):
                 dt = tn1 - tn
                 state_n1 = drone_model.f(tn, state=g_n, w_func=u_func, fa=torch.zeros(12)) * dt + g_n
+                loss = (g_n1 - state_n1) ** 2
+                coef_learning = torch.tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
+                loss = (coef_learning / coef_learning.sum() * loss).sum()
+                batch_loss = loss + batch_loss
+
+            batch_loss = batch_loss / (len(g_states_batch) - 1)
+
+            optimizer.zero_grad()  # zero the gradient buffers
+            batch_loss.backward()  # And learning rate
+            optimizer.step()  # Does the update
+
+            # Saving data
+            if writer is not None:
+                writer.add_scalars("Loss", {"Training loss": batch_loss.item()}, global_step=global_iteration)
+            learned_prms["loss"].append(batch_loss.item())
+            for e in prm_name:
+                exec(f"""learned_prms["{e}"].append((coef_{e} * {e}).item())""")
+                if writer is not None:
+                    exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
+                             global_step=global_iteration)""")
+            global_iteration += 1
+            learned_prms["iteration"].append(global_iteration)
+
+    if verbose:
+        for e in prm_name:
+            exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+                 f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    return learned_prms
+
+
+def system_identification_reduced_model(u_func: torch.tensor, g_states: torch.tensor, time_train: torch.tensor,
+                                        initial_parameters, batch_size, epochs, lr, global_iteration, writer=None,
+                                        verbose=True):
+    """
+    Learn drone's parameters
+    :param u_func: Function that generate a command of the system, time as a parameter.
+    :param g_states: Ground truth states.
+    :param time_train: Time of the states.
+    :param initial_parameters: The initial parameters used to start the optimization.
+    :param batch_size: Number of data to mean over before a backpropagation.
+    :param epochs: Number of time data are optimized over.
+    :param lr: Learning rate used for Adam optimizer.
+    :param global_iteration: Iteration to use for plotting data on tensorboard.
+    :param writer: tensorboard SummaryWriter
+    :param verbose: True if you want console printed info.
+    :return: Drone's parameters identified to data.
+    """
+    theta1, theta2, theta3, theta4 = initial_parameters.values()
+
+    # Parameter's scaling coefficients initialization
+    prm_name = ["theta1", "theta2", "theta3", "theta4"]  # Parameters name
+
+    coef_theta1 = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_theta2 = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_theta3 = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+    coef_theta4 = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
+
+    learned_prms = {"loss": [], "iteration": [global_iteration]}
+    for e in prm_name:
+        exec(f"""learned_prms["{e}"] = [(coef_{e} * {e}).item()]""")
+        if writer is not None:
+            exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
+    drone_model = AscTecFireflyReducedDroneModel(g=9.81, theta1=theta1, theta2=theta2, theta3=theta3, theta4=theta4,
+                                                 coef_theta1=coef_theta1, coef_theta2=coef_theta2,
+                                                 coef_theta3=coef_theta3, coef_theta4=coef_theta4)
+
+    if verbose:
+        for e in prm_name:
+            exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
+                 f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
+
+    # TODO use dataloader or shuffle data
+
+    # Adam optimization
+    optimizer = torch.optim.Adam(drone_model.parameters(), lr=lr)
+    batch_nb = len(time_train) // batch_size
+    for epoch in range(epochs):
+        for batch_i in (tqdm(range(batch_nb + 1),
+                             desc=f"Epoch nº{epoch + 1}/{epochs}") if verbose else range(batch_nb + 1)):
+            # Dividing data by batch
+            start = batch_i * batch_size - 1
+            end = (batch_i + 1) * batch_size
+            if batch_i == batch_nb:
+                time_batch = time_train[start:]
+                g_states_batch = g_states[start:]
+            elif batch_i == 0:
+                time_batch = time_train[start + 1:end]
+                g_states_batch = g_states[start + 1:end]
+            else:
+                time_batch = time_train[start:end]
+                g_states_batch = g_states[start:end]
+
+            if len(time_batch) == 1:  # If batch is size 1 then pass.
+                continue
+
+            batch_loss = torch.zeros(1)
+            # Forward
+            for tn, tn1, g_n, g_n1 in zip(time_batch[:-1], time_batch[1:], g_states_batch[:-1], g_states_batch[1:]):
+                dt = tn1 - tn
+                state_n1 = drone_model.f(tn, state=g_n, w_func=u_func) * dt + g_n
                 loss = (g_n1 - state_n1) ** 2
                 coef_learning = torch.tensor([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
                 loss = (coef_learning / coef_learning.sum() * loss).sum()
@@ -1230,7 +1547,8 @@ def find_motor_speed_order(flight_number: int, load_previous: bool = False):
 
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
-                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+                                          coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,
+                                          izz=izz)
 
     for e in prm_name:
         exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
