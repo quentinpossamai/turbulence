@@ -5,6 +5,7 @@ This file contains a drone models to compute the turbulence forces and torques l
 import pickle
 import torch
 import torch.nn as nn
+import torch.nn.functional as f
 from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint  # https://github.com/rtqichen/torchdiffeq
 import matplotlib.pyplot as plt
@@ -315,6 +316,9 @@ class AscTecFireflyReducedDroneModel(nn.Module):
         self.g = g
         # self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
 
+        self.conv1 = nn.Conv1d(in_channels=1, out_channels=10, kernel_size=1)
+        self.conv2 = nn.Conv1d(in_channels=10, out_channels=1, kernel_size=1)
+
     def f(self, t_time: torch.Tensor, state: torch.Tensor, w_func: Callable) -> torch.Tensor:
         """
         Compute the derivative of the state. x_dot = f(x, u, fa).
@@ -354,8 +358,16 @@ class AscTecFireflyReducedDroneModel(nn.Module):
 
         # w = torch.tensor([547.5904, 547.5904, 547.5904, 547.5904, 547.5904, 547.5904])
 
+        # TODO one by one
+        # w  # Tensor size 6
+
+        w = w.reshape((1, 1, 6))
+        w_rad_s = self.conv2(torch.sigmoid(self.conv1(w)))
+        w_rad_s = list(w_rad_s)
+
         # Command converted to forces and torques
-        cmd = w ** 2
+        cmd = w_rad_s ** 2
+        # cmd = w ** 2
         alphai_ui = b @ cmd
 
         # Drone reaction -----------------------------------------------------------------------------------------------
