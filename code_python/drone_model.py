@@ -2,22 +2,21 @@
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
 """
+import datetime
+import itertools
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pandas as pd
 import pickle
+from pathlib import Path
+from scipy.signal import savgol_filter
 import torch
 import torch.nn as nn
-import torch.nn.functional as f
 from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint  # https://github.com/rtqichen/torchdiffeq
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
 from tqdm import tqdm
-import datetime
-import os
-from scipy.signal import savgol_filter
-from typing import Iterable, Callable
-import itertools
-from pathlib import Path
+from typing import Iterable, Callable, Tuple
 
 import code_python.utils as utils
 
@@ -357,13 +356,8 @@ class AscTecFireflyReducedDroneModel(nn.Module):
             w = w_func
 
         # w = torch.tensor([547.5904, 547.5904, 547.5904, 547.5904, 547.5904, 547.5904])
-
-        # TODO one by one
-        # w  # Tensor size 6
-
         w = w.reshape((1, 1, 6))
-        w_rad_s = self.conv2(torch.sigmoid(self.conv1(w)))
-        w_rad_s = list(w_rad_s)
+        w_rad_s = self.conv2(torch.sigmoid(self.conv1(w))).reshape(6)
 
         # Command converted to forces and torques
         cmd = w_rad_s ** 2
@@ -1602,6 +1596,92 @@ def find_motor_speed_order(flight_number: int, load_previous: bool = False):
     pickle.dump(result, open(result_folder + "motor_combinations_losses.pkl", "wb"))
 
 
+def find_motor_speed_order_model_reduced_identification(flight_number: int, load_previous: bool = False):
+    """
+    Estimates the assignation of the motors between the motor speed in the data w = [w0, w1, w2, w3, w4, w5] and the
+    motor speed in the mathematical model.
+
+    :param flight_number: 0, 1, 2: The number of the flights Vicon Room 1 in the EuRoC MAV dataset.
+    :param load_previous: If True load most recent computed drone parameters.
+    """
+    # Loading dataset
+    f = utils.DataFolder("euroc_mav")
+    flight_number = flight_number
+    data_path = f.get_unique_file_path(".pkl", f.folders["intermediate"][flight_number], "fa")
+    data = pd.read_pickle(data_path)
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    result_folder = f.folders["results"][flight_number] + f"find_motor_speed_order_model_reduced_identification/{now}/"
+    Path(result_folder).mkdir(parents=True, exist_ok=True)
+
+    # Plotting tools
+    tensorboard_cmd = f"tensorboard --logdir {result_folder}"
+    # writer = SummaryWriter(result_folder + now + "/")
+
+    original_prms = {"m": torch.tensor(1.56779),
+                     "kt": torch.tensor(8.54858e-6),
+                     "km": torch.tensor(1.6e-2),
+                     "l_arm": torch.tensor(0.215),
+                     "ixx": torch.tensor(0.0347563),
+                     "iyy": torch.tensor(0.0458929),
+                     "izz": torch.tensor(0.0977)}
+
+    initial_prms = {"theta1": original_prms["kt"] / original_prms["m"],
+                    "theta2": original_prms["izz"] / original_prms["ixx"],
+                    "theta3": original_prms["kt"] * original_prms["l_arm"] / original_prms["ixx"],
+                    "theta4": original_prms["kt"] * original_prms["km"] / original_prms["izz"]}
+
+    print("Initial params:")
+    for key, val in initial_prms.items():
+        print(f"{key}: {val}")
+    print()
+
+    dataset_start, dataset_end = 500, 2500  # dataset_start > 0 because of nan angular and linear speed
+    mc_train = torch.stack(list(data["state"][dataset_start:dataset_end]))
+    time_train = torch.tensor(list(data["time"])).float()[dataset_start:dataset_end]  # only when the drone is
+    # flying, no ground reaction
+    time_train = time_train - time_train[0]
+
+    def motor_speed(t: float, combination: Tuple) -> Iterable:
+        ms = torch.stack(list(data["motor_speed"])).numpy()[dataset_start:dataset_end]
+        w_interp = torch.tensor([np.interp(t, time_train.numpy(),
+                                           ms[:, i_motor_speed]) for i_motor_speed in range(6)]).float()
+        return w_interp[torch.tensor(combination)]
+
+    iteration = 0
+
+    batch_size = 32
+    epochs = 10
+    lr = 1e-3
+
+    # Finding
+    combinations = list(itertools.permutations(range(6)))
+    result = []
+
+    for iter_combinations in tqdm(combinations):
+        u_func = lambda var: motor_speed(var, iter_combinations)
+        print(u_func(0))
+        output = system_identification_reduced_model(u_func=u_func,
+                                                     g_states=mc_train, time_train=time_train,
+                                                     initial_parameters=initial_prms,
+                                                     batch_size=batch_size,
+                                                     epochs=epochs, lr=lr,
+                                                     global_iteration=iteration,
+                                                     writer=None, verbose=False)
+
+        learned_prms = {"theta1": output["theta1"][-1],
+                        "theta2": output["theta2"][-1],
+                        "theta3": output["theta3"][-1],
+                        "theta4": output["theta4"][-1]}
+        loss = output["loss"][-1]
+        loss_last_epoch = np.mean(output['loss'][-len(mc_train) // batch_size:])
+
+        iteration = output["iteration"][-1]
+
+        result.append((iter_combinations, learned_prms, loss_last_epoch, output))
+        print(f"Combination: {iter_combinations} | Loss: {loss_last_epoch:20.8f}")
+    pickle.dump(result, open(result_folder + "motor_combinations_losses.pkl", "wb"))
+
+
 def analyze_motor_speed_order(flight_number):
     # Loading dataset
     f = utils.DataFolder("euroc_mav")
@@ -1797,12 +1877,13 @@ def reverse_motor_speed_computation(flight_number):
 
 
 if __name__ == '__main__':
-    euroc_mav_compute_fa(0)
-    euroc_mav_compute_fa(1)
-    euroc_mav_compute_fa(2)
+    # euroc_mav_compute_fa(0)
+    # euroc_mav_compute_fa(1)
+    # euroc_mav_compute_fa(2)
     # euroc_mav_ode_solving(flight_number=0, horizon="hinf", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
     # find_motor_speed_order(flight_number=0, load_previous=False)
     # analyze_motor_speed_order(flight_number=0)
     # reverse_motor_speed_computation(flight_number=0)
+    find_motor_speed_order_model_reduced_identification(flight_number=0, load_previous=False)
