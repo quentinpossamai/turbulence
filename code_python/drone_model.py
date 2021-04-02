@@ -1476,6 +1476,7 @@ def system_identification_reduced_model(u_func: torch.tensor, g_states: torch.te
                              global_step=global_iteration)""")
             global_iteration += 1
             learned_prms["iteration"].append(global_iteration)
+            learned_prms["prms"].append(list(drone_model.parameters()))
 
     if verbose:
         for e in prm_name:

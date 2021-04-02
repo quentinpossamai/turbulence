@@ -118,10 +118,10 @@ def test_drone_reduced_identification():
     writer = SummaryWriter(result_folder)
     iteration = 0
 
-    drone = drone_model.AscTecFireflyReducedDroneModel(g=9.81, theta1=ground_truth_prms["theta1"],
-                                                       theta2=ground_truth_prms["theta2"],
-                                                       theta3=ground_truth_prms["theta3"],
-                                                       theta4=ground_truth_prms["theta4"])
+    ground_truth_drone = drone_model.AscTecFireflyReducedDroneModel(g=9.81, theta1=ground_truth_prms["theta1"],
+                                                                    theta2=ground_truth_prms["theta2"],
+                                                                    theta3=ground_truth_prms["theta3"],
+                                                                    theta4=ground_truth_prms["theta4"])
 
     # Wrong initial params
     wrong_initial_prms = {"theta1": ground_truth_prms["theta1"] / 2,
@@ -146,7 +146,7 @@ def test_drone_reduced_identification():
     for dataset_i in tqdm(range(dataset_nb)):
         # Generating the dataset
         w_func = gen_cmd()
-        states = odeint(lambda t, x: drone.f(t_time=t, state=x, w_func=w_func), initial_state,
+        states = odeint(lambda t, x: ground_truth_drone.f(t_time=t, state=x, w_func=w_func), initial_state,
                         time_array, method="euler")
         assert torch.isnan(states).sum() == 0
         # plot_simulated_drone_position(states, time_array, 0, 2)
