@@ -2,11 +2,12 @@
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
 """
+import os
+print(os.getcwd())
 import datetime
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import pandas as pd
 import pickle
 from pathlib import Path
@@ -1888,5 +1889,4 @@ if __name__ == '__main__':
     # find_motor_speed_order(flight_number=0, load_previous=False)
     # analyze_motor_speed_order(flight_number=0)
     # reverse_motor_speed_computation(flight_number=0)
-    print(os.getcwd())
     find_motor_speed_order_model_reduced_identification(flight_number=0, load_previous=False)
