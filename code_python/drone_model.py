@@ -25,6 +25,7 @@ import utils
 # 05 June 2020
 # DRONE MODEL
 print(f"in drone_model cwd: {os.getcwd()}")
+print(sys.path)
 
 
 # noinspection PyAbstractClass
