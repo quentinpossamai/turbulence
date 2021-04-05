@@ -1308,9 +1308,9 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
     coef_iyy = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
     coef_izz = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
 
-    learned_prms = {"loss": [], "iteration": [global_iteration]}
+    saved_vars = {"loss": [], "iteration": [global_iteration]}
     for e in prm_name:
-        exec(f"""learned_prms["{e}"] = [(coef_{e} * {e}).item()]""")
+        exec(f"""saved_vars["{e}"] = [(coef_{e} * {e}).item()]""")
         if writer is not None:
             exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
@@ -1366,21 +1366,21 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
             # Saving data
             if writer is not None:
                 writer.add_scalars("Loss", {"Training loss": batch_loss.item()}, global_step=global_iteration)
-            learned_prms["loss"].append(batch_loss.item())
+            saved_vars["loss"].append(batch_loss.item())
             for e in prm_name:
-                exec(f"""learned_prms["{e}"].append((coef_{e} * {e}).item())""")
+                exec(f"""saved_vars["{e}"].append((coef_{e} * {e}).item())""")
                 if writer is not None:
                     exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
                              global_step=global_iteration)""")
             global_iteration += 1
-            learned_prms["iteration"].append(global_iteration)
+            saved_vars["iteration"].append(global_iteration)
 
     if verbose:
         for e in prm_name:
             exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
                  f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
-    return learned_prms
+    return saved_vars
 
 
 def system_identification_reduced_model(u_func: torch.tensor, g_states: torch.tensor, time_train: torch.tensor,
@@ -1410,9 +1410,9 @@ def system_identification_reduced_model(u_func: torch.tensor, g_states: torch.te
     coef_theta3 = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
     coef_theta4 = nn.parameter.Parameter(torch.tensor(1., dtype=torch.float, requires_grad=True))
 
-    learned_prms = {"loss": [], "iteration": [global_iteration]}
+    saved_vars = {"loss": [], "iteration": [global_iteration], "prms": []}
     for e in prm_name:
-        exec(f"""learned_prms["{e}"] = [(coef_{e} * {e}).item()]""")
+        exec(f"""saved_vars["{e}"] = [(coef_{e} * {e}).item()]""")
         if writer is not None:
             exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
     drone_model = AscTecFireflyReducedDroneModel(g=9.81, theta1=theta1, theta2=theta2, theta3=theta3, theta4=theta4,
@@ -1467,22 +1467,22 @@ def system_identification_reduced_model(u_func: torch.tensor, g_states: torch.te
             # Saving data
             if writer is not None:
                 writer.add_scalars("Loss", {"Training loss": batch_loss.item()}, global_step=global_iteration)
-            learned_prms["loss"].append(batch_loss.item())
+            saved_vars["loss"].append(batch_loss.item())
             for e in prm_name:
-                exec(f"""learned_prms["{e}"].append((coef_{e} * {e}).item())""")
+                exec(f"""saved_vars["{e}"].append((coef_{e} * {e}).item())""")
                 if writer is not None:
                     exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}},
                              global_step=global_iteration)""")
             global_iteration += 1
-            learned_prms["iteration"].append(global_iteration)
-            learned_prms["prms"].append(list(drone_model.parameters()))
+            saved_vars["iteration"].append(global_iteration)
+            saved_vars["prms"].append(list(drone_model.parameters()))
 
     if verbose:
         for e in prm_name:
             exec(f"""print(f"scaled: {{drone_model.coef_{e}}} | val: {{drone_model.{e}}} |"""
                  f"""new val: {{drone_model.coef_{e}*drone_model.{e}}}")""")
 
-    return learned_prms
+    return saved_vars
 
 
 def find_motor_speed_order(flight_number: int, load_previous: bool = False):
