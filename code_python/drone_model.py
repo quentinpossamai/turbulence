@@ -3,7 +3,7 @@
 This file contains a drone models to compute the turbulence forces and torques labels.
 """
 import os
-print(os.getcwd())
+
 import datetime
 import itertools
 import matplotlib.pyplot as plt
@@ -20,7 +20,7 @@ from torchdiffeq import odeint  # https://github.com/rtqichen/torchdiffeq
 from tqdm import tqdm
 from typing import Iterable, Callable, Tuple
 
-import code_python.utils as utils
+import utils
 
 
 # 05 June 2020

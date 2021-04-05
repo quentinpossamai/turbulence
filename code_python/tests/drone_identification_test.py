@@ -8,8 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint
 from tqdm import tqdm
 
-import code_python.drone_model as drone_model
-from code_python.utils import TURBULENCE_PATH
+import drone_model
+from utils import TURBULENCE_PATH
 
 
 def test_drone_identification():
