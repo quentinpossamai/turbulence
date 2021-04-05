@@ -1,26 +1,27 @@
 from __future__ import print_function
 
-import numpy as np
-from scipy.spatial.transform import Rotation
-from typing import Union, Tuple, Optional, List, Iterable
-import sys
-import os
-import re
-import pathlib
-import time
-import pickle
-import pandas as pd
 from matplotlib import rc
+import numpy as np
+import os
+import pandas as pd
+import pathlib
+import pickle
+import re
+from scipy.spatial.transform import Rotation
+import socket
+import sys
+import time
+from typing import Union, Tuple, Optional, List, Iterable
+
 
 ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
-TURBULENCE_PATH = ABSOLUTE_PATH + "turbulence/"
-
+print(f"ABSOLUTE_PATH: {ABSOLUTE_PATH}")
 
 def matplotlib_latex_font():
     rc('font', **{'family': 'serif',
                   'serif': ['Computer Modern Roman']})
-                  # 'sans-serif': ['Computer Modern Sans serif'],
-                  # "monospace": ["Computer Modern Typewriter"]})
+    # 'sans-serif': ['Computer Modern Sans serif'],
+    # "monospace": ["Computer Modern Typewriter"]})
     rc('text', usetex=False)
 
 
