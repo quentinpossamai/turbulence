@@ -14,7 +14,8 @@ import time
 from typing import Union, Tuple, Optional, List, Iterable
 
 
-ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
+# ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
+ABSOLUTE_PATH = os.getcwd() + "/"
 print(f"in utils ABSOLUTE_PATH: {ABSOLUTE_PATH}")
 
 def matplotlib_latex_font():
