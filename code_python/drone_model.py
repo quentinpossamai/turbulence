@@ -2,12 +2,11 @@
 """
 This file contains a drone models to compute the turbulence forces and torques labels.
 """
-import os
-
 import datetime
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import pandas as pd
 import pickle
 from pathlib import Path
@@ -25,6 +24,7 @@ import utils
 
 # 05 June 2020
 # DRONE MODEL
+print(f"in drone_model cwd: {os.getcwd()}")
 
 
 # noinspection PyAbstractClass
