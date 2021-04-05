@@ -1877,13 +1877,13 @@ def reverse_motor_speed_computation(flight_number):
 
 
 if __name__ == '__main__':
-    euroc_mav_compute_fa(0)
-    euroc_mav_compute_fa(1)
-    euroc_mav_compute_fa(2)
+    # euroc_mav_compute_fa(0)
+    # euroc_mav_compute_fa(1)
+    # euroc_mav_compute_fa(2)
     # euroc_mav_ode_solving(flight_number=0, horizon="hinf", load_previous=False)
     # estimate_euroc_mav_params_hinf(epochs=200, batch_size=32, lr=1e-2, load_previous=True)
     # estimate_euroc_mav_params_h1(epochs=200, batch_size=32, lr=1e-5, load_previous=False)
     # find_motor_speed_order(flight_number=0, load_previous=False)
     # analyze_motor_speed_order(flight_number=0)
     # reverse_motor_speed_computation(flight_number=0)
-    # find_motor_speed_order_model_reduced_identification(flight_number=0, load_previous=False)
+    find_motor_speed_order_model_reduced_identification(flight_number=0, load_previous=False)
