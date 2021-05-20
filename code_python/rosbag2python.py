@@ -49,6 +49,31 @@ def main_euroc_mav():
             pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
 
 
+def main_blackbird():
+    """
+    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
+    """
+    # Data to extract parameters
+    file_to_extract = '/Users/quentin/phd/turbulence/rosbag.bag'
+
+    # Create saving path
+    filename = file_to_extract.split('/')[-1].split('.')[0]
+    # saving_path = abs_path + data_folder + '/raw_python/' + flight + '/' + filename + '.pkl'
+
+    # Extract data
+    e = Extractor(file_to_extract)
+    data_extracted = e.extract()
+
+    # Saving file
+    # print('Saving at : {}'.format(saving_path))
+    # pickle.dump(data_extracted, open(saving_path, 'wb'))
+    # if 'tara/left/image_raw' in data_extracted:
+    #     del data_extracted['tara/right/image_raw']
+    #     del data_extracted['tara/right/camera_info']
+    #     pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
+    print()
+
+
 def main_data_drones():
     """
     Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
@@ -317,4 +342,5 @@ class Progress(object):
 
 if __name__ == '__main__':
     # main_data_drones()
-    main_euroc_mav()
+    # main_euroc_mav()
+    main_blackbird()

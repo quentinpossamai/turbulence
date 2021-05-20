@@ -257,12 +257,14 @@ class ErrorEstimation(object):
             fig = plt.figure(figsize=(self.frames_width / 100., self.frames_height / 100.))
             ax = plt.axes([0, 0, 1, 1])
             ax.imshow(image)
+
+            # Contribution part, comment to get a raw video.
             if isinstance(self.p3[i], np.ndarray):
                 p = self.p3[i]
                 ax.scatter(p[0], p[1], color='r')
             else:
                 ax.annotate(self.p3[i], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
-                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='wn'))
+                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
             xyz = self.df['pose'][i].inv().get_trans()
             angles = self.df['pose'][i].inv().get_rot_euler(seq='xyz', degrees=True)
             legend = (f'Camera position\n'
@@ -274,7 +276,9 @@ class ErrorEstimation(object):
                       f'   Rot z:{angles[2]:8.3f}°\n'
                       f'frame id:{i:9}')
             ax.annotate(legend, (self.frames_width - 40, 40), xycoords='data', size=12, ha='right', va='top',
-                        bbox=dict(boxstyle='round', alpha=0.5, fc='wn'), family='monospace')
+                        bbox=dict(boxstyle='round', alpha=0.5, fc='w'), family='monospace')
+            # Contribution part end
+
             ax.axis('off')
             fig.canvas.draw()
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)

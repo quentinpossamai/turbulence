@@ -24,7 +24,6 @@ import utils
 
 # 05 June 2020
 # DRONE MODEL
-# noinspection PyAbstractClass
 class AscTecFireflyDroneModel(nn.Module):
     """
     AscTec Firefly drone model used in EuRoC MAV data implementing "f" the derivative of the state over time, "forward"

@@ -6,6 +6,7 @@ import pandas as pd
 import imageio
 import numpy as np
 import yaml
+import csv
 
 
 def data_processing():
@@ -106,8 +107,39 @@ def error_estimation():
                                                              distortion_coefficient=camera_parameters['D'],
                                                              max_distance=5)
         estimator.p3_generator()
-        saving_path = f.folders['results'][flight_number] + 'raw_video.mkv'
-        estimator.p32video(fps=camera_parameters['fps'], saving_path=saving_path)
+        # saving_path = f.folders['results'][flight_number] + 'raw_video.mkv'
+        saving_path = f.folders['results'][flight_number] + 'pose_camera_correspondence_video.mkv'
+
+        # p3 saved as csv
+        point_position_in_image = estimator.p3
+        with open(f.folders['results'][flight_number] + "points.csv", 'w', newline="") as csv_file:
+            wr = csv.writer(csv_file, dialect="excel", quoting=csv.QUOTE_NONE)
+            wr.writerow(["p3 [px] (red dot position in image)",
+                         "x [m] (position of the camera relative to global reference frame)",
+                         "y [m] (position of the camera relative to global reference frame)",
+                         "z [m] (position of the camera relative to global reference frame)",
+                         "a [quaternion] (orientation of the camera relative to global reference frame)",
+                         "b [quaternion] (orientation of the camera relative to global reference frame)",
+                         "c [quaternion] (orientation of the camera relative to global reference frame)",
+                         "w [quaternion] (orientation of the camera relative to global reference frame)",
+                         "phi [deg] (orientation of the camera relative to global reference frame)",
+                         "theta [deg] (orientation of the camera relative to global reference frame)",
+                         "psi [deg] (orientation of the camera relative to global reference frame)"])
+            for i in range(len(estimator.df)):
+                p3 = point_position_in_image[i]
+                xyz = estimator.df["pose"][i].inv().get_trans()
+                quat = estimator.df["pose"][i].inv().get_quat()
+                ang = estimator.df["pose"][i].inv().get_rot_euler(seq='xyz', degrees=True)
+                if isinstance(p3, np.ndarray):
+                    wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
+                                ang[0], ang[1], ang[2]])
+                else:
+                    if "\n" in p3:
+                        p3 = p3.replace("\n", " ")
+                    wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
+                                ang[0], ang[1], ang[2]])
+
+        # estimator.p32video(fps=camera_parameters['fps'], saving_path=saving_path)
         print()
 
 
@@ -193,7 +225,7 @@ def dataset_creation(flight_number: int):
 
 if __name__ == '__main__':
     # data_processing()
-    # error_estimation()
-    dataset_creation(flight_number=0)
-    dataset_creation(flight_number=1)
-    dataset_creation(flight_number=2)
+    error_estimation()
+    # dataset_creation(flight_number=0)
+    # dataset_creation(flight_number=1)
+    # dataset_creation(flight_number=2)

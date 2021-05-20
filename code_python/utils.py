@@ -102,6 +102,7 @@ class Transformation(object):
         return self.matrix
 
     def get_quat(self) -> np.ndarray:
+        """quat = x, y, z, w with scipy Rotation."""
         return Rotation.from_matrix(self.get_rot_matrix()).as_quat()
 
     def inv(self) -> 'Transformation':
@@ -151,7 +152,7 @@ class Transformation(object):
         Create a Transformation object from the reference frame of (xyz, quat) to a new one at position xyz and oriented
         with quat.
 
-        quat = x, y, z, wn
+        quat = x, y, z, w
 
         A reference frame.
 
