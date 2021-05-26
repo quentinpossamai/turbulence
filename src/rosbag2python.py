@@ -130,32 +130,6 @@ def _process_sensor_msgs_camera_info(msg):
             'R': np.array(msg.R).reshape((3, 3))}
 
 
-def _process_geometry_msgs_transform_stamped(msg):
-    """
-    Processing function to extract data from rosbag message to built-in python object.
-    This function must be used for message of type : 'geometry_msgs/TransformStamped'.
-    :param msg: The rosbag message to extract.
-    :return: Dict containing the useful data.
-    """
-    return {'translation': np.array([msg.transform.translation.x,
-                                     msg.transform.translation.y,
-                                     msg.transform.translation.z]),
-            'rotation': np.array([msg.transform.rotation.x,
-                                  msg.transform.rotation.y,
-                                  msg.transform.rotation.z,
-                                  msg.transform.rotation.w])}
-
-
-def _process_asctec_hl_comm_motor_speed(msg):
-    """
-    Processing function to extract data from rosbag message to built-in python object.
-    This function must be used for message of type : 'asctec_hl_comm/MotorSpeed'.
-    :param msg: The rosbag message to extract.
-    :return: Dict containing the useful data.
-    """
-    return {'motor_speed': np.array(msg.motor_speed)}
-
-
 def _process_sensor_msgs_imu(msg):
     """
     Processing function to extract data from rosbag message to built-in python object.
@@ -177,14 +151,20 @@ def _process_sensor_msgs_imu(msg):
             'orientation_covariance': np.array(msg.orientation_covariance).reshape((3, 3))}
 
 
-def _process_blackbird_motorpwm(msg):
+def _process_geometry_msgs_transform_stamped(msg):
     """
     Processing function to extract data from rosbag message to built-in python object.
-    This function must be used for message of type : 'blackbird/MotorPWM'.
+    This function must be used for message of type : 'geometry_msgs/TransformStamped'.
     :param msg: The rosbag message to extract.
     :return: Dict containing the useful data.
     """
-    return {"motor_pwm": np.array(msg.pwm)}  # Motor's Pulse Width Modulation
+    return {'translation': np.array([msg.transform.translation.x,
+                                     msg.transform.translation.y,
+                                     msg.transform.translation.z]),
+            'rotation': np.array([msg.transform.rotation.x,
+                                  msg.transform.rotation.y,
+                                  msg.transform.rotation.z,
+                                  msg.transform.rotation.w])}
 
 
 def _process_tf_tfmessage(msg):
@@ -219,6 +199,26 @@ def _process_geometry_msgs_posestamped(msg):
                                   transform_object.orientation.y,
                                   transform_object.orientation.z,
                                   transform_object.orientation.w])}
+
+
+def _process_asctec_hl_comm_motor_speed(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'asctec_hl_comm/MotorSpeed'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {'motor_speed': np.array(msg.motor_speed)}
+
+
+def _process_blackbird_motorpwm(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'blackbird/MotorPWM'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {"motor_pwm": np.array(msg.pwm)}  # Motor's Pulse Width Modulation
 
 
 def _process_blackbird_motorrpm(msg):

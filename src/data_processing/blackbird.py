@@ -44,19 +44,47 @@ def data_processing():
         except yaml.YAMLError as exc:
             print(exc)
     # Finding the correct environment
-    environment_found = False
+    offset = None
     for e in yaml_file["unitySettings"][flight_name]:
         if e["name"] == environment:
-            environment_found = True
             offset = e["offset"]
-    if not environment_found:
+    if offset is None:
         print(f"Environment not found: {environment}")
         raise ValueError(environment)
     trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
     tf_fgenv_norm = utils.Transformation().from_euler(trans, "zyx", angles, degrees=True)
 
-    trans, angles = np.array(offset[:3]), np.array([0, 0, offset[3]])
-    tf_fgenv_norm = utils.Transformation().from_euler(trans, "xyz", angles, degrees=True)
+    # Intermediate folder is used to store processed data
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    data_path = intermediate_flight_path + "rosbag.pkl"
+
+    # Load sensors data
+    # Extracting /Users/quentin/phd/turbulence/data/blackbird/raw/ampersand/yawForward/maxSpeed1p0/rosbag.bag
+    # List of topic to be extracted :
+    # - /blackbird/pwm | Type : blackbird/MotorPWM | Message count : 38893
+    # - /blackbird/rotor_rpm | Type : blackbird/MotorRPM | Message count : 38897
+    # - /blackbird/imu | Type : sensor_msgs/Imu | Message count : 21257
+    # - /camera_d/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
+    # - /camera_l/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
+    # - /camera_r/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
+    # - /tf | Type : tf/tfMessage | Message count : 77148
+    # - /blackbird/state | Type : geometry_msgs/PoseStamped | Message count : 77148
+    # - /blackbird/pose_ref | Type : geometry_msgs/PoseStamped | Message count : 35090
+    # Encoding is latin1 because pickle with python 2.7 was used to make the .pkl
+    data_raw = pickle.load(open(data_path, 'rb'), encoding='latin1')
+    renaming_dict = {'/blackbird/pwm__blackbird/MotorPWM': "motor_pwm",
+                     '/blackbird/rotor_rpm__blackbird/MotorRPM': "motor_rpm",
+                     '/camera_d/camera_info__sensor_msgs/CameraInfo': "camera_info_d",
+                     '/camera_l/camera_info__sensor_msgs/CameraInfo': "camera_info_l",
+                     '/camera_r/camera_info__sensor_msgs/CameraInfo': "camera_info_r",
+                     '/blackbird/imu__sensor_msgs/Imu': "imu",
+                     '/blackbird/pose_ref__geometry_msgs/PoseStamped': "pose_ref",
+                     '/tf__tf/tfMessage': "tf",
+                     '/blackbird/state__geometry_msgs/PoseStamped': "state"}
+
+    # Renaming data keys for easier use
+    for old_key, new_key in renaming_dict.items():
+        data_raw[new_key] = data_raw.pop(old_key)
 
     csv_filenames = ["blackbird_slash_imu.csv",
                      "blackbird_slash_pose_ref.csv",
@@ -68,62 +96,19 @@ def data_processing():
                      "camera_r_slash_camera_info.csv",
                      "tf.csv"]
 
-    # Intermediate folder is used to store processed data
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-    data_path = intermediate_flight_path + "rosbag.pkl"
+    ground_truth = {}
+    with open(raw_flight_path + "groundTruthPoses.csv", newline='') as csv_file:
+        reader = csv.reader(csv_file, delimiter=',')
+        for i, row in enumerate(reader):
+            ground_truth[i] = [float(e) for e in row]
 
-    # Load sensors data
-    # Extracting /Users/quentin/phd/turbulence/data/blackbird/raw/ampersand/yawForward/maxSpeed1p0/rosbag.bag
-    # List of topic to be extracted :
-    # - /blackbird/pwm | Type : blackbird/MotorPWM | Message count : 38893
-    # - /blackbird/imu | Type : sensor_msgs/Imu | Message count : 21257
-    # - /camera_l/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
-    # - /tf | Type : tf/tfMessage | Message count : 77148
-    # - /camera_r/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
-    # - /blackbird/state | Type : geometry_msgs/PoseStamped | Message count : 77148
-    # - /blackbird/rotor_rpm | Type : blackbird/MotorRPM | Message count : 38897
-    # - /blackbird/pose_ref | Type : geometry_msgs/PoseStamped | Message count : 35090
-    # - /camera_d/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
-    # Encoding is latin1 because pickle with python 2.7 was used to make the .pkl
-    data = pickle.load(open(data_path, 'rb'), encoding='latin1')
-    renaming_dict = {'/blackbird/pwm__blackbird/MotorPWM': "motor_pwm",
-                     '/blackbird/rotor_rpm__blackbird/MotorRPM': "motor_rpm",
-                     '/camera_d/camera_info__sensor_msgs/CameraInfo': "camera_info_d",
-                     '/camera_l/camera_info__sensor_msgs/CameraInfo': "camera_info_l",
-                     '/camera_r/camera_info__sensor_msgs/CameraInfo': "camera_info_r",
-                     '/blackbird/imu__sensor_msgs/Imu': "imu",
-                     '/blackbird/pose_ref__geometry_msgs/PoseStamped': "pose_ref",
-                     '/tf__tf/tfMessage': "tf",
-                     '/blackbird/state__geometry_msgs/PoseStamped': "state"}
-
-    data.keys()
-
-    print()
-    # tmp = {}
-    # with open(test_path, newline='') as csv_file:
-    #     reader = csv.reader(csv_file, delimiter=',')
-    #     tmp[0] = next(reader)
-    #     for i, row in enumerate(reader):
-    #         tmp[i + 1] = [int(row[0]), , ]
-    #         tmp[i] = [e for j, e in enumerate(row) if j != 1 or j != 3 or j!=6]
-    #         tmp[i][]
-
-    camera_parameters = {'K': np.eye(3),
-                         # D distortion model
-                         'D': np.array([e for e in yaml_file['distortion_coefficients']]),
-                         'fps': yaml_file['rate_hz']}
-
-    # K camera matrix : intrinsic parameters
-    camera_parameters['K'][0, 0] = yaml_file['intrinsics'][0]
-    camera_parameters['K'][1, 1] = yaml_file['intrinsics'][1]
-    camera_parameters['K'][0, 2] = yaml_file['intrinsics'][2]
-    camera_parameters['K'][1, 2] = yaml_file['intrinsics'][3]
+    tf_imu_body
 
     # drone_tf_camera
-    tmp = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
+    ground_truth = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
 
     # The extrinsic parameter of the
-    camera_parameters['camera_tf_drone'] = utils.Transformation().from_matrix(tmp).inv()
+    camera_parameters['camera_tf_drone'] = utils.Transformation().from_matrix(ground_truth).inv()
 
     # Vicon0 parameters
     # f.get_files_paths('.yaml', f.folders['raw'][vol_number], 'vicon0')
@@ -142,15 +127,15 @@ def data_processing():
     mc = pd.read_csv(f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'vicon0'), sep=',', header=0,
                      names=['pose_time', 'x', 'y', 'z', 'wn', 'a', 'b', 'c'])  # Renaming column for simplification
     p = utils.Progress(len(mc), "Preparing mc data")
-    tmp = {}
+    ground_truth = {}
     for index, row in mc.iterrows():
         # vicon0_tf_origin
         vicon0_tf_origin = utils.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
                                                             quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
         camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
-        tmp[index] = camera_tf_origin
+        ground_truth[index] = camera_tf_origin
         p.update()
-    mc['pose'] = pd.Series(tmp)  # camera_tf_origin
+    mc['pose'] = pd.Series(ground_truth)  # camera_tf_origin
 
     # image default columns : '#timestamp [ns]', 'filename'
     file_path = f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'cam0')
@@ -158,16 +143,16 @@ def data_processing():
     # simplification
     p = utils.Progress(len(image), "Preparing camera data")
     image_path = utils.get_folder_path(file_path) + 'data/'
-    tmp = {}
+    ground_truth = {}
     shape = np.array(imageio.imread(image_path + image['filename'][0])).shape
     for index, filename in image['filename'].items():
         measure = np.array(imageio.imread(image_path + filename))
         color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
         for j in range(3):
             color_frame[:, :, j] = measure
-        tmp[index] = color_frame
+        ground_truth[index] = color_frame
         p.update()
-    image['image'] = pd.Series(tmp)
+    image['image'] = pd.Series(ground_truth)
 
     # Synchro
     time_min = min(mc['pose_time'][0], image['image_time'][0])
@@ -311,6 +296,44 @@ def dataset_creation(flight_number: int):
 
 
 def _test():
+    for i, e in enumerate(ground_truth.values()):
+        gt_trans = np.array([e[1], e[2], e[3]])
+        gt_quat = np.array([e[5], e[6], e[7], e[4]])
+        gt_time_like_gt = e[0]
+
+        tf_secs = data["tf"][i]["secs"]
+        tf_nsecs = data["tf"][i]["nsecs"]
+        tf_trans = data["tf"][i]["translation"]
+        tf_quat = data["tf"][i]["rotation"]
+
+        state_secs = data["state"][i]["secs"]
+        state_nsecs = data["state"][i]["nsecs"]
+        state_trans = data["state"][i]["translation"]
+        state_quat = data["state"][i]["rotation"]
+
+        assert tf_secs == state_secs
+        assert tf_nsecs == state_nsecs
+        assert all(tf_trans == state_trans)
+        assert all(tf_quat == state_quat)
+
+        tf_time_like_gt = tf_secs * 1e6 + np.around(tf_nsecs * 1e-3, 0)
+        tf_trans = np.around(data["tf"][i]["translation"], 6)
+        tf_quat = np.around(data["tf"][i]["rotation"], 6)
+
+        assert tf_time_like_gt == gt_time_like_gt
+        assert all(tf_trans == gt_trans)
+        assert all(tf_quat == gt_quat)
+
+    for camera_name in ["camera_info_d", "camera_info_l", "camera_info_r"]:
+        D = data[camera_name][0]["D"]
+        K = data[camera_name][0]["K"]
+        P = data[camera_name][0]["P"]
+        R = data[camera_name][0]["R"]
+        for e in data[camera_name].values():
+            np.testing.assert_equal(D, e["D"])
+            np.testing.assert_equal(K, e["K"])
+            np.testing.assert_equal(P, e["P"])
+            np.testing.assert_equal(R, e["R"])
     print("blackbird.py is being tested.")
 
 
