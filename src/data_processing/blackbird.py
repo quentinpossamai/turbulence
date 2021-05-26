@@ -7,16 +7,17 @@ import pickle
 import os
 import yaml
 
-from .. import utils
-from .. import posture_error_estimation
+from src import utils
+from src import posture_error_estimation
 
-DATASET_PATH = os.getcwd() + "/blackbird/"
+DATASET_PATH = os.getcwd() + "/data/blackbird/"
 
 
 def data_processing():
-    raw_flight_path = "raw/ampersand/yawForward/maxSpeed1p0/"
-    p = pathlib.Path(DATASET_PATH + "pythonic_data")
-    p.mkdir(parents=True, exist_ok=True)
+    flight_name = "ampersand"
+    flight_yaw = "yawForward"
+    flight_speed = "maxSpeed1p0"
+    raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
 
     with open(DATASET_PATH + "raw/trajectoryOffsets.yaml", 'r') as stream:
         try:
@@ -24,13 +25,26 @@ def data_processing():
         except yaml.YAMLError as exc:
             print(exc)
 
-    # Camera parameters
-    f.get_files_paths('.yaml', f.folders['raw'][flight_number], 'cam0')
-    with open(f.get_unique_file_path('.yaml', f.folders['raw'][flight_number], 'cam0'), 'r') as stream:
-        try:
-            yaml_file = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
+    csv_filenames = ["blackbird_slash_imu.csv",
+                     "blackbird_slash_pose_ref.csv",
+                     "blackbird_slash_pwm.csv",
+                     "blackbird_slash_rotor_rpm.csv",
+                     "blackbird_slash_state.csv",
+                     "camera_d_slash_camera_info.csv",
+                     "camera_l_slash_camera_info.csv",
+                     "camera_r_slash_camera_info.csv",
+                     "tf.csv"]
+
+    test_path = raw_flight_path + "csv/" + csv_filenames[2]
+
+    tmp = {}
+    with open(test_path, newline='') as csv_file:
+        reader = csv.reader(csv_file, delimiter=',')
+        tmp[0] = next(reader)
+        for i, row in enumerate(reader):
+            tmp[i + 1] = [int(row[0]), , ]
+            tmp[i] = [e for j, e in enumerate(row) if j != 1 or j != 3 or j!=6]
+            tmp[i][]
 
     camera_parameters = {'K': np.eye(3),
                          # D distortion model
@@ -234,9 +248,10 @@ def dataset_creation(flight_number: int):
     data_clean.to_pickle(f.folders["intermediate"][flight_number] + "sensors_synchronised.pkl")
 
 
-if __name__ == '__main__':
-    # data_processing()
-    error_estimation()
-    # dataset_creation(flight_number=0)
-    # dataset_creation(flight_number=1)
-    # dataset_creation(flight_number=2)
+def _test():
+    print("blackbird.py is being tested.")
+
+
+if __name__ == "__main__":
+    data_processing()
+    # _test()

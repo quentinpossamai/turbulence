@@ -1,130 +1,16 @@
 from __future__ import print_function
-import rosbag
 import glob
-import re
 import numpy as np
-import sys
 import pickle
+import os
+import re
+import rosbag
+import sys
 import time
-from scipy.spatial.transform import Rotation
 
 # This code must be executed with python 2.7 because of the rosbag package.
 major, _, _, _, _ = sys.version_info
 assert major == 2
-
-
-def main_euroc_mav():
-    """
-    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
-    """
-    # Data to extract parameters
-    abs_path = '/Users/quentin/phd/turbulence/'
-    data_folder = 'euroc_mav'
-    for flight_number, flight in enumerate(['V1_03_difficult']):
-        pattern = '.*(/{}.*)'.format(flight)
-
-        # Locate the file to be extracted
-        flight_path = abs_path + data_folder + '/raw/' + flight + '/'
-        bags = []
-        for bag in sorted(glob.glob(flight_path + '*.bag')):
-            bags.append(bag)
-        file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
-        assert len(file_to_extract) == 1, FileNotFoundError
-        file_to_extract = file_to_extract[0]
-
-        # Create saving path
-        filename = file_to_extract.split('/')[-1].split('.')[0]
-        saving_path = abs_path + data_folder + '/raw_python/' + flight + '/' + filename + '.pkl'
-
-        # Extract data
-        e = Extractor(file_to_extract)
-        data_extracted = e.extract()
-
-        # Saving file
-        print('Saving at : {}'.format(saving_path))
-        pickle.dump(data_extracted, open(saving_path, 'wb'))
-        if 'tara/left/image_raw' in data_extracted:
-            del data_extracted['tara/right/image_raw']
-            del data_extracted['tara/right/camera_info']
-            pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
-
-
-def main_blackbird():
-    """
-    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
-    """
-    # Data to extract parameters
-    file_to_extract = '/Users/quentin/phd/turbulence/rosbag.bag'
-
-    # Create saving path
-    filename = file_to_extract.split('/')[-1].split('.')[0]
-    # saving_path = abs_path + data_folder + '/raw_python/' + flight + '/' + filename + '.pkl'
-
-    # Extract data
-    e = Extractor(file_to_extract)
-    data_extracted = e.extract()
-
-    # Saving file
-    # print('Saving at : {}'.format(saving_path))
-    # pickle.dump(data_extracted, open(saving_path, 'wb'))
-    # if 'tara/left/image_raw' in data_extracted:
-    #     del data_extracted['tara/right/image_raw']
-    #     del data_extracted['tara/right/camera_info']
-    #     pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
-    print()
-
-
-def main_data_drones():
-    """
-    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
-    """
-    # Data to extract parameters
-    abs_path = '/Users/quentin/phd/turbulence/'
-    data_folder = 'data_drone2'
-    for flight_number in [3, 4]:
-        pattern = '.*(/tara.*)'
-
-        flights = []
-        if data_folder == 'data_drone':
-            flights = ['20200214_vol_1_Exterieur_MaintientPositionPX4',
-                       '20200214_vol_2_Exterieur_MaintientPositionPX4',
-                       '20200218_vol_1_Exterieur',
-                       '20200218_vol_2_Exterieur',
-                       '20200218_vol_3_Exterieur',
-                       '20200218_vol_4_Exterieur',
-                       '20200218_vol_5_Exterieur',
-                       '20200218_vol_6_Exterieur',
-                       '20200219_vol_1_Exterieur',
-                       '20200219_vol_2_Exterieur',
-                       '20200219_vol_3_Exterieur',
-                       '20200220_vol_1_Exterieur']
-        elif data_folder == 'data_drone2':
-            flights = ['vol_1', 'vol_2', 'vol_3', 'vol_4_poubelle', 'vol_5_poubelle']
-
-        # Locate the file to be extracted
-        flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
-        bags = []
-        for bag in sorted(glob.glob(flight_path + '*.bag')):
-            bags.append(bag)
-        file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
-        assert len(file_to_extract) == 1, FileNotFoundError
-        file_to_extract = file_to_extract[0]
-
-        # Create saving path
-        filename = file_to_extract.split('/')[-1].split('.')[0]
-        saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
-
-        # Extract data
-        e = Extractor(file_to_extract)
-        data_extracted = e.extract()
-
-        # Saving file
-        print('Saving at : {}'.format(saving_path))
-        pickle.dump(data_extracted, open(saving_path, 'wb'))
-        if 'tara/left/image_raw' in data_extracted:
-            del data_extracted['tara/right/image_raw']
-            del data_extracted['tara/right/camera_info']
-            pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
 
 
 class Extractor(object):
@@ -187,14 +73,27 @@ class Extractor(object):
                 processing_func = _process_asctec_hl_comm_motor_speed
             elif msg_type == 'sensor_msgs/Imu':
                 processing_func = _process_sensor_msgs_imu
+            elif msg_type == 'blackbird/MotorPWM':
+                processing_func = _process_blackbird_motorpwm
+            elif msg_type == 'tf/tfMessage':
+                processing_func = _process_tf_tfmessage
+            elif msg_type == 'geometry_msgs/PoseStamped':
+                processing_func = _process_geometry_msgs_posestamped
+            elif msg_type == 'blackbird/MotorRPM':
+                processing_func = _process_blackbird_motorrpm
             assert processing_func is not None, 'Message type : {} not known.'.format(msg_type)
 
             # Processing
             for i, (_, msg_raw, t) in enumerate(bag.read_messages(topics=topic)):
                 extracted_data[main_key][i] = processing_func(msg_raw)
-                assert extracted_data[main_key][i].get('tan') is None, "'tan' key already used."
-                extracted_data[main_key][i]['tan'] = t.to_sec()
 
+                # assert extracted_data[main_key][i].get('tan') is None, "'tan' key already used."
+                # extracted_data[main_key][i]['tan'] = t.to_sec()
+
+                assert extracted_data[main_key][i].get('secs') is None, "'secs' key already used."
+                assert extracted_data[main_key][i].get('nsecs') is None, "'nsecs' key already used."
+                extracted_data[main_key][i]['secs'] = t.secs
+                extracted_data[main_key][i]['nsecs'] = t.nsecs
                 p.update_pgr()  # # Progress print
         bag.close()
         return extracted_data
@@ -276,6 +175,181 @@ def _process_sensor_msgs_imu(msg):
                                      msg.orientation.y,
                                      msg.orientation.z]),
             'orientation_covariance': np.array(msg.orientation_covariance).reshape((3, 3))}
+
+
+def _process_blackbird_motorpwm(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'blackbird/MotorPWM'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {"motor_pwm": np.array(msg.pwm)}  # Motor's Pulse Width Modulation
+
+
+def _process_tf_tfmessage(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'tf/tfMessage'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    transform_object = msg.transforms[0].transform
+    return {'translation': np.array([transform_object.translation.x,
+                                     transform_object.translation.y,
+                                     transform_object.translation.z]),
+            'rotation': np.array([transform_object.rotation.x,
+                                  transform_object.rotation.y,
+                                  transform_object.rotation.z,
+                                  transform_object.rotation.w])}
+
+
+def _process_geometry_msgs_posestamped(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'geometry_msgs/PoseStamped'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    transform_object = msg.pose
+    return {'translation': np.array([transform_object.position.x,
+                                     transform_object.position.y,
+                                     transform_object.position.z]),
+            'rotation': np.array([transform_object.orientation.x,
+                                  transform_object.orientation.y,
+                                  transform_object.orientation.z,
+                                  transform_object.orientation.w])}
+
+
+def _process_blackbird_motorrpm(msg):
+    """
+    Processing function to extract data from rosbag message to built-in python object.
+    This function must be used for message of type : 'blackbird/MotorRPM'.
+    :param msg: The rosbag message to extract.
+    :return: Dict containing the useful data.
+    """
+    return {0: (msg.sample_stamp[0], msg.rpm[0]),
+            1: (msg.sample_stamp[1], msg.rpm[1]),
+            2: (msg.sample_stamp[2], msg.rpm[2]),
+            3: (msg.sample_stamp[3], msg.rpm[3])}
+
+
+def main_data_drones():
+    """
+    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
+    """
+    # Data to extract parameters
+    abs_path = '/Users/quentin/phd/turbulence/'
+    data_folder = 'data_drone2'
+    for flight_number in [3, 4]:
+        pattern = '.*(/tara.*)'
+
+        flights = []
+        if data_folder == 'data_drone':
+            flights = ['20200214_vol_1_Exterieur_MaintientPositionPX4',
+                       '20200214_vol_2_Exterieur_MaintientPositionPX4',
+                       '20200218_vol_1_Exterieur',
+                       '20200218_vol_2_Exterieur',
+                       '20200218_vol_3_Exterieur',
+                       '20200218_vol_4_Exterieur',
+                       '20200218_vol_5_Exterieur',
+                       '20200218_vol_6_Exterieur',
+                       '20200219_vol_1_Exterieur',
+                       '20200219_vol_2_Exterieur',
+                       '20200219_vol_3_Exterieur',
+                       '20200220_vol_1_Exterieur']
+        elif data_folder == 'data_drone2':
+            flights = ['vol_1', 'vol_2', 'vol_3', 'vol_4_poubelle', 'vol_5_poubelle']
+
+        # Locate the file to be extracted
+        flight_path = abs_path + data_folder + '/raw/' + flights[flight_number] + '/'
+        bags = []
+        for bag in sorted(glob.glob(flight_path + '*.bag')):
+            bags.append(bag)
+        file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
+        assert len(file_to_extract) == 1, FileNotFoundError
+        file_to_extract = file_to_extract[0]
+
+        # Create saving path
+        filename = file_to_extract.split('/')[-1].split('.')[0]
+        saving_path = abs_path + data_folder + '/raw_python/' + flights[flight_number] + '/' + filename + '.pkl'
+
+        # Extract data
+        e = Extractor(file_to_extract)
+        data_extracted = e.extract()
+
+        # Saving file
+        print('Saving at : {}'.format(saving_path))
+        pickle.dump(data_extracted, open(saving_path, 'wb'))
+        if 'tara/left/image_raw' in data_extracted:
+            del data_extracted['tara/right/image_raw']
+            del data_extracted['tara/right/camera_info']
+            pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
+
+
+def main_euroc_mav():
+    """
+    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
+    """
+    # Data to extract parameters
+    abs_path = '/Users/quentin/phd/turbulence/'
+    data_folder = 'euroc_mav'
+    for flight_number, flight in enumerate(['V1_03_difficult']):
+        pattern = '.*(/{}.*)'.format(flight)
+
+        # Locate the file to be extracted
+        flight_path = abs_path + data_folder + '/raw/' + flight + '/'
+        bags = []
+        for bag in sorted(glob.glob(flight_path + '*.bag')):
+            bags.append(bag)
+        file_to_extract = [e for e in bags if re.search(pattern, e) is not None]
+        assert len(file_to_extract) == 1, FileNotFoundError
+        file_to_extract = file_to_extract[0]
+
+        # Create saving path
+        filename = file_to_extract.split('/')[-1].split('.')[0]
+        saving_path = abs_path + data_folder + '/raw_python/' + flight + '/' + filename + '.pkl'
+
+        # Extract data
+        e = Extractor(file_to_extract)
+        data_extracted = e.extract()
+
+        # Saving file
+        print('Saving at : {}'.format(saving_path))
+        pickle.dump(data_extracted, open(saving_path, 'wb'))
+        if 'tara/left/image_raw' in data_extracted:
+            del data_extracted['tara/right/image_raw']
+            del data_extracted['tara/right/camera_info']
+            pickle.dump(data_extracted, open(saving_path.replace('tara', 'tara_left'), 'wb'))
+
+
+def main_blackbird():
+    """
+    Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
+    """
+    # Data loading path
+    dataset_path = os.getcwd() + "/data/blackbird/"
+    flight_name = "ampersand"
+    flight_yaw = "yawForward"
+    flight_speed = "maxSpeed1p0"
+    raw_flight_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
+    rosbag_path = raw_flight_path + "rosbag.bag"
+
+    # Data saving path
+    intermediate_flight_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,
+                                                                    flight_yaw, flight_speed)
+    if not os.path.exists(intermediate_flight_path):
+        os.makedirs(intermediate_flight_path)
+    saving_path = intermediate_flight_path + "rosbag.pkl"
+
+    # Extract data
+    e = Extractor(rosbag_path)
+    data_extracted = e.extract()
+
+    # Saving processed data
+    print('Saving at : {}'.format(saving_path))
+    pickle.dump(data_extracted, open(saving_path, 'wb'))
+    print()
 
 
 def object_analysis(obj):
