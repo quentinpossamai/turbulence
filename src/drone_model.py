@@ -540,7 +540,7 @@ def euroc_mav_compute_fa(flight_number: int):
 
     data["state"] = np.zeros(len(data))
     data[["state"]] = data[["state"]].apply(
-        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("zyx", False),
+        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("zyx", False)[::-1],
                                                data["angular_velocity"][_x.name],
                                                data["linear_speed"][_x.name],
                                                data["trans"][_x.name]]).astype(np.float)), axis=1)

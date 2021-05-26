@@ -14,16 +14,49 @@ DATASET_PATH = os.getcwd() + "/data/blackbird/"
 
 
 def data_processing():
+    """
+    Process data from the blackbird dataset.
+    1. Load data.
+    2. Synchronized them.
+    3.
+    Downloaded from: http://blackbird-dataset.mit.edu/BlackbirdDatasetData/.
+    Github: https://github.com/mit-fast/Blackbird-Dataset
+    Paper: https://arxiv.org/abs/1810.01987
+    """
+    # Trajectories name classification
     flight_name = "ampersand"
     flight_yaw = "yawForward"
     flight_speed = "maxSpeed1p0"
+    environment = "Small_Apartment"  # Small_Apartment, Large_Apartment_Night_Near_Couches
+    # raw folder is used to store raw data
     raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
 
+    # Load tf_norm_mocap
+    with open(raw_flight_path + "flightNormalizationOffset.csv", newline='') as csv_file:
+        reader = csv.reader(csv_file, delimiter=',')
+        trans = np.array(next(reader))
+    tf_norm_mocap = utils.Transformation().from_pose(trans, np.array([0, 0, 0, 1]))
+
+    # Load tf_fgenv_norm for each environment
     with open(DATASET_PATH + "raw/trajectoryOffsets.yaml", 'r') as stream:
         try:
             yaml_file = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
+    # Finding the correct environment
+    environment_found = False
+    for e in yaml_file["unitySettings"][flight_name]:
+        if e["name"] == environment:
+            environment_found = True
+            offset = e["offset"]
+    if not environment_found:
+        print(f"Environment not found: {environment}")
+        raise ValueError(environment)
+    trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
+    tf_fgenv_norm = utils.Transformation().from_euler(trans, "zyx", angles, degrees=True)
+
+    trans, angles = np.array(offset[:3]), np.array([0, 0, offset[3]])
+    tf_fgenv_norm = utils.Transformation().from_euler(trans, "xyz", angles, degrees=True)
 
     csv_filenames = ["blackbird_slash_imu.csv",
                      "blackbird_slash_pose_ref.csv",
@@ -35,16 +68,45 @@ def data_processing():
                      "camera_r_slash_camera_info.csv",
                      "tf.csv"]
 
-    test_path = raw_flight_path + "csv/" + csv_filenames[2]
+    # Intermediate folder is used to store processed data
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    data_path = intermediate_flight_path + "rosbag.pkl"
 
-    tmp = {}
-    with open(test_path, newline='') as csv_file:
-        reader = csv.reader(csv_file, delimiter=',')
-        tmp[0] = next(reader)
-        for i, row in enumerate(reader):
-            tmp[i + 1] = [int(row[0]), , ]
-            tmp[i] = [e for j, e in enumerate(row) if j != 1 or j != 3 or j!=6]
-            tmp[i][]
+    # Load sensors data
+    # Extracting /Users/quentin/phd/turbulence/data/blackbird/raw/ampersand/yawForward/maxSpeed1p0/rosbag.bag
+    # List of topic to be extracted :
+    # - /blackbird/pwm | Type : blackbird/MotorPWM | Message count : 38893
+    # - /blackbird/imu | Type : sensor_msgs/Imu | Message count : 21257
+    # - /camera_l/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
+    # - /tf | Type : tf/tfMessage | Message count : 77148
+    # - /camera_r/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
+    # - /blackbird/state | Type : geometry_msgs/PoseStamped | Message count : 77148
+    # - /blackbird/rotor_rpm | Type : blackbird/MotorRPM | Message count : 38897
+    # - /blackbird/pose_ref | Type : geometry_msgs/PoseStamped | Message count : 35090
+    # - /camera_d/camera_info | Type : sensor_msgs/CameraInfo | Message count : 25717
+    # Encoding is latin1 because pickle with python 2.7 was used to make the .pkl
+    data = pickle.load(open(data_path, 'rb'), encoding='latin1')
+    renaming_dict = {'/blackbird/pwm__blackbird/MotorPWM': "motor_pwm",
+                     '/blackbird/rotor_rpm__blackbird/MotorRPM': "motor_rpm",
+                     '/camera_d/camera_info__sensor_msgs/CameraInfo': "camera_info_d",
+                     '/camera_l/camera_info__sensor_msgs/CameraInfo': "camera_info_l",
+                     '/camera_r/camera_info__sensor_msgs/CameraInfo': "camera_info_r",
+                     '/blackbird/imu__sensor_msgs/Imu': "imu",
+                     '/blackbird/pose_ref__geometry_msgs/PoseStamped': "pose_ref",
+                     '/tf__tf/tfMessage': "tf",
+                     '/blackbird/state__geometry_msgs/PoseStamped': "state"}
+
+    data.keys()
+
+    print()
+    # tmp = {}
+    # with open(test_path, newline='') as csv_file:
+    #     reader = csv.reader(csv_file, delimiter=',')
+    #     tmp[0] = next(reader)
+    #     for i, row in enumerate(reader):
+    #         tmp[i + 1] = [int(row[0]), , ]
+    #         tmp[i] = [e for j, e in enumerate(row) if j != 1 or j != 3 or j!=6]
+    #         tmp[i][]
 
     camera_parameters = {'K': np.eye(3),
                          # D distortion model

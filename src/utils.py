@@ -202,7 +202,8 @@ class Transformation(object):
 
         :param trans: The translation of the Transformation, must be of length 3 : A_D_B
 
-        :param seq: Angle convention of the Euler angles, can be 'xyz' or any other order
+        :param seq: Angle convention of the Euler angles, can be "xyz" or any other order.
+        If "zyx" is used then angles must be = [z_angle, y_angle, x_angle]
 
         :param angles: An array of the 3 Euler angles in the order of the convention : A_R_B
         Meaning where the euler angles describes the position of B relative to A.
@@ -450,8 +451,8 @@ def get_folder_path(file_path: Union[str, List[str]]) -> Union[str, List[str]]:
 
 
 def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
-                     array2: Union[np.ndarray, Iterable, int, float]) -> Tuple[Union[List[int], int],
-                                                                               Union[List[int], int]]:
+                     array2: Union[np.ndarray, Iterable, int, float]) \
+                     -> Tuple[Union[List[int], int], Union[List[int], int]]:
     """
     From two sorted arrays of different length and uniques values : array1 and array2.
     :param array1: An array of values to be compared to array2.
