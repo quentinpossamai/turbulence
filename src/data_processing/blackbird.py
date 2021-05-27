@@ -1,11 +1,13 @@
 import csv
 import imageio
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pathlib
 import pickle
 import os
 import yaml
+
+from typing import Dict, Any
 
 from src import utils
 from src import posture_error_estimation
@@ -54,6 +56,11 @@ def data_processing():
     trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
     tf_fgenv_norm = utils.Transformation().from_euler(trans, "zyx", angles, degrees=True)
 
+    tf_fgenvflu_fgenv = utils.Transformation().from_euler(trans=np.zeros(3), seq="zyx",
+                                                          angles=np.array([0, 0, 180]), degrees=True)
+    tf_drone_droneflu = utils.Transformation().from_euler(trans=np.zeros(3), seq="zyx",
+                                                          angles=np.array([0, 0, 180]), degrees=True)
+
     # Intermediate folder is used to store processed data
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     data_path = intermediate_flight_path + "rosbag.pkl"
@@ -71,7 +78,7 @@ def data_processing():
     # - /blackbird/state | Type : geometry_msgs/PoseStamped | Message count : 77148
     # - /blackbird/pose_ref | Type : geometry_msgs/PoseStamped | Message count : 35090
     # Encoding is latin1 because pickle with python 2.7 was used to make the .pkl
-    data_raw = pickle.load(open(data_path, 'rb'), encoding='latin1')
+    raw_data = pickle.load(open(data_path, 'rb'), encoding='latin1')
     renaming_dict = {'/blackbird/pwm__blackbird/MotorPWM': "motor_pwm",
                      '/blackbird/rotor_rpm__blackbird/MotorRPM': "motor_rpm",
                      '/camera_d/camera_info__sensor_msgs/CameraInfo': "camera_info_d",
@@ -79,91 +86,75 @@ def data_processing():
                      '/camera_r/camera_info__sensor_msgs/CameraInfo': "camera_info_r",
                      '/blackbird/imu__sensor_msgs/Imu': "imu",
                      '/blackbird/pose_ref__geometry_msgs/PoseStamped': "pose_ref",
-                     '/tf__tf/tfMessage': "tf",
+                     '/tf__tf/tfMessage': "mc_pose",
                      '/blackbird/state__geometry_msgs/PoseStamped': "state"}
 
     # Renaming data keys for easier use
     for old_key, new_key in renaming_dict.items():
-        data_raw[new_key] = data_raw.pop(old_key)
+        raw_data[new_key] = raw_data.pop(old_key)
 
-    csv_filenames = ["blackbird_slash_imu.csv",
-                     "blackbird_slash_pose_ref.csv",
-                     "blackbird_slash_pwm.csv",
-                     "blackbird_slash_rotor_rpm.csv",
-                     "blackbird_slash_state.csv",
-                     "camera_d_slash_camera_info.csv",
-                     "camera_l_slash_camera_info.csv",
-                     "camera_r_slash_camera_info.csv",
-                     "tf.csv"]
+    # Let's search IMU camera body transformations
+    calibration_data = pickle.load(open(DATASET_PATH + "raw/cameraCalibration/imuCameraCalibration.bag", 'rb'),
+                                   encoding='latin1')
 
-    ground_truth = {}
-    with open(raw_flight_path + "groundTruthPoses.csv", newline='') as csv_file:
-        reader = csv.reader(csv_file, delimiter=',')
-        for i, row in enumerate(reader):
-            ground_truth[i] = [float(e) for e in row]
+    # All data have been loaded, formatting begins
+    data = {"motor_rpm_0": {},
+            "motor_rpm_1": {},
+            "motor_rpm_2": {},
+            "motor_rpm_3": {},
+            "imu": {},
+            "mc_pose": {},
+            "state": {}}
+    data: Dict[str][Dict[int][Dict[str][Any]]]
+    # data structure
+    # data = {
+    #   "motor_rpm_0": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_rpm_1": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_rpm_2": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_rpm_3": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "imu": {idx(int): {"t": float, "linear_acceleration": ndarray, "angular_velocity": ndarray}},
+    #   "mc_pose": {idx(int): {"t": float, "translation": ndarray, "rotation": ndarray}},
+    #   "state":  {idx(int): {"t": float, "dt": float, "state": ndarray}}
 
-    tf_imu_body
+    for idx, msg in raw_data["motor_rpm"].items():
+        data["motor_rpm_0"][idx] = {"t": msg[0][0].secs + 1e-9 * msg[0][0].nsecs,
+                                    "angular_velocity": np.pi / 30 * msg[0][1]}
+        data["motor_rpm_1"][idx] = {"t": msg[1][0].secs + 1e-9 * msg[1][0].nsecs,
+                                    "angular_velocity": np.pi / 30 * msg[1][1]}
+        data["motor_rpm_2"][idx] = {"t": msg[2][0].secs + 1e-9 * msg[2][0].nsecs,
+                                    "angular_velocity": np.pi / 30 * msg[2][1]}
+        data["motor_rpm_3"][idx] = {"t": msg[3][0].secs + 1e-9 * msg[3][0].nsecs,
+                                    "angular_velocity": np.pi / 30 * msg[3][1]}
+    for idx, msg in raw_data["imu"].items():
+        # TODO Imu must be in the same reference frame as the mc_pose.
+        data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
+                            "linear_acceleration": msg["linear_acceleration"],
+                            "angular_velocity": msg["angular_velocity"]}
+    for idx, msg in raw_data["mc_pose"].items():
+        # TODO mc_pose must be in a FLU reference frame.
+        # mc_pose is tf_mocap_drone
+        tf_mocap_drone = utils.Transformation().from_pose(trans=msg["translation"], quat=msg["rotation"])
 
-    # drone_tf_camera
-    ground_truth = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
+        tf_fgenvflu_droneflu = tf_fgenvflu_fgenv @ tf_fgenv_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
+        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transformation": tf_fgenvflu_droneflu}
 
-    # The extrinsic parameter of the
-    camera_parameters['camera_tf_drone'] = utils.Transformation().from_matrix(ground_truth).inv()
+    xyz = np.stack([e["transformation"].get_trans() for e in data["mc_pose"].values()])
+    for i in range(3):
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        ax.plot(xyz[:, i])
+    plt.show()
 
-    # Vicon0 parameters
-    # f.get_files_paths('.yaml', f.folders['raw'][vol_number], 'vicon0')
-    with open(f.get_unique_file_path('.yaml', f.folders['raw'][flight_number], 'vicon0'), 'r') as stream:
-        try:
-            yaml_file = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
-    # drone_tf_vicon0 : Sensor extrinsic wrt. the body-frame
-    drone_tf_vicon0 = utils.Transformation().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
-    camera_parameters['camera_tf_vicon0'] = camera_parameters['camera_tf_drone'] @ drone_tf_vicon0
-    del camera_parameters['camera_tf_drone']
+    # Compute the 12 dimension state of the drone
+    for idx in range(1, len(data["mc_pose"])):
+        dt = data["mc_pose"][idx]["t"] - data["mc_pose"][idx - 1]["t"]
 
-    # mc default columns : '#timestamp [ns]', 'p_RS_R_x [m]', 'p_RS_R_y [m]', 'p_RS_R_z [m]', 'q_RS_w []',
-    #                                         'q_RS_x []', 'q_RS_y []', 'q_RS_z []'
-    mc = pd.read_csv(f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'vicon0'), sep=',', header=0,
-                     names=['pose_time', 'x', 'y', 'z', 'wn', 'a', 'b', 'c'])  # Renaming column for simplification
-    p = utils.Progress(len(mc), "Preparing mc data")
-    ground_truth = {}
-    for index, row in mc.iterrows():
-        # vicon0_tf_origin
-        vicon0_tf_origin = utils.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
-                                                            quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
-        camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
-        ground_truth[index] = camera_tf_origin
-        p.update()
-    mc['pose'] = pd.Series(ground_truth)  # camera_tf_origin
-
-    # image default columns : '#timestamp [ns]', 'filename'
-    file_path = f.get_unique_file_path('.csv', f.folders['raw'][flight_number], 'cam0')
-    image = pd.read_csv(file_path, sep=',', header=0, names=['image_time', 'filename'])  # Renaming column for
-    # simplification
-    p = utils.Progress(len(image), "Preparing camera data")
-    image_path = utils.get_folder_path(file_path) + 'data/'
-    ground_truth = {}
-    shape = np.array(imageio.imread(image_path + image['filename'][0])).shape
-    for index, filename in image['filename'].items():
-        measure = np.array(imageio.imread(image_path + filename))
-        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
-        for j in range(3):
-            color_frame[:, :, j] = measure
-        ground_truth[index] = color_frame
-        p.update()
-    image['image'] = pd.Series(ground_truth)
-
-    # Synchro
-    time_min = min(mc['pose_time'][0], image['image_time'][0])
-    mc['pose_time'] = (mc['pose_time'] - time_min) * 1e-9
-    image['image_time'] = (image['image_time'] - time_min) * 1e-9
-    mc_ids, image_ids = utils.merge_two_arrays(mc['pose_time'], image['image_time'])
-    input_data = pd.concat([mc.loc[mc_ids, ['pose_time', 'pose']].reset_index(drop=True),
-                            image.loc[image_ids, ['image_time', 'image']].reset_index(drop=True)],
-                           axis=1)
-    pickle.dump(input_data, open(f.folders['intermediate'][flight_number] + 'posture_error_input_data.pkl', 'wb'))
-    pickle.dump(camera_parameters, open(f.folders['intermediate'][flight_number] + 'camera_parameters.pkl', 'wb'))
+        euler_orientation = data["mc_pose"][idx]["transformation"].get_rot_euler(seq="zyx", degrees=False)[::-1]
+        # angular_velocity =
+        # linear_speed =
+        position = data["mc_pose"][idx]["transformation"].get_trans()
+        data["state"][idx - 1] = {"t": data["mc_pose"][idx]["t"],
+                                  "dt": dt,
+                                  "state": 1}
 
 
 def error_estimation():
@@ -272,11 +263,13 @@ def dataset_creation(flight_number: int):
             raise TypeError(f'ROS type not implemented : {msg_type}')
         to_synchro.append(pd.DataFrame(tmp))
 
+    # Find the time series with the lowest frequency
     freq = []
     for i in range(len(to_synchro)):
         freq.append(len(to_synchro[i]) / (to_synchro[i]['time'].iloc[-1] - to_synchro[i]['time'].iloc[0]))
     ind_freq = sorted(range(len(freq)), key=lambda k: freq[k])
 
+    # Synchronise other time series to the lowest one
     ids_0 = list(range(len(to_synchro[ind_freq[0]])))
     for i in ind_freq[1:]:
         ids_0, ids_i = utils.merge_two_arrays(to_synchro[ind_freq[0]]['time'], to_synchro[i]['time'])
@@ -296,6 +289,21 @@ def dataset_creation(flight_number: int):
 
 
 def _test():
+    # csv_filenames = ["blackbird_slash_imu.csv",
+    #                  "blackbird_slash_pose_ref.csv",
+    #                  "blackbird_slash_pwm.csv",
+    #                  "blackbird_slash_rotor_rpm.csv",
+    #                  "blackbird_slash_state.csv",
+    #                  "camera_d_slash_camera_info.csv",
+    #                  "camera_l_slash_camera_info.csv",
+    #                  "camera_r_slash_camera_info.csv",
+    #                  "tf.csv"]
+
+    ground_truth_data = {}
+    with open(raw_flight_path + "groundTruthPoses.csv", newline='') as csv_file:
+        reader = csv.reader(csv_file, delimiter=',')
+        for i, row in enumerate(reader):
+            ground_truth_data[i] = [float(e) for e in row]
     for i, e in enumerate(ground_truth.values()):
         gt_trans = np.array([e[1], e[2], e[3]])
         gt_quat = np.array([e[5], e[6], e[7], e[4]])

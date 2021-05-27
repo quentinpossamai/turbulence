@@ -81,6 +81,8 @@ class Extractor(object):
                 processing_func = _process_geometry_msgs_posestamped
             elif msg_type == 'blackbird/MotorRPM':
                 processing_func = _process_blackbird_motorrpm
+            elif msg_type == 'tf2_msgs/TFMessage':
+                processing_func = _process_tf_tfmessage
             assert processing_func is not None, 'Message type : {} not known.'.format(msg_type)
 
             # Processing
@@ -327,20 +329,26 @@ def main_blackbird():
     """
     Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
     """
-    # Data loading path
     dataset_path = os.getcwd() + "/data/blackbird/"
-    flight_name = "ampersand"
-    flight_yaw = "yawForward"
-    flight_speed = "maxSpeed1p0"
-    raw_flight_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
-    rosbag_path = raw_flight_path + "rosbag.bag"
 
-    # Data saving path
-    intermediate_flight_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,
-                                                                    flight_yaw, flight_speed)
-    if not os.path.exists(intermediate_flight_path):
-        os.makedirs(intermediate_flight_path)
-    saving_path = intermediate_flight_path + "rosbag.pkl"
+    # # Flight loading
+    # # Data loading path
+    # flight_name = "ampersand"
+    # flight_yaw = "yawForward"
+    # flight_speed = "maxSpeed1p0"
+    # raw_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
+    # rosbag_path = raw_path + "rosbag.bag"
+    # intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder
+    #                                                          flight_yaw, flight_speed)
+    # saving_path = intermediate_path + "rosbag.pkl"
+
+    # Calibration loading
+    rosbag_path = dataset_path + "raw/cameraCalibration/imuCameraCalibration.bag"
+    intermediate_path = dataset_path + "intermediate/cameraCalibration/"
+    saving_path = intermediate_path + "imuCameraCalibration.pkl"
+
+    if not os.path.exists(intermediate_path):
+        os.makedirs(intermediate_path)
 
     # Extract data
     e = Extractor(rosbag_path)
