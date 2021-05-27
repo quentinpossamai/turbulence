@@ -36,7 +36,7 @@ def data_processing():
         tmp = np.array(yaml_file['T_BS']['data']).reshape((4, 4))  # Sensor extrinsic wrt. the body-frame
 
         # The extrinsic parameter of the
-        camera_parameters['camera_tf_drone'] = utils.Transformation().from_matrix(tmp).inv()
+        camera_parameters['camera_tf_drone'] = utils.Transform().from_matrix(tmp).inv()
 
         # Vicon0 parameters
         # f.get_files_paths('.yaml', f.folders['raw'][vol_number], 'vicon0')
@@ -46,7 +46,7 @@ def data_processing():
             except yaml.YAMLError as exc:
                 print(exc)
         # drone_tf_vicon0 : Sensor extrinsic wrt. the body-frame
-        drone_tf_vicon0 = utils.Transformation().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
+        drone_tf_vicon0 = utils.Transform().from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4)))
         camera_parameters['camera_tf_vicon0'] = camera_parameters['camera_tf_drone'] @ drone_tf_vicon0
         del camera_parameters['camera_tf_drone']
 
@@ -58,8 +58,8 @@ def data_processing():
         tmp = {}
         for index, row in mc.iterrows():
             # vicon0_tf_origin
-            vicon0_tf_origin = utils.Transformation().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
-                                                                quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
+            vicon0_tf_origin = utils.Transform().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
+                                                           quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
             camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
             tmp[index] = camera_tf_origin
             p.update()
@@ -174,7 +174,7 @@ def dataset_creation(flight_number: int):
             for measure in data[data_column].values():
                 tmp['time'].append(measure['t'])
                 trans, quat = measure['translation'], measure['rotation']
-                tmp[name].append(utils.Transformation().from_pose(trans, quat).inv())
+                tmp[name].append(utils.Transform().from_pose(trans, quat).inv())
         elif msg_type == 'asctec_hl_comm/MotorSpeed':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():

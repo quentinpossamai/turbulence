@@ -37,7 +37,7 @@ def data_processing():
     with open(raw_flight_path + "flightNormalizationOffset.csv", newline='') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
         trans = np.array(next(reader))
-    tf_norm_mocap = utils.Transformation().from_pose(trans, np.array([0, 0, 0, 1]))
+    tf_norm_mocap = utils.Transform().from_pose(trans, np.array([0, 0, 0, 1]))
 
     # Load tf_fgenv_norm for each environment
     with open(DATASET_PATH + "raw/trajectoryOffsets.yaml", 'r') as stream:
@@ -54,12 +54,12 @@ def data_processing():
         print(f"Environment not found: {environment}")
         raise ValueError(environment)
     trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
-    tf_fgenv_norm = utils.Transformation().from_euler(trans, "zyx", angles, degrees=True)
+    tf_fgenv_norm = utils.Transform().from_euler(trans, "zyx", angles, degrees=True)
 
-    tf_fgenvflu_fgenv = utils.Transformation().from_euler(trans=np.zeros(3), seq="zyx",
-                                                          angles=np.array([0, 0, 180]), degrees=True)
-    tf_drone_droneflu = utils.Transformation().from_euler(trans=np.zeros(3), seq="zyx",
-                                                          angles=np.array([0, 0, 180]), degrees=True)
+    tf_fgenvflu_fgenv = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
+                                                     angles=np.array([0, 0, 180]), degrees=True)
+    tf_drone_droneflu = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
+                                                     angles=np.array([0, 0, 180]), degrees=True)
 
     # Intermediate folder is used to store processed data
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
@@ -133,7 +133,7 @@ def data_processing():
     for idx, msg in raw_data["mc_pose"].items():
         # TODO mc_pose must be in a FLU reference frame.
         # mc_pose is tf_mocap_drone
-        tf_mocap_drone = utils.Transformation().from_pose(trans=msg["translation"], quat=msg["rotation"])
+        tf_mocap_drone = utils.Transform().from_pose(trans=msg["translation"], quat=msg["rotation"])
 
         tf_fgenvflu_droneflu = tf_fgenvflu_fgenv @ tf_fgenv_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
         data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transformation": tf_fgenvflu_droneflu}
@@ -237,7 +237,7 @@ def dataset_creation(flight_number: int):
             for measure in data[data_column].values():
                 tmp['time'].append(measure['t'])
                 trans, quat = measure['translation'], measure['rotation']
-                tmp[name].append(utils.Transformation().from_pose(trans, quat).inv())
+                tmp[name].append(utils.Transform().from_pose(trans, quat).inv())
         elif msg_type == 'asctec_hl_comm/MotorSpeed':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():
