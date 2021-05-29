@@ -1,5 +1,4 @@
 import csv
-import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -7,7 +6,6 @@ import pickle
 import os
 from tqdm import tqdm
 from typing import Dict, Any
-import yaml
 
 from src import utils
 from src import posture_error_estimation
@@ -15,25 +13,22 @@ from src import posture_error_estimation
 DATASET_PATH = os.getcwd() + "/data/blackbird/"
 
 
-def data_processing():
+def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
     """
     Process data from the blackbird dataset.
     1. Load data.
     2. Format data.
-    2. Synchronized data.
-    3.
+
     Downloaded from: http://blackbird-dataset.mit.edu/BlackbirdDatasetData/.
     Github: https://github.com/mit-fast/Blackbird-Dataset
     Paper: https://arxiv.org/abs/1810.01987
+
+    Will save in intermediate/[flight_directory]/rosbag.pkl
     """
     print("Loading data")
-    # Trajectories name classification
-    flight_name = "ampersand"
-    flight_yaw = "yawForward"
-    flight_speed = "maxSpeed1p0"
-    environment = "Small_Apartment"  # Small_Apartment, Large_Apartment_Night_Near_Couches
     # raw folder is used to store raw data
     raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
 
     # Load tf_norm_mocap
     with open(raw_flight_path + "flightNormalizationOffset.csv", newline='') as csv_file:
@@ -41,30 +36,34 @@ def data_processing():
         trans = np.array(next(reader))
     tf_norm_mocap = utils.Transform().from_pose(trans, np.array([0, 0, 0, 1]))
 
-    # Load tf_fgenv_norm for each environment
-    with open(DATASET_PATH + "raw/trajectoryOffsets.yaml", 'r') as stream:
-        try:
-            yaml_file = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
-    # Finding the correct environment
-    offset = None
-    for e in yaml_file["unitySettings"][flight_name]:
-        if e["name"] == environment:
-            offset = e["offset"]
-    if offset is None:
-        print(f"Environment not found: {environment}")
-        raise ValueError(environment)
-    trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
-    tf_fgenv_norm = utils.Transform().from_euler(trans, "zyx", angles, degrees=True)
+    # # We do not use images so this transform is useless
+    # # Load tf_fgenv_norm for each environment
+    # with open(DATASET_PATH + "raw/trajectoryOffsets.yaml", 'r') as stream:
+    #     try:
+    #         yaml_file = yaml.safe_load(stream)
+    #     except yaml.YAMLError as exc:
+    #         print(exc)
+    # # Finding the correct environment
+    # offset = None
+    # for e in yaml_file["unitySettings"][flight_name]:
+    #     if e["name"] == environment:
+    #         offset = e["offset"]
+    # if offset is None:
+    #     print(f"Environment not found: {environment}")
+    #     raise ValueError(environment)
+    # trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
+    # tf_fgenv_norm = utils.Transform().from_euler(trans, "zyx", angles, degrees=True)
 
-    tf_fgenvflu_fgenv = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
-                                                     angles=np.array([0, 0, 180]), degrees=True)
+    # We will not use this one
+    # tf_fgenvflu_fgenv = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
+    #                                                  angles=np.array([0, 0, 180]), degrees=True)
+    # We will use this one instead
+    tf_normflu_norm = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
+                                                   angles=np.array([0, 0, 180]), degrees=True)
     tf_drone_droneflu = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
                                                      angles=np.array([0, 0, 180]), degrees=True)
 
     # Intermediate folder is used to store processed data
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     data_path = intermediate_flight_path + "rosbag.pkl"
 
     # Load sensors data
@@ -102,16 +101,17 @@ def data_processing():
                                                  key=lambda ts_msg: ts_msg["secs"] + 1e-9 * ts_msg["nsecs"]))}
     raw_data = tmp
 
-    # Let's search IMU camera body Transforms
-    calibration_data = pickle.load(open(DATASET_PATH + "intermediate/cameraCalibration/imuCameraCalibration.pkl", 'rb'),
-                                   encoding='latin1')
-    # dict_keys(['/camera_d/camera_info__sensor_msgs/CameraInfo',
-    # '/camera_l/camera_info__sensor_msgs/CameraInfo'
-    # '/camera_r/camera_info__sensor_msgs/CameraInfo',
-    # '/blackbird/imu__sensor_msgs/Imu',
-    # '/blackbird/state__geometry_msgs/PoseStamped',  mocap_NED
-    # '/tf__tf2_msgs/TFMessage',
-    # ])
+    # # Let's search IMU camera body Transforms
+    # calibration_data = pickle.load(open(DATASET_PATH +
+    #                                     "intermediate/cameraCalibration/imuCameraCalibration.pkl", 'rb'),
+    #                                encoding='latin1')
+    # # dict_keys(['/camera_d/camera_info__sensor_msgs/CameraInfo',
+    # # '/camera_l/camera_info__sensor_msgs/CameraInfo'
+    # # '/camera_r/camera_info__sensor_msgs/CameraInfo',
+    # # '/blackbird/imu__sensor_msgs/Imu',
+    # # '/blackbird/state__geometry_msgs/PoseStamped',  mocap_NED
+    # # '/tf__tf2_msgs/TFMessage',
+    # # ])
 
     # All data have been loaded, formatting begins
     data = {"motor_speed_0": {},
@@ -161,9 +161,16 @@ def data_processing():
     for idx, msg in tqdm(raw_data["mc_pose"].items(), desc="Computing pose"):
         # mc_pose is tf_mocap_drone
         tf_mocap_drone = utils.Transform().from_pose(trans=msg["translation"], quat=msg["rotation"])
-        tf_fgenvflu_droneflu = tf_fgenvflu_fgenv @ tf_fgenv_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
+        tf_normflu_droneflu = tf_normflu_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
         # mc_pose is tf_fgenvflu_droneflu
-        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_fgenvflu_droneflu}
+        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_normflu_droneflu}
+    # Resetting drone position
+    tf_dronestart_normflu = utils.Transform().from_pose(trans=data["mc_pose"][0]["transform"].get_trans(),
+                                                        quat=np.array([0, 0, 0, 1])).inv()
+    for idx in tqdm(data["mc_pose"], desc="Resetting first position"):
+        tf_normflu_droneflu = data["mc_pose"][idx]["transform"]
+        tf_dronestart_droneflu = tf_dronestart_normflu @ tf_normflu_droneflu
+        data["mc_pose"][idx]["transform"] = tf_dronestart_droneflu
 
     # Compute the 12 dimension state data of the drone
     for idx in tqdm(range(1, len(data["mc_pose"])), desc="Computing state"):
@@ -193,6 +200,14 @@ def data_processing():
         data["state"][idx - 1] = {"t": data["mc_pose"][idx]["t"],
                                   "dt": dt,
                                   "state": np.hstack((euler_orientation, angular_velocity, linear_speed, position))}
+
+    pickle.dump(data, open(intermediate_flight_path + "before_synchro.pkl", "wb"))
+
+
+def synchronization(flight_name, flight_yaw, flight_speed):
+    print("Loading data")
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    data = pickle.load(open(intermediate_flight_path + "before_synchro.pkl", "rb"))
 
     # data = {"motor_speed_0": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
     #         "motor_speed_1": {0: {"t": 1}, 1: {"t": 1}, 2: {"t": 3}, 3: {"t": 3}},
@@ -244,6 +259,29 @@ def data_processing():
 
         synchronisation_master[ts_name]["idx"] = synchronisation_master[ts_name]["idx"] + 1
     print()
+
+    # Check synchronization results
+    data_keys = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
+    var_time = []
+    for sample in data_synced:
+        var_time.append(np.var([sample[e]["t"] for e in data_keys]))
+        # for data_type, element in sample.items():
+        #     timestamp -
+    var_time = np.array(var_time)
+    tol = 1e-4
+    bad_synchros = list(np.where(var_time > tol))[0]
+
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.plot([e for i, e in enumerate(var_time) if i not in bad_synchros])
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    ax.set_ylabel("Variance of timestamp considered as synced [s-2]")
+    ax.set_xlabel("Sample number")
+    ax.grid()
+    plt.tight_layout()
+    plt.show()
+
+    print(f"Bad synchronisation happened at indices {bad_synchros} with a tolerance of {tol} of "
+          f"the variance of the timestamps.")
 
 
 def error_estimation():
@@ -454,6 +492,28 @@ def _test():
     plt.show()
 
 
-if __name__ == "__main__":
-    data_processing()
+def main():
+    # Trajectories name classification
+
+    # flight_names = ['ampersand','bentDice','cameraCalibration','clover','dice','egg','halfMoon','mouse','oval',
+    # 'patrick','picasso','sid','sphinx','star','thrice','tiltedThrice','winter']
+
+    # flight_yaws = ['yawForward', 'yawConstant']
+
+    # flight_speed = ['maxSpeed0p5', 'maxSpeed1p0', 'maxSpeed2p0', 'maxSpeed3p0', 'maxSpeed4p0', 'maxSpeed5p0',
+    # 'maxSpeed6p0', 'maxSpeed7p0']
+
+    # environments = ['Small_Apartment', 'Large_Apartment_Night_Near_Couches']+
+
+    flight_name = "ampersand"
+    flight_yaw = "yawForward"
+    flight_speed = "maxSpeed1p0"
+    # environment = "Small_Apartment"
+
+    # raw_importing_cleaning(flight_name, flight_yaw, flight_speed)
+    synchronization(flight_name, flight_yaw, flight_speed)
     # _test()
+
+
+if __name__ == "__main__":
+    main()
