@@ -1,14 +1,12 @@
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pickle
 import os
 from tqdm import tqdm
 from typing import Dict, Any
 
 from src import utils
-from src import posture_error_estimation
 
 DATASET_PATH = os.getcwd() + "/data/blackbird/"
 
@@ -258,7 +256,6 @@ def synchronization(flight_name, flight_yaw, flight_speed):
                 synchronisation_master[ts_name2]["buffer"] = None
 
         synchronisation_master[ts_name]["idx"] = synchronisation_master[ts_name]["idx"] + 1
-    print()
 
     # Check synchronization results
     data_keys = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
@@ -282,214 +279,86 @@ def synchronization(flight_name, flight_yaw, flight_speed):
 
     print(f"Bad synchronisation happened at indices {bad_synchros} with a tolerance of {tol} of "
           f"the variance of the timestamps.")
+    assert bad_synchros == [0], "Not only the first point is badly synchronised."
+    kept_data = [e for i, e in enumerate(data_synced) if i not in bad_synchros]
+    pickle.dump(kept_data, open(intermediate_flight_path + "data_synced.pkl", "wb"))
 
 
-def error_estimation():
-    f = utils.DataFolder('euroc_mav')
-    for flight_number in [0, 1, 2, 3, 4, 5]:
-        print(f"Flight : {flight_number}")
-
-        input_data = pickle.load(open(f.folders['intermediate'][flight_number] + 'posture_error_input_data.pkl', 'rb'))
-        camera_parameters = pickle.load(open(f.folders['intermediate'][flight_number] + 'camera_parameters.pkl', 'rb'))
-
-        estimator = posture_error_estimation.ErrorEstimation(input_data=input_data,
-                                                             calibration_matrix=camera_parameters['K'],
-                                                             distortion_coefficient=camera_parameters['D'],
-                                                             max_distance=5)
-        estimator.p3_generator()
-        # saving_path = f.folders['results'][flight_number] + 'raw_video.mkv'
-        saving_path = f.folders['results'][flight_number] + 'pose_camera_correspondence_video.mkv'
-
-        # p3 saved as csv
-        point_position_in_image = estimator.p3
-        with open(f.folders['results'][flight_number] + "points.csv", 'w', newline="") as csv_file:
-            wr = csv.writer(csv_file, dialect="excel", quoting=csv.QUOTE_NONE)
-            wr.writerow(["p3 [px] (red dot position in image)",
-                         "x [m] (position of the camera relative to global reference frame)",
-                         "y [m] (position of the camera relative to global reference frame)",
-                         "z [m] (position of the camera relative to global reference frame)",
-                         "a [quaternion] (orientation of the camera relative to global reference frame)",
-                         "b [quaternion] (orientation of the camera relative to global reference frame)",
-                         "c [quaternion] (orientation of the camera relative to global reference frame)",
-                         "w [quaternion] (orientation of the camera relative to global reference frame)",
-                         "phi [deg] (orientation of the camera relative to global reference frame)",
-                         "theta [deg] (orientation of the camera relative to global reference frame)",
-                         "psi [deg] (orientation of the camera relative to global reference frame)"])
-            for i in range(len(estimator.df)):
-                p3 = point_position_in_image[i]
-                xyz = estimator.df["pose"][i].inv().get_trans()
-                quat = estimator.df["pose"][i].inv().get_quat()
-                ang = estimator.df["pose"][i].inv().get_rot_euler(seq='xyz', degrees=True)
-                if isinstance(p3, np.ndarray):
-                    wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
-                                 ang[0], ang[1], ang[2]])
-                else:
-                    if "\n" in p3:
-                        p3 = p3.replace("\n", " ")
-                    wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
-                                 ang[0], ang[1], ang[2]])
-
-        # estimator.p32video(fps=camera_parameters['fps'], saving_path=saving_path)
-        print()
-
-
-def dataset_creation(flight_number: int):
-    f = utils.DataFolder('euroc_mav')
-    flight_number = flight_number
-
-    # Motor speed
-    data = f.pickle_load_file('.pkl', f.folders['raw_python'][flight_number], None, True)
-
-    renaming = {'/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped': 'vicon_pose',
-                '/fcu/motor_speed__asctec_hl_comm/MotorSpeed': 'motor_speed',
-                '/cam0/image_raw__sensor_msgs/Image': 'cam0_img',
-                '/cam1/image_raw__sensor_msgs/Image': 'cam1_img',
-                '/imu0__sensor_msgs/Imu': 'imu0',
-                '/fcu/imu__sensor_msgs/Imu': 'fcu_imu'}
-
-    correspondence = {}
-    for key in data:
-        _, msg_type = key.split('__')
-        correspondence[key] = [renaming[key], renaming[key] + '_time', msg_type]
-
-    to_synchro = []
-    for data_column, (name, _, msg_type) in correspondence.items():
-        if msg_type == 'sensor_msgs/Image':
-            tmp = {'time': [], name: []}
-            for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
-                tmp[name].append(measure['image'])
-        elif msg_type == 'geometry_msgs/TransformStamped':
-            tmp = {'time': [], name: []}
-            for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
-                trans, quat = measure['translation'], measure['rotation']
-                tmp[name].append(utils.Transform().from_pose(trans, quat).inv())
-        elif msg_type == 'asctec_hl_comm/MotorSpeed':
-            tmp = {'time': [], name: []}
-            for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
-                tmp[name].append(measure['motor_speed'])
-        elif msg_type == 'sensor_msgs/Imu':
-            tmp = {'time': [],
-                   name + '_angular_velocity': [],
-                   name + '_angular_velocity_covariance': [],
-                   name + '_linear_acceleration': [],
-                   name + '_linear_acceleration_covariance': [],
-                   name + '_orientation': [],
-                   name + '_orientation_covariance': []}
-            for measure in data[data_column].values():
-                tmp['time'].append(measure['t'])
-                tmp[name + '_angular_velocity'].append(measure['angular_velocity'])
-                tmp[name + '_angular_velocity_covariance'].append(measure['angular_velocity_covariance'])
-                tmp[name + '_linear_acceleration'].append(measure['linear_acceleration'])
-                tmp[name + '_linear_acceleration_covariance'].append(measure['linear_acceleration_covariance'])
-                tmp[name + '_orientation'].append(measure['orientation'])
-                tmp[name + '_orientation_covariance'].append(measure['orientation_covariance'])
-        else:
-            raise TypeError(f'ROS type not implemented : {msg_type}')
-        to_synchro.append(pd.DataFrame(tmp))
-
-    # Find the time series with the lowest frequency
-    freq = []
-    for i in range(len(to_synchro)):
-        freq.append(len(to_synchro[i]) / (to_synchro[i]['time'].iloc[-1] - to_synchro[i]['time'].iloc[0]))
-    ind_freq = sorted(range(len(freq)), key=lambda k: freq[k])
-
-    # Synchronise other time series to the lowest one
-    ids_0 = list(range(len(to_synchro[ind_freq[0]])))
-    for i in ind_freq[1:]:
-        ids_0, ids_i = utils.merge_two_arrays(to_synchro[ind_freq[0]]['time'], to_synchro[i]['time'])
-        to_synchro[ind_freq[0]] = to_synchro[ind_freq[0]].iloc[ids_0].reset_index(drop=True)
-        to_synchro[i] = to_synchro[i].iloc[ids_i].reset_index(drop=True)
-        to_synchro[i]['time'] = to_synchro[ind_freq[0]]['time']
-
-    for i in range(len(to_synchro)):
-        to_synchro[i] = to_synchro[i].iloc[ids_0].reset_index(drop=True)
-        if 0 != i:
-            to_synchro[i] = to_synchro[i].drop(['time'], axis=1)
-
-    data_clean = pd.concat(to_synchro, axis=1)
-    np.set_printoptions(threshold=np.inf)
-    # data_clean.to_csv(f.folders["intermediate"][flight_number] + "sensors_synchronised.csv", sep=";")
-    data_clean.to_pickle(f.folders["intermediate"][flight_number] + "sensors_synchronised.pkl")
-
-
-def _test():
-    # csv_filenames = ["blackbird_slash_imu.csv",
-    #                  "blackbird_slash_pose_ref.csv",
-    #                  "blackbird_slash_pwm.csv",
-    #                  "blackbird_slash_rotor_rpm.csv",
-    #                  "blackbird_slash_state.csv",
-    #                  "camera_d_slash_camera_info.csv",
-    #                  "camera_l_slash_camera_info.csv",
-    #                  "camera_r_slash_camera_info.csv",
-    #                  "tf.csv"]
-
-    # Check tf contains always the same transform
-    transform_list = []
-    for e in raw_data["mc_pose"].values():
-        frame1 = e["child_frame_id"]
-        frame2 = e["frame_id"]
-        transform = (frame1, frame2)
-        if transform not in transform_list:
-            transform_list.append(transform)
-
-    ground_truth_data = {}
-    with open(raw_flight_path + "groundTruthPoses.csv", newline='') as csv_file:
-        reader = csv.reader(csv_file, delimiter=',')
-        for i, row in enumerate(reader):
-            ground_truth_data[i] = [float(e) for e in row]
-    for i, e in enumerate(ground_truth.values()):
-        gt_trans = np.array([e[1], e[2], e[3]])
-        gt_quat = np.array([e[5], e[6], e[7], e[4]])
-        gt_time_like_gt = e[0]
-
-        tf_secs = data["tf"][i]["secs"]
-        tf_nsecs = data["tf"][i]["nsecs"]
-        tf_trans = data["tf"][i]["translation"]
-        tf_quat = data["tf"][i]["rotation"]
-
-        state_secs = data["state"][i]["secs"]
-        state_nsecs = data["state"][i]["nsecs"]
-        state_trans = data["state"][i]["translation"]
-        state_quat = data["state"][i]["rotation"]
-
-        assert tf_secs == state_secs
-        assert tf_nsecs == state_nsecs
-        assert all(tf_trans == state_trans)
-        assert all(tf_quat == state_quat)
-
-        tf_time_like_gt = tf_secs * 1e6 + np.around(tf_nsecs * 1e-3, 0)
-        tf_trans = np.around(data["tf"][i]["translation"], 6)
-        tf_quat = np.around(data["tf"][i]["rotation"], 6)
-
-        assert tf_time_like_gt == gt_time_like_gt
-        assert all(tf_trans == gt_trans)
-        assert all(tf_quat == gt_quat)
-
-    for camera_name in ["camera_info_d", "camera_info_l", "camera_info_r"]:
-        D = data[camera_name][0]["D"]
-        K = data[camera_name][0]["K"]
-        P = data[camera_name][0]["P"]
-        R = data[camera_name][0]["R"]
-        for e in data[camera_name].values():
-            np.testing.assert_equal(D, e["D"])
-            np.testing.assert_equal(K, e["K"])
-            np.testing.assert_equal(P, e["P"])
-            np.testing.assert_equal(R, e["R"])
-    print("blackbird.py is being tested.")
-
-    xyz = np.stack([e["transform"].get_trans() for e in data["mc_pose"].values()])
-    for i in range(3):
-        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-        ax.plot(xyz[:, i])
-    plt.show()
-
-    motor_speed = np.stack([e["angular_velocity"] for e in data["motor_speed_0"].values()])
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.plot(motor_speed)
-    plt.show()
+# def _test():
+#     # csv_filenames = ["blackbird_slash_imu.csv",
+#     #                  "blackbird_slash_pose_ref.csv",
+#     #                  "blackbird_slash_pwm.csv",
+#     #                  "blackbird_slash_rotor_rpm.csv",
+#     #                  "blackbird_slash_state.csv",
+#     #                  "camera_d_slash_camera_info.csv",
+#     #                  "camera_l_slash_camera_info.csv",
+#     #                  "camera_r_slash_camera_info.csv",
+#     #                  "tf.csv"]
+#
+#     # Check tf contains always the same transform
+#     transform_list = []
+#     for e in raw_data["mc_pose"].values():
+#         frame1 = e["child_frame_id"]
+#         frame2 = e["frame_id"]
+#         transform = (frame1, frame2)
+#         if transform not in transform_list:
+#             transform_list.append(transform)
+#
+#     ground_truth_data = {}
+#     with open(raw_flight_path + "groundTruthPoses.csv", newline='') as csv_file:
+#         reader = csv.reader(csv_file, delimiter=',')
+#         for i, row in enumerate(reader):
+#             ground_truth_data[i] = [float(e) for e in row]
+#     for i, e in enumerate(ground_truth.values()):
+#         gt_trans = np.array([e[1], e[2], e[3]])
+#         gt_quat = np.array([e[5], e[6], e[7], e[4]])
+#         gt_time_like_gt = e[0]
+#
+#         tf_secs = data["tf"][i]["secs"]
+#         tf_nsecs = data["tf"][i]["nsecs"]
+#         tf_trans = data["tf"][i]["translation"]
+#         tf_quat = data["tf"][i]["rotation"]
+#
+#         state_secs = data["state"][i]["secs"]
+#         state_nsecs = data["state"][i]["nsecs"]
+#         state_trans = data["state"][i]["translation"]
+#         state_quat = data["state"][i]["rotation"]
+#
+#         assert tf_secs == state_secs
+#         assert tf_nsecs == state_nsecs
+#         assert all(tf_trans == state_trans)
+#         assert all(tf_quat == state_quat)
+#
+#         tf_time_like_gt = tf_secs * 1e6 + np.around(tf_nsecs * 1e-3, 0)
+#         tf_trans = np.around(data["tf"][i]["translation"], 6)
+#         tf_quat = np.around(data["tf"][i]["rotation"], 6)
+#
+#         assert tf_time_like_gt == gt_time_like_gt
+#         assert all(tf_trans == gt_trans)
+#         assert all(tf_quat == gt_quat)
+#
+#     for camera_name in ["camera_info_d", "camera_info_l", "camera_info_r"]:
+#         D = data[camera_name][0]["D"]
+#         K = data[camera_name][0]["K"]
+#         P = data[camera_name][0]["P"]
+#         R = data[camera_name][0]["R"]
+#         for e in data[camera_name].values():
+#             np.testing.assert_equal(D, e["D"])
+#             np.testing.assert_equal(K, e["K"])
+#             np.testing.assert_equal(P, e["P"])
+#             np.testing.assert_equal(R, e["R"])
+#     print("blackbird.py is being tested.")
+#
+#     xyz = np.stack([e["transform"].get_trans() for e in data["mc_pose"].values()])
+#     for i in range(3):
+#         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+#         ax.plot(xyz[:, i])
+#     plt.show()
+#
+#     motor_speed = np.stack([e["angular_velocity"] for e in data["motor_speed_0"].values()])
+#     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+#     ax.plot(motor_speed)
+#     plt.show()
 
 
 def main():
