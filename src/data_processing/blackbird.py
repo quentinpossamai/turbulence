@@ -62,7 +62,7 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
                                                      angles=np.array([0, 0, 180]), degrees=True)
 
     # Intermediate folder is used to store processed data
-    data_path = intermediate_flight_path + "rosbag.pkl"
+    data_path = intermediate_flight_path + "0_rosbag.pkl"
 
     # Load sensors data
     raw_data = pickle.load(open(data_path, 'rb'), encoding='latin1')
@@ -199,13 +199,13 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
                                   "dt": dt,
                                   "state": np.hstack((euler_orientation, angular_velocity, linear_speed, position))}
 
-    pickle.dump(data, open(intermediate_flight_path + "before_synchro.pkl", "wb"))
+    pickle.dump(data, open(intermediate_flight_path + "1_before_synchro.pkl", "wb"))
 
 
 def synchronization(flight_name, flight_yaw, flight_speed):
     print("Loading data")
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-    data = pickle.load(open(intermediate_flight_path + "before_synchro.pkl", "rb"))
+    data = pickle.load(open(intermediate_flight_path + "1_before_synchro.pkl", "rb"))
 
     # data = {"motor_speed_0": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
     #         "motor_speed_1": {0: {"t": 1}, 1: {"t": 1}, 2: {"t": 3}, 3: {"t": 3}},
@@ -281,7 +281,109 @@ def synchronization(flight_name, flight_yaw, flight_speed):
           f"the variance of the timestamps.")
     assert bad_synchros == [0], "Not only the first point is badly synchronised."
     kept_data = [e for i, e in enumerate(data_synced) if i not in bad_synchros]
-    pickle.dump(kept_data, open(intermediate_flight_path + "data_synced.pkl", "wb"))
+    pickle.dump(kept_data, open(intermediate_flight_path + "2_data_synced.pkl", "wb"))
+
+
+def plot_data(flight_name, flight_yaw, flight_speed):
+    print("Loading data")
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    data = pickle.load(open(intermediate_flight_path + "2_data_synced.pkl", "rb"))
+
+    fig_path = os.getcwd() + "/reports/blackbird_processing/"
+
+    # data_names = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
+    time = np.array([e["t"] for e in data]) - data[0]["t"]
+
+    # Motor speeds
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i in range(4):
+        ax.plot(time, [e[f"motor_speed_{i}"]["angular_velocity"] for e in data], label=f"Motor {i}")
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Motor speed [rad/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "motor_speed.png")
+    plt.show()
+
+    # IMU angular velocity
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, [e[f"imu"]["angular_velocity"][i] for e in data], label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("IMU angular velocity [rad/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "imu_angular_velocity.png")
+    plt.show()
+
+    # IMU linear acceleration
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, [e[f"imu"]["linear_acceleration"][i] for e in data], label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("IMU linear acceleration [m/s2]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "imu_linear_acceleration.png")
+    plt.show()
+
+    # State orientation
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("phi", "theta", "psi")):
+        ax.plot(time, [e[f"state"]["state"][i] for e in data], label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State orientation [rad]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_orientation.png")
+    plt.show()
+
+    # State angular velocity
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("p", "q", "r")):
+        ax.plot(time, [e[f"state"]["state"][i + 3] for e in data], label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State angular velocity [rad/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_angular_velocity.png")
+    plt.show()
+
+    # State linear speed
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("u", "v", "w")):
+        ax.plot(time, [e[f"state"]["state"][i + 6] for e in data], label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State linear speed [m/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_linear_speed.png")
+    plt.show()
+
+    # State position
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, [e[f"state"]["state"][i + 9] for e in data], label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State position[m]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_position.png")
+    plt.show()
 
 
 # def _test():
@@ -380,7 +482,9 @@ def main():
     # environment = "Small_Apartment"
 
     # raw_importing_cleaning(flight_name, flight_yaw, flight_speed)
-    synchronization(flight_name, flight_yaw, flight_speed)
+    # synchronization(flight_name, flight_yaw, flight_speed)
+    plot_data(flight_name, flight_yaw, flight_speed)
+
     # _test()
 
 

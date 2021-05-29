@@ -355,7 +355,7 @@ def main_blackbird():
     rosbag_path = raw_path + "rosbag.bag"
     intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder
                                                              flight_yaw, flight_speed)
-    saving_path = intermediate_path + "rosbag.pkl"
+    saving_path = intermediate_path + "0_rosbag.pkl"
 
     # # Calibration loading
     # rosbag_path = dataset_path + "raw/cameraCalibration/imuCameraCalibration.bag"
