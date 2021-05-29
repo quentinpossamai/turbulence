@@ -129,7 +129,18 @@ def _process_sensor_msgs_camera_info(msg):
     return {'D': np.array(msg.D),
             'K': np.array(msg.K).reshape((3, 3)),
             'P': np.array(msg.P).reshape((3, 4)),
-            'R': np.array(msg.R).reshape((3, 3))}
+            'R': np.array(msg.R).reshape((3, 3)),
+            "binning_x": msg.binning_x,
+            "binning_y": msg.binning_y,
+            "distortion_model": msg.distortion_model,
+            "height": msg.height,
+            "width": msg.width,
+            "roi_do_rectify": msg.roi.do_rectify,
+            "roi_height": msg.roi.height,
+            "roi_width": msg.roi.width,
+            "roi_x_offset": msg.roi.x_offset,
+            "roi_y_offset": msg.roi.y_offset,
+            "frame_id": msg.header.frame_id}
 
 
 def _process_sensor_msgs_imu(msg):
@@ -150,7 +161,8 @@ def _process_sensor_msgs_imu(msg):
             'orientation': np.array([msg.orientation.x,
                                      msg.orientation.y,
                                      msg.orientation.z]),
-            'orientation_covariance': np.array(msg.orientation_covariance).reshape((3, 3))}
+            'orientation_covariance': np.array(msg.orientation_covariance).reshape((3, 3)),
+            "frame_id": msg.header.frame_id}
 
 
 def _process_geometry_msgs_transform_stamped(msg):
@@ -183,7 +195,9 @@ def _process_tf_tfmessage(msg):
             'rotation': np.array([transform_object.rotation.x,
                                   transform_object.rotation.y,
                                   transform_object.rotation.z,
-                                  transform_object.rotation.w])}
+                                  transform_object.rotation.w]),
+            "child_frame_id": msg.transforms[0].child_frame_id,
+            "frame_id": msg.transforms[0].header.frame_id}
 
 
 def _process_geometry_msgs_posestamped(msg):
@@ -200,7 +214,8 @@ def _process_geometry_msgs_posestamped(msg):
             'rotation': np.array([transform_object.orientation.x,
                                   transform_object.orientation.y,
                                   transform_object.orientation.z,
-                                  transform_object.orientation.w])}
+                                  transform_object.orientation.w]),
+            "frame_id": msg.header.frame_id}
 
 
 def _process_asctec_hl_comm_motor_speed(msg):
@@ -331,21 +346,21 @@ def main_blackbird():
     """
     dataset_path = os.getcwd() + "/data/blackbird/"
 
-    # # Flight loading
-    # # Data loading path
-    # flight_name = "ampersand"
-    # flight_yaw = "yawForward"
-    # flight_speed = "maxSpeed1p0"
-    # raw_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
-    # rosbag_path = raw_path + "rosbag.bag"
-    # intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder
-    #                                                          flight_yaw, flight_speed)
-    # saving_path = intermediate_path + "rosbag.pkl"
+    # Flight loading
+    # Data loading path
+    flight_name = "ampersand"
+    flight_yaw = "yawForward"
+    flight_speed = "maxSpeed1p0"
+    raw_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
+    rosbag_path = raw_path + "rosbag.bag"
+    intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder
+                                                             flight_yaw, flight_speed)
+    saving_path = intermediate_path + "rosbag.pkl"
 
-    # Calibration loading
-    rosbag_path = dataset_path + "raw/cameraCalibration/imuCameraCalibration.bag"
-    intermediate_path = dataset_path + "intermediate/cameraCalibration/"
-    saving_path = intermediate_path + "imuCameraCalibration.pkl"
+    # # Calibration loading
+    # rosbag_path = dataset_path + "raw/cameraCalibration/imuCameraCalibration.bag"
+    # intermediate_path = dataset_path + "intermediate/cameraCalibration/"
+    # saving_path = intermediate_path + "imuCameraCalibration.pkl"
 
     if not os.path.exists(intermediate_path):
         os.makedirs(intermediate_path)

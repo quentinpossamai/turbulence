@@ -5,9 +5,9 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
-import yaml
-
+from tqdm import tqdm
 from typing import Dict, Any
+import yaml
 
 from src import utils
 from src import posture_error_estimation
@@ -19,12 +19,14 @@ def data_processing():
     """
     Process data from the blackbird dataset.
     1. Load data.
-    2. Synchronized them.
+    2. Format data.
+    2. Synchronized data.
     3.
     Downloaded from: http://blackbird-dataset.mit.edu/BlackbirdDatasetData/.
     Github: https://github.com/mit-fast/Blackbird-Dataset
     Paper: https://arxiv.org/abs/1810.01987
     """
+    print("Loading data")
     # Trajectories name classification
     flight_name = "ampersand"
     flight_yaw = "yawForward"
@@ -66,6 +68,7 @@ def data_processing():
     data_path = intermediate_flight_path + "rosbag.pkl"
 
     # Load sensors data
+    raw_data = pickle.load(open(data_path, 'rb'), encoding='latin1')
     # Extracting /Users/quentin/phd/turbulence/data/blackbird/raw/ampersand/yawForward/maxSpeed1p0/rosbag.bag
     # List of topic to be extracted :
     # - /blackbird/pwm | Type : blackbird/MotorPWM | Message count : 38893
@@ -78,7 +81,6 @@ def data_processing():
     # - /blackbird/state | Type : geometry_msgs/PoseStamped | Message count : 77148
     # - /blackbird/pose_ref | Type : geometry_msgs/PoseStamped | Message count : 35090
     # Encoding is latin1 because pickle with python 2.7 was used to make the .pkl
-    raw_data = pickle.load(open(data_path, 'rb'), encoding='latin1')
     renaming_dict = {'/blackbird/pwm__blackbird/MotorPWM': "motor_pwm",
                      '/blackbird/rotor_rpm__blackbird/MotorRPM': "motor_rpm",
                      '/camera_d/camera_info__sensor_msgs/CameraInfo': "camera_info_d",
@@ -88,73 +90,160 @@ def data_processing():
                      '/blackbird/pose_ref__geometry_msgs/PoseStamped': "pose_ref",
                      '/tf__tf/tfMessage': "mc_pose",
                      '/blackbird/state__geometry_msgs/PoseStamped': "state"}
-
     # Renaming data keys for easier use
     for old_key, new_key in renaming_dict.items():
         raw_data[new_key] = raw_data.pop(old_key)
 
-    # Let's search IMU camera body transformations
-    calibration_data = pickle.load(open(DATASET_PATH + "raw/cameraCalibration/imuCameraCalibration.bag", 'rb'),
+    # Assuming data timeseries keys are sorted by time and index is start at 0 and is incrementing by 1
+    tmp = {}
+    for name, timeserie in raw_data.items():
+        tmp[name] = {k: v for k, v in zip(range(len(timeserie)),
+                                          sorted(timeserie.values(),
+                                                 key=lambda ts_msg: ts_msg["secs"] + 1e-9 * ts_msg["nsecs"]))}
+    raw_data = tmp
+
+    # Let's search IMU camera body Transforms
+    calibration_data = pickle.load(open(DATASET_PATH + "intermediate/cameraCalibration/imuCameraCalibration.pkl", 'rb'),
                                    encoding='latin1')
+    # dict_keys(['/camera_d/camera_info__sensor_msgs/CameraInfo',
+    # '/camera_l/camera_info__sensor_msgs/CameraInfo'
+    # '/camera_r/camera_info__sensor_msgs/CameraInfo',
+    # '/blackbird/imu__sensor_msgs/Imu',
+    # '/blackbird/state__geometry_msgs/PoseStamped',  mocap_NED
+    # '/tf__tf2_msgs/TFMessage',
+    # ])
 
     # All data have been loaded, formatting begins
-    data = {"motor_rpm_0": {},
-            "motor_rpm_1": {},
-            "motor_rpm_2": {},
-            "motor_rpm_3": {},
+    data = {"motor_speed_0": {},
+            "motor_speed_1": {},
+            "motor_speed_2": {},
+            "motor_speed_3": {},
             "imu": {},
             "mc_pose": {},
             "state": {}}
     data: Dict[str][Dict[int][Dict[str][Any]]]
     # data structure
     # data = {
-    #   "motor_rpm_0": {idx(int): {"t": float, "angular_velocity": float}},
-    #   "motor_rpm_1": {idx(int): {"t": float, "angular_velocity": float}},
-    #   "motor_rpm_2": {idx(int): {"t": float, "angular_velocity": float}},
-    #   "motor_rpm_3": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_speed_0": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_speed_1": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_speed_2": {idx(int): {"t": float, "angular_velocity": float}},
+    #   "motor_speed_3": {idx(int): {"t": float, "angular_velocity": float}},
     #   "imu": {idx(int): {"t": float, "linear_acceleration": ndarray, "angular_velocity": ndarray}},
     #   "mc_pose": {idx(int): {"t": float, "translation": ndarray, "rotation": ndarray}},
     #   "state":  {idx(int): {"t": float, "dt": float, "state": ndarray}}
 
-    for idx, msg in raw_data["motor_rpm"].items():
-        data["motor_rpm_0"][idx] = {"t": msg[0][0].secs + 1e-9 * msg[0][0].nsecs,
-                                    "angular_velocity": np.pi / 30 * msg[0][1]}
-        data["motor_rpm_1"][idx] = {"t": msg[1][0].secs + 1e-9 * msg[1][0].nsecs,
-                                    "angular_velocity": np.pi / 30 * msg[1][1]}
-        data["motor_rpm_2"][idx] = {"t": msg[2][0].secs + 1e-9 * msg[2][0].nsecs,
-                                    "angular_velocity": np.pi / 30 * msg[2][1]}
-        data["motor_rpm_3"][idx] = {"t": msg[3][0].secs + 1e-9 * msg[3][0].nsecs,
-                                    "angular_velocity": np.pi / 30 * msg[3][1]}
-    for idx, msg in raw_data["imu"].items():
-        # TODO Imu must be in the same reference frame as the mc_pose.
+    # Motor speed
+    for idx, msg in tqdm(raw_data["motor_rpm"].items(), desc="Computing motor speed"):
+        data["motor_speed_0"][idx] = {"t": msg[0][0].secs + 1e-9 * msg[0][0].nsecs,
+                                      "angular_velocity": np.pi / 30 * msg[0][1]}
+        data["motor_speed_1"][idx] = {"t": msg[1][0].secs + 1e-9 * msg[1][0].nsecs,
+                                      "angular_velocity": np.pi / 30 * msg[1][1]}
+        data["motor_speed_2"][idx] = {"t": msg[2][0].secs + 1e-9 * msg[2][0].nsecs,
+                                      "angular_velocity": np.pi / 30 * msg[2][1]}
+        data["motor_speed_3"][idx] = {"t": msg[3][0].secs + 1e-9 * msg[3][0].nsecs,
+                                      "angular_velocity": np.pi / 30 * msg[3][1]}
+    # Assuming data timeseries keys are sorted by time and index is start at 0 and is incrementing by 1
+    for name in ["motor_speed_0", "motor_speed_1", "motor_speed_2", "motor_speed_3"]:
+        data[name] = {k: v for k, v in zip(range(len(data[name])),
+                                           sorted(data[name].values(), key=lambda ts_msg: ts_msg["t"]))}
+
+    # Compute IMU data in the correct reference frame
+    for idx, msg in tqdm(raw_data["imu"].items(), desc="Computing imu"):
+        # This transform is not confirmed, it is an HYPOTHESIS
+        tf_imu_drone = utils.Transform().from_euler(trans=np.array([0, 0, 0]), seq="zyx",
+                                                    angles=np.array([-90, 0, 0]), degrees=True)
+        rot_droneflu_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
         data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
-                            "linear_acceleration": msg["linear_acceleration"],
-                            "angular_velocity": msg["angular_velocity"]}
-    for idx, msg in raw_data["mc_pose"].items():
-        # TODO mc_pose must be in a FLU reference frame.
+                            "linear_acceleration": rot_droneflu_imu @ msg["linear_acceleration"],
+                            "angular_velocity": rot_droneflu_imu @ msg["angular_velocity"]}
+
+    # Compute pose data in the correct reference frame
+    for idx, msg in tqdm(raw_data["mc_pose"].items(), desc="Computing pose"):
         # mc_pose is tf_mocap_drone
         tf_mocap_drone = utils.Transform().from_pose(trans=msg["translation"], quat=msg["rotation"])
-
         tf_fgenvflu_droneflu = tf_fgenvflu_fgenv @ tf_fgenv_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
-        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transformation": tf_fgenvflu_droneflu}
+        # mc_pose is tf_fgenvflu_droneflu
+        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_fgenvflu_droneflu}
 
-    xyz = np.stack([e["transformation"].get_trans() for e in data["mc_pose"].values()])
-    for i in range(3):
-        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-        ax.plot(xyz[:, i])
-    plt.show()
-
-    # Compute the 12 dimension state of the drone
-    for idx in range(1, len(data["mc_pose"])):
+    # Compute the 12 dimension state data of the drone
+    for idx in tqdm(range(1, len(data["mc_pose"])), desc="Computing state"):
         dt = data["mc_pose"][idx]["t"] - data["mc_pose"][idx - 1]["t"]
+        # Compute euler angles in global frame from quaternion in global frame
+        euler_orientation = data["mc_pose"][idx]["transform"].get_rot_euler(seq="zyx", degrees=False)[::-1]
 
-        euler_orientation = data["mc_pose"][idx]["transformation"].get_rot_euler(seq="zyx", degrees=False)[::-1]
-        # angular_velocity =
-        # linear_speed =
-        position = data["mc_pose"][idx]["transformation"].get_trans()
+        # Compute angular velocity in drone's frame from quaternion in global frame
+        qn1 = data["mc_pose"][idx]["transform"].get_quat()
+        qn = data["mc_pose"][idx - 1]["transform"].get_quat()
+        # Graf, Basile. ‘Quaternions and Dynamics’. ArXiv:0811.2889 [Math-Ph], 18 November 2008.
+        # https://arxiv.org/abs/0811.2889. Use a different convention than scipy.spatial.transform.Rotation.from_quat¶
+        dq_dt = (qn1 - qn) / dt
+        dq_dt = np.array([dq_dt[3], dq_dt[0], dq_dt[1], dq_dt[2]])
+        q0, q1, q2, q3 = qn1[3], qn1[0], qn1[1], qn1[2]
+        g_matrix = np.array([[-q1, q0, q3, -q2],
+                             [-q2, -q3, q0, q1],
+                             [-q3, q2, -q1, q0]])
+        angular_velocity = (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
+
+        # Compute linear speed in drone's frame from drone's position in global frame
+        rot_droneflu_fgenvflu = data["mc_pose"][idx]["transform"].inv().get_rot_matrix()
+        linear_speed = rot_droneflu_fgenvflu @ (data["mc_pose"][idx]["transform"].get_trans() -
+                                                data["mc_pose"][idx - 1]["transform"].get_trans()) / dt
+
+        position = data["mc_pose"][idx]["transform"].get_trans()
         data["state"][idx - 1] = {"t": data["mc_pose"][idx]["t"],
                                   "dt": dt,
-                                  "state": 1}
+                                  "state": np.hstack((euler_orientation, angular_velocity, linear_speed, position))}
+
+    # data = {"motor_speed_0": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
+    #         "motor_speed_1": {0: {"t": 1}, 1: {"t": 1}, 2: {"t": 3}, 3: {"t": 3}},
+    #         "motor_speed_2": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
+    #         "motor_speed_3": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
+    #         "imu": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
+    #         "mc_pose": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
+    #         "state": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}}}
+
+    # Synchronisation
+    print("Synchronisation")
+    # Assuming data timeseries keys are sorted by time and index is start at 0 and is incrementing by 1
+    for ts_name, timeserie in data.items():
+        times = np.array([timeserie[i]["t"] for i in range(len(timeserie))])
+        sorted_times = np.sort(times)
+        assert all(sorted_times == times), f"Timeseries: {ts_name} is not sorted by time"
+    assert "t" not in data, "'t' key will be used for synchronisation"
+
+    synchronisation_master = {}
+    for ts_name in list(data.keys()):
+        synchronisation_master[ts_name] = {"max": len(data[ts_name]), "idx": 0, "buffer": None}
+
+    def is_one_timeserie_done():
+        for max_idx_buffer in synchronisation_master.values():
+            if max_idx_buffer["max"] == max_idx_buffer["idx"]:
+                return True
+        return False
+
+    data_synced = []
+    while not is_one_timeserie_done():
+        ts_name, ts_stat = min(synchronisation_master.items(), key=lambda elem: data[elem[0]][elem[1]["idx"]]["t"])
+
+        # for name in data.keys():
+        #     print(data[name][synchronisation_master[name]["idx"]])
+        synchronisation_master[ts_name]["buffer"] = data[ts_name][ts_stat["idx"]]
+
+        # When buffer is full store sample with the most recent timestamp
+        if all(val["buffer"] is not None for val in synchronisation_master.values()):
+            # Create a sample from the buffer
+            data_sample = {k: v["buffer"] for k, v in synchronisation_master.items()}
+
+            # Timestamp kept for the sample will be the last addition to the complete buffer
+            data_sample["t"] = data[ts_name][ts_stat["idx"]]["t"]
+            data_synced.append(data_sample)
+
+            # Resetting buffer
+            for ts_name2 in synchronisation_master:
+                synchronisation_master[ts_name2]["buffer"] = None
+
+        synchronisation_master[ts_name]["idx"] = synchronisation_master[ts_name]["idx"] + 1
+    print()
 
 
 def error_estimation():
@@ -299,6 +388,15 @@ def _test():
     #                  "camera_r_slash_camera_info.csv",
     #                  "tf.csv"]
 
+    # Check tf contains always the same transform
+    transform_list = []
+    for e in raw_data["mc_pose"].values():
+        frame1 = e["child_frame_id"]
+        frame2 = e["frame_id"]
+        transform = (frame1, frame2)
+        if transform not in transform_list:
+            transform_list.append(transform)
+
     ground_truth_data = {}
     with open(raw_flight_path + "groundTruthPoses.csv", newline='') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
@@ -343,6 +441,17 @@ def _test():
             np.testing.assert_equal(P, e["P"])
             np.testing.assert_equal(R, e["R"])
     print("blackbird.py is being tested.")
+
+    xyz = np.stack([e["transform"].get_trans() for e in data["mc_pose"].values()])
+    for i in range(3):
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        ax.plot(xyz[:, i])
+    plt.show()
+
+    motor_speed = np.stack([e["angular_velocity"] for e in data["motor_speed_0"].values()])
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.plot(motor_speed)
+    plt.show()
 
 
 if __name__ == "__main__":
