@@ -11,7 +11,7 @@ from src import utils
 DATASET_PATH = os.getcwd() + "/data/blackbird/"
 
 
-def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
+def raw_importing_cleaning(raw_flight_path, intermediate_flight_path):
     """
     Process data from the blackbird dataset.
     1. Load data.
@@ -24,10 +24,6 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
     Will save in intermediate/[flight_directory]/rosbag.pkl
     """
     print("Loading data")
-    # raw folder is used to store raw data
-    raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-
     # Load tf_norm_mocap
     with open(raw_flight_path + "flightNormalizationOffset.csv", newline='') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
@@ -56,10 +52,10 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
     # tf_fgenvflu_fgenv = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
     #                                                  angles=np.array([0, 0, 180]), degrees=True)
     # We will use this one instead
-    tf_normflu_norm = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
-                                                   angles=np.array([0, 0, 180]), degrees=True)
-    tf_drone_droneflu = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
-                                                     angles=np.array([0, 0, 180]), degrees=True)
+    # tf_normflu_norm = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
+    #                                                angles=np.array([0, 0, 180]), degrees=True)
+    # tf_drone_droneflu = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
+    #                                                  angles=np.array([0, 0, 180]), degrees=True)
 
     # Intermediate folder is used to store processed data
     data_path = intermediate_flight_path + "0_rosbag.pkl"
@@ -150,25 +146,28 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
         # This transform is not confirmed, it is an HYPOTHESIS
         tf_imu_drone = utils.Transform().from_euler(trans=np.array([0, 0, 0]), seq="zyx",
                                                     angles=np.array([-90, 0, 0]), degrees=True)
-        rot_droneflu_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
+        # rot_drone_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
+        rot_drone_imu = tf_imu_drone.inv().get_rot_matrix()
         data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
-                            "linear_acceleration": rot_droneflu_imu @ msg["linear_acceleration"],
-                            "angular_velocity": rot_droneflu_imu @ msg["angular_velocity"]}
+                            "linear_acceleration": rot_drone_imu @ msg["linear_acceleration"],
+                            "angular_velocity": rot_drone_imu @ msg["angular_velocity"]}
 
     # Compute pose data in the correct reference frame
     for idx, msg in tqdm(raw_data["mc_pose"].items(), desc="Computing pose"):
         # mc_pose is tf_mocap_drone
         tf_mocap_drone = utils.Transform().from_pose(trans=msg["translation"], quat=msg["rotation"])
-        tf_normflu_droneflu = tf_normflu_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
-        # mc_pose is tf_fgenvflu_droneflu
-        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_normflu_droneflu}
+        # tf_norm_drone = tf_normflu_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
+        tf_norm_drone = tf_norm_mocap @ tf_mocap_drone
+        # mc_pose is tf_norm_drone
+        data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_norm_drone}
+
     # Resetting drone position
-    tf_dronestart_normflu = utils.Transform().from_pose(trans=data["mc_pose"][0]["transform"].get_trans(),
-                                                        quat=np.array([0, 0, 0, 1])).inv()
+    tf_dronestart_norm = utils.Transform().from_pose(trans=data["mc_pose"][0]["transform"].get_trans(),
+                                                     quat=np.array([0, 0, 0, 1])).inv()
     for idx in tqdm(data["mc_pose"], desc="Resetting first position"):
-        tf_normflu_droneflu = data["mc_pose"][idx]["transform"]
-        tf_dronestart_droneflu = tf_dronestart_normflu @ tf_normflu_droneflu
-        data["mc_pose"][idx]["transform"] = tf_dronestart_droneflu
+        tf_norm_drone = data["mc_pose"][idx]["transform"]
+        tf_dronestart_drone = tf_dronestart_norm @ tf_norm_drone
+        data["mc_pose"][idx]["transform"] = tf_dronestart_drone  # mc_pose is tf_dronestartFRD_droneFRD !
 
     # Compute the 12 dimension state data of the drone
     for idx in tqdm(range(1, len(data["mc_pose"])), desc="Computing state"):
@@ -190,9 +189,9 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
         angular_velocity = (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
 
         # Compute linear speed in drone's frame from drone's position in global frame
-        rot_droneflu_fgenvflu = data["mc_pose"][idx]["transform"].inv().get_rot_matrix()
-        linear_speed = rot_droneflu_fgenvflu @ (data["mc_pose"][idx]["transform"].get_trans() -
-                                                data["mc_pose"][idx - 1]["transform"].get_trans()) / dt
+        rot_drone_dronestart = data["mc_pose"][idx]["transform"].inv().get_rot_matrix()
+        linear_speed = rot_drone_dronestart @ (data["mc_pose"][idx]["transform"].get_trans() -
+                                               data["mc_pose"][idx - 1]["transform"].get_trans()) / dt
 
         position = data["mc_pose"][idx]["transform"].get_trans()
         data["state"][idx - 1] = {"t": data["mc_pose"][idx]["t"],
@@ -202,9 +201,8 @@ def raw_importing_cleaning(flight_name, flight_yaw, flight_speed):
     pickle.dump(data, open(intermediate_flight_path + "1_before_synchro.pkl", "wb"))
 
 
-def synchronization(flight_name, flight_yaw, flight_speed):
+def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
     print("Loading data")
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     data = pickle.load(open(intermediate_flight_path + "1_before_synchro.pkl", "rb"))
 
     # data = {"motor_speed_0": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
@@ -275,6 +273,7 @@ def synchronization(flight_name, flight_yaw, flight_speed):
     ax.set_xlabel("Sample number")
     ax.grid()
     plt.tight_layout()
+    plt.savefig(fig_path + "blackbird_synchro_one_flight.png")
     plt.show()
 
     print(f"Bad synchronisation happened at indices {bad_synchros} with a tolerance of {tol} of "
@@ -284,12 +283,9 @@ def synchronization(flight_name, flight_yaw, flight_speed):
     pickle.dump(kept_data, open(intermediate_flight_path + "2_data_synced.pkl", "wb"))
 
 
-def plot_data(flight_name, flight_yaw, flight_speed):
+def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
     print("Loading data")
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     data = pickle.load(open(intermediate_flight_path + "2_data_synced.pkl", "rb"))
-
-    fig_path = os.getcwd() + "/reports/blackbird_processed_data/"
 
     # data_names = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
     time = np.array([e["t"] for e in data]) - data[0]["t"]
@@ -481,9 +477,14 @@ def main():
     flight_speed = "maxSpeed1p0"
     # environment = "Small_Apartment"
 
-    # raw_importing_cleaning(flight_name, flight_yaw, flight_speed)
-    # synchronization(flight_name, flight_yaw, flight_speed)
-    plot_data(flight_name, flight_yaw, flight_speed)
+    # Paths
+    raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    fig_path = os.getcwd() + "/reports/blackbird_processed_data/"
+
+    raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
+    synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
+    plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
 
     # _test()
 
