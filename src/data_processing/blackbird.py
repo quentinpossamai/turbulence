@@ -289,7 +289,7 @@ def plot_data(flight_name, flight_yaw, flight_speed):
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     data = pickle.load(open(intermediate_flight_path + "2_data_synced.pkl", "rb"))
 
-    fig_path = os.getcwd() + "/reports/blackbird_processing/"
+    fig_path = os.getcwd() + "/reports/blackbird_processed_data/"
 
     # data_names = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
     time = np.array([e["t"] for e in data]) - data[0]["t"]
