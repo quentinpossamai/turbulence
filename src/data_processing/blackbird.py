@@ -11,11 +11,17 @@ from src import utils
 DATASET_PATH = os.getcwd() + "/data/blackbird/"
 
 
-def raw_importing_cleaning(raw_flight_path, intermediate_flight_path):
+def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     """
-    Process data from the blackbird dataset.
+    Processes data from the blackbird dataset.
+    The args are used to determine loading data path and saving result path.
+
     1. Load data.
     2. Format data.
+    3. Turn math IMU frame to body frame.
+    4. Normalize mocap fixed frame, reset drone's drone initial position.
+    5. Compute state euler's angle with zyx convention from motion capture.
+    6. Derive motion capture orientation to get local angular velocity. Same for position and linear speed.
 
     Downloaded from: http://blackbird-dataset.mit.edu/BlackbirdDatasetData/.
     Github: https://github.com/mit-fast/Blackbird-Dataset
@@ -142,10 +148,10 @@ def raw_importing_cleaning(raw_flight_path, intermediate_flight_path):
                                            sorted(data[name].values(), key=lambda ts_msg: ts_msg["t"]))}
 
     # Compute IMU data in the correct reference frame
+    # This transform is not confirmed, it is an HYPOTHESIS
+    tf_imu_drone = utils.Transform().from_euler(trans=np.array([0, 0, 0]), seq="zyx",
+                                                angles=np.array([-90, 0, 0]), degrees=True)
     for idx, msg in tqdm(raw_data["imu"].items(), desc="Computing imu"):
-        # This transform is not confirmed, it is an HYPOTHESIS
-        tf_imu_drone = utils.Transform().from_euler(trans=np.array([0, 0, 0]), seq="zyx",
-                                                    angles=np.array([-90, 0, 0]), degrees=True)
         # rot_drone_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
         rot_drone_imu = tf_imu_drone.inv().get_rot_matrix()
         data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
@@ -202,7 +208,14 @@ def raw_importing_cleaning(raw_flight_path, intermediate_flight_path):
 
 
 def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
-    print("Loading data")
+    """
+    Synchronizes data with a buffer with one place for each timeseries to synchronise. The buffer add the next unseen
+    measure from the timeseries. As soon as the buffer is full a sample is created and the process restart.
+    Uses the output of raw_importing_cleaning
+
+    The args are used to determine loading data path and saving result path.
+    """
+    print("Loading data for synchronisation")
     data = pickle.load(open(intermediate_flight_path + "1_before_synchro.pkl", "rb"))
 
     # data = {"motor_speed_0": {0: {"t": 1}, 1: {"t": 2}, 2: {"t": 3}, 3: {"t": 4}, 4: {"t": 5}},
@@ -284,7 +297,11 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
 
 
 def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
-    print("Loading data")
+    """
+    Plots the motor speeds, IMU, and state data for one flight for synchronized data.
+    The args are used to determine loading data path and saving result path.
+    """
+    print("Plotting flight data")
     data = pickle.load(open(intermediate_flight_path + "2_data_synced.pkl", "rb"))
 
     # data_names = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
