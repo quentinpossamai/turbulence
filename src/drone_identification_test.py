@@ -8,8 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchdiffeq import odeint
 from tqdm import tqdm
 
-import drone_model
-from utils import TURBULENCE_PATH
+from src.drone_models import drone_model
+from utils import WD_PATH
 
 
 def test_drone_identification():
@@ -29,7 +29,7 @@ def test_drone_identification():
 
     # tensorboard --logdir /Users/quentin/phd/turbulence/products/sanity check system identification/20210323_125158/
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_folder = TURBULENCE_PATH + f"products/sanity check system identification/{now}/"
+    result_folder = WD_PATH + f"products/sanity check system identification/{now}/"
     writer = SummaryWriter(result_folder)
     iteration = 0
 
@@ -114,7 +114,7 @@ def test_drone_reduced_identification():
 
     # tensorboard --logdir "/Users/quentin/phd/turbulence/products/sanity check reduced system identification/20210326_173857/"
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    result_folder = TURBULENCE_PATH + f"products/sanity check reduced system identification/{now}/"
+    result_folder = WD_PATH + f"products/sanity check reduced system identification/{now}/"
     writer = SummaryWriter(result_folder)
     iteration = 0
 
@@ -171,7 +171,7 @@ def test_drone_reduced_identification():
 
 
 def analyze_test_result():
-    result_folder = TURBULENCE_PATH + f"products/sanity check system identification/"
+    result_folder = WD_PATH + f"products/sanity check system identification/"
     last_folder = sorted(next(os.walk(result_folder))[1])[-1] + "/"
     prm = pickle.load(open(result_folder + last_folder + "learned_prms.pkl", "rb"))
 
@@ -233,7 +233,7 @@ def analyze_test_result():
 
 
 def analyze_test_reduced_result():
-    result_folder = TURBULENCE_PATH + f"products/sanity check reduced system identification/"
+    result_folder = WD_PATH + f"products/sanity check reduced system identification/"
     last_folder = sorted(next(os.walk(result_folder))[1])[-1] + "/"
     prm = pickle.load(open(result_folder + last_folder + "learned_prms.pkl", "rb"))
 

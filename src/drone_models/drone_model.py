@@ -1312,6 +1312,7 @@ def system_identification(u_func: torch.tensor, g_states: torch.tensor, time_tra
         exec(f"""saved_vars["{e}"] = [(coef_{e} * {e}).item()]""")
         if writer is not None:
             exec(f"""writer.add_scalars("{e}", {{"{e}": (coef_{e} * {e}).item()}}, global_step=global_iteration)""")
+
     drone_model = AscTecFireflyDroneModel(coef_m=coef_m, g=9.81, coef_kt=coef_kt, coef_km=coef_km,
                                           coef_l_arm=coef_l_arm, coef_ixx=coef_ixx, coef_iyy=coef_iyy,
                                           coef_izz=coef_izz, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy,

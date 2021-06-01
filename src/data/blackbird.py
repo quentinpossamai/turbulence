@@ -3,12 +3,53 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import os
+import torch
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from typing import Dict, Any
 
 from src import utils
 
-DATASET_PATH = os.getcwd() + "/data/blackbird/"
+DATASET_PATH = utils.WD_PATH + "data/blackbird/"
+
+
+class BlackbirdDataset(Dataset):
+    def __init__(self, flight_name, flight_yaw, flight_speed):
+        """
+        Return sample from the synchronised Blackbird dataset.
+
+        Args are used to import data with this path structure:
+        WORKING_DIR/data/blackbird/intermediate/{flight_name}/{flight_yaw}/{flight_speed}/
+
+        getitem returns
+        sample = {"t": torch.tensor, float32, size 1.
+                  "motor_speed": torch.tensor, float32, size 4.
+                  "imu":  torch.tensor, float32, size 6. Linear acceleration size 3 then angular velocity size 3.
+                  "state": torch.tensor, float32, size 12 with :
+                      Euler angle computed with convention zyx but presented with [x, y, z] order size 3.
+                      Angular velocity size 3.
+                      Linear acceleration size 3.
+                      Position size 3.
+                  }
+        label = The next state: torch.tensor, float32, size 12 with the same properties as the state in sample.
+        """
+        # Todo Complete for multiple flights.
+        self.load_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+        self.data = pickle.load(open(self.load_path + "2_data_synced.pkl", "rb"))
+
+    def __len__(self):
+        return len(self.data) - 1  # Dataset size is decreased by 1 to always get a future state.
+
+    def __getitem__(self, idx):
+        # Return the future state for the label. Returns sensors, current state, and command for the sample.
+        sample = {"t": torch.tensor(self.data[idx]["t"]).float(),
+                  "motor_speed": torch.tensor([self.data[idx][f"motor_speed_{i}"]["angular_velocity"]
+                                               for i in range(4)]).float(),
+                  "imu": torch.from_numpy(np.hstack([self.data[idx]["imu"]["linear_acceleration"],
+                                                     self.data[idx]["imu"]["angular_velocity"]])).float(),
+                  "state": torch.from_numpy(self.data[idx]["state"]["state"]).float()}
+        label = torch.from_numpy(self.data[idx + 1]["state"]["state"]).float()
+        return sample, label
 
 
 def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
@@ -499,12 +540,20 @@ def main():
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     fig_path = os.getcwd() + "/reports/blackbird_processed_data/"
 
-    raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
-    synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
-    plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
+    # raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
+    # synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
+    # plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
 
-    # _test()
+    # # Testing pytorch Dataset and Dataloader
+    # dataset = BlackbirdDataset(flight_name, flight_yaw, flight_speed)
+    # sample, label = dataset[3]
+    # dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
+    # for samples, labels in dataloader
+    #     print(samples)
+    #     print(labels)
 
+    # For splitting data use torch.utils.data.random_split(dataset, lengths).
+    # docs: https://pytorch.org/docs/stable/data.html#torch.utils.data.random_split
 
 if __name__ == "__main__":
     main()

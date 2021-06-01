@@ -1,12 +1,12 @@
-import pickle
-
-import posture_error_estimation
-import utils
-import pandas as pd
+import csv
 import imageio
 import numpy as np
+import pandas as pd
+import pickle
+import posture_error_estimation
 import yaml
-import csv
+
+from src import utils
 
 
 def data_processing():
@@ -132,12 +132,12 @@ def error_estimation():
                 ang = estimator.df["pose"][i].inv().get_rot_euler(seq='xyz', degrees=True)
                 if isinstance(p3, np.ndarray):
                     wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
-                                ang[0], ang[1], ang[2]])
+                                 ang[0], ang[1], ang[2]])
                 else:
                     if "\n" in p3:
                         p3 = p3.replace("\n", " ")
                     wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
-                                ang[0], ang[1], ang[2]])
+                                 ang[0], ang[1], ang[2]])
 
         # estimator.p32video(fps=camera_parameters['fps'], saving_path=saving_path)
         print()

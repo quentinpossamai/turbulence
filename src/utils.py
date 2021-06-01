@@ -13,8 +13,7 @@ import sys
 import time
 from typing import Union, Tuple, Optional, List, Iterable
 
-# ABSOLUTE_PATH = "/".join(os.getcwd().split("/")[:-1]) + "/"
-ABSOLUTE_PATH = os.getcwd() + "/"
+WD_PATH = "/Users/quentin/phd/turbulence/"
 
 
 def matplotlib_latex_font():
@@ -283,9 +282,9 @@ class DataFolder(object):
         purpose_folder_names: str. It is defined below.
         :param data_folder_name the name of the data folder to use.
         """
-        self.workspace_path = ABSOLUTE_PATH
-        self.data_path = ABSOLUTE_PATH + data_folder_name + '/'
-        self.tensorboard = ABSOLUTE_PATH + "tensorboard/" + data_folder_name
+        self.workspace_path = WD_PATH
+        self.data_path = WD_PATH + data_folder_name + '/'
+        self.tensorboard = WD_PATH + "tensorboard/" + data_folder_name
 
         # Add "purpose" folders, first purpose folder will be the reference to construct the others.
         purpose_folder_names = ['raw', 'raw_python', 'intermediate', 'results', 'plots']
