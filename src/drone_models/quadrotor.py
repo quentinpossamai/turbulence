@@ -97,17 +97,28 @@ class Quadrotor(nn.Module, ABC):
 
         motor_speed_squared = motor_speed ** 2
 
-        # # Quadrotor
+        # # Quadrotor assuming the drone's body frame is in O_ABC from FIG 2.2:
+        # Sabatino, Francesco. ‘Quadrotor Control: Modeling, Nonlinear Control Design, and Simulation’, 2015, 67.
         # tau_cmd_x = kt * l_arm * (w3 ** 2 - w1 ** 2)
         # tau_cmd_y = kt * l_arm * (w4 ** 2 - w2 ** 2)
         # tau_cmd_z = km * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
         # f_cmd_t = kt * (w1 ** 2 + w2 ** 2 + w3 ** 2 + w4 ** 2)
 
+        # But here the model is using a Forward Right Down body frame's like in the blackbird dataset FIG1:
+        # Antonini, Amado, Winter Guerra, Varun Murali, Thomas Sayre-McCord, and Sertac Karaman.
+        # ‘The Blackbird Dataset: A Large-Scale Dataset for UAV Perception in Aggressive Flight’.
+        # ArXiv:1810.01987 [Cs], 3 October 2018. http://arxiv.org/abs/1810.01987.
+        # So the model becomes:
+        # tau_cmd_x = 1 / sqrt(2) * kt * l_arm * (w3 ** 2 + w4 ** 2 - w1 ** 2 - w2 ** 2)
+        # tau_cmd_y = 1 / sqrt(2) * kt * l_arm * (w1 ** 2 + w4 ** 2 - w2 ** 2 - w3 ** 2)
+        # tau_cmd_z = km * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
+        # f_cmd_t = kt * (w1 ** 2 + w2 ** 2 + w3 ** 2 + w4 ** 2)
+
         # Motor model derivable with pytorch
-        kt_l_arm_matrix = torch.tensor([[-1, 0, 1, 0],
-                                        [0, -1, 0, 1],
-                                        [0, 0, 0, 0],
-                                        [0, 0, 0, 0]]) * kt * l_arm
+        kt_l_arm_matrix = 1 * torch.sqrt(2) * torch.tensor([[-1, -1, 1, 1],
+                                                            [1, -1, -1, 1],
+                                                            [0, 0, 0, 0],
+                                                            [0, 0, 0, 0]]) * kt * l_arm
         km_matrix = torch.tensor([[0, 0, 0, 0],
                                   [0, 0, 0, 0],
                                   [-1, 1, -1, 1],
@@ -238,7 +249,7 @@ def _test():
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Drone take-off")
     for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (9+i)].detach().numpy(), label=name)
+        ax.plot(time, states[:, (9 + i)].detach().numpy(), label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State position[m]")
     plt.legend()
