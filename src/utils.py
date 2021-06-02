@@ -8,7 +8,6 @@ import pathlib
 import pickle
 import re
 from scipy.spatial.transform import Rotation
-import socket
 import sys
 import time
 from typing import Union, Tuple, Optional, List, Iterable

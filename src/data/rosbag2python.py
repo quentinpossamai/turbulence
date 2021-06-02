@@ -256,7 +256,7 @@ def main_data_drones():
     Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
     """
     # Data to extract parameters
-    abs_path = '/Users/quentin/phd/turbulence/'
+    abs_path = '//'
     data_folder = 'data_drone2'
     for flight_number in [3, 4]:
         pattern = '.*(/tara.*)'
@@ -309,7 +309,7 @@ def main_euroc_mav():
     Load rosbag file and save (pickle dump) it in python form. Adaptable to any message type.
     """
     # Data to extract parameters
-    abs_path = '/Users/quentin/phd/turbulence/'
+    abs_path = '//'
     data_folder = 'euroc_mav'
     for flight_number, flight in enumerate(['V1_03_difficult']):
         pattern = '.*(/{}.*)'.format(flight)
@@ -348,9 +348,10 @@ def main_blackbird():
 
     # Flight loading
     # Data loading path
-    flight_name = "ampersand"
+    flight_name = "mouse"  # "ampersand"
     flight_yaw = "yawForward"
-    flight_speed = "maxSpeed1p0"
+    flight_speed = "maxSpeed7p0"  # "maxSpeed1p0"
+
     raw_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
     rosbag_path = raw_path + "rosbag.bag"
     intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder

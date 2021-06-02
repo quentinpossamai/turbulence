@@ -8,6 +8,8 @@ import torch.nn as nn
 from torchdiffeq import odeint
 from typing import Callable, Iterable
 
+from src.data import blackbird
+
 
 class Quadrotor(nn.Module, ABC):
     """
@@ -68,11 +70,11 @@ class Quadrotor(nn.Module, ABC):
         self.g = g
         self.fa = nn.parameter.Parameter(torch.zeros(12, dtype=torch.float, requires_grad=True))
 
-    def f(self, t_time: torch.Tensor, state: torch.Tensor, ms_func: Callable,
+    def f(self, t: torch.Tensor, state: torch.Tensor, ms_func: Callable,
           fa: torch.Tensor) -> torch.Tensor:
         """
         Compute the derivative of the state. x_dot = f(x, u, fa).
-        :param t_time: scalar in seconds (Tensor of shape (1,)).
+        :param t: scalar in seconds (Tensor of shape (1,)).
         :param state: state of the drone torch.Tensor[phi, theta, psi, p, q, r, u, v, w, x, y, z].
         :param ms_func: Command: 6 rotors angular velocity in rad/s.
         :param fa: External perturbation in N=kg.m/s2.
@@ -88,7 +90,7 @@ class Quadrotor(nn.Module, ABC):
         izz = self.izz * self.coef_izz
 
         if callable(ms_func):
-            motor_speed = ms_func(t_time.item())
+            motor_speed = ms_func(t.item())
         else:
             motor_speed = ms_func
 
@@ -115,10 +117,10 @@ class Quadrotor(nn.Module, ABC):
         # f_cmd_t = kt * (w1 ** 2 + w2 ** 2 + w3 ** 2 + w4 ** 2)
 
         # Motor model derivable with pytorch
-        kt_l_arm_matrix = 1 * torch.sqrt(2) * torch.tensor([[-1, -1, 1, 1],
-                                                            [1, -1, -1, 1],
-                                                            [0, 0, 0, 0],
-                                                            [0, 0, 0, 0]]) * kt * l_arm
+        kt_l_arm_matrix = 1 * torch.sqrt(torch.tensor(2.)) * torch.tensor([[-1, -1, 1, 1],
+                                                                           [1, -1, -1, 1],
+                                                                           [0, 0, 0, 0],
+                                                                           [0, 0, 0, 0]]) * kt * l_arm
         km_matrix = torch.tensor([[0, 0, 0, 0],
                                   [0, 0, 0, 0],
                                   [-1, 1, -1, 1],
@@ -201,13 +203,13 @@ def _test():
     g = 9.81
 
     # Drone's parameters
-    m = torch.tensor(1.56779)
-    kt = torch.tensor(8.54858e-6)
-    km = torch.tensor(1.6e-2)
-    l_arm = torch.tensor(0.215)
-    ixx = torch.tensor(0.0347563)
-    iyy = torch.tensor(0.0458929)
-    izz = torch.tensor(0.0977)
+    m = torch.tensor(1.56779)  # Drone's mass [kg]
+    kt = torch.tensor(8.54858e-6)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
+    km = torch.tensor(1.6e-2)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
+    l_arm = torch.tensor(0.215)  # Length of drone's arm  [m]
+    ixx = torch.tensor(0.0347563)  # Inertia matrix diagonal first parameter [kg.m2]
+    iyy = torch.tensor(0.0458929)  # Inertia matrix diagonal first parameter [kg.m2]
+    izz = torch.tensor(0.0977)  # Inertia matrix diagonal first parameter [kg.m2]
 
     coef_m = torch.tensor(1., requires_grad=True)
     coef_kt = torch.tensor(1., requires_grad=True)
@@ -220,7 +222,7 @@ def _test():
     drone = Quadrotor(g=g, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz,
                       coef_m=coef_m, coef_kt=coef_kt, coef_km=coef_km, coef_l_arm=coef_l_arm, coef_ixx=coef_ixx,
                       coef_iyy=coef_iyy, coef_izz=coef_izz)
-    x_dot = drone.f(t_time=torch.zeros(1), state=torch.zeros(12),
+    x_dot = drone.f(t=torch.zeros(1), state=torch.zeros(12),
                     ms_func=torch.tensor([1200., 1200., 1200., 1200.]),
                     fa=torch.tensor([0., 0., 0., 1., 1., 1., 1., 1., 1., 0., 0., 0.], requires_grad=True))
 
@@ -236,10 +238,10 @@ def _test():
         ms_final = torch.tensor([1200., 1200., 1200., 1200.])
         ms = torch.stack((ms_start, ms_final))
         time_array = torch.tensor([0., 10.])
-        ms_interp = torch.tensor([np.interp(t, time_array, ms[:, i]) for i in range(4)]).float()
+        ms_interp = torch.tensor([np.interp(t, time_array, ms[:, j]) for j in range(4)]).float()
         return ms_interp
 
-    states = odeint(lambda t, x: drone.f(t_time=t, state=x, ms_func=ms_cmd, fa=torch.zeros(12)),
+    states = odeint(lambda t, x: drone.f(t=t, state=x, ms_func=ms_cmd, fa=torch.zeros(12)),
                     initial_state, time, method="rk4")
 
     # State position
@@ -261,5 +263,202 @@ def _test():
     pass
 
 
+def _test_blackbird():
+    fig_path = os.getcwd() + "/reports/quadrotor_tests/"
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+
+    # Physics parameters
+    g = 9.81
+
+    # Blackbird's parameters
+    m = torch.tensor(0.915)  # Drone's mass [kg]
+    kt = torch.tensor(2.0699917818129613e-06)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
+    km = torch.tensor(5.11e-8)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
+    l_arm = torch.tensor(0.13)  # Length of drone's arm  [m]
+    ixx = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    iyy = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    izz = torch.tensor(6.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+
+    with torch.no_grad():
+        drone = Quadrotor(g=g, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+        data = blackbird.BlackbirdDataset(flight_name="ampersand", flight_yaw="yawForward", flight_speed="maxSpeed1p0")
+
+        time = torch.tensor([e[0]["t"] for e in data])
+        initial_state = torch.zeros(12)
+
+        def ms_cmd(t: float) -> Iterable:
+            time_array = time
+            ms = torch.stack([e[0]["motor_speed"] for e in data])
+            ms_interp = torch.tensor([np.interp(t, time_array, ms[:, j]) for j in range(4)]).float()
+            return ms_interp
+
+        states = odeint(lambda t, x: drone.f(t=t, state=x, ms_func=ms_cmd, fa=torch.zeros(12)),
+                        initial_state, time, method="rk4")
+
+    # State orientation
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("phi", "theta", "psi")):
+        ax.plot(time, states[:, (0 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State orientation[rad]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_orientation.png")
+    plt.show()
+
+    # State angular velocity
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, states[:, (3 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State angular velocity [rad/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_angular_velocity.png")
+    plt.show()
+
+    # State linear speed
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, states[:, (6 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State linear speed [m/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_linear_speed.png")
+    plt.show()
+
+    # State linear speed
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, states[:, (9 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State position [m]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_position.png")
+    plt.show()
+
+    pass
+
+
+def _test_blackbird_motor_speed():
+    fig_path = os.getcwd() + "/reports/quadrotor_tests/"
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+
+    data = blackbird.BlackbirdDataset(flight_name="ampersand", flight_yaw="yawForward", flight_speed="maxSpeed1p0")
+
+    # Compute angular and linear acceleration of the state
+    for i, e in enumerate(data):
+        sample, xn1 = e
+        xn = sample["state"]
+        pass
+
+    # Physics parameters
+    g = 9.81
+
+    # Blackbird's parameters
+    m = torch.tensor(0.915)  # Drone's mass [kg]
+    kt = torch.tensor(2.0699917818129613e-06)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
+    km = torch.tensor(5.11e-8)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
+    l_arm = torch.tensor(0.13)  # Length of drone's arm  [m]
+    ixx = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    iyy = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    izz = torch.tensor(6.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+
+    drone = Quadrotor(g=g, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
+
+    time = torch.tensor([e[0]["t"] for e in data])
+    initial_state = torch.zeros(12)
+
+    def ms_cmd(t: float) -> Iterable:
+        time_array = time
+        ms = torch.stack([d[0]["motor_speed"] for d in data])
+        ms_interp = torch.tensor([np.interp(t, time_array, ms[:, j]) for j in range(4)]).float()
+        return ms_interp
+
+    states = odeint(lambda t, x: drone.f(t=t, state=x, ms_func=ms_cmd, fa=torch.zeros(12)),
+                    initial_state, time, method="rk4")
+
+    # State orientation
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("phi", "theta", "psi")):
+        ax.plot(time, states[:, (0 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State orientation[rad]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_orientation.png")
+    plt.show()
+
+    # State angular velocity
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, states[:, (3 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State angular velocity [rad/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_angular_velocity.png")
+    plt.show()
+
+    # State linear speed
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, states[:, (6 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State linear speed [m/s]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_linear_speed.png")
+    plt.show()
+
+    # State linear speed
+    p = pathlib.Path(fig_path)
+    p.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Blackbird data with quadrotor model")
+    for i, name in zip(range(3), ("x", "y", "z")):
+        ax.plot(time, states[:, (9 + i)].detach().numpy(), label=name)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("State position [m]")
+    plt.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.savefig(fig_path + "state_position.png")
+    plt.show()
+
+    pass
+
+
 if __name__ == "__main__":
-    _test()
+    # _test()
+    # _test_blackbird()
+    _test_blackbird_motor_speed()

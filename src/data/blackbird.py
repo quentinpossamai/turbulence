@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 import os
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from tqdm import tqdm
 from typing import Dict, Any
 
@@ -68,7 +68,10 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     Github: https://github.com/mit-fast/Blackbird-Dataset
     Paper: https://arxiv.org/abs/1810.01987
 
-    Will save in intermediate/[flight_directory]/rosbag.pkl
+    Will save in intermediate/[flight_directory]/rosbag.pkl.
+
+    HYPOTHESIS MADE:
+    -Transform between the IMU frame and the body frame is guessed from fig 1 of the blackbird paper.
     """
     print("Loading data")
     # Load tf_norm_mocap
@@ -95,7 +98,7 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     # trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
     # tf_fgenv_norm = utils.Transform().from_euler(trans, "zyx", angles, degrees=True)
 
-    # We will not use this one
+    # We will not use FLU frames but FRD for body for norm frame. Note norm = fixed earth from Sabatino.
     # tf_fgenvflu_fgenv = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
     #                                                  angles=np.array([0, 0, 180]), degrees=True)
     # We will use this one instead
@@ -323,7 +326,7 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.plot([e for i, e in enumerate(var_time) if i not in bad_synchros])
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    ax.set_ylabel("Variance of timestamp considered as synced [s-2]")
+    ax.set_ylabel("Variance of timestamp considered as synced [s2]")
     ax.set_xlabel("Sample number")
     ax.grid()
     plt.tight_layout()
@@ -334,7 +337,29 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
           f"the variance of the timestamps.")
     assert bad_synchros == [0], "Not only the first point is badly synchronised."
     kept_data = [e for i, e in enumerate(data_synced) if i not in bad_synchros]
+
+    # Resetting time
+    t0 = kept_data[0]["t"]
+    for i in range(len(kept_data)):
+        kept_data[i]["t"] = kept_data[i]["t"] - t0
+
     pickle.dump(kept_data, open(intermediate_flight_path + "2_data_synced.pkl", "wb"))
+
+    time = np.array([e["t"] for e in data["imu"].values()])
+    # Difference between synchronised IMU timestamps
+    time_diff = time[1:] - time[:-1]
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    ax.plot(time[1:], time_diff)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Difference between IMU timestamps [s]")
+    # ax.set_xlim([40, 50])
+    # ax.set_ylim([1000, 1200])
+    ax.grid()
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(fig_path + "imu_timestamp_diff.png")
+    plt.show()
 
 
 def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
@@ -346,20 +371,46 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
     data = pickle.load(open(intermediate_flight_path + "2_data_synced.pkl", "rb"))
 
     # data_names = ['motor_speed_0', 'motor_speed_1', 'motor_speed_2', 'motor_speed_3', 'imu', 'mc_pose', 'state']
-    time = np.array([e["t"] for e in data]) - data[0]["t"]
+    time = np.array([e["t"] for e in data])
 
-    # Motor speeds
+    # Difference between synchronised timestamps
+    time_diff = time[1:] - time[:-1]
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for i in range(4):
-        ax.plot(time, [e[f"motor_speed_{i}"]["angular_velocity"] for e in data], label=f"Motor {i}")
+    ax.plot(time[1:], time_diff)
     ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Motor speed [rad/s]")
-    plt.legend()
+    ax.set_ylabel("Difference between timestamps [s]")
     ax.grid()
+    # ax.legend()
     plt.tight_layout()
-    plt.savefig(fig_path + "motor_speed.png")
+    plt.savefig(fig_path + "timestamp_diff.png")
     plt.show()
+
+    # Motor speeds
+    def ms_plot(xlim1, xlim2, ylim1, ylim2):
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+        for i in range(4):
+            ax.plot(time, [e[f"motor_speed_{i}"]["angular_velocity"] for e in data], label=f"Motor {i}")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Motor speed [rad/s]")
+        ax.set_xlim([xlim1, xlim2])
+        ax.set_ylim([ylim1, ylim2])
+        ax.grid()
+        ax.legend()
+        plt.tight_layout()
+        plt.savefig(fig_path + "motor_speed.png")
+        plt.show()
+    i = 0
+    a = 20
+    for i in range(7):
+        ms_plot(xlim1=i * a, xlim2=i*a + a, ylim1=800, ylim2=1600)
+    ms_plot(xlim1=103, xlim2=105, ylim1=800, ylim2=1600)
+
+    # for e in data:
+    #     if e["motor_speed_0"]["angular_velocity"] > 1000.:
+    #         print(e["t"])
+    #         break
 
     # IMU angular velocity
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
@@ -368,7 +419,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         ax.plot(time, [e[f"imu"]["angular_velocity"][i] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("IMU angular velocity [rad/s]")
-    plt.legend()
+    ax.legend()
     ax.grid()
     plt.tight_layout()
     plt.savefig(fig_path + "imu_angular_velocity.png")
@@ -381,7 +432,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         ax.plot(time, [e[f"imu"]["linear_acceleration"][i] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("IMU linear acceleration [m/s2]")
-    plt.legend()
+    ax.legend()
     ax.grid()
     plt.tight_layout()
     plt.savefig(fig_path + "imu_linear_acceleration.png")
@@ -394,7 +445,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         ax.plot(time, [e[f"state"]["state"][i] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State orientation [rad]")
-    plt.legend()
+    ax.legend()
     ax.grid()
     plt.tight_layout()
     plt.savefig(fig_path + "state_orientation.png")
@@ -407,7 +458,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         ax.plot(time, [e[f"state"]["state"][i + 3] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State angular velocity [rad/s]")
-    plt.legend()
+    ax.legend()
     ax.grid()
     plt.tight_layout()
     plt.savefig(fig_path + "state_angular_velocity.png")
@@ -420,7 +471,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         ax.plot(time, [e[f"state"]["state"][i + 6] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State linear speed [m/s]")
-    plt.legend()
+    ax.legend()
     ax.grid()
     plt.tight_layout()
     plt.savefig(fig_path + "state_linear_speed.png")
@@ -433,7 +484,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         ax.plot(time, [e[f"state"]["state"][i + 9] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State position[m]")
-    plt.legend()
+    ax.legend()
     ax.grid()
     plt.tight_layout()
     plt.savefig(fig_path + "state_position.png")
@@ -530,10 +581,9 @@ def main():
 
     # environments = ['Small_Apartment', 'Large_Apartment_Night_Near_Couches']+
 
-    flight_name = "ampersand"
+    flight_name = "mouse"  # "ampersand"
     flight_yaw = "yawForward"
-    flight_speed = "maxSpeed1p0"
-    # environment = "Small_Apartment"
+    flight_speed = "maxSpeed7p0"  # "maxSpeed1p0"
 
     # Paths
     raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
@@ -542,7 +592,7 @@ def main():
 
     # raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
     # synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
-    # plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
+    plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
 
     # # Testing pytorch Dataset and Dataloader
     # dataset = BlackbirdDataset(flight_name, flight_yaw, flight_speed)
@@ -554,6 +604,7 @@ def main():
 
     # For splitting data use torch.utils.data.random_split(dataset, lengths).
     # docs: https://pytorch.org/docs/stable/data.html#torch.utils.data.random_split
+
 
 if __name__ == "__main__":
     main()
