@@ -48,7 +48,8 @@ class BlackbirdDataset(Dataset):
                   "imu": torch.from_numpy(np.hstack([self.data[idx]["imu"]["linear_acceleration"],
                                                      self.data[idx]["imu"]["angular_velocity"]])).float(),
                   "state": torch.from_numpy(self.data[idx]["state"]["state"]).float()}
-        label = torch.from_numpy(self.data[idx + 1]["state"]["state"]).float()
+        label = {"state": torch.from_numpy(self.data[idx + 1]["state"]["state"]).float(),
+                 "t": torch.tensor(self.data[idx + 1]["t"]).float()}
         return sample, label
 
 

@@ -367,8 +367,10 @@ def _test_blackbird_motor_speed():
 
     # Compute angular and linear acceleration of the state
     for i, e in enumerate(data):
-        sample, xn1 = e
+        sample, label = e
         xn = sample["state"]
+        xn1 = label["state"]
+        accelerations = (xn1 - xn)[3:9] / (label["t"] - sample["t"])
         pass
 
     # Physics parameters
