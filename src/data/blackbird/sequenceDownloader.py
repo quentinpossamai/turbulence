@@ -18,7 +18,7 @@ import urllib
 import wget
 
 # S3 address as URI (yes, /// is on purpose)
-serverAddress = "ijrr-blackbird-dataset.s3-accelerate.amazonaws.com/BlackbirdDatasetData"
+serverAddress = "ijrr20-blackbird-dataset.s3-accelerate.amazonaws.com/BlackbirdDatasetData"
 
 # Flight files that can be used for playback / analysis
 flightFileList = [
