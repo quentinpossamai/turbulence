@@ -12,6 +12,65 @@ from src import utils
 
 DATASET_PATH = utils.WD_PATH + "data/blackbird/"
 
+FLIGHT_COMBINATIONS = {"3dFigure8": {"yawConstant": [0.5, 1, 2, 3, 4, 5],
+                                     "yawForward": []},
+                       "ampersand": {"yawConstant": [1, 2, 3],
+                                     "yawForward": [1, 2]},
+                       "bentDice": {"yawConstant": [1, 2, 3, 4],
+                                    "yawForward": [0.5, 1, 2, 3]},
+                       "clover": {"yawConstant": [1, 2, 3, 4, 5, 6],
+                                  "yawForward": [0.5, 1, 2, 3, 4, 5]},
+                       "dice": {"yawConstant": [2, 3, 4],
+                                "yawForward": [1, 2, 3]},
+                       "egg": {"yawConstant": [13.8],
+                               "yawForward": [3, 4, 5, 6, 7, 8, 9]},
+                       "figure8": {"yawConstant": [0.5, 1, 2, 3.25, 5],
+                                   "yawForward": []},
+                       "halfMoon": {"yawConstant": [1, 2, 3, 4],
+                                    "yawForward": [1, 1.5, 2, 3, 4, "maxSpeed1p0_run_2"]},
+                       "mouse": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                 "yawForward": [0.5, 1, 2, 3, 4, 5, 6, 7, "maxSpeed0p5_run_2"]},
+                       "oval": {"yawConstant": [2, 3, 4],
+                                "yawForward": [1, 2, 3, 4]},
+                       "patrick": {"yawConstant": [1, 2, 3, 4, 5],
+                                   "yawForward": [0.5, 1, 2, 3, 4]},
+                       "picasso": {"yawConstant": [0.5, 1, 2, 3, 4, 5, 6],
+                                   "yawForward": [0.5, 1, 3, 4, 5]},
+                       "sid": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                               "yawForward": [0.5, 1, 2, 3, 4, 5]},
+                       "sphinx": {"yawConstant": [1, 2, 3, 4],
+                                  "yawForward": [1, 2, 3, 4]},
+                       "star": {"yawConstant": [1, 2, 3, 4, 5, "maxSpeed4p0_run_2"],
+                                "yawForward": [0.5, 1, 2, 3, 4, 5]},
+                       "thrice": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                  "yawForward": [0.5, 1, 2, 3, 4, 5, 6]},
+                       "tiltedThrice": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                        "yawForward": [0.5, 1, 2, 3, 4, 5, 6]},
+                       "winter": {"yawConstant": [1, 2, 3, 4, 5],
+                                  "yawForward": [0.5, 2, 3, 4, "maxSpeed3p0_run_2"]}
+
+                       }
+
+
+def _get_flight_list():
+    flight_list = []
+    for flight_name, traj in FLIGHT_COMBINATIONS.items():
+        for flight_yaw, speeds in traj.items():
+            for speed in speeds:
+                if type(speed) == int:
+                    flight_speed = f"maxSpeed{speed}p0"
+                elif type(speed) == float:
+                    unit, dec = str(speed).split(".")
+                    flight_speed = f"maxSpeed{int(unit)}p{int(dec)}"
+                else:
+                    # speed must be str
+                    flight_speed = speed
+                flight_list.append(f"{flight_name}/{flight_yaw}/{flight_speed}/")
+        return flight_list
+
+
+FLIGHT_LIST = _get_flight_list()
+
 
 class BlackbirdDataset(Dataset):
     def __init__(self, flight_name, flight_yaw, flight_speed):
@@ -252,7 +311,7 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     pickle.dump(data, open(intermediate_flight_path + "1_before_synchro.pkl", "wb"))
 
 
-def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
+def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path, is_plotting):
     """
     Synchronizes data with a buffer with one place for each timeseries to synchronise. The buffer add the next unseen
     measure from the timeseries. As soon as the buffer is full a sample is created and the process restart.
@@ -291,6 +350,15 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
         return False
 
     data_synced = []
+    # data_synced = [{"motor_speed_0": {angular_velocity: np.ndarray},
+    # "motor_speed_1": {"angular_velocity": np.ndarray, "t": float},
+    # "motor_speed_2": {"angular_velocity": np.ndarray, "t": float},
+    # "motor_speed_3": {"angular_velocity": np.ndarray, "t": float},
+    # "imu": {"angular_velocity": np.ndarray, "linear_acceleration": np.ndarray, "t": float},
+    # "mc_pose": {"transform": utils.Transform, "t": float},
+    # "state": {"state": np.ndarray, "t": float},
+    # "t": float}]
+
     while not is_one_timeserie_done():
         ts_name, ts_stat = min(synchronisation_master.items(), key=lambda elem: data[elem[0]][elem[1]["idx"]]["t"])
 
@@ -324,16 +392,6 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
     tol = 1e-4
     bad_synchros = list(np.where(var_time > tol))[0]
 
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.plot([e for i, e in enumerate(var_time) if i not in bad_synchros])
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    ax.set_ylabel("Variance of timestamp considered as synced [s2]")
-    ax.set_xlabel("Sample number")
-    ax.grid()
-    plt.tight_layout()
-    plt.savefig(fig_path + "blackbird_synchro_one_flight.png")
-    plt.show()
-
     print(f"Bad synchronisation happened at indices {bad_synchros} with a tolerance of {tol} of "
           f"the variance of the timestamps.")
     assert bad_synchros == [0], "Not only the first point is badly synchronised."
@@ -344,23 +402,45 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
     for i in range(len(kept_data)):
         kept_data[i]["t"] = kept_data[i]["t"] - t0
 
+    # Identifying when the drone start to fly and stops
+    start, stop = 0, 0
+    start_done = False
+    for i, sample in enumerate(kept_data):
+        if sample["motor_speed"][0] > 1000 and not start_done:
+            start = i
+            start_done = True
+        elif start_done and sample["motor_speed"][0] < 900:
+            stop = i
+            break
+
     pickle.dump(kept_data, open(intermediate_flight_path + "2_data_synced.pkl", "wb"))
 
-    time = np.array([e["t"] for e in data["imu"].values()])
-    # Difference between synchronised IMU timestamps
-    time_diff = time[1:] - time[:-1]
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    ax.plot(time[1:], time_diff)
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Difference between IMU timestamps [s]")
-    # ax.set_xlim([40, 50])
-    # ax.set_ylim([1000, 1200])
-    ax.grid()
-    ax.legend()
-    plt.tight_layout()
-    plt.savefig(fig_path + "imu_timestamp_diff.png")
-    plt.show()
+    if is_plotting:
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        ax.plot([e for i, e in enumerate(var_time) if i not in bad_synchros])
+        ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+        ax.set_ylabel("Variance of timestamp considered as synced [s2]")
+        ax.set_xlabel("Sample number")
+        ax.grid()
+        plt.tight_layout()
+        plt.savefig(fig_path + "blackbird_synchro_one_flight.png")
+        plt.show()
+
+        time = np.array([e["t"] for e in data["imu"].values()])
+        # Difference between synchronised IMU timestamps
+        time_diff = time[1:] - time[:-1]
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+        ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+        ax.plot(time[1:], time_diff)
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Difference between IMU timestamps [s]")
+        # ax.set_xlim([40, 50])
+        # ax.set_ylim([1000, 1200])
+        ax.grid()
+        ax.legend()
+        plt.tight_layout()
+        plt.savefig(fig_path + "imu_timestamp_diff.png")
+        plt.show()
 
 
 def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
@@ -403,6 +483,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         plt.tight_layout()
         plt.savefig(fig_path + "motor_speed.png")
         plt.show()
+
     i = 0
     a = 20
     # for i in range(7):
@@ -593,9 +674,9 @@ def main():
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     fig_path = os.getcwd() + "/reports/blackbird_processed_data/"
 
-    # raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
-    # synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
-    plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
+    raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
+    synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path, is_plotting=False)
+    # plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
 
     # # Testing pytorch Dataset and Dataloader
     # dataset = BlackbirdDataset(flight_name, flight_yaw, flight_speed)

@@ -346,34 +346,90 @@ def main_blackbird():
     """
     dataset_path = os.getcwd() + "/data/blackbird/"
 
+    flight_combinations = {"3dFigure8": {"yawConstant": [0.5, 1, 2, 3, 4, 5],
+                                         "yawForward": []},
+                           "ampersand": {"yawConstant": [1, 2, 3],
+                                         "yawForward": [1, 2]},
+                           "bentDice": {"yawConstant": [1, 2, 3, 4],
+                                        "yawForward": [0.5, 1, 2, 3]},
+                           "clover": {"yawConstant": [1, 2, 3, 4, 5, 6],
+                                      "yawForward": [0.5, 1, 2, 3, 4, 5]},
+                           "dice": {"yawConstant": [2, 3, 4],
+                                    "yawForward": [1, 2, 3]},
+                           "egg": {"yawConstant": [13.8],
+                                   "yawForward": [3, 4, 5, 6, 7, 8, 9]},
+                           "figure8": {"yawConstant": [0.5, 1, 2, 3.25, 5],
+                                       "yawForward": []},
+                           "halfMoon": {"yawConstant": [1, 2, 3, 4],
+                                        "yawForward": [1, 1.5, 2, 3, 4, "maxSpeed1p0_run_2"]},
+                           "mouse": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                     "yawForward": [0.5, 1, 2, 3, 4, 5, 6, 7, "maxSpeed0p5_run_2"]},
+                           "oval": {"yawConstant": [2, 3, 4],
+                                    "yawForward": [1, 2, 3, 4]},
+                           "patrick": {"yawConstant": [1, 2, 3, 4, 5],
+                                       "yawForward": [0.5, 1, 2, 3, 4]},
+                           "picasso": {"yawConstant": [0.5, 1, 2, 3, 4, 5, 6],
+                                       "yawForward": [0.5, 1, 3, 4, 5]},
+                           "sid": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                   "yawForward": [0.5, 1, 2, 3, 4, 5]},
+                           "sphinx": {"yawConstant": [1, 2, 3, 4],
+                                      "yawForward": [1, 2, 3, 4]},
+                           "star": {"yawConstant": [1, 2, 3, 4, 5, "maxSpeed4p0_run_2"],
+                                    "yawForward": [0.5, 1, 2, 3, 4, 5]},
+                           "thrice": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                      "yawForward": [0.5, 1, 2, 3, 4, 5, 6]},
+                           "tiltedThrice": {"yawConstant": [1, 2, 3, 4, 5, 6, 7],
+                                            "yawForward": [0.5, 1, 2, 3, 4, 5, 6]},
+                           "winter": {"yawConstant": [1, 2, 3, 4, 5],
+                                      "yawForward": [0.5, 2, 3, 4, "maxSpeed3p0_run_2"]}
+                           }
+
+    flight_list = []
+    for flight_name, traj in flight_combinations.items():
+        for flight_yaw, speeds in traj.items():
+            for speed in speeds:
+                if type(speed) == int:
+                    flight_speed = "maxSpeed{}p0".format(speed)
+                elif type(speed) == float:
+                    unit, dec = str(speed).split(".")
+                    flight_speed = "maxSpeed{}p{}".format(int(unit), int(dec))
+                else:
+                    # speed must be str
+                    flight_speed = speed
+                flight_list.append("{}/{}/{}/".format(flight_name, flight_yaw, flight_speed))
+
     # Flight loading
     # Data loading path
-    flight_name = "mouse"  # "ampersand"
-    flight_yaw = "yawForward"
-    flight_speed = "maxSpeed7p0"  # "maxSpeed1p0"
+    # flight_name = "mouse"  # "ampersand"
+    # flight_yaw = "yawForward"
+    # flight_speed = "maxSpeed7p0"  # "maxSpeed1p0"
 
-    raw_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
-    rosbag_path = raw_path + "rosbag.bag"
-    intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder
-                                                             flight_yaw, flight_speed)
-    saving_path = intermediate_path + "0_rosbag.pkl"
+    # raw_path = dataset_path + "{}/{}/{}/{}/".format("raw", flight_name, flight_yaw, flight_speed)
+    # intermediate_path = dataset_path + "{}/{}/{}/{}/".format("intermediate", flight_name,  # data saving folder
+    #                                                          flight_yaw, flight_speed)
 
-    # # Calibration loading
-    # rosbag_path = dataset_path + "raw/cameraCalibration/imuCameraCalibration.bag"
-    # intermediate_path = dataset_path + "intermediate/cameraCalibration/"
-    # saving_path = intermediate_path + "imuCameraCalibration.pkl"
+    for flight in flight_list:
+        raw_path = dataset_path + "raw/" + flight
+        intermediate_path = dataset_path + "intermediate/" + flight
+        rosbag_path = raw_path + "rosbag.bag"
+        saving_path = intermediate_path + "0_rosbag.pkl"
 
-    if not os.path.exists(intermediate_path):
-        os.makedirs(intermediate_path)
+        # # Calibration loading
+        # rosbag_path = dataset_path + "raw/cameraCalibration/imuCameraCalibration.bag"
+        # intermediate_path = dataset_path + "intermediate/cameraCalibration/"
+        # saving_path = intermediate_path + "imuCameraCalibration.pkl"
 
-    # Extract data
-    e = Extractor(rosbag_path)
-    data_extracted = e.extract()
+        if not os.path.exists(intermediate_path):
+            os.makedirs(intermediate_path)
 
-    # Saving processed data
-    print('Saving at : {}'.format(saving_path))
-    pickle.dump(data_extracted, open(saving_path, 'wb'))
-    print()
+        # Extract data
+        e = Extractor(rosbag_path)
+        data_extracted = e.extract()
+
+        # Saving processed data
+        print('Saving at : {}'.format(saving_path))
+        pickle.dump(data_extracted, open(saving_path, 'wb'))
+        print()
 
 
 def object_analysis(obj):
