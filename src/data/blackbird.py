@@ -388,15 +388,16 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
     plt.show()
 
     # Motor speeds
-    def ms_plot(xlim1, xlim2, ylim1, ylim2):
+    def ms_plot(xlim1=None, xlim2=None, ylim1=None, ylim2=None):
         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
         ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
         for i in range(4):
             ax.plot(time, [e[f"motor_speed_{i}"]["angular_velocity"] for e in data], label=f"Motor {i}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Motor speed [rad/s]")
-        ax.set_xlim([xlim1, xlim2])
-        ax.set_ylim([ylim1, ylim2])
+        if xlim1 is None:
+            ax.set_xlim([xlim1, xlim2])
+            ax.set_ylim([ylim1, ylim2])
         ax.grid()
         ax.legend()
         plt.tight_layout()
@@ -404,9 +405,10 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
         plt.show()
     i = 0
     a = 20
-    for i in range(7):
-        ms_plot(xlim1=i * a, xlim2=i*a + a, ylim1=800, ylim2=1600)
-    ms_plot(xlim1=103, xlim2=105, ylim1=800, ylim2=1600)
+    # for i in range(7):
+    #     ms_plot(xlim1=i * a, xlim2=i*a + a, ylim1=800, ylim2=1600)
+    # ms_plot(xlim1=103, xlim2=105, ylim1=800, ylim2=1600)
+    ms_plot(xlim1=None, xlim2=None, ylim1=None, ylim2=None)
 
     # for e in data:
     #     if e["motor_speed_0"]["angular_velocity"] > 1000.:
@@ -443,7 +445,7 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
     for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(time, [e[f"state"]["state"][i] for e in data], label=name)
+        ax.plot(time, [e[f"state"]["state"][0 + i] for e in data], label=name)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State orientation [rad]")
     ax.legend()

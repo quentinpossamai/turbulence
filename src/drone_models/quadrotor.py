@@ -1,4 +1,5 @@
 from abc import ABC
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -116,22 +117,27 @@ class Quadrotor(nn.Module, ABC):
         # tau_cmd_z = km * (w2 ** 2 + w4 ** 2 - w1 ** 2 - w3 ** 2)
         # f_cmd_t = kt * (w1 ** 2 + w2 ** 2 + w3 ** 2 + w4 ** 2)
 
-        # Motor model derivable with pytorch
-        kt_l_arm_matrix = 1 * torch.sqrt(torch.tensor(2.)) * torch.tensor([[-1, -1, 1, 1],
-                                                                           [1, -1, -1, 1],
-                                                                           [0, 0, 0, 0],
-                                                                           [0, 0, 0, 0]]) * kt * l_arm
-        km_matrix = torch.tensor([[0, 0, 0, 0],
-                                  [0, 0, 0, 0],
-                                  [-1, 1, -1, 1],
-                                  [0, 0, 0, 0]]) * km
+        # # Motor model derivable with pytorch
+        # kt_l_arm_matrix = 1 * torch.sqrt(torch.tensor(2.)) * torch.tensor([[-1, -1, 1, 1],
+        #                                                                    [1, -1, -1, 1],
+        #                                                                    [0, 0, 0, 0],
+        #                                                                    [0, 0, 0, 0]]) * kt * l_arm
+        # km_matrix = torch.tensor([[0, 0, 0, 0],
+        #                           [0, 0, 0, 0],
+        #                           [-1, 1, -1, 1],
+        #                           [0, 0, 0, 0]]) * km
+        #
+        # kt_matrix = torch.tensor([[0, 0, 0, 0],
+        #                           [0, 0, 0, 0],
+        #                           [0, 0, 0, 0],
+        #                           [1, 1, 1, 1]]) * kt
+        #
+        # b = kt_l_arm_matrix + km_matrix + kt_matrix
 
-        kt_matrix = torch.tensor([[0, 0, 0, 0],
-                                  [0, 0, 0, 0],
-                                  [0, 0, 0, 0],
-                                  [1, 1, 1, 1]]) * kt
-
-        b = kt_l_arm_matrix + km_matrix + kt_matrix
+        b = torch.tensor([[1.1929e-06, -6.6763e-07, -1.0711e-06, 5.8162e-07],
+                          [1.1559e-06, 4.2571e-07, -1.0062e-06, -4.0577e-07],
+                          [-1.0810e-07, 3.2904e-08, -2.3441e-07, 2.6588e-07],
+                          [1.3094e-06, 1.1255e-06, 2.9530e-06, 2.4706e-06]])
 
         # Command converted to forces and torques
         drone_torsor = b @ motor_speed_squared
@@ -263,6 +269,69 @@ def _test():
     pass
 
 
+def _test_blackbird_motor_speed_matrix():
+    fig_path = os.getcwd() + "/reports/quadrotor_tests/"
+    path_manager = pathlib.Path(fig_path)
+    path_manager.mkdir(parents=True, exist_ok=True)
+
+    # Physics parameters
+    g = 9.81
+
+    # Blackbird's parameters
+    m = torch.tensor(0.915)  # Drone's mass [kg]
+    kt = torch.tensor(2.0699917818129613e-06)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
+    km = torch.tensor(5.11e-8)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
+    l_arm = torch.tensor(0.13)  # Length of drone's arm  [m]
+    ixx = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    iyy = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    izz = torch.tensor(6.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+
+    data = blackbird.BlackbirdDataset(flight_name="mouse", flight_yaw="yawForward", flight_speed="maxSpeed7p0")
+
+    all_motor_permutations = itertools.permutations([0, 1, 2, 3], 4)
+    # actuator_dynamics = [{"motor_permutation": [], "b": np.ndarray(4, 4)}]
+    permuted_motors_dynamic = []
+
+    # Identifying when the drone start to fly and stops
+    start, stop = 0, 0
+    start_done = False
+    for i, (sample, label) in enumerate(data):
+        if sample["motor_speed"][0] > 1000 and not start_done:
+            start = i
+            start_done = True
+        elif start_done and sample["motor_speed"][0] < 900:
+            stop = i
+            break
+
+    # Computing actuator dynamic matrix for each motor permutations
+    for motor_permutation in all_motor_permutations:
+        # Identifying motor's matrix
+        left, right = [], []
+        # Compute angular and linear acceleration of the state
+        for i, e in enumerate(data):
+            if i < start or i > stop:
+                continue
+            sample, label = e
+            xn = sample["state"]
+            xn1 = label["state"]
+            dt = (label["t"] - sample["t"])
+            p_dot, q_dot, r_dot, _, _, w_dot = (xn1 - xn)[3:9] / dt
+            phi, theta, psi, p, q, r, u, v, w, x, y, z = xn
+            taux = p_dot * ixx + (izz - iyy) * r * q
+            tauy = q_dot * iyy + (ixx - izz) * p * r
+            tauz = r_dot * izz + (iyy - ixx) * p * q
+            ft = m * (q * u - p * v) + g * torch.cos(phi) * torch.cos(theta) - w_dot
+            right.append(sample["motor_speed"][list(motor_permutation)] ** 2)
+            left.append(torch.tensor([taux, tauy, tauz, ft]))
+        right = torch.stack(right).T
+        left = torch.stack(left).T
+        b = left @ right.T @ (right @ right.T).pinverse()
+        print(b)
+        permuted_motors_dynamic.append({"motor_permutation": motor_permutation, "actuator_dynamic": b})
+    pass
+
+
+
 def _test_blackbird():
     fig_path = os.getcwd() + "/reports/quadrotor_tests/"
     p = pathlib.Path(fig_path)
@@ -280,28 +349,43 @@ def _test_blackbird():
     iyy = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
     izz = torch.tensor(6.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
 
+    # data = blackbird.BlackbirdDataset(flight_name="ampersand", flight_yaw="yawForward",
+    # flight_speed="maxSpeed1p0")
+    data = blackbird.BlackbirdDataset(flight_name="mouse", flight_yaw="yawForward", flight_speed="maxSpeed7p0")
+
+    # Identifying when the drone start to fly and stops
+    start, stop = 0, 0
+    start_done = False
+    for i, (sample, label) in enumerate(data):
+        if sample["motor_speed"][0] > 1000 and not start_done:
+            start = i
+            start_done = True
+        elif start_done and sample["motor_speed"][0] < 900:
+            stop = i
+            break
+    if stop - start > 100:
+        stop = start + 100
+
     with torch.no_grad():
         drone = Quadrotor(g=g, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
 
-        data = blackbird.BlackbirdDataset(flight_name="ampersand", flight_yaw="yawForward", flight_speed="maxSpeed1p0")
-
-        time = torch.tensor([e[0]["t"] for e in data])
-        initial_state = torch.zeros(12)
+        time = torch.tensor([e[0]["t"] for e in data])[start:stop]
+        states_gt = torch.stack([e[0]["state"] for e in data])[start:stop, :]
+        initial_state = data[start][0]["state"]
 
         def ms_cmd(t: float) -> Iterable:
-            time_array = time
-            ms = torch.stack([e[0]["motor_speed"] for e in data])
-            ms_interp = torch.tensor([np.interp(t, time_array, ms[:, j]) for j in range(4)]).float()
+            ms = torch.stack([e[0]["motor_speed"] for e in data])[start:stop, :]
+            ms_interp = torch.tensor([np.interp(t, time, ms[:, j]) for j in range(4)]).float()
             return ms_interp
 
         states = odeint(lambda t, x: drone.f(t=t, state=x, ms_func=ms_cmd, fa=torch.zeros(12)),
-                        initial_state, time, method="rk4")
-
+                        initial_state, time, method="euler")
     # State orientation
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(time, states[:, (0 + i)].detach().numpy(), label=name)
+    for i, name, color in zip(range(3), ("phi", "theta", "psi"), ("blue", "green", "purple")):
+        ax.plot(time, states[:, (0 + i)].detach().numpy(), label=name, color=color)
+        ax.plot(time, states_gt[:, (0 + i)], label=name + "ground_truth", linestyle="--", color=color)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State orientation[rad]")
     plt.legend()
@@ -315,8 +399,9 @@ def _test_blackbird():
     p.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (3 + i)].detach().numpy(), label=name)
+    for i, name, color in zip(range(3), ("x", "y", "z"), ("blue", "green", "purple")):
+        ax.plot(time, states[:, (3 + i)].detach().numpy(), label=name, color=color)
+        ax.plot(time, states_gt[:, (3 + i)], label=name + "ground_truth", linestyle="--", color=color)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State angular velocity [rad/s]")
     plt.legend()
@@ -330,8 +415,9 @@ def _test_blackbird():
     p.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (6 + i)].detach().numpy(), label=name)
+    for i, name, color in zip(range(3), ("x", "y", "z"), ("blue", "green", "purple")):
+        ax.plot(time, states[:, (6 + i)].detach().numpy(), label=name, color=color)
+        ax.plot(time, states_gt[:, (6 + i)], label=name + "ground_truth", linestyle="--", color=color)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State linear speed [m/s]")
     plt.legend()
@@ -340,115 +426,14 @@ def _test_blackbird():
     plt.savefig(fig_path + "state_linear_speed.png")
     plt.show()
 
-    # State linear speed
+    # State position
     p = pathlib.Path(fig_path)
     p.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
     ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (9 + i)].detach().numpy(), label=name)
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("State position [m]")
-    plt.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.savefig(fig_path + "state_position.png")
-    plt.show()
-
-    pass
-
-
-def _test_blackbird_motor_speed():
-    fig_path = os.getcwd() + "/reports/quadrotor_tests/"
-    p = pathlib.Path(fig_path)
-    p.mkdir(parents=True, exist_ok=True)
-
-    data = blackbird.BlackbirdDataset(flight_name="ampersand", flight_yaw="yawForward", flight_speed="maxSpeed1p0")
-
-    # Compute angular and linear acceleration of the state
-    for i, e in enumerate(data):
-        sample, label = e
-        xn = sample["state"]
-        xn1 = label["state"]
-        accelerations = (xn1 - xn)[3:9] / (label["t"] - sample["t"])
-        pass
-
-    # Physics parameters
-    g = 9.81
-
-    # Blackbird's parameters
-    m = torch.tensor(0.915)  # Drone's mass [kg]
-    kt = torch.tensor(2.0699917818129613e-06)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
-    km = torch.tensor(5.11e-8)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
-    l_arm = torch.tensor(0.13)  # Length of drone's arm  [m]
-    ixx = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
-    iyy = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
-    izz = torch.tensor(6.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
-
-    drone = Quadrotor(g=g, m=m, kt=kt, km=km, l_arm=l_arm, ixx=ixx, iyy=iyy, izz=izz)
-
-    time = torch.tensor([e[0]["t"] for e in data])
-    initial_state = torch.zeros(12)
-
-    def ms_cmd(t: float) -> Iterable:
-        time_array = time
-        ms = torch.stack([d[0]["motor_speed"] for d in data])
-        ms_interp = torch.tensor([np.interp(t, time_array, ms[:, j]) for j in range(4)]).float()
-        return ms_interp
-
-    states = odeint(lambda t, x: drone.f(t=t, state=x, ms_func=ms_cmd, fa=torch.zeros(12)),
-                    initial_state, time, method="rk4")
-
-    # State orientation
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(time, states[:, (0 + i)].detach().numpy(), label=name)
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("State orientation[rad]")
-    plt.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.savefig(fig_path + "state_orientation.png")
-    plt.show()
-
-    # State angular velocity
-    p = pathlib.Path(fig_path)
-    p.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (3 + i)].detach().numpy(), label=name)
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("State angular velocity [rad/s]")
-    plt.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.savefig(fig_path + "state_angular_velocity.png")
-    plt.show()
-
-    # State linear speed
-    p = pathlib.Path(fig_path)
-    p.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (6 + i)].detach().numpy(), label=name)
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("State linear speed [m/s]")
-    plt.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.savefig(fig_path + "state_linear_speed.png")
-    plt.show()
-
-    # State linear speed
-    p = pathlib.Path(fig_path)
-    p.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    ax.set_title(f"Blackbird data with quadrotor model")
-    for i, name in zip(range(3), ("x", "y", "z")):
-        ax.plot(time, states[:, (9 + i)].detach().numpy(), label=name)
+    for i, name, color in zip(range(3), ("x", "y", "z"), ("blue", "green", "purple")):
+        ax.plot(time, states[:, (9 + i)].detach().numpy(), label=name, color=color)
+        ax.plot(time, states_gt[:, (9 + i)], label=name + "ground_truth", linestyle="--", color=color)
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("State position [m]")
     plt.legend()
@@ -462,5 +447,5 @@ def _test_blackbird_motor_speed():
 
 if __name__ == "__main__":
     # _test()
+    _test_blackbird_motor_speed_matrix()
     # _test_blackbird()
-    _test_blackbird_motor_speed()

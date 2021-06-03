@@ -3,13 +3,11 @@ import os
 import pickle
 import time
 import re
-from pathlib import Path
-
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as integrate
 
-from utils import Transform, DataFolder
+from src.utils import Transform, DataFolder, WD_PATH
 
 
 def main():
@@ -29,8 +27,8 @@ class DataPreparation(object):
         # Import data
         flight_files = []
         i = 0
-        for day in sorted(next(os.walk(ABSOLUTE_PATH))[1]):
-            temp_path = ABSOLUTE_PATH + day + '/'
+        for day in sorted(next(os.walk(WD_PATH))[1]):
+            temp_path = WD_PATH + day + '/'
             for flight_name in sorted(next(os.walk(temp_path))[1]):
                 flight_path = temp_path + flight_name + '/'
                 if i == self.flight_number:
@@ -126,7 +124,7 @@ class DataPreparation(object):
 
             # Video creation
             # part1, part2, _ = self.flight_name.split('/')
-            # name = ABSOLUTE_PATH + 'integration_videos/' + part1 + '_' + part2 + '_integration.mkv'
+            # name = WD_PATH + 'integration_videos/' + part1 + '_' + part2 + '_integration.mkv'
             # aff3d(xyz, quat, video_path=name)
             # states.exit(0)
 
@@ -219,7 +217,7 @@ class DataPreparation(object):
             # plt.ylabel('Position (m)')
             # plt.legend(loc=1, framealpha=0.5)
             # fig.tight_layout()
-            # name = (ABSOLUTE_PATH[:-11] +
+            # name = (WD_PATH[:-11] +
             #         f'plots/mavros_imu_denoising_comparison/{self.flight_name[:-1].replace("/", "_")}.png')
             # fig.savefig(name, dpi=fig.dpi)
             # plt.show()
@@ -384,7 +382,7 @@ class DataPreparation(object):
                       'camera_info_right': self.camera_info_right,
                       'camera_info_left': self.camera_info_left}
 
-        # path = ABSOLUTE_PATH + self.flight_name + 'clean_data/'
+        # path = WD_PATH + self.flight_name + 'clean_data/'
         # Path(path).mkdir(parents=True, exist_ok=True)
         # pickle.dump(clean_data, open(path + 'data.pkl', 'wb'))
         print()
