@@ -172,7 +172,7 @@ class MCAnalysis(object):
             # ai_prime_mat - ((drone_r_origin @ ai_mat.T).T + drone_t_origin)
 
             # Append drone_tf_origin
-            drone_tf_origin = utils.Transform().from_rot_matrix_trans_vect(trans=drone_t_origin, rot=drone_r_origin)
+            drone_tf_origin = utils.Transform().from_rot_mat_trans(rot=drone_r_origin, trans=drone_t_origin)
             poses.append(drone_tf_origin)
 
             p.update()
@@ -215,7 +215,7 @@ class MCAnalysis(object):
         y = np.cross(z, x) / np.linalg.norm(np.cross(z, x))
 
         # Compute ai'
-        self.drone_tf_o = utils.Transform().from_trans_3_axis(trans=oc, x=x, y=y, z=z).inv()
+        self.drone_tf_o = utils.Transform().from_3_axis_rot_trans(x=x, y=y, z=z, trans=oc).inv()
         res = {}
         for point_name in self.points_name:
             res[point_name] = self.drone_tf_o @ self.data.get_point(point_name, frame_number)

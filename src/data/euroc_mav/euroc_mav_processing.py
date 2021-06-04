@@ -58,8 +58,8 @@ def data_processing():
         tmp = {}
         for index, row in mc.iterrows():
             # vicon0_tf_origin
-            vicon0_tf_origin = utils.Transform().from_pose(trans=row[['x', 'y', 'z']].to_numpy(),
-                                                           quat=row[['a', 'b', 'c', 'wn']].to_numpy()).inv()
+            vicon0_tf_origin = utils.Transform().from_quat_trans(quat=row[['a', 'b', 'c', 'wn']].to_numpy(),
+                                                                 trans=row[['x', 'y', 'z']].to_numpy()).inv()
             camera_tf_origin = camera_parameters['camera_tf_vicon0'] @ vicon0_tf_origin
             tmp[index] = camera_tf_origin
             p.update()
@@ -127,9 +127,9 @@ def error_estimation():
                          "psi [deg] (orientation of the camera relative to global reference frame)"])
             for i in range(len(estimator.df)):
                 p3 = point_position_in_image[i]
-                xyz = estimator.df["pose"][i].inv().get_trans()
-                quat = estimator.df["pose"][i].inv().get_quat()
-                ang = estimator.df["pose"][i].inv().get_rot_euler(seq='xyz', degrees=True)
+                xyz = estimator.df["pose"][i].inv().as_trans()
+                quat = estimator.df["pose"][i].inv().as_rot_quat()
+                ang = estimator.df["pose"][i].inv().as_rot_euler(seq='xyz', degrees=True)
                 if isinstance(p3, np.ndarray):
                     wr.writerow([p3, xyz[0], xyz[1], xyz[2], quat[0], quat[1], quat[2], quat[3],
                                  ang[0], ang[1], ang[2]])
@@ -174,7 +174,7 @@ def dataset_creation(flight_number: int):
             for measure in data[data_column].values():
                 tmp['time'].append(measure['t'])
                 trans, quat = measure['translation'], measure['rotation']
-                tmp[name].append(utils.Transform().from_pose(trans, quat).inv())
+                tmp[name].append(utils.Transform().from_quat_trans(quat, trans).inv())
         elif msg_type == 'asctec_hl_comm/MotorSpeed':
             tmp = {'time': [], name: []}
             for measure in data[data_column].values():

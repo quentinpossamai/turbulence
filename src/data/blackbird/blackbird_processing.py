@@ -138,7 +138,7 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     with open(raw_flight_path + "flightNormalizationOffset.csv", newline='') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
         trans = np.array(next(reader))
-    tf_norm_mocap = utils.Transform().from_pose(trans, np.array([0, 0, 0, 1]))
+    tf_norm_mocap = utils.Transform().from_quat_trans(np.array([0, 0, 0, 1]), trans)
 
     # # We do not use images so this transform is useless
     # # Load tf_fgenv_norm for each environment
@@ -253,9 +253,9 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
 
     # Compute IMU data in the correct reference frame
     # This transform is not confirmed, it is an HYPOTHESIS
-    tf_imu_drone = utils.Transform().from_euler(trans=np.array([0, 0, 0]), seq="zyx",
-                                                angles=np.array([-90, 0, 0]), degrees=True)
-    rot_drone_imu = tf_imu_drone.inv().get_rot_matrix()
+    tf_imu_drone = utils.Transform().from_euler_trans(seq="zyx", angles=np.array([-90, 0, 0]), degrees=True,
+                                                      trans=np.array([0, 0, 0]))
+    rot_drone_imu = tf_imu_drone.inv().as_rot_mat()
     for idx, msg in tqdm(raw_data["imu"].items(), desc="Computing imu"):
         # rot_drone_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
         data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
@@ -265,15 +265,15 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     # Compute pose data in the correct reference frame
     for idx, msg in tqdm(raw_data["mc_pose"].items(), desc="Computing pose"):
         # mc_pose is tf_mocap_drone
-        tf_mocap_drone = utils.Transform().from_pose(trans=msg["translation"], quat=msg["rotation"])
+        tf_mocap_drone = utils.Transform().from_quat_trans(quat=msg["rotation"], trans=msg["translation"])
         # tf_norm_drone = tf_normflu_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
         tf_norm_drone = tf_norm_mocap @ tf_mocap_drone
         # mc_pose is tf_norm_drone
         data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_norm_drone}
 
     # Resetting drone position
-    tf_dronestart_norm = utils.Transform().from_pose(trans=data["mc_pose"][0]["transform"].get_trans(),
-                                                     quat=np.array([0, 0, 0, 1])).inv()
+    tf_dronestart_norm = utils.Transform().from_quat_trans(quat=np.array([0, 0, 0, 1]),
+                                                           trans=data["mc_pose"][0]["transform"].as_trans()).inv()
     for idx in tqdm(data["mc_pose"], desc="Resetting first position"):
         tf_norm_drone = data["mc_pose"][idx]["transform"]
         tf_dronestart_drone = tf_dronestart_norm @ tf_norm_drone
@@ -283,11 +283,11 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     for idx in tqdm(range(1, len(data["mc_pose"])), desc="Computing state"):
         dt = data["mc_pose"][idx]["t"] - data["mc_pose"][idx - 1]["t"]
         # Compute euler angles in global frame from quaternion in global frame
-        euler_orientation = data["mc_pose"][idx]["transform"].get_rot_euler(seq="zyx", degrees=False)[::-1]
+        euler_orientation = data["mc_pose"][idx]["transform"].as_rot_euler(seq="zyx", degrees=False)[::-1]
 
         # Compute angular velocity in drone's frame from quaternion in global frame
-        qn1 = data["mc_pose"][idx]["transform"].get_quat()
-        qn = data["mc_pose"][idx - 1]["transform"].get_quat()
+        qn1 = data["mc_pose"][idx]["transform"].as_rot_quat()
+        qn = data["mc_pose"][idx - 1]["transform"].as_rot_quat()
         # Graf, Basile. ‘Quaternions and Dynamics’. ArXiv:0811.2889 [Math-Ph], 18 November 2008.
         # https://arxiv.org/abs/0811.2889. Use a different convention than scipy.spatial.transform.Rotation.from_quat¶
         dq_dt = (qn1 - qn) / dt
@@ -299,11 +299,11 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
         angular_velocity = (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
 
         # Compute linear speed in drone's frame from drone's position in global frame
-        rot_drone_dronestart = data["mc_pose"][idx]["transform"].inv().get_rot_matrix()
-        linear_speed = rot_drone_dronestart @ (data["mc_pose"][idx]["transform"].get_trans() -
-                                               data["mc_pose"][idx - 1]["transform"].get_trans()) / dt
+        rot_drone_dronestart = data["mc_pose"][idx]["transform"].inv().as_rot_mat()
+        linear_speed = rot_drone_dronestart @ (data["mc_pose"][idx]["transform"].as_trans() -
+                                               data["mc_pose"][idx - 1]["transform"].as_trans()) / dt
 
-        position = data["mc_pose"][idx]["transform"].get_trans()
+        position = data["mc_pose"][idx]["transform"].as_trans()
         data["state"][idx - 1] = {"t": data["mc_pose"][idx]["t"],
                                   "dt": dt,
                                   "state": np.hstack((euler_orientation, angular_velocity, linear_speed, position))}

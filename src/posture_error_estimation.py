@@ -106,11 +106,11 @@ class ErrorEstimation(object):
         vect_camera = np.array([x_prime, y_prime, 1])
 
         origin_tf_camera = self.df['pose'][idx].inv()
-        origin_rot_camera = origin_tf_camera.get_rot_matrix()
+        origin_rot_camera = origin_tf_camera.as_rot_mat()
         vect_origin = origin_rot_camera @ vect_camera
         vect_origin /= np.linalg.norm(vect_origin)
 
-        camera_position = origin_tf_camera.get_trans()
+        camera_position = origin_tf_camera.as_trans()
         h = camera_position[2]  # drone'sin height
         floor_normal = np.array([0, 0, 1])
         # If height is positive and camera sees the floor
@@ -266,8 +266,8 @@ class ErrorEstimation(object):
             else:
                 ax.annotate(self.p3[i], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
                             ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
-            xyz = self.df['pose'][i].inv().get_trans()
-            angles = self.df['pose'][i].inv().get_rot_euler(seq='xyz', degrees=True)
+            xyz = self.df['pose'][i].inv().as_trans()
+            angles = self.df['pose'][i].inv().as_rot_euler(seq='xyz', degrees=True)
             legend = (f'Camera position\n'
                       f'       x:{xyz[0]:8.3f}m\n'
                       f'       y:{xyz[1]:8.3f}m\n'

@@ -502,8 +502,8 @@ def euroc_mav_compute_fa(flight_number: int):
     data["vicon_pose"] = data["vicon_pose"].apply(lambda _x: _x.inv())
     # Now data["vicon_pose"] is tf_origin_drone
 
-    data["trans"] = data["vicon_pose"].apply(lambda _x: _x.get_trans())
-    data["quat"] = data["vicon_pose"].apply(lambda _x: _x.get_pose()[1])
+    data["trans"] = data["vicon_pose"].apply(lambda _x: _x.as_trans())
+    data["quat"] = data["vicon_pose"].apply(lambda _x: _x.as_quat_trans()[0])
     data.motor_speed = data.motor_speed.apply(lambda _x: torch.from_numpy(_x).float())
 
     dt = pd.Series(data["time"][1:].values - data["time"][:len(data) - 1].values)
@@ -514,7 +514,7 @@ def euroc_mav_compute_fa(flight_number: int):
     linear_speed = (data["trans"][1:].values - data["trans"][:len(data) - 1].values) / dt
     # Linear speed in drone
     linear_speed = linear_speed.to_frame(0) \
-        .apply(lambda _x: data["vicon_pose"][_x.name].get_rot_matrix().T @ _x.values[0], axis=1)
+        .apply(lambda _x: data["vicon_pose"][_x.name].as_rot_mat().T @ _x.values[0], axis=1)
 
     def angular_velocity_euler(_x: pd.Series) -> np.ndarray:
         """
@@ -540,7 +540,7 @@ def euroc_mav_compute_fa(flight_number: int):
 
     data["state"] = np.zeros(len(data))
     data[["state"]] = data[["state"]].apply(
-        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].get_rot_euler("zyx", False)[::-1],
+        lambda _x: torch.from_numpy(np.hstack([data["vicon_pose"][_x.name].as_rot_euler("zyx", False)[::-1],
                                                data["angular_velocity"][_x.name],
                                                data["linear_speed"][_x.name],
                                                data["trans"][_x.name]]).astype(np.float)), axis=1)

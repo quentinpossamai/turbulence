@@ -34,7 +34,7 @@ def data_processing():
     # Vincent input : (0.105, 0, 0, -1.57, 0.0, -2.0943) (convention x, y, z, roll, pitch, yaw)
     drone_d_camera = np.array([0.105, 0, 0])
     drone_rot_camera = Rotation.from_euler('xyz', np.array([-120, 0, -90]), degrees=True).as_quat()
-    camera_tf_drone = utils.Transform().from_pose(drone_d_camera, drone_rot_camera).inv()
+    camera_tf_drone = utils.Transform().from_quat_trans(drone_rot_camera, drone_d_camera).inv()
     mc['pose'] = mc['pose'].apply(lambda x: camera_tf_drone @ x)
     mc['pose_time'] = (mc['pose_time'] - mc['pose_time'][0])
 
@@ -225,8 +225,8 @@ def mc_drone_origin(mc_measure: pd.DataFrame, ind_inf: int, ind_sup: int, saving
     """
     # Finding second synchro
     fig, axs = plt.subplots(3, 2)
-    position = np.vstack([mc_measure['pose'][i].inv().get_trans() for i in mc_measure.index])
-    angle = np.vstack([mc_measure['pose'][i].inv().get_rot_euler('xyz', True) for i in mc_measure.index])
+    position = np.vstack([mc_measure['pose'][i].inv().as_trans() for i in mc_measure.index])
+    angle = np.vstack([mc_measure['pose'][i].inv().as_rot_euler('xyz', True) for i in mc_measure.index])
     xx = list(range(ind_inf, ind_sup))
     for i in range(2):
         if i == 0:
@@ -310,11 +310,11 @@ def aff3d(xyz_array, quat_array, video_path):
     prg = utils.Progress(len(xyz_array))
 
     for xyz, quat in zip(xyz_array, quat_array):
-        ref_tf_pos = utils.Transform().from_pose(xyz, quat)
+        ref_tf_pos = utils.Transform().from_quat_trans(quat, xyz)
 
-        x_ref = ref_tf_pos.get_rot_matrix() @ x_pos
-        y_ref = ref_tf_pos.get_rot_matrix() @ y_pos
-        z_ref = ref_tf_pos.get_rot_matrix() @ z_pos
+        x_ref = ref_tf_pos.as_rot_mat() @ x_pos
+        y_ref = ref_tf_pos.as_rot_mat() @ y_pos
+        z_ref = ref_tf_pos.as_rot_mat() @ z_pos
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')

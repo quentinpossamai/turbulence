@@ -1,95 +1,74 @@
 import numpy as np
 from scipy.spatial.transform import Rotation
-from typing import Union
+from typing import Tuple
 
 
 class Transform(object):
-    def __init__(self):
-        self.matrix: np.ndarray = np.eye(4)
+    def __init__(self, matrix: np.ndarray):
+        self._matrix: np.ndarray = matrix  # shape = (n, 4, 4)
+        self._is_single = False
+        if self._matrix.shape[0] == 1:
+            self._is_single = True
 
-    def __matmul__(self, multiple: Union['Transform', np.ndarray]) -> Union['Transform', np.ndarray]:
-        if isinstance(multiple, Transform):
-            return Transform().from_matrix(self.matrix @ multiple.get_matrix())
-        else:  # type(multiple) is np.ndarray
-            if multiple.shape[0] == 4:
-                return self.matrix @ multiple
-            elif multiple.shape in [(3,)]:
-                return (self.matrix @ np.append(multiple, 1))[:-1]
-            else:
-                if not len(multiple.shape) in [1, 2]:
-                    raise ArithmeticError(f"Multiplication between Transform object and object with "
-                                          f"{len(multiple.shape)}-axis is not defined. Only with "
-                                          f"shape =(4, n), (4,), (3,)")
-                else:
-                    raise ArithmeticError(f"Multiplication between Transform object and an object of shape "
-                                          f"{multiple.shape} is not defined. Only with "
-                                          f"shape =(4, n), (4,), (3,)")
-
+    # def __matmul__(self, multiple: Union['Transform', np.ndarray]) -> Union['Transform', np.ndarray]:
+    #     if isinstance(multiple, Transform):
+    #         return Transform().from_matrix(self.matrix @ multiple.as_matrix())
+    #     else:  # type(multiple) is np.ndarray
+    #         if multiple.shape[0] == 4:
+    #             return self.matrix @ multiple
+    #         elif multiple.shape in [(3,)]:
+    #             return (self.matrix @ np.append(multiple, 1))[:-1]
+    #         else:
+    #             if not len(multiple.shape) in [1, 2]:
+    #                 raise ArithmeticError(f"Multiplication between Transform object and object with "
+    #                                       f"{len(multiple.shape)}-axis is not defined. Only with "
+    #                                       f"shape =(4, n), (4,), (3,)")
+    #             else:
+    #                 raise ArithmeticError(f"Multiplication between Transform object and an object of shape "
+    #                                       f"{multiple.shape} is not defined. Only with "
+    #                                       f"shape =(4, n), (4,), (3,)")
+    #
     def __repr__(self):
-        return self.matrix.__repr__()
+        return self._matrix.__repr__()
 
-    def get_rot_matrix(self) -> np.ndarray:
-        return self.matrix[:3, :3]
+    def __len__(self):
+        """Number of rotations contained in this object.
 
-    def get_rot_euler(self, seq, degrees):
+        Multiple rotations can be stored in a single instance.
+
+        Returns
+        -------
+        length : int
+            Number of rotations stored in object.
+
         """
-        Cf doc scipy.spatial.transform.Rotation
-        """
-        return Rotation.from_matrix(self.get_rot_matrix()).as_euler(seq=seq, degrees=degrees)
+        return self._matrix.shape[0]
 
-    def get_trans(self) -> np.ndarray:
-        return self.matrix[:3, 3]
 
-    def get_matrix(self) -> np.ndarray:
-        return self.matrix
+    @classmethod
+    def from_matrix(cls, matrix: np.ndarray) -> 'Transform':
+        if not isinstance(matrix, np.ndarray):
+            raise TypeError(f"Expected `matrix` to be numpy.ndarray got {matrix.__class__.__name__}")
+        if matrix.ndim not in [2, 3] or matrix.shape[-2:] != (4, 4):
+            raise ValueError("Expected `matrix` to have shape (4, 4) or "
+                             f"(N, 4, 4), got {matrix.shape}")
+        if matrix.shape == (4, 4):
+            matrix = matrix.reshape((1, 4, 4))
+        n = matrix.shape[0]
 
-    def get_quat(self) -> np.ndarray:
-        """quat = x, y, z, w with scipy Rotation."""
-        return Rotation.from_matrix(self.get_rot_matrix()).as_quat()
+        rot = matrix[:, :3, :3]
+        trans = matrix[:, :3, 3]
+        assert (matrix[:, 3, :] == np.array([0, 0, 0, 1])).all(), "Last row must be [0, 0, 0, 1]."
 
-    def inv(self) -> 'Transform':
-        r = self.get_rot_matrix()
-        rt = r.T
+        rot = Rotation.from_matrix(rot).as_matrix()
 
-        t = self.get_trans()
-        t = - rt @ t
+        tf = np.repeat(np.eye(4).reshape((1, 4, 4)), n, 0)
+        tf[:, :3, :3] = rot
+        tf[:, :3, 3] = trans
+        return cls(matrix=tf)
 
-        new_tf = np.eye(4)
-        new_tf[:3, :3] = rt
-        new_tf[:3, 3] = t
-        return Transform().from_matrix(new_tf)
-
-    def get_pose(self) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        A reference frame.
-
-        B reference frame.
-
-        A_R_B = quat = orientation of B relative to A.
-
-        A_D_B = trans = translation from A origin to B origin described in A.
-
-        P_A point described in A.
-
-        A_T_B = tf = Transform object such as P_A = Transform().from_pose(trans, quat) @ P_B.
-
-        trans, quat = tf.get_pose().
-
-        :return: trans, quat.
-
-        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A) while applying '@' operator.
-
-        C reference frame.
-
-        D reference frame.
-
-        C_T_D = C_T_A @ A_T_B @ B_T_D.                T_C_D = C_T_D
-        """
-        quat = Rotation.from_matrix(self.get_rot_matrix()).as_quat()
-        trans = self.get_trans()
-        return trans, quat
-
-    def from_pose(self, trans: np.ndarray, quat: np.ndarray) -> 'Transform':
+    @classmethod
+    def from_quat_trans(cls, quat: np.ndarray, trans: np.ndarray) -> 'Transform':
         """
         Create a Transform object from the reference frame of (xyz, quat) to a new one at position xyz and oriented
         with quat.
@@ -122,23 +101,24 @@ class Transform(object):
 
         C_T_D = C_T_A @ A_T_B @ B_T_D.
         """
-        assert trans.shape == (3,)
-        assert quat.shape == (4,)
-        assert np.round(np.linalg.norm(quat), 3) == 1
+        if not isinstance(quat, np.ndarray) and not isinstance(trans, np.ndarray):
+            raise TypeError(f"Expected `quat` and `trans` to be numpy.ndarray got {quat.__class__.__name__} and"
+                            f" {trans.__class__.__name__}")
+        if trans.ndim not in [1, 2] or trans.shape[-1:] != (3,):
+            raise ValueError("Expected `trans` to have shape (3,) or "
+                             f"(N, 3), got {trans.shape}")
+        if trans.shape == (3,):
+            trans = trans.reshape((1, 3))
+        n = trans.shape[0]
 
-        r = Rotation.from_quat(quat).as_matrix()
-        tf = np.eye(4)
-        tf[:3, :3] = r
-        tf[:3, 3] = trans
-        self.matrix = tf
-        return self
+        rot = Rotation.from_quat(quat).as_matrix()
+        tf = np.repeat(np.eye(4).reshape((1, 4, 4)), n, 0)
+        tf[:, :3, :3] = rot
+        tf[:, :3, 3] = trans
+        return cls(tf)
 
-    def from_matrix(self, matrix: np.ndarray) -> 'Transform':
-        self.matrix = matrix
-        return self
-
-    def from_euler(self, trans: np.ndarray, seq: str,
-                   angles: np.ndarray, degrees: Optional[bool] = False) -> 'Transform':
+    @classmethod
+    def from_euler_trans(cls, seq: str, angles: np.ndarray, degrees: bool, trans: np.ndarray) -> 'Transform':
         """
         Return a Transform object from a translation, an angle convention, and 3 Euler angles.
 
@@ -154,10 +134,25 @@ class Transform(object):
 
         :return: A_TF_B
         """
-        assert angles.shape == (3,)
-        return self.from_pose(trans=trans, quat=Rotation.from_euler(seq=seq, angles=angles, degrees=degrees).as_quat())
 
-    def from_rot_matrix_trans_vect(self, trans: np.ndarray, rot: np.ndarray) -> 'Transform':
+        if not isinstance(angles, np.ndarray) and not isinstance(trans, np.ndarray):
+            raise TypeError(f"Expected `angles` and `trans` to be numpy.ndarray got {angles.__class__.__name__} and"
+                            f" {trans.__class__.__name__}")
+        if trans.ndim not in [1, 2] or trans.shape[-1:] != (3,):
+            raise ValueError("Expected `trans` to have shape (3,) or "
+                             f"(N, 3), got {trans.shape}")
+        if trans.shape == (3,):
+            trans = trans.reshape((1, 3))
+        n = trans.shape[0]
+
+        rot = Rotation.from_euler(seq=seq, angles=angles, degrees=degrees).as_matrix()
+        tf = np.repeat(np.eye(4).reshape((1, 4, 4)), n, 0)
+        tf[:, :3, :3] = rot
+        tf[:, :3, 3] = trans
+        return cls(tf)
+
+    @classmethod
+    def from_rot_mat_trans(cls, rot: np.ndarray, trans: np.ndarray) -> 'Transform':
         """
         A reference frame.
 
@@ -181,17 +176,24 @@ class Transform(object):
         C_T_D = C_T_A @ A_T_B @ B_T_D.
         Return the Transform object from a rotation matrix and a translation vector.
         """
-        assert trans.shape == (3,)
-        assert rot.shape == (3, 3)
+        if not isinstance(rot, np.ndarray) and not isinstance(trans, np.ndarray):
+            raise TypeError(f"Expected `rot` and `trans` to be numpy.ndarray got {rot.__class__.__name__} and"
+                            f" {trans.__class__.__name__}")
+        if trans.ndim not in [1, 2] or trans.shape[-1:] != (3,):
+            raise ValueError("Expected `trans` to have shape (3,) or "
+                             f"(N, 3), got {trans.shape}")
+        if trans.shape == (3,):
+            trans = trans.reshape((1, 3))
+        n = trans.shape[0]
 
-        tf = np.eye(4)
-        tf[:3, :3] = rot
-        tf[:3, 3] = trans
-        self.matrix = tf
+        new_rot = Rotation.from_quat(rot).as_matrix()
+        tf = np.repeat(np.eye(4).reshape((1, 4, 4)), n, 0)
+        tf[:, :3, :3] = new_rot
+        tf[:, :3, 3] = trans
+        return cls(tf)
 
-        return self
-
-    def from_trans_3_axis(self, trans: np.ndarray, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> 'Transform':
+    @classmethod
+    def from_3_axis_rot_trans(cls, x: np.ndarray, y: np.ndarray, z: np.ndarray, trans: np.ndarray) -> 'Transform':
         """
 
         :param x: unit vector of B x-axis expressed in A.
@@ -200,23 +202,171 @@ class Transform(object):
         :param trans: A_D_B = translation from A origin to B origin described in A.
         :return: The corresponding Transform object : A_tf_B
         """
-        assert x.shape == (3,)
-        assert y.shape == (3,)
-        assert z.shape == (3,)
-        assert trans.shape == (3,)
+
+        def check(var):
+            if not isinstance(var, np.ndarray):
+                raise TypeError(f"Expected `var`  to be numpy.ndarray got {var.__class__.__name__})")
+            if var.ndim not in [1, 2] or var.shape[-1:] != (3,):
+                raise ValueError("Expected `trans` to have shape (3,) or "
+                                 f"(N, 3), got {var.shape}")
+            if var.shape == (3,):
+                return var.reshape((1, 3))
+            return var
+
+        trans = check(trans)
+        x = check(x)
+        y = check(y)
+        z = check(z)
+
+        n = trans.shape[0]
 
         # Inspired by https://stackoverflow.com/a/34392459/10054528
-        a_r_b = np.hstack([x.reshape((3, 1)),  # r = A_R_B
-                           y.reshape((3, 1)),
-                           z.reshape((3, 1))])
-        quat = Rotation.from_matrix(a_r_b).as_quat()
-        self.from_pose(trans, quat)
-        return self
+        a_r_b = np.stack([x, y, z], axis=2)  # A_R_B
+        rot = Rotation.from_matrix(a_r_b).as_matrix()
+        tf = np.repeat(np.eye(4).reshape((1, 4, 4)), n, 0)
+        tf[:, :3, :3] = rot
+        tf[:, :3, 3] = trans
+        return cls(tf)
+
+    def as_matrix(self) -> np.ndarray:
+        if self._is_single:
+            return self._matrix[0]
+        else:
+            return self._matrix
+
+    def as_quat_trans(self) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        A reference frame.
+
+        B reference frame.
+
+        A_R_B = quat = orientation of B relative to A.
+
+        A_D_B = trans = translation from A origin to B origin described in A.
+
+        P_A point described in A.
+
+        A_T_B = tf = Transform object such as P_A = Transform().from_pose(trans, quat) @ P_B.
+
+        trans, quat = tf.get_pose().
+
+        :return: quat(x, y, z, w), trans (x, y,z ) concatenated array.
+
+        Note: only work for 3D points_name, P_A = (x_A, y_A, z_A) while applying '@' operator.
+
+        C reference frame.
+
+        D reference frame.
+
+        C_T_D = C_T_A @ A_T_B @ B_T_D.                T_C_D = C_T_D
+        """
+        quat = Rotation.from_matrix(self.as_rot_mat()).as_quat()
+        if self._is_single:
+            return np.hstack((quat[0], self.as_trans()))
+        else:
+            return np.hstack((quat, self.as_trans()))
+
+    def as_rot_quat(self) -> np.ndarray:
+        """quat = x, y, z, w with scipy Rotation."""
+        return Rotation.from_matrix(self.as_rot_mat()).as_quat()
+
+    def as_rot_mat(self) -> np.ndarray:
+        if self._is_single:
+            return self._matrix[0, :3, :3]
+        else:
+            return self._matrix[:, :3, :3]
+
+    def as_rot_euler(self, seq, degrees):
+        """
+        Cf doc scipy.spatial.transform.Rotation
+
+        Return angle in the seq order
+        Example for a rotation of pi/2 around z-axis if seq = zyx, will return np.array([pi/2, 0, 0])
+        """
+        return Rotation.from_matrix(self.as_rot_mat()).as_euler(seq=seq, degrees=degrees)
+
+    def as_trans(self) -> np.ndarray:
+        if self._is_single:
+            return self._matrix[0, :3, 3]
+        else:
+            return self._matrix[:, :3, 3]
+
+    def inv(self) -> 'Transform':
+        r = self._matrix[:, :3, :3]
+        rt = r.transpose((0, 2, 1))
+
+        t = self.as_trans()
+        t_rotated = (- rt @ t.reshape((-1, 3, 1))).squeeze()
+
+        new_tf = np.repeat(np.eye(4).reshape((1, 4, 4)), len(r), 0)
+        new_tf[:, :3, :3] = rt
+        new_tf[:, :3, 3] = t_rotated
+        return Transform(new_tf)
 
 
-def _test():
-    pass
+def _test_from_matrix_as_matrix():
+    n = 1000
+    quat = np.random.randn(n, 4)  # x, y, z , w
+
+    # Test 1
+    try:
+        matrix = np.random.randn(1000, 4, 4)
+        Transform.from_matrix(matrix).as_matrix()  # Must AssertionError
+    except AssertionError:
+        print("Input: Bad last row from matrix. Validated.")
+    # Test 2
+    matrix = np.eye(4)
+    res = Transform.from_matrix(matrix).as_matrix()
+    if (res == matrix).all():
+        print("Eye(4, 4) Succeed.")
+
+    # Test 3
+    matrix = np.repeat(np.expand_dims(np.eye(4), 0), n, 0)
+    res = Transform.from_matrix(matrix).as_matrix()
+    if (res != matrix).all():
+        print("Eye(N, 4, 4) Failed")
+
+    # Test 4
+    matrix = np.expand_dims(np.repeat(np.expand_dims(np.eye(4), 0), n, 0), 0)
+    try:
+        Transform.from_matrix(matrix).as_matrix()
+    except ValueError:
+        print("Shape (1, N, 4, 4): Succeed")
+
+    # Test real transforms
+    rot = np.random.randn(n, 3, 3)
+    trans = np.random.randn(n, 3)
+    matrix = np.repeat(np.expand_dims(np.eye(4), 0), n, 0)
+    matrix[:, :3, :3] = rot
+    matrix[:, :3, 3] = trans
+    Transform.from_matrix(matrix).as_matrix()
+    Transform.from_matrix(matrix).inv().as_matrix()
+    Transform.from_quat_trans(quat, trans).as_matrix()
+
+    x = np.random.randn(n, 3)
+    y = np.random.randn(n, 3)
+    z = np.random.randn(n, 3)
+    trans = np.random.randn(n, 3)
+    Transform.from_3_axis_rot_trans(x, y, z, trans).as_matrix()
+
+    assert (Rotation.from_matrix(rot).as_matrix() == Transform.from_matrix(matrix).as_rot_mat()).all()
+
+    # Why you must not compare rotations with quaternions
+    msg = "Quaternion can sometimes have a sign difference, to compare rotation use matrices"
+    try:
+        assert (Rotation.from_matrix(rot).as_quat() == Transform.from_matrix(matrix).as_rot_quat()).all(), msg
+    except AssertionError:
+        print(msg)
+    rot = np.array([[0.65277675, -0.399756, -1.45508672],
+                    [0.20181084, 0.60089933, -1.41854686],
+                    [-1.45746281, 0.70406115, -1.2892034]])
+    matrix = np.array([[0.65277675, -0.399756, -1.45508672, -0.44544586],
+                       [0.20181084, 0.60089933, -1.41854686, 0.37889411],
+                       [-1.45746281, 0.70406115, -1.2892034, -0.13891746],
+                       [0., 0., 0., 1.]])
+    Rotation.from_matrix(rot).as_quat()
+    Transform.from_matrix(matrix).as_rot_quat()
 
 
 if __name__ == '__main__':
-    _test()
+    _test_from_matrix_as_matrix()
