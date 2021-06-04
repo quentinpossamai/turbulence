@@ -255,9 +255,9 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     # This transform is not confirmed, it is an HYPOTHESIS
     tf_imu_drone = utils.Transform().from_euler(trans=np.array([0, 0, 0]), seq="zyx",
                                                 angles=np.array([-90, 0, 0]), degrees=True)
+    rot_drone_imu = tf_imu_drone.inv().get_rot_matrix()
     for idx, msg in tqdm(raw_data["imu"].items(), desc="Computing imu"):
         # rot_drone_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
-        rot_drone_imu = tf_imu_drone.inv().get_rot_matrix()
         data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
                             "linear_acceleration": rot_drone_imu @ msg["linear_acceleration"],
                             "angular_velocity": rot_drone_imu @ msg["angular_velocity"]}
@@ -412,6 +412,7 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
         elif start_done and sample["motor_speed"][0] < 900:
             stop = i
             break
+
 
     pickle.dump(kept_data, open(intermediate_flight_path + "2_data_synced.pkl", "wb"))
 
