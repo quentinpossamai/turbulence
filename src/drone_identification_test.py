@@ -9,7 +9,7 @@ from torchdiffeq import odeint
 from tqdm import tqdm
 
 from src.drone_models import drone_model
-from utils import WD_PATH
+from src.utils.paths import WD_PATH
 
 
 def test_drone_identification():

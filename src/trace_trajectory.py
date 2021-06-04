@@ -11,12 +11,6 @@ from src.utils.transform import Transform
 def trace_trajectory(transforms: np.ndarray):
     position = Transform.from_matrix(transforms).as_trans()
     quaternion = Transform.from_matrix(transforms).as_rot_quat()
-    norm = np.sqrt(np.sum(quaternion ** 2, axis=-1, keepdims=True))
-    plt.plot(norm)
-    plt.ylim(0, 1.2)
-    plt.show()
-
-    quaternion = quaternion  # / np.sqrt(np.sum(quaternion ** 2, axis=-1, keepdims=True))
     state = np.concatenate([position, quaternion], axis=-1)[10000:]
 
     def get_vertex_point(pos, quat):

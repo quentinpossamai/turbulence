@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from cv2 import VideoWriter, VideoWriter_fourcc
 
-from src.utils import Progress
+from src.utils.paths import Progress
 
 
 class ErrorEstimation(object):

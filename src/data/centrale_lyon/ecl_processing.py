@@ -7,7 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as integrate
 
-from src.utils import Transform, DataFolder, WD_PATH
+from src.utils.transform import Transform
+from src.utils.paths import DataFolder, WD_PATH
 
 
 def main():
