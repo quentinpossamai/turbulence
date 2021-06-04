@@ -6,10 +6,19 @@ import pickle
 from scipy.spatial.transform import Rotation
 
 from src.utils.transform import Transform
-from src.utils.paths import WD_PATH
 
 
 def trace_trajectory(transforms: np.ndarray):
+    position = Transform.from_matrix(transforms).as_trans()
+    quaternion = Transform.from_matrix(transforms).as_rot_quat()
+    norm = np.sqrt(np.sum(quaternion ** 2, axis=-1, keepdims=True))
+    plt.plot(norm)
+    plt.ylim(0, 1.2)
+    plt.show()
+
+    quaternion = quaternion  # / np.sqrt(np.sum(quaternion ** 2, axis=-1, keepdims=True))
+    state = np.concatenate([position, quaternion], axis=-1)[10000:]
+
     def get_vertex_point(pos, quat):
         width = 0.5
         d1 = np.array([1, 0, 0])
@@ -24,16 +33,6 @@ def trace_trajectory(transforms: np.ndarray):
         p3 = pos + d3 * width
 
         return p1, p2, p3
-
-    position = Transform.from_matrix(transforms).as_trans()
-    quaternion = Transform.from_matrix(transforms).as_rot_quat()
-    norm = np.sqrt(np.sum(quaternion ** 2, axis=-1, keepdims=True))
-    plt.plot(norm)
-    plt.ylim(0, 1.2)
-    plt.show()
-
-    quaternion = quaternion  # / np.sqrt(np.sum(quaternion ** 2, axis=-1, keepdims=True))
-    state = np.concatenate([position, quaternion], axis=-1)[10000:]
 
     fig = plt.figure(figsize=(6, 6))
     ax = fig.add_subplot(111, projection='3d')
@@ -52,7 +51,3 @@ def trace_trajectory(transforms: np.ndarray):
         ax.set_title(str(t))
         plt.pause(0.000001)
     plt.show()
-
-
-if __name__ == '__main__':
-    trace_trajectory()

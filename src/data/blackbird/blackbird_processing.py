@@ -8,9 +8,11 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 from typing import Dict, Any
 
-from src import utils
+from src.trace_trajectory import trace_trajectory
+from src.utils.paths import WD_PATH
+from src.utils.transform import Transform
 
-DATASET_PATH = utils.WD_PATH + "data/blackbird/"
+DATASET_PATH = WD_PATH + "data/blackbird/"
 
 FLIGHT_COMBINATIONS = {"3dFigure8": {"yawConstant": [0.5, 1, 2, 3, 4, 5],
                                      "yawForward": []},
@@ -138,7 +140,7 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     with open(raw_flight_path + "flightNormalizationOffset.csv", newline='') as csv_file:
         reader = csv.reader(csv_file, delimiter=',')
         trans = np.array(next(reader))
-    tf_norm_mocap = utils.Transform().from_quat_trans(np.array([0, 0, 0, 1]), trans)
+    tf_norm_mocap = Transform.from_quat_trans(np.array([0, 0, 0, 1]), trans).as_matrix()
 
     # # We do not use images so this transform is useless
     # # Load tf_fgenv_norm for each environment
@@ -156,16 +158,16 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     #     print(f"Environment not found: {environment}")
     #     raise ValueError(environment)
     # trans, angles = np.array(offset[:3]), np.array([offset[3], 0, 0])
-    # tf_fgenv_norm = utils.Transform().from_euler(trans, "zyx", angles, degrees=True)
+    # tf_fgenv_norm = Transform.from_euler_trans("zyx", angles, degrees=True, trans).as_matrix()
 
     # We will not use FLU frames but FRD for body for norm frame. Note norm = fixed earth from Sabatino.
-    # tf_fgenvflu_fgenv = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
-    #                                                  angles=np.array([0, 0, 180]), degrees=True)
+    # tf_fgenvflu_fgenv = Transform.from_euler(seq="zyx", angles=np.array([0, 0, 180]), degrees=True,
+    #                                          trans=np.zeros(3)).as_matrix()
     # We will use this one instead
-    # tf_normflu_norm = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
-    #                                                angles=np.array([0, 0, 180]), degrees=True)
-    # tf_drone_droneflu = utils.Transform().from_euler(trans=np.zeros(3), seq="zyx",
-    #                                                  angles=np.array([0, 0, 180]), degrees=True)
+    # tf_normflu_norm = Transform.from_euler(seq="zyx", angles=np.array([0, 0, 180]), degrees=True,
+    #                                        trans=np.zeros(3)).as_matrix()
+    # tf_drone_droneflu = Transform.from_euler(seq="zyx", angles=np.array([0, 0, 180]), degrees=True,
+    #                                          trans=np.zeros(3)).as_matrix()
 
     # Intermediate folder is used to store processed data
     data_path = intermediate_flight_path + "0_rosbag.pkl"
@@ -253,27 +255,26 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
 
     # Compute IMU data in the correct reference frame
     # This transform is not confirmed, it is an HYPOTHESIS
-    tf_imu_drone = utils.Transform().from_euler_trans(seq="zyx", angles=np.array([-90, 0, 0]), degrees=True,
-                                                      trans=np.array([0, 0, 0]))
-    rot_drone_imu = tf_imu_drone.inv().as_rot_mat()
+    tf_imu_drone = Transform.from_euler_trans(seq="zyx", angles=np.array([-90, 0, 0]), degrees=True,
+                                              trans=np.array([0, 0, 0])).as_matrix()
+    rot_drone_imu = Transform.from_matrix(tf_imu_drone).inv().as_rot_mat()
     for idx, msg in tqdm(raw_data["imu"].items(), desc="Computing imu"):
-        # rot_drone_imu = (tf_imu_drone @ tf_drone_droneflu).inv().get_rot_matrix()
         data["imu"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"],
                             "linear_acceleration": rot_drone_imu @ msg["linear_acceleration"],
                             "angular_velocity": rot_drone_imu @ msg["angular_velocity"]}
 
-    # Compute pose data in the correct reference frame
+    # Compute mc_pose data in the correct reference frame
     for idx, msg in tqdm(raw_data["mc_pose"].items(), desc="Computing pose"):
         # mc_pose is tf_mocap_drone
-        tf_mocap_drone = utils.Transform().from_quat_trans(quat=msg["rotation"], trans=msg["translation"])
+        tf_mocap_drone = Transform.from_quat_trans(quat=msg["rotation"], trans=msg["translation"]).as_matrix()
         # tf_norm_drone = tf_normflu_norm @ tf_norm_mocap @ tf_mocap_drone @ tf_drone_droneflu
         tf_norm_drone = tf_norm_mocap @ tf_mocap_drone
         # mc_pose is tf_norm_drone
         data["mc_pose"][idx] = {"t": msg["secs"] + 1e-9 * msg["nsecs"], "transform": tf_norm_drone}
 
     # Resetting drone position
-    tf_dronestart_norm = utils.Transform().from_quat_trans(quat=np.array([0, 0, 0, 1]),
-                                                           trans=data["mc_pose"][0]["transform"].as_trans()).inv()
+    trans = Transform.from_matrix(data["mc_pose"][0]["transform"]).as_trans()
+    tf_dronestart_norm = Transform.from_quat_trans(quat=np.array([0, 0, 0, 1]), trans=trans).inv().as_matrix()
     for idx in tqdm(data["mc_pose"], desc="Resetting first position"):
         tf_norm_drone = data["mc_pose"][idx]["transform"]
         tf_dronestart_drone = tf_dronestart_norm @ tf_norm_drone
@@ -283,11 +284,12 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
     for idx in tqdm(range(1, len(data["mc_pose"])), desc="Computing state"):
         dt = data["mc_pose"][idx]["t"] - data["mc_pose"][idx - 1]["t"]
         # Compute euler angles in global frame from quaternion in global frame
-        euler_orientation = data["mc_pose"][idx]["transform"].as_rot_euler(seq="zyx", degrees=False)[::-1]
+        euler_orientation = Transform.from_matrix(data["mc_pose"][idx]["transform"]).as_rot_euler(seq="zyx",
+                                                                                                  degrees=False)[::-1]
 
         # Compute angular velocity in drone's frame from quaternion in global frame
-        qn1 = data["mc_pose"][idx]["transform"].as_rot_quat()
-        qn = data["mc_pose"][idx - 1]["transform"].as_rot_quat()
+        qn1 = Transform.from_matrix(data["mc_pose"][idx]["transform"]).as_rot_quat()
+        qn = Transform.from_matrix(data["mc_pose"][idx - 1]["transform"]).as_rot_quat()
         # Graf, Basile. ‘Quaternions and Dynamics’. ArXiv:0811.2889 [Math-Ph], 18 November 2008.
         # https://arxiv.org/abs/0811.2889. Use a different convention than scipy.spatial.transform.Rotation.from_quat¶
         dq_dt = (qn1 - qn) / dt
@@ -299,11 +301,12 @@ def raw_importing_cleaning(raw_flight_path: str, intermediate_flight_path: str):
         angular_velocity = (2 * g_matrix @ dq_dt.reshape((4, 1))).reshape((3,))
 
         # Compute linear speed in drone's frame from drone's position in global frame
-        rot_drone_dronestart = data["mc_pose"][idx]["transform"].inv().as_rot_mat()
-        linear_speed = rot_drone_dronestart @ (data["mc_pose"][idx]["transform"].as_trans() -
-                                               data["mc_pose"][idx - 1]["transform"].as_trans()) / dt
+        rot_drone_dronestart = Transform.from_matrix(data["mc_pose"][idx]["transform"]).inv().as_rot_mat()
+        linear_speed = rot_drone_dronestart @ (Transform.from_matrix(data["mc_pose"][idx]["transform"]).as_trans() -
+                                               Transform.from_matrix(
+                                                   data["mc_pose"][idx - 1]["transform"]).as_trans()) / dt
 
-        position = data["mc_pose"][idx]["transform"].as_trans()
+        position = Transform.from_matrix(data["mc_pose"][idx]["transform"]).as_trans()
         data["state"][idx - 1] = {"t": data["mc_pose"][idx]["t"],
                                   "dt": dt,
                                   "state": np.hstack((euler_orientation, angular_velocity, linear_speed, position))}
@@ -355,7 +358,7 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
     # "motor_speed_2": {"angular_velocity": np.ndarray, "t": float},
     # "motor_speed_3": {"angular_velocity": np.ndarray, "t": float},
     # "imu": {"angular_velocity": np.ndarray, "linear_acceleration": np.ndarray, "t": float},
-    # "mc_pose": {"transform": utils.Transform, "t": float},
+    # "mc_pose": {"transform": np.ndarray, "t": float},
     # "state": {"state": np.ndarray, "t": float},
     # "t": float}]
 
@@ -406,13 +409,12 @@ def synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_p
     start, stop = 0, 0
     start_done = False
     for i, sample in enumerate(kept_data):
-        if sample["motor_speed"][0] > 1000 and not start_done:
+        if sample["motor_speed_0"]["angular_velocity"] > 1000 and not start_done:
             start = i
             start_done = True
-        elif start_done and sample["motor_speed"][0] < 900:
+        elif start_done and sample["motor_speed_0"]["angular_velocity"] < 900:
             stop = i
             break
-
 
     pickle.dump(kept_data, open(intermediate_flight_path + "2_data_synced.pkl", "wb"))
 
@@ -652,6 +654,17 @@ def plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, f
 #     ax.plot(motor_speed)
 #     plt.show()
 
+def trace_blackbird_trajectory(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path):
+    raw_data = pickle.load(open(intermediate_flight_path + "0_rosbag.pkl", "rb"), encoding="latin1")
+    data_synced = pickle.load(open(intermediate_flight_path + "2_data_synced.pkl", "rb"))
+
+    # /blackbird/state__geometry_msgs/PoseStamped, /tf__tf/tfMessage
+    quat = np.array([e["rotation"] for e in raw_data["/tf__tf/tfMessage"].values()])
+    trans = np.array([e["translation"] for e in raw_data["/tf__tf/tfMessage"].values()])
+    raw_transforms = Transform.from_quat_trans(quat=quat, trans=trans).as_matrix()
+
+    trace_trajectory(raw_transforms)
+
 
 def main():
     # Trajectories name classification
@@ -675,9 +688,10 @@ def main():
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     fig_path = os.getcwd() + "/reports/blackbird_processed_data/"
 
-    raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
-    synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path, is_plotting=False)
+    # raw_importing_cleaning(raw_flight_path, intermediate_flight_path)
+    # synchronization(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path, is_plotting=False)
     # plot_data(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
+    trace_blackbird_trajectory(flight_name, flight_yaw, flight_speed, intermediate_flight_path, fig_path)
 
     # # Testing pytorch Dataset and Dataloader
     # dataset = BlackbirdDataset(flight_name, flight_yaw, flight_speed)
