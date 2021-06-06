@@ -44,7 +44,6 @@ class Transform(object):
         """
         return self._matrix.shape[0]
 
-
     @classmethod
     def from_matrix(cls, matrix: np.ndarray) -> 'Transform':
         if not isinstance(matrix, np.ndarray):
@@ -70,7 +69,7 @@ class Transform(object):
     @classmethod
     def from_quat_trans(cls, quat: np.ndarray, trans: np.ndarray) -> 'Transform':
         """
-        Create a Transform object from the reference frame of (xyz, quat) to a new one at position xyz and oriented
+        Create a Transform object from the reference frame of quat, trans to a new one at position trans and oriented
         with quat.
 
         quat = x, y, z, w
@@ -85,7 +84,7 @@ class Transform(object):
 
         P_A point described in A.
 
-        A_T_B = tf = Transform().from_pose(trans, quat).
+        A_T_B = tf = Transform.from_pose(trans, quat).
 
         P_A = tf @ P_B.
 
