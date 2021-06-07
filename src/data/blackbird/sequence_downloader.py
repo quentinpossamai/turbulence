@@ -23,14 +23,14 @@ flightFileList = ["rosbag.bag",
 # These are not required, but may be helpful
 csvFiles = [
     "blackbird_slash_imu.csv",
-    "blackbird_slash_pose_ref.csv",
+    # "blackbird_slash_pose_ref.csv",
     # "blackbird_slash_pwm.csv",
     "blackbird_slash_rotor_rpm.csv",
     "blackbird_slash_state.csv",
     # "camera_d_slash_camera_info.csv",
     # "camera_l_slash_camera_info.csv",
     # "camera_r_slash_camera_info.csv",
-    "tf.csv",
+    # "tf.csv",
 ]
 
 globalFiles = [
@@ -175,13 +175,13 @@ def main():
                     flight_speed = speed
                 flight_list.append(f"{flight_name}/{flight_yaw}/{flight_speed}/")
 
-    # for flight in flight_list:
-    #     downloadSequence(flight=flight, environment=environment, datasetFolder=datasetFolder)
-    flight_name = "mouse"  # "ampersand"
-    flight_yaw = "yawForward"
-    flight_speed = "maxSpeed7p0"  # "maxSpeed1p0"
-    flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
-    download_sequence(flight=flight, environment=environment, dataset_folder=dataset_folder)
+    for flight in flight_list:
+        download_sequence(flight=flight, environment=environment, dataset_folder=dataset_folder)
+    # flight_name = "mouse"  # "ampersand"
+    # flight_yaw = "yawForward"
+    # flight_speed = "maxSpeed7p0"  # "maxSpeed1p0"
+    # flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
+    # download_sequence(flight=flight, environment=environment, dataset_folder=dataset_folder)
 
 
 if __name__ == "__main__":

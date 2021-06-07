@@ -9,7 +9,7 @@ import torch.nn as nn
 from torchdiffeq import odeint
 from typing import Callable, Iterable
 
-from src.data import blackbird
+from src.data.blackbird.blackbird_processing import BlackbirdDataset
 
 
 class Quadrotor(nn.Module, ABC):
@@ -278,13 +278,13 @@ def _test_blackbird_motor_speed_matrix():
     g = 9.81
 
     # Blackbird's parameters
-    m = torch.tensor(0.915)  # Drone's mass [kg]
-    kt = torch.tensor(2.0699917818129613e-06)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
-    km = torch.tensor(5.11e-8)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
-    l_arm = torch.tensor(0.13)  # Length of drone's arm  [m]
-    ixx = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
-    iyy = torch.tensor(4.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
-    izz = torch.tensor(6.9e-2)  # Inertia matrix diagonal first parameter [kg.m2]
+    m = torch.tensor(0.873)  # Drone's mass [kg]
+    kt = torch.tensor(1.91e-06)  # Thrust coefficient [kg.m/rad2] = [N.s2.rad-2]
+    km = torch.tensor(2.6e-7)  # Torque coefficient [kg.m2/rad2] = [N.m.s2.rad-2]
+    l_arm = torch.tensor(0.08)  # Length of drone's arm  [m]
+    ixx = torch.tensor(4.9e-3)  # Inertia matrix diagonal first parameter [kg.m2]
+    iyy = torch.tensor(4.9e-3)  # Inertia matrix diagonal first parameter [kg.m2]
+    izz = torch.tensor(6.9e-3)  # Inertia matrix diagonal first parameter [kg.m2]
 
     data = blackbird.BlackbirdDataset(flight_name="mouse", flight_yaw="yawForward", flight_speed="maxSpeed7p0")
 
