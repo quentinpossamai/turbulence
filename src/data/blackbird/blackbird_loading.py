@@ -5,6 +5,7 @@ import pathlib
 import pickle
 import random
 from scipy.spatial.transform import Rotation
+from scipy.interpolate import splrep, splev
 import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
@@ -154,15 +155,16 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
         # print(f"{name}: {header}")
         data = [e for e in csv_reader]
         assert len(data[0]) == 17
+        # TODO if problem with data maybe main timestamp is the good one instead of each motor's timestamp.
         time0 = np.array([float(e[8]) + float(e[9]) * 1e-9 for e in data])
         time1 = np.array([float(e[10]) + float(e[11]) * 1e-9 for e in data])
         time2 = np.array([float(e[12]) + float(e[13]) * 1e-9 for e in data])
         time3 = np.array([float(e[14]) + float(e[15]) * 1e-9 for e in data])
         motors = np.array([np.array(e[16].strip("[]").split(","), dtype=float) for e in data]) * np.pi / 30
         motors_dict = {"m0": np.stack([time0, motors[:, 0]], 1),
-                       "m1": np.stack([time0, motors[:, 1]], 1),
-                       "m2": np.stack([time0, motors[:, 2]], 1),
-                       "m3": np.stack([time0, motors[:, 3]], 1)}
+                       "m1": np.stack([time1, motors[:, 1]], 1),
+                       "m2": np.stack([time2, motors[:, 2]], 1),
+                       "m3": np.stack([time3, motors[:, 3]], 1)}
 
     name = "blackbird_slash_state"
     with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
@@ -212,7 +214,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     motor_sync = np.stack([np.interp(x=pose_dict["t"],
                                      xp=motors_dict[f"m{i}"][:, 0],
                                      fp=motors_dict[f"m{i}"][:, 1]) for i in range(4)], axis=1)
-    synchronisation = {"t": pose_dict["t"], "imu_ang_vel": imu_sync, "motor": motor_sync,
+    synchronisation = {"t": pose_dict["t"], "imu_ang_acc": imu_sync, "motor": motor_sync,
                        "pose_quat_trans": pose_dict["quat_trans"], "state": state, "dstate": dstate}
 
     # Take data only when drone is flying
@@ -228,7 +230,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
             stop = i
             break
     assert start != stop
-    [plt.plot(synchronisation["motor"][:, i]) for i in range(4)]
+    # [plt.plot(synchronisation["motor"][:, i]) for i in range(4)]
 
     # return start, stop
     cut_data = {}
@@ -237,11 +239,13 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     cut_data["t"] = cut_data["t"] - cut_data["t"][0]
 
     # Flight data keys:
-    # ['t', 'imu_ang_vel', 'motor', 'pose_quat_trans', 'state', 'dstate']
-    # state:12, motor:4, imu_ang_vel:6, dstate:12, next_state:12 = 46
-    res = np.concatenate((cut_data["state"][:-1],
+    # ['t', 'imu_ang_acc', 'motor', 'pose_quat_trans', 'state', 'dstate']
+    # time:1, state:12, motor:4, imu_ang_acc:6, time_next_state:1, dstate:12, next_state:12 = 48
+    res = np.concatenate((cut_data["t"][:-1].reshape((-1, 1)),
+                          cut_data["state"][:-1],
                           cut_data["motor"][:-1],
-                          cut_data["imu_ang_vel"][:-1],
+                          cut_data["imu_ang_acc"][:-1],
+                          cut_data["t"][1:].reshape((-1, 1)),
                           cut_data["dstate"][1:],
                           cut_data["state"][1:]),
                          axis=1)
@@ -300,15 +304,47 @@ class BlackbirdDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        One sample is state:12, motor:4, imu_ang_vel:6, dstate:12, next_state:12 = 46
+        One sample is time:1, state:12, motor:4, imu_ang_acc:6, time_next_state:1, dstate:12, next_state:12 = 48
+
         """
         data = self.data[idx]
-        return {"state": data[:12], "motor": data[12:16], "imu": data[16:22], "dstate": data[22:34],
-                "next_state": data[34:]}
+        return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
+                "dstate": data[24:36], "next_state": data[36:]}
+
+
+def madiha_laurent_csv():
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
+    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
+    #         "dstate": data[24:36], "next_state": data[36:]}
+
+    t = data[:, 0]
+    state = data[:, 1:13]
+    motor = data[:, 13:17]
+    imu_ang_acc = data[:, 17:23]
+    header = ["t[s]",
+              "phi[rad]", "theta[rad]", "psi[rad]",
+              "x[m]", "y[m]", "z[m]",
+              "motor0[rad/s]", "motor1[rad/s]", "motor2[rad/s]", "motor3[rad/s]",
+              "imu_ang_vel_x[rad/s]", "imu_ang_vel_y[rad/s]", "imu_ang_vel_z[rad/s]",
+              "imu_acc_x[m/s2]", "imu_acc_y[m/s2]", "imu_acc_z[m/s2]"]
+    ml_data = np.concatenate([t.reshape((-1, 1)),
+                              state[:, 0:3],
+                              state[:, 9:12],
+                              motor,
+                              imu_ang_acc], axis=1)
+    assert len(header) == ml_data.shape[1]
+    with open(DATASET_PATH + "intermediate/madiha_laurent.csv", 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(header)
+        for row in ml_data:
+            writer.writerow(row)
 
 
 def main():
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
     # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
@@ -316,14 +352,86 @@ def main():
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    # for i in tqdm(range(len(FLIGHT_LIST))):
-    #     flight = FLIGHT_LIST[i]
-    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
-    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    #     load_clean_data(raw_flight_path, intermediate_flight_path)
-    #
-    # building_data_and_splitting()
+    for i in tqdm(range(len(FLIGHT_LIST))):
+        flight = FLIGHT_LIST[i]
+        raw_flight_path = DATASET_PATH + f"raw/{flight}"
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+        load_clean_data(raw_flight_path, intermediate_flight_path)
+
+    building_data_and_splitting()
+
+    # madiha_laurent_csv()
+
+
+def plot():
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
+
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
+    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
+    #         "dstate": data[24:36], "next_state": data[36:]}
+
+    # State orientation
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    dt = 1 / 360
+    dphi = (data[1:, 0] - data[:-1, 0]) / dt
+    dtheta = (data[1:, 1] - data[:-1, 1]) / dt
+    dpsi = (data[1:, 2] - data[:-1, 2]) / dt
+
+    fig, ax = plt.subplots(1, 1)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("phi", "theta", "psi")):
+        ax.plot(range(len(data)), data[:, 0 + i], label=name)
+    ax.set_xlabel("Nb d'échantillon")
+    ax.set_ylabel("State orientation [rad]")
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+    # plt.savefig(fig_path + "state_orientation.png")
+    plt.show()
+
+    # Autre derivee
+    fig, ax = plt.subplots(1, 1)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for array, name in zip([dphi, dtheta, dpsi], ("phi", "theta", "psi")):
+        ax.plot(list(range(len(data)))[1:], array, label=name)
+    ax.set_xlabel("Nb d'échantillon")
+    ax.set_ylabel("State orientation [rad]")
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+    # plt.savefig(fig_path + "state_orientation.png")
+    plt.show()
+
+    # State orientation
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    fig, ax = plt.subplots(1, 1)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("phi", "theta", "psi")):
+        ax.plot(range(len(data)), data[:, 0 + i], label=name)
+    ax.set_xlabel("Nb d'échantillon")
+    ax.set_ylabel("State orientation [rad]")
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+    # plt.savefig(fig_path + "state_orientation.png")
+    plt.show()
+
+    # State angular velocity
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    fig, ax = plt.subplots(1, 1)
+    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    for i, name in zip(range(3), ("phi", "theta", "psi")):
+        ax.plot(range(len(data)), data[:, 3 + i], label=name)
+    ax.set_xlabel("Nb d'échantillon")
+    ax.set_ylabel("State orientation [rad]")
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
     main()
+    # plot()
