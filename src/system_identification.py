@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from src.data.blackbird.blackbird_loading import BlackbirdDataset
 from src.drone_models.learned_quadrotor import Quadrotor
-from src.utils.paths import MODELS_PATH, REPORTS_PATH
+from src.utils.paths import MODELS_PATH, ANALYSIS_PATH
 
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
@@ -71,7 +71,7 @@ def si_blackbird_quadrotor():
             #         memory = validation_loss
             #         torch.save(model.state_dict(), MODELS_PATH + "blackbird_learned_quadrotor.pt")
 
-    reports_path = REPORTS_PATH + "blackbird_learned_quadrotor_training/"
+    reports_path = ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
     p = pathlib.Path(reports_path)
     p.mkdir(parents=True, exist_ok=True)
     pickle.dump(training_log, open(reports_path + "training_loss.pkl", "wb"))

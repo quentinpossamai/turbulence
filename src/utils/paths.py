@@ -13,7 +13,7 @@ from typing import Union, Tuple, List, Iterable
 
 WD_PATH = "/Users/quentin/phd/turbulence/"
 MODELS_PATH = WD_PATH + "models/"
-REPORTS_PATH = WD_PATH + "reports/"
+ANALYSIS_PATH = WD_PATH + "analysis/"
 
 
 def matplotlib_latex_font():
