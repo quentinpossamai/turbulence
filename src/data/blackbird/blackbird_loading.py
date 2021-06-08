@@ -288,7 +288,7 @@ def building_data_and_splitting():
                 open(torch_dataset_path + "flight_split.pkl", "wb"))
 
 
-class BlackbirdTrain(Dataset):
+class BlackbirdDataset(Dataset):
     def __init__(self, train_validation_test: str):
         torch_dataset_path = DATASET_PATH + f"intermediate_torch_dataset/"
         if train_validation_test not in ["train", "validation", "test"]:
@@ -303,12 +303,8 @@ class BlackbirdTrain(Dataset):
         One sample is state:12, motor:4, imu_ang_vel:6, dstate:12, next_state:12 = 46
         """
         data = self.data[idx]
-        # state = data[:12]
-        # motor = data[12:16]
-        # imu = data[16:22]
-        # dstate = data[22:34]
-        # next_state = data[34:]
-        return data[:16], data[22:34]
+        return {"state": data[:12], "motor": data[12:16], "imu": data[16:22], "dstate": data[22:34],
+                "next_state": data[34:]}
 
 
 def main():

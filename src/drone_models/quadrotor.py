@@ -1,4 +1,3 @@
-from abc import ABC
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,7 +11,7 @@ from typing import Callable, Iterable
 from src.data.blackbird.blackbird_processing import BlackbirdDataset
 
 
-class Quadrotor(nn.Module, ABC):
+class Quadrotor(nn.Module):
     """
     This class implements the quadrotor described in:
     -Sabatino, Francesco. ‘Quadrotor Control: Modeling, Nonlinear Control Design, and Simulation’, 2015, 67.

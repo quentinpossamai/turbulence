@@ -13,6 +13,8 @@ import time
 from typing import Union, Tuple, Optional, List, Iterable
 
 WD_PATH = "/Users/quentin/phd/turbulence/"
+MODELS_PATH = WD_PATH + "models/"
+REPORTS_PATH = WD_PATH + "reports/"
 
 
 def matplotlib_latex_font():
