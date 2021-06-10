@@ -470,8 +470,8 @@ def main():
         raw_flight_path = DATASET_PATH + f"raw/{flight}"
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         load_clean_data(raw_flight_path, intermediate_flight_path)
-    #
-    # building_data_and_splitting()
+
+    building_data_and_splitting()
 
     # madiha_laurent_csv()
 
