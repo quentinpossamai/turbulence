@@ -495,7 +495,7 @@ def plot_final_data():
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
     for i, name in zip(range(3), ("phi", "theta", "psi")):
         ax.plot(range(len(data)), data[:, 0 + i], label=name)
-    ax.set_xlabel("Nb d'échantillon")
+    ax.set_xlabel("Sample number")
     ax.set_ylabel("State orientation [rad]")
     ax.legend()
     ax.grid()
@@ -508,7 +508,7 @@ def plot_final_data():
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
     for array, name in zip([dphi, dtheta, dpsi], ("phi", "theta", "psi")):
         ax.plot(list(range(len(data)))[1:], array, label=name)
-    ax.set_xlabel("Nb d'échantillon")
+    ax.set_xlabel("Sample number")
     ax.set_ylabel("State orientation [rad]")
     ax.legend()
     ax.grid()
@@ -522,7 +522,7 @@ def plot_final_data():
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
     for i, name in zip(range(3), ("phi", "theta", "psi")):
         ax.plot(range(len(data)), data[:, 0 + i], label=name)
-    ax.set_xlabel("Nb d'échantillon")
+    ax.set_xlabel("Sample number")
     ax.set_ylabel("State orientation [rad]")
     ax.legend()
     ax.grid()
@@ -536,7 +536,7 @@ def plot_final_data():
     ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
     for i, name in zip(range(3), ("phi", "theta", "psi")):
         ax.plot(range(len(data)), data[:, 3 + i], label=name)
-    ax.set_xlabel("Nb d'échantillon")
+    ax.set_xlabel("Sample number")
     ax.set_ylabel("State orientation [rad]")
     ax.legend()
     ax.grid()
