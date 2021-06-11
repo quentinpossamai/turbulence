@@ -360,8 +360,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
                           cut_data["imu_ang_acc"][:-1],
                           cut_data["t"][1:].reshape((-1, 1)),
                           cut_data["dstate"][1:],
-                          cut_data["state"][1:]),
-                         axis=1)
+                          cut_data["state"][1:]), axis=1)
 
     save_path = intermediate_flight_path + "data.pkl"
     p = pathlib.Path(intermediate_flight_path)
