@@ -12,7 +12,7 @@ import sys
 import time
 from typing import Union, Tuple, List, Iterable
 
-WD_PATH = os.getcwd()
+WD_PATH = os.getcwd() + "/"
 MODELS_PATH = WD_PATH + "models/"
 ANALYSIS_PATH = WD_PATH + "analysis/"
 
