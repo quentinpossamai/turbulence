@@ -12,12 +12,7 @@ import sys
 import time
 from typing import Union, Tuple, List, Iterable
 
-hostname = socket.gethostname()
-if hostname == "remsto1":
-    WD_PATH = "/Users/qpossamai/phd/turbulence/"
-else:  # hostname = "DESKTOP-F931CTG.insa-lyon.fr"
-    assert hostname == "DESKTOP-F931CTG.insa-lyon.fr"
-    WD_PATH = "/Users/quentin/phd/turbulence/"
+WD_PATH = os.getcwd()
 MODELS_PATH = WD_PATH + "models/"
 ANALYSIS_PATH = WD_PATH + "analysis/"
 
