@@ -59,7 +59,7 @@ def si_blackbird_quadrotor():
                             pin_memory=True)
     validation_data = DataLoader(BlackbirdDataset("validation"), batch_size=batch_size, shuffle=True, num_workers=1,
                                  pin_memory=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     global_iteration = 0
     for epoch in range(epochs):
