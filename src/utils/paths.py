@@ -14,7 +14,7 @@ from typing import Union, Tuple, List, Iterable
 
 WD_PATH = os.getcwd() + "/"
 MODELS_PATH = WD_PATH + "models/"
-ANALYSIS_PATH = WD_PATH + "analysis/"
+GENERAL_ANALYSIS_PATH = WD_PATH + "analysis/"
 
 
 def matplotlib_latex_font():

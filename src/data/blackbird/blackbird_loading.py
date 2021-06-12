@@ -12,11 +12,13 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from src.trace_trajectory import trace_trajectory
-from src.utils.paths import WD_PATH, ANALYSIS_PATH
+from src.utils.paths import WD_PATH, GENERAL_ANALYSIS_PATH
 from src.utils.transform import Transform
 
 DATASET_PATH = WD_PATH + "data/blackbird/"
-ANALYSIS_SECTION_PATH = ANALYSIS_PATH + "blackbird_processing_data/"
+ANALYSIS_SECTION_PATH = GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
+TORCH_DATASET_PATH = DATASET_PATH + f"intermediate_torch_dataset/"
+SPLITTING_CONFIG_PATH = TORCH_DATASET_PATH + "flight_split.pkl"
 
 FLIGHT_COMBINATIONS = {"3dFigure8": {"yawConstant": [0.5, 1, 2, 3, 4, 5],
                                      "yawForward": []},
@@ -369,39 +371,38 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
 
 
 def building_data_and_splitting():
-    torch_dataset_path = DATASET_PATH + f"intermediate_torch_dataset/"
-
     idx = list(range(len(FLIGHT_LIST)))
     random.shuffle(idx)
     idx = np.array(idx)
     train_validation_idx = round(len(idx) * 0.6)
     validation_test_idx = round(len(idx) * 0.8)
 
+    # TODO Must check passage from np.float64 to torch.float32 !!
     train = []
     for flight in FLIGHT_LIST[:train_validation_idx]:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         train.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
     train = torch.from_numpy(np.concatenate(train, axis=0)).float()
-    torch.save(train, torch_dataset_path + "train.pt")
+    torch.save(train, TORCH_DATASET_PATH + "train.pt")
 
     validation = []
     for flight in FLIGHT_LIST[train_validation_idx:validation_test_idx]:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         validation.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
     validation = torch.from_numpy(np.concatenate(validation, axis=0)).float()
-    torch.save(validation, torch_dataset_path + "validation.pt")
+    torch.save(validation, TORCH_DATASET_PATH + "validation.pt")
 
     test = []
     for flight in FLIGHT_LIST[validation_test_idx:]:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         test.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
     test = torch.from_numpy(np.concatenate(test, axis=0)).float()
-    torch.save(test, torch_dataset_path + "test.pt")
+    torch.save(test, TORCH_DATASET_PATH + "test.pt")
 
     pickle.dump({"train_flights": FLIGHT_LIST[:train_validation_idx],
                  "validation_flights": FLIGHT_LIST[train_validation_idx:validation_test_idx],
                  "test_flights": FLIGHT_LIST[validation_test_idx:]},
-                open(torch_dataset_path + "flight_split.pkl", "wb"))
+                open(SPLITTING_CONFIG_PATH, "wb"))
 
 
 class BlackbirdDataset(Dataset):
@@ -473,6 +474,15 @@ def main():
     building_data_and_splitting()
 
     # madiha_laurent_csv()
+
+
+def load_flight(flight_name, flight_yaw, flight_speed):
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
+
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
+    return data
 
 
 def plot_final_data():
