@@ -377,26 +377,35 @@ def building_data_and_splitting():
     train_validation_idx = round(len(idx) * 0.6)
     validation_test_idx = round(len(idx) * 0.8)
 
-    # TODO Must check passage from np.float64 to torch.float32 !!
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    special_flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
+
+    while special_flight not in FLIGHT_LIST[:train_validation_idx]:
+        idx = list(range(len(FLIGHT_LIST)))
+        random.shuffle(idx)
+        idx = np.array(idx)
+        train_validation_idx = round(len(idx) * 0.6)
+        validation_test_idx = round(len(idx) * 0.8)
+
     train = []
     for flight in FLIGHT_LIST[:train_validation_idx]:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         train.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
-    train = torch.from_numpy(np.concatenate(train, axis=0)).float()
+    train = torch.from_numpy(np.concatenate(train, axis=0))
     torch.save(train, TORCH_DATASET_PATH + "train.pt")
 
     validation = []
     for flight in FLIGHT_LIST[train_validation_idx:validation_test_idx]:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         validation.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
-    validation = torch.from_numpy(np.concatenate(validation, axis=0)).float()
+    validation = torch.from_numpy(np.concatenate(validation, axis=0))
     torch.save(validation, TORCH_DATASET_PATH + "validation.pt")
 
     test = []
     for flight in FLIGHT_LIST[validation_test_idx:]:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         test.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
-    test = torch.from_numpy(np.concatenate(test, axis=0)).float()
+    test = torch.from_numpy(np.concatenate(test, axis=0))
     torch.save(test, TORCH_DATASET_PATH + "test.pt")
 
     pickle.dump({"train_flights": FLIGHT_LIST[:train_validation_idx],
@@ -465,11 +474,11 @@ def main():
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    for i in tqdm(range(len(FLIGHT_LIST))):
-        flight = FLIGHT_LIST[i]
-        raw_flight_path = DATASET_PATH + f"raw/{flight}"
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        load_clean_data(raw_flight_path, intermediate_flight_path)
+    # for i in tqdm(range(len(FLIGHT_LIST))):
+    #     flight = FLIGHT_LIST[i]
+    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
+    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    #     load_clean_data(raw_flight_path, intermediate_flight_path)
 
     building_data_and_splitting()
 
@@ -477,7 +486,6 @@ def main():
 
 
 def load_flight(flight_name, flight_yaw, flight_speed):
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
 
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"

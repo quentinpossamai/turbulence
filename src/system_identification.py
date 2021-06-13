@@ -114,7 +114,6 @@ def test_model_on_training():
 
     # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
     #         "dstate": data[24:36], "next_state": data[36:]}
-    # TODO check if conversion float64 to float32 is ok
     state = torch.from_numpy(data[:, 1:13]).float()
     motor = torch.from_numpy(data[:, 13:17]).float()
     time = torch.from_numpy(data[:, 23]).float()

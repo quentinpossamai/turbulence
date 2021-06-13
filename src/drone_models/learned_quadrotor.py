@@ -9,8 +9,8 @@ from src.data.blackbird.blackbird_loading import BlackbirdDataset
 class Quadrotor(nn.Module):
     def __init__(self):
         super(Quadrotor, self).__init__()
-        self.a = nn.Parameter(torch.randn(3) * 0.01 / np.sqrt(3), requires_grad=True)
-        self.b = nn.Parameter(torch.randn(4, 4) * 0.01 / 4, requires_grad=True)
+        self.a = nn.Parameter(torch.randn(3, dtype=torch.float64) * 0.01 / np.sqrt(3), requires_grad=True)
+        self.b = nn.Parameter(torch.randn(4, 4, dtype=torch.float64) * 0.01 / 4, requires_grad=True)
 
     def forward(self, state, motor_speed):
         cmd = self.compute_cmd(motor_speed)
