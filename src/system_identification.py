@@ -83,12 +83,12 @@ def si_blackbird_quadrotor():
         writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
         if validation_loss < memory:
             memory = validation_loss
-            torch.save(model.state_dict(), training_path + f"{name}.pt")
+            torch.save(model.state_dict(), training_path + f"weights.pt")
 
 
 def test_model_on_training():
-    weights = torch.load(ANALYSIS_PATH + "training/20210612_084200_batch_size_64000/"
-                                         "20210612_084200_batch_size_64000.pt")
+    weights = torch.load(ANALYSIS_PATH + "training/20210613_115328_batch_size_64000/"
+                                         "20210613_115328_batch_size_64000.pt")
     print(weights)
     model = Quadrotor().to(device)
     model.load_state_dict(weights)
@@ -145,34 +145,34 @@ def test_model_on_training():
     plt.tight_layout()
     plt.show()
 
-    # State orientation
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    fig, ax = plt.subplots(1, 1)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(range(len(data)), data[:, 0 + i], label=name)
-    ax.set_xlabel("Sample number")
-    ax.set_ylabel("State orientation [rad]")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    # plt.savefig(fig_path + "state_orientation.png")
-    plt.show()
-
-    # State angular velocity
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    fig, ax = plt.subplots(1, 1)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(range(len(data)), data[:, 3 + i], label=name)
-    ax.set_xlabel("Sample number")
-    ax.set_ylabel("State orientation [rad]")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.show()
+    # # State orientation
+    # # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    # fig, ax = plt.subplots(1, 1)
+    # ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    # for i, name in zip(range(3), ("phi", "theta", "psi")):
+    #     ax.plot(range(len(data)), data[:, 0 + i], label=name)
+    # ax.set_xlabel("Sample number")
+    # ax.set_ylabel("State orientation [rad]")
+    # ax.legend()
+    # ax.grid()
+    # plt.tight_layout()
+    # # plt.savefig(fig_path + "state_orientation.png")
+    # plt.show()
+    #
+    # # State angular velocity
+    # # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
+    # fig, ax = plt.subplots(1, 1)
+    # ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
+    # for i, name in zip(range(3), ("phi", "theta", "psi")):
+    #     ax.plot(range(len(data)), data[:, 3 + i], label=name)
+    # ax.set_xlabel("Sample number")
+    # ax.set_ylabel("State orientation [rad]")
+    # ax.legend()
+    # ax.grid()
+    # plt.tight_layout()
+    # plt.show()
 
 
 if __name__ == "__main__":
-    si_blackbird_quadrotor()
-    # test_model_on_training()
+    # si_blackbird_quadrotor()
+    test_model_on_training()
