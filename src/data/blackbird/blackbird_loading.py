@@ -474,11 +474,11 @@ def main():
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    # for i in tqdm(range(len(FLIGHT_LIST))):
-    #     flight = FLIGHT_LIST[i]
-    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
-    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    #     load_clean_data(raw_flight_path, intermediate_flight_path)
+    for i in tqdm(range(len(FLIGHT_LIST))):
+        flight = FLIGHT_LIST[i]
+        raw_flight_path = DATASET_PATH + f"raw/{flight}"
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+        load_clean_data(raw_flight_path, intermediate_flight_path)
 
     building_data_and_splitting()
 
