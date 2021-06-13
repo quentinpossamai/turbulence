@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 import numpy as np
-
-from src.data.blackbird.blackbird_loading import BlackbirdDataset
 
 
 class Quadrotor(nn.Module):
