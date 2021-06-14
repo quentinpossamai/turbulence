@@ -29,6 +29,7 @@ def loss(state, dstate_hat, next_state_gt, dt):
     linear_speed_loss = nn.MSELoss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
     position_loss = nn.MSELoss(next_state_hat[:, 9:], next_state_gt[:, 9:])
     return angle_loss + angular_velocity_loss + linear_speed_loss + position_loss
+    # return 10. * angle_loss + angular_velocity_loss + linear_speed_loss + 1/10. * position_loss
 
 
 def validate(model, dataloader, global_iteration, epoch):
