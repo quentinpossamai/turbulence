@@ -307,75 +307,75 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.tight_layout()
     # plt.show()
 
-    def low_pass_filter(fft_coef, freqs, threshold):
-        output = fft_coef.copy()
-        output[np.abs(freqs) > threshold] = 0
-        return output
-
-    def coefficient_determination(y, y_hat):
-        assert len(y) == len(y_hat) and (isinstance(y, np.ndarray) and isinstance(y_hat, np.ndarray))
-        ss_tot = len(y) * np.var(y)
-        ss_res = np.sum((y - y_hat) ** 2)
-        return 1 - ss_res / ss_tot
-
-    # Analyse signal fft
-    i = 2
-    time = pose_dict["t"] - pose_dict["t"][0]
-    signal = rot.reshape((-1, 9))[:, i]
-    den_signal = den_rot.reshape((-1, 9))[:, i]
-    den_dsignal = den_drot.reshape((-1, 9))[:, i]
-    period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
-    n = len(signal)
-    yf = fft(signal)
-    den_yf = fft(den_signal)
-    xf = fftfreq(n, d=period)
-    dyf = 2 * np.pi * complex(0, 1) * xf * yf
-
-    # Filter coefficients
-    fc_signal = 10.  # Hz
-    yf_filtered = low_pass_filter(yf, xf, fc_signal)
-
-    fc_dsignal = 10.  # Hz
-    dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
-
-    # Compute back signal
-    filtered_signal = np.real(ifft(yf_filtered))
-    dfourier_signal = np.real(ifft(dyf))
-    dfourier_low_pass = np.real(ifft(dyf_filtered))
-
-    # Compute and compare derivative
-    fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
-    ax.plot(time, dfourier_signal, label="fourier derivative")
-    ax.plot(time, den_dsignal, label="Spline derivative")
-    ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Matrix coefficient")
-    ax.set_title(flight)
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-
-    fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    ax.plot(time, signal, label="raw")
-    ax.plot(time, den_signal, c="r", label=f"denoised r2: {coefficient_determination(signal, den_signal):10.6f}")
-    ax.plot(time, filtered_signal, label=f"filtered f: {fc_signal}Hz"
-                                         f" r2: {coefficient_determination(signal, filtered_signal):10.6f}")
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Matrix coefficient")
-    ax.set_title(flight)
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-
-    plt.plot(xf[:n // 2], np.abs(yf[:n // 2]), label="raw")
-    plt.plot(xf[:n // 2], np.abs(den_yf[:n // 2]), label="denoised")
-    plt.plot(xf[:n // 2], np.abs(dyf[:n // 2]), label="raw derivative")
-    plt.plot()
-    plt.ylim(-10, 100)
-    plt.xlim(-1, 10)
-    plt.grid()
-    plt.legend()
+    # def low_pass_filter(fft_coef, freqs, threshold):
+    #     output = fft_coef.copy()
+    #     output[np.abs(freqs) > threshold] = 0
+    #     return output
+    #
+    # def coefficient_determination(y, y_hat):
+    #     assert len(y) == len(y_hat) and (isinstance(y, np.ndarray) and isinstance(y_hat, np.ndarray))
+    #     ss_tot = len(y) * np.var(y)
+    #     ss_res = np.sum((y - y_hat) ** 2)
+    #     return 1 - ss_res / ss_tot
+    #
+    # # Analyse signal fft
+    # i = 2
+    # time = pose_dict["t"] - pose_dict["t"][0]
+    # signal = rot.reshape((-1, 9))[:, i]
+    # den_signal = den_rot.reshape((-1, 9))[:, i]
+    # den_dsignal = den_drot.reshape((-1, 9))[:, i]
+    # period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
+    # n = len(signal)
+    # yf = fft(signal)
+    # den_yf = fft(den_signal)
+    # xf = fftfreq(n, d=period)
+    # dyf = 2 * np.pi * complex(0, 1) * xf * yf
+    #
+    # # Filter coefficients
+    # fc_signal = 10.  # Hz
+    # yf_filtered = low_pass_filter(yf, xf, fc_signal)
+    #
+    # fc_dsignal = 10.  # Hz
+    # dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
+    #
+    # # Compute back signal
+    # filtered_signal = np.real(ifft(yf_filtered))
+    # dfourier_signal = np.real(ifft(dyf))
+    # dfourier_low_pass = np.real(ifft(dyf_filtered))
+    #
+    # # Compute and compare derivative
+    # fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
+    # ax.plot(time, dfourier_signal, label="fourier derivative")
+    # ax.plot(time, den_dsignal, label="Spline derivative")
+    # ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
+    # ax.set_xlabel("Time [s]")
+    # ax.set_ylabel("Matrix coefficient")
+    # ax.set_title(flight)
+    # ax.legend()
+    # ax.grid()
+    # plt.tight_layout()
+    #
+    # fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # ax.plot(time, signal, label="raw")
+    # ax.plot(time, den_signal, c="r", label=f"denoised r2: {coefficient_determination(signal, den_signal):10.6f}")
+    # ax.plot(time, filtered_signal, label=f"filtered f: {fc_signal}Hz"
+    #                                      f" r2: {coefficient_determination(signal, filtered_signal):10.6f}")
+    # ax.set_xlabel("Time [s]")
+    # ax.set_ylabel("Matrix coefficient")
+    # ax.set_title(flight)
+    # ax.legend()
+    # ax.grid()
+    # plt.tight_layout()
+    #
+    # plt.plot(xf[:n // 2], np.abs(yf[:n // 2]), label="raw")
+    # plt.plot(xf[:n // 2], np.abs(den_yf[:n // 2]), label="denoised")
+    # plt.plot(xf[:n // 2], np.abs(dyf[:n // 2]), label="raw derivative")
+    # plt.plot()
+    # plt.ylim(-10, 100)
+    # plt.xlim(-1, 10)
+    # plt.grid()
+    # plt.legend()
 
     state = np.concatenate([den_angles, den_angular_velocity_matrix, den_linear_speed, trans], axis=1)
 
