@@ -1,5 +1,6 @@
 import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pathlib
 import pickle
@@ -18,9 +19,20 @@ use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
 
-def loss(state, state_gt):
+def loss(state, dstate_hat, next_state_gt, dt):
     # Without the angles
-    return nn.MSELoss()(state[:, 3:], state_gt[:, 3:])
+    next_state_hat = state + dstate_hat * dt
+
+    phi_hat = torch.fmod(next_state_hat[:, 0], np.pi)
+    theta_hat = torch.fmod(next_state_hat[:, 1], np.pi / 2)
+    psi_hat = torch.fmod(next_state_hat[:, 2], np.pi)
+    angle_loss = (nn.MSELoss(phi_hat, next_state_gt[:, 0]) + nn.MSELoss(theta_hat, next_state_gt[:, 1]) +
+                  nn.MSELoss(psi_hat, next_state_gt[:, 2]))
+
+    angular_velocity_loss = nn.MSELoss(next_state_hat[:, 3:6], next_state_gt[:, 3:6])
+    linear_speed_loss = nn.MSELoss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
+    position_loss = nn.MSELoss(next_state_hat[:, 9:], next_state_gt[:, 9:])
+    return angle_loss + angular_velocity_loss + linear_speed_loss + position_loss
 
 
 def validate(model, dataloader, global_iteration, epoch):
@@ -33,7 +45,7 @@ def validate(model, dataloader, global_iteration, epoch):
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
             output = model(state, motor)  # dstate
-            validation_loss = loss(output * dt + state, next_state)
+            validation_loss = loss(state=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
             loss_log.append(validation_loss)
     return torch.mean(torch.tensor(loss_log).float())
 
@@ -70,7 +82,7 @@ def si_blackbird_quadrotor():
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
             output = model(state, motor)  # dstate
-            training_loss = loss(output * dt + state, next_state)
+            training_loss = loss(state=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
 
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
 
@@ -137,8 +149,8 @@ def test_model_on_training():
                                   "position [m]"]):
         for j, axe in zip(range(3), ["x", "y", "z"]):
             ax = axs[i, j]
-            ax.plot(time[start:stop], state[start:stop, i*3+j], label="GT")
-            ax.plot(time[start:stop], hat_ns[start:stop, i*3+j], label="Model")
+            ax.plot(time[start:stop], state[start:stop, i * 3 + j], label="GT")
+            ax.plot(time[start:stop], hat_ns[start:stop, i * 3 + j], label="Model")
             ax.set_ylabel(f"{name} {axe}")
             ax.set_xlabel(f"Time [s]")
             ax.grid()
