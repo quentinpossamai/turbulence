@@ -185,5 +185,5 @@ def test_model_on_training():
 
 
 if __name__ == "__main__":
-    # si_blackbird_quadrotor()
-    test_model_on_training()
+    si_blackbird_quadrotor()
+    # test_model_on_training()
