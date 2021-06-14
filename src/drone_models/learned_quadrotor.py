@@ -25,6 +25,7 @@ class Quadrotor(nn.Module):
         p, q, r = state[:, 3], state[:, 4], state[:, 5]
         u, v, w = state[:, 6], state[:, 7], state[:, 8]
         cos, sin, tan = torch.cos, torch.sin, torch.tan
+
         dphi = p + r * cos(phi) * tan(theta) + q * sin(phi) * tan(theta)
         dtheta = q * cos(phi) - r * sin(phi)
         dpsi = r * cos(phi) / cos(theta) + q * sin(phi) / cos(theta)
