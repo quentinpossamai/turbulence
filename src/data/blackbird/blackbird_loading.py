@@ -555,8 +555,7 @@ def main():
         raw_flight_path = DATASET_PATH + f"raw/{flight}"
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         tic = time.time()
-        # load_clean_data(raw_flight_path, intermediate_flight_path)
-        print("lol")
+        load_clean_data(raw_flight_path, intermediate_flight_path)
         processing_time[flight] = time.time() - tic
     pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
 
