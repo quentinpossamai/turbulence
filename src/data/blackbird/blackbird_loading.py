@@ -165,6 +165,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
         data = [e for e in csv_reader]
         assert len(data[0]) == 17
         # TODO if problem with data maybe main timestamp is the good one instead of each motor's timestamp.
+        time = np.array([float(e[0]) * 1e-9 for e in data])
         time0 = np.array([float(e[8]) + float(e[9]) * 1e-9 for e in data])
         time1 = np.array([float(e[10]) + float(e[11]) * 1e-9 for e in data])
         time2 = np.array([float(e[12]) + float(e[13]) * 1e-9 for e in data])
@@ -173,7 +174,8 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
         motors_dict = {"m0": np.stack([time0, motors[:, 0]], 1),
                        "m1": np.stack([time1, motors[:, 1]], 1),
                        "m2": np.stack([time2, motors[:, 2]], 1),
-                       "m3": np.stack([time3, motors[:, 3]], 1)}
+                       "m3": np.stack([time3, motors[:, 3]], 1),
+                       "rosbag_t": time}
 
     name = "blackbird_slash_state"
     with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
@@ -307,6 +309,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.tight_layout()
     # plt.show()
 
+    # FOURIER ANALYSIS
     # def low_pass_filter(fft_coef, freqs, threshold):
     #     output = fft_coef.copy()
     #     output[np.abs(freqs) > threshold] = 0
@@ -377,6 +380,21 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.grid()
     # plt.legend()
 
+    # # Check motor timestamps
+    # fig, ax = plt.subplots(2, 1, figsize=(19.2, 10.8))
+    # ax[0].plot(pose_dict["t"], trans)
+    # for i in range(4):
+    #     ax[1].plot(motors_dict[f"m{i}"][:, 0], motors_dict[f"m{i}"][:, 1])
+    # ax[0].grid()
+    # ax[1].grid()
+    #
+    # fig, ax = plt.subplots(2, 1, figsize=(19.2, 10.8))
+    # ax[0].plot(pose_dict["t"], trans)
+    # for i in range(4):
+    #     ax[1].plot(motors_dict["rosbag_t"], motors_dict[f"m{i}"][:, 1])
+    # ax[0].grid()
+    # ax[1].grid()
+
     state = np.concatenate([den_angles, den_angular_velocity_matrix, den_linear_speed, trans], axis=1)
 
     dstate = np.concatenate([den_dangles, den_angular_acc_matrix, den_linear_acc, den_dtrans], axis=1)
@@ -386,7 +404,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
                                    xp=imu_dict["t"],
                                    fp=imu_dict["ang_acc"][:, i]) for i in range(6)], axis=1)
     motor_sync = np.stack([np.interp(x=pose_dict["t"],
-                                     xp=motors_dict[f"m{i}"][:, 0],
+                                     xp=motors_dict["rosbag_t"],
                                      fp=motors_dict[f"m{i}"][:, 1]) for i in range(4)], axis=1)
 
     # den_motor = np.stack([splev(pose_dict["t"],
@@ -544,11 +562,13 @@ def main():
     # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
+    # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
     # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
     # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
-    print(ANALYSIS_SECTION_PATH)
+
+    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
     processing_time = {}
     for i in tqdm(range(len(FLIGHT_LIST))):
         flight = FLIGHT_LIST[i]
