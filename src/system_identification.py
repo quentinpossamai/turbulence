@@ -1,8 +1,6 @@
 import datetime
 import matplotlib.pyplot as plt
 import numpy as np
-import os
-import pathlib
 import pickle
 import torch
 import torch.nn as nn
@@ -23,11 +21,9 @@ def loss(state, dstate_hat, next_state_gt, dt):
     # Without the angles
     next_state_hat = state + dstate_hat * dt
 
-    phi_hat = torch.fmod(next_state_hat[:, 0], np.pi)
-    theta_hat = torch.fmod(next_state_hat[:, 1], np.pi / 2)
-    psi_hat = torch.fmod(next_state_hat[:, 2], np.pi)
-    angle_loss = (nn.MSELoss(phi_hat, next_state_gt[:, 0]) + nn.MSELoss(theta_hat, next_state_gt[:, 1]) +
-                  nn.MSELoss(psi_hat, next_state_gt[:, 2]))
+    angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
+                  torch.mean(torch.fmod(next_state_hat[:, 1] - next_state_gt[:, 1], np.pi / 2) ** 2) +
+                  torch.mean(torch.fmod(next_state_hat[:, 2] - next_state_gt[:, 2], np.pi) ** 2))
 
     angular_velocity_loss = nn.MSELoss(next_state_hat[:, 3:6], next_state_gt[:, 3:6])
     linear_speed_loss = nn.MSELoss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
