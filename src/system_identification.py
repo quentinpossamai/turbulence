@@ -10,9 +10,10 @@ from tqdm import tqdm
 
 from src.data.blackbird.blackbird_loading import BlackbirdDataset, load_flight, SPLITTING_CONFIG_PATH
 from src.drone_models.learned_quadrotor import Quadrotor
-from src.utils.paths import GENERAL_ANALYSIS_PATH
+from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
+mkdir_if_not_exist(ANALYSIS_PATH)
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 

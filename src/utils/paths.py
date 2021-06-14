@@ -17,6 +17,14 @@ MODELS_PATH = WD_PATH + "models/"
 GENERAL_ANALYSIS_PATH = WD_PATH + "analysis/"
 
 
+def mkdir_if_not_exist(paths: list):
+    for path in paths:
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+
+mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
+
+
 def matplotlib_latex_font():
     rc('font', **{'family': 'serif',
                   'serif': ['Computer Modern Roman']})
@@ -241,7 +249,7 @@ def get_folder_path(file_path: Union[str, List[str]]) -> Union[str, List[str]]:
 
 def merge_two_arrays(array1: Union[np.ndarray, Iterable, int, float],
                      array2: Union[np.ndarray, Iterable, int, float]) \
-                     -> Tuple[Union[List[int], int], Union[List[int], int]]:
+        -> Tuple[Union[List[int], int], Union[List[int], int]]:
     """
     From two sorted arrays of different length and uniques values : array1 and array2.
     :param array1: An array of values to be compared to array2.

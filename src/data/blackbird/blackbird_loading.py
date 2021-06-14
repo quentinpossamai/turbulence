@@ -4,7 +4,6 @@ import numpy as np
 import pathlib
 import pickle
 import random
-
 from scipy.fft import fft, fftfreq, ifft
 from scipy.interpolate import splrep, splev
 from scipy.spatial.transform import Rotation
@@ -14,13 +13,16 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 from src.trace_trajectory import trace_trajectory
-from src.utils.paths import WD_PATH, GENERAL_ANALYSIS_PATH
+import src.utils.paths
 from src.utils.transform import Transform
 
-DATASET_PATH = WD_PATH + "data/blackbird/"
-ANALYSIS_SECTION_PATH = GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
+# Path
+ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
+DATASET_PATH = src.utils.paths.WD_PATH + "data/blackbird/"
 TORCH_DATASET_PATH = DATASET_PATH + f"intermediate_torch_dataset/"
 SPLITTING_CONFIG_PATH = TORCH_DATASET_PATH + "flight_split.pkl"
+
+src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, TORCH_DATASET_PATH])
 
 FLIGHT_COMBINATIONS = {"3dFigure8": {"yawConstant": [0.5, 1, 2, 3, 4, 5],
                                      "yawForward": []},
@@ -327,26 +329,38 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     yf = fft(signal)
     den_yf = fft(den_signal)
     xf = fftfreq(n, d=period)
-    dyf = complex(0, 1) * xf * yf
+    dyf = 2 * np.pi * complex(0, 1) * xf * yf
 
-    yf_filtered = low_pass_filter(yf, xf, 10)
+    # Filter coefficients
+    fc_signal = 10.  # Hz
+    yf_filtered = low_pass_filter(yf, xf, fc_signal)
+
+    fc_dsignal = 10.  # Hz
+    dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
+
+    # Compute back signal
     filtered_signal = np.real(ifft(yf_filtered))
-    dyf_filtered = low_pass_filter(dyf, xf, 2)
-
     dfourier_signal = np.real(ifft(dyf))
     dfourier_low_pass = np.real(ifft(dyf_filtered))
 
-    plt.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler")
-    plt.plot(time, dfourier_signal, label="fourier derivative")
-    plt.plot(time, den_dsignal, label="Spline derivative")
-    plt.plot(time, dfourier_low_pass, label="dfourier_low_pass")
-    plt.grid()
-    plt.legend()
+    # Compute and compare derivative
+    fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
+    ax.plot(time, dfourier_signal, label="fourier derivative")
+    ax.plot(time, den_dsignal, label="Spline derivative")
+    ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Matrix coefficient")
+    ax.set_title(flight)
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
 
     fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
     ax.plot(time, signal, label="raw")
     ax.plot(time, den_signal, c="r", label=f"denoised r2: {coefficient_determination(signal, den_signal):10.6f}")
-    ax.plot(time, filtered_signal, label=f"filtered   r2: {coefficient_determination(signal, filtered_signal):10.6f}")
+    ax.plot(time, filtered_signal, label=f"filtered f: {fc_signal}Hz"
+                                         f" r2: {coefficient_determination(signal, filtered_signal):10.6f}")
     ax.set_xlabel("Time [s]")
     ax.set_ylabel("Matrix coefficient")
     ax.set_title(flight)
@@ -534,14 +548,15 @@ def main():
     # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
-
+    print(ANALYSIS_SECTION_PATH)
     processing_time = {}
     for i in tqdm(range(len(FLIGHT_LIST))):
         flight = FLIGHT_LIST[i]
         raw_flight_path = DATASET_PATH + f"raw/{flight}"
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         tic = time.time()
-        load_clean_data(raw_flight_path, intermediate_flight_path)
+        # load_clean_data(raw_flight_path, intermediate_flight_path)
+        print("lol")
         processing_time[flight] = time.time() - tic
     pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
 
