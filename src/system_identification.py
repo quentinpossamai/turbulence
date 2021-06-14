@@ -114,14 +114,14 @@ def test_model_on_training():
 
     # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
     #         "dstate": data[24:36], "next_state": data[36:]}
-    state = torch.from_numpy(data[:, 1:13]).float()
-    motor = torch.from_numpy(data[:, 13:17]).float()
-    time = torch.from_numpy(data[:, 23]).float()
-    dt = torch.from_numpy(data[:, 23]).float() - torch.from_numpy(data[:, 0]).float()
-    next_state = torch.from_numpy(data[:, 36:]).float()
-    with torch.no_grad():
-        hat_dstate = model(state, motor)  # predict dstate
-        hat_ns = state + dt.reshape((-1, 1)) * hat_dstate
+    state = torch.from_numpy(data[:, 1:13])
+    motor = torch.from_numpy(data[:, 13:17])
+    time = torch.from_numpy(data[:, 23])
+    dt = torch.from_numpy(data[:, 23]) - torch.from_numpy(data[:, 0])
+    next_state = torch.from_numpy(data[:, 36:])
+    # with torch.no_grad():
+    #     hat_dstate = model(state, motor)  # predict dstate
+    #     hat_ns = state + dt.reshape((-1, 1)) * hat_dstate
 
     traj = [state[0, :]]
     with torch.no_grad():
@@ -132,9 +132,10 @@ def test_model_on_training():
 
     start = 0
     stop = 100
-    fig, axs = plt.subplots(4, 3)
-    for i, name in zip(range(4), ["orientation", "angular_velocity", "linear_speed", "position"]):
-        for j, axe in zip(range(3), ["x", "z", "y"]):
+    fig, axs = plt.subplots(4, 3, figsize=(19.2, 10.8), dpi=100)
+    for i, name in zip(range(4), ["orientation [rad]", "angular_velocity [rad/s]", "linear_speed [m/s]",
+                                  "position [m]"]):
+        for j, axe in zip(range(3), ["x", "y", "z"]):
             ax = axs[i, j]
             ax.plot(time[start:stop], state[start:stop, i*3+j], label="GT")
             ax.plot(time[start:stop], hat_ns[start:stop, i*3+j], label="Model")

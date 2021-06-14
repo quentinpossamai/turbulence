@@ -4,9 +4,9 @@ import numpy as np
 import pathlib
 import pickle
 import random
-
 from scipy.spatial.transform import Rotation
 from scipy.interpolate import splrep, splev
+import time
 import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
@@ -474,13 +474,17 @@ def main():
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
 
+    processing_time = {}
     for i in tqdm(range(len(FLIGHT_LIST))):
         flight = FLIGHT_LIST[i]
         raw_flight_path = DATASET_PATH + f"raw/{flight}"
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+        tic = time.time()
         load_clean_data(raw_flight_path, intermediate_flight_path)
+        processing_time[flight] = time.time() - tic
+    pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
 
-    building_data_and_splitting()
+    # building_data_and_splitting()
 
     # madiha_laurent_csv()
 
