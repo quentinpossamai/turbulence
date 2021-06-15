@@ -13,22 +13,24 @@ from src.drone_models.learned_quadrotor import Quadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
-mkdir_if_not_exist(ANALYSIS_PATH)
+mkdir_if_not_exist([ANALYSIS_PATH])
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
 
 def loss(state, dstate_hat, next_state_gt, dt):
+    mse_loss = nn.MSELoss()
     # Without the angles
     next_state_hat = state + dstate_hat * dt
 
+    # Todo use cos sin
     angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
                   torch.mean(torch.fmod(next_state_hat[:, 1] - next_state_gt[:, 1], np.pi / 2) ** 2) +
                   torch.mean(torch.fmod(next_state_hat[:, 2] - next_state_gt[:, 2], np.pi) ** 2))
 
-    angular_velocity_loss = nn.MSELoss(next_state_hat[:, 3:6], next_state_gt[:, 3:6])
-    linear_speed_loss = nn.MSELoss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
-    position_loss = nn.MSELoss(next_state_hat[:, 9:], next_state_gt[:, 9:])
+    angular_velocity_loss = mse_loss(next_state_hat[:, 3:6], next_state_gt[:, 3:6])
+    linear_speed_loss = mse_loss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
+    position_loss = mse_loss(next_state_hat[:, 9:], next_state_gt[:, 9:])
     return angle_loss + angular_velocity_loss + linear_speed_loss + position_loss
     # return 10. * angle_loss + angular_velocity_loss + linear_speed_loss + 1/10. * position_loss
 

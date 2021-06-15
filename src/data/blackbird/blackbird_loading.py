@@ -190,14 +190,39 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
         quat_trans = np.concatenate([quat, trans], axis=1)
         pose_dict = {"t": time, "quat_trans": quat_trans}
 
-    # Computing state.
-    # Rot is rot_fixed_body
-    rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))
-    rot_reps = [splrep(pose_dict["t"], rot[:, i], k=5, s=5e-2) for i in range(9)]
+    # FOURIER noise reduction
+    def low_pass_filter(fft_coef, fourier_freq, freq_cut):
+        output = fft_coef.copy()
+        output[np.abs(fourier_freq) > freq_cut] = 0
+        return output
+
+    # Computing a denoised state.
+    period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
+    n = len(pose_dict["t"])
+    frequencies = fftfreq(n, d=period)
+
+    # DENOISING with Fourier
+    fc_rot = 10  # Hz
+    rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))  # Rot is rot_fixed_body
+    fourier_rot = fft(rot, axis=0)
+    fourier_drot = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_rot
+    fourier_d2rot = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_drot
+    den_rot = np.real(ifft(low_pass_filter(fourier_rot, frequencies, 5), axis=0)).reshape((-1, 3, 3))
+    den_drot = np.real(ifft(low_pass_filter(fourier_drot, frequencies, 5), axis=0)).reshape((-1, 3, 3))
+    den_d2rot = np.real(ifft(low_pass_filter(fourier_d2rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
+    # plt.plot(rot, label="gt")
+    # plt.plot(den_rot, label="fourier")
+    # plt.legend()
+    # plt.plot(frequencies, fourier_d2rot)
+    plt.plot(den_drot.reshape((-1, 9)))
+
+    # DENOISING solution: Spline interpolation and smoothing
+    # rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))  # Rot is rot_fixed_body
+    # rot_reps = [splrep(pose_dict["t"], rot[:, i], k=5, s=5e-2) for i in range(9)]
     # rot = rot.reshape((-1, 3, 3))
-    den_rot = np.stack([splev(pose_dict["t"], rot_reps[i]) for i in range(9)], axis=1).reshape((-1, 3, 3))
-    den_drot = np.stack([splev(pose_dict["t"], rot_reps[i], der=1) for i in range(9)], axis=1).reshape((-1, 3, 3))
-    den_d2rot = np.stack([splev(pose_dict["t"], rot_reps[i], der=2) for i in range(9)], axis=1).reshape((-1, 3, 3))
+    # den_rot = np.stack([splev(pose_dict["t"], rot_reps[i]) for i in range(9)], axis=1).reshape((-1, 3, 3))
+    # den_drot = np.stack([splev(pose_dict["t"], rot_reps[i], der=1) for i in range(9)], axis=1).reshape((-1, 3, 3))
+    # den_d2rot = np.stack([splev(pose_dict["t"], rot_reps[i], der=2) for i in range(9)], axis=1).reshape((-1, 3, 3))
 
     # angles = Rotation.from_quat(quat).as_euler("zyx", False)[:, ::-1]
     den_angles = Rotation.from_matrix(den_rot).as_euler("zyx", False)[:, ::-1]
@@ -216,6 +241,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     wx1 = -omega[1, 2, :]
     wx2 = omega[2, 1, :]
     den_angular_velocity_matrix = np.stack([(wx1 + wx2) / 2, (wy1 + wy2) / 2, (wz1 + wz2) / 2], axis=1)
+    plt.plot(den_angular_velocity_matrix)
 
     # Compute angular acceleration
     domega = Rotation.from_matrix(den_rot).inv().as_matrix() @ den_d2rot
@@ -310,55 +336,55 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.show()
 
     # FOURIER ANALYSIS
-    # def low_pass_filter(fft_coef, freqs, threshold):
-    #     output = fft_coef.copy()
-    #     output[np.abs(freqs) > threshold] = 0
-    #     return output
+    def low_pass_filter(fft_coef, freqs, threshold):
+        output = fft_coef.copy()
+        output[np.abs(freqs) > threshold] = 0
+        return output
+
+    def coefficient_determination(y, y_hat):
+        assert len(y) == len(y_hat) and (isinstance(y, np.ndarray) and isinstance(y_hat, np.ndarray))
+        ss_tot = len(y) * np.var(y)
+        ss_res = np.sum((y - y_hat) ** 2)
+        return 1 - ss_res / ss_tot
+
+    # Analyse signal fft
+    i = 0
+    time = pose_dict["t"] - pose_dict["t"][0]
+    signal = rot.reshape((-1, 9))[:, i]
+    den_signal = den_rot.reshape((-1, 9))[:, i]
+    den_dsignal = den_drot.reshape((-1, 9))[:, i]
+    period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
+    n = len(signal)
+    yf = fft(signal)
+    den_yf = fft(den_signal)
+    xf = fftfreq(n, d=period)
+    dyf = 2 * np.pi * complex(0, 1) * xf * yf
+
+    # Filter coefficients
+    fc_signal = 10.  # Hz
+    yf_filtered = low_pass_filter(yf, xf, fc_signal)
+
+    fc_dsignal = 10.  # Hz
+    dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
+
+    # Compute back signal
+    filtered_signal = np.real(ifft(yf_filtered))
+    dfourier_signal = np.real(ifft(dyf))
+    dfourier_low_pass = np.real(ifft(dyf_filtered))
     #
-    # def coefficient_determination(y, y_hat):
-    #     assert len(y) == len(y_hat) and (isinstance(y, np.ndarray) and isinstance(y_hat, np.ndarray))
-    #     ss_tot = len(y) * np.var(y)
-    #     ss_res = np.sum((y - y_hat) ** 2)
-    #     return 1 - ss_res / ss_tot
-    #
-    # # Analyse signal fft
-    # i = 2
-    # time = pose_dict["t"] - pose_dict["t"][0]
-    # signal = rot.reshape((-1, 9))[:, i]
-    # den_signal = den_rot.reshape((-1, 9))[:, i]
-    # den_dsignal = den_drot.reshape((-1, 9))[:, i]
-    # period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
-    # n = len(signal)
-    # yf = fft(signal)
-    # den_yf = fft(den_signal)
-    # xf = fftfreq(n, d=period)
-    # dyf = 2 * np.pi * complex(0, 1) * xf * yf
-    #
-    # # Filter coefficients
-    # fc_signal = 10.  # Hz
-    # yf_filtered = low_pass_filter(yf, xf, fc_signal)
-    #
-    # fc_dsignal = 10.  # Hz
-    # dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
-    #
-    # # Compute back signal
-    # filtered_signal = np.real(ifft(yf_filtered))
-    # dfourier_signal = np.real(ifft(dyf))
-    # dfourier_low_pass = np.real(ifft(dyf_filtered))
-    #
-    # # Compute and compare derivative
-    # fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
+    # Compute and compare derivative
+    fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
     # ax.plot(time, dfourier_signal, label="fourier derivative")
-    # ax.plot(time, den_dsignal, label="Spline derivative")
-    # ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Matrix coefficient")
-    # ax.set_title(flight)
-    # ax.legend()
-    # ax.grid()
-    # plt.tight_layout()
-    #
+    # ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
+    ax.plot(time, den_dsignal, label="Spline derivative")
+    ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Matrix coefficient")
+    ax.set_title(flight)
+    ax.legend()
+    ax.grid()
+    plt.tight_layout()
+
     # fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
     # ax.plot(time, signal, label="raw")
     # ax.plot(time, den_signal, c="r", label=f"denoised r2: {coefficient_determination(signal, den_signal):10.6f}")
@@ -370,11 +396,10 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # ax.legend()
     # ax.grid()
     # plt.tight_layout()
-    #
+
     # plt.plot(xf[:n // 2], np.abs(yf[:n // 2]), label="raw")
     # plt.plot(xf[:n // 2], np.abs(den_yf[:n // 2]), label="denoised")
     # plt.plot(xf[:n // 2], np.abs(dyf[:n // 2]), label="raw derivative")
-    # plt.plot()
     # plt.ylim(-10, 100)
     # plt.xlim(-1, 10)
     # plt.grid()
@@ -406,19 +431,6 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     motor_sync = np.stack([np.interp(x=pose_dict["t"],
                                      xp=motors_dict["rosbag_t"],
                                      fp=motors_dict[f"m{i}"][:, 1]) for i in range(4)], axis=1)
-
-    # den_motor = np.stack([splev(pose_dict["t"],
-    #                             splrep(pose_dict["t"], motor_sync[:, i], k=3, s=1e-3)) for i in range(4)], axis=1)
-    # # Plot motors
-    # fig, ax = plt.subplots(1, 1)
-    # [ax.plot(pose_dict["t"] - pose_dict["t"][0], motor_sync[:, i], label=f"Motor {i}") for i in range(4)]
-    # [ax.plot(pose_dict["t"] - pose_dict["t"][0], den_motor[:, i], label=f"Denoised motor {i}") for i in range(4)]
-    # ax.set_title(intermediate_flight_path.split("/")[-4:-1])
-    # ax.set_xlabel("Time[s]")
-    # ax.legend()
-    # ax.grid()
-    # plt.tight_layout()
-    # plt.show()
 
     synchronisation = {"t": pose_dict["t"], "imu_ang_acc": imu_sync, "motor": motor_sync,
                        "pose_quat_trans": pose_dict["quat_trans"], "state": state, "dstate": dstate}
@@ -562,23 +574,23 @@ def main():
     # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
-    # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
-    # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
-    # load_clean_data(raw_flight_path, intermediate_flight_path)
+    flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
+    raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
+    load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
-    processing_time = {}
-    for i in tqdm(range(len(FLIGHT_LIST))):
-        flight = FLIGHT_LIST[i]
-        raw_flight_path = DATASET_PATH + f"raw/{flight}"
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        tic = time.time()
-        load_clean_data(raw_flight_path, intermediate_flight_path)
-        processing_time[flight] = time.time() - tic
-    pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
-
+    # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
+    # processing_time = {}
+    # for i in tqdm(range(len(FLIGHT_LIST))):
+    #     flight = FLIGHT_LIST[i]
+    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
+    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    #     tic = time.time()
+    #     load_clean_data(raw_flight_path, intermediate_flight_path)
+    #     processing_time[flight] = time.time() - tic
+    # pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
+    #
     # building_data_and_splitting()
 
     # madiha_laurent_csv()

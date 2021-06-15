@@ -18,6 +18,7 @@ GENERAL_ANALYSIS_PATH = WD_PATH + "analysis/"
 
 
 def mkdir_if_not_exist(paths: list):
+    assert isinstance(paths, list)
     for path in paths:
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
