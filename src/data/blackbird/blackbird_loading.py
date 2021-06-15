@@ -12,9 +12,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-from src.trace_trajectory import trace_trajectory
 import src.utils.paths
-from src.utils.transform import Transform
 
 # Path
 ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
@@ -164,7 +162,6 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
         # print(f"{name}: {header}")
         data = [e for e in csv_reader]
         assert len(data[0]) == 17
-        # TODO if problem with data maybe main timestamp is the good one instead of each motor's timestamp.
         time = np.array([float(e[0]) * 1e-9 for e in data])
         time0 = np.array([float(e[8]) + float(e[9]) * 1e-9 for e in data])
         time1 = np.array([float(e[10]) + float(e[11]) * 1e-9 for e in data])
@@ -202,19 +199,19 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     frequencies = fftfreq(n, d=period)
 
     # DENOISING with Fourier
-    fc_rot = 10  # Hz
+    fc_rot = 5  # Hz
     rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))  # Rot is rot_fixed_body
     fourier_rot = fft(rot, axis=0)
     fourier_drot = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_rot
     fourier_d2rot = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_drot
-    den_rot = np.real(ifft(low_pass_filter(fourier_rot, frequencies, 5), axis=0)).reshape((-1, 3, 3))
-    den_drot = np.real(ifft(low_pass_filter(fourier_drot, frequencies, 5), axis=0)).reshape((-1, 3, 3))
+    den_rot = np.real(ifft(low_pass_filter(fourier_rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
+    den_drot = np.real(ifft(low_pass_filter(fourier_drot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
     den_d2rot = np.real(ifft(low_pass_filter(fourier_d2rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
     # plt.plot(rot, label="gt")
     # plt.plot(den_rot, label="fourier")
     # plt.legend()
     # plt.plot(frequencies, fourier_d2rot)
-    plt.plot(den_drot.reshape((-1, 9)))
+    # plt.plot(den_drot.reshape((-1, 9)))
 
     # DENOISING solution: Spline interpolation and smoothing
     # rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))  # Rot is rot_fixed_body
@@ -272,17 +269,26 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # angular_velocity = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
 
     # Computing linear speed
-    # dt = pose_dict["t"][1:] - pose_dict["t"][:-1]
-    # euler_linear_speed = (trans[1:] - trans[:-1]) / dt.reshape((-1, 1))
-    # euler_linear_speed = np.concatenate([np.zeros((1, 3)), euler_linear_speed])
-    # euler_linear_speed = Rotation.from_quat(quat).inv().as_matrix() @ euler_linear_speed.reshape((-1, 3, 1))
-    trans_rep = [splrep(pose_dict["t"], trans[:, i], k=5, s=1e-3) for i in range(3)]
+    dt = pose_dict["t"][1:] - pose_dict["t"][:-1]
+    euler_linear_speed = (trans[1:] - trans[:-1]) / dt.reshape((-1, 1))
+    euler_linear_speed = np.concatenate([np.zeros((1, 3)), euler_linear_speed])
+    euler_linear_speed = (Rotation.from_quat(quat).inv().as_matrix() @ euler_linear_speed.reshape((-1, 3, 1))).squeeze()
+    # trans_rep = [splrep(pose_dict["t"], trans[:, i], k=5, s=1e-3) for i in range(3)]
     # den_trans = np.stack([splev(pose_dict["t"], trans_rep[i]) for i in range(3)], axis=1)
-    den_dtrans = np.stack([splev(pose_dict["t"], trans_rep[i], der=1) for i in range(3)], axis=1)
-    den_d2trans = np.stack([splev(pose_dict["t"], trans_rep[i], der=2) for i in range(3)], axis=1)
-    den_linear_speed = (Rotation.from_quat(quat).inv().as_matrix() @ den_dtrans.reshape((-1, 3, 1))).squeeze()
+    # den_dtrans = np.stack([splev(pose_dict["t"], trans_rep[i], der=1) for i in range(3)], axis=1)
+    # den_d2trans = np.stack([splev(pose_dict["t"], trans_rep[i], der=2) for i in range(3)], axis=1)
+
+    # DENOISING with Fourier
+    fc_trans = 5  # Hz
+    fourier_trans = fft(trans, axis=0)
+    fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
+    fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
+    den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
+    den_dtrans = np.real(ifft(low_pass_filter(fourier_dtrans, frequencies, fc_trans), axis=0))
+    den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
+
+    den_linear_speed = (Rotation.from_matrix(den_rot).inv().as_matrix() @ den_dtrans.reshape((-1, 3, 1))).squeeze()
     den_linear_acc = (Rotation.from_matrix(den_rot).inv().as_matrix() @ den_d2trans.reshape((-1, 3, 1))).squeeze()
-    pass
 
     # # PLOT Linear speed derivation denoising
     # fig, ax = plt.subplots(1, 1)
@@ -335,56 +341,57 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.tight_layout()
     # plt.show()
 
-    # FOURIER ANALYSIS
-    def low_pass_filter(fft_coef, freqs, threshold):
-        output = fft_coef.copy()
-        output[np.abs(freqs) > threshold] = 0
-        return output
-
-    def coefficient_determination(y, y_hat):
-        assert len(y) == len(y_hat) and (isinstance(y, np.ndarray) and isinstance(y_hat, np.ndarray))
-        ss_tot = len(y) * np.var(y)
-        ss_res = np.sum((y - y_hat) ** 2)
-        return 1 - ss_res / ss_tot
-
-    # Analyse signal fft
-    i = 0
-    time = pose_dict["t"] - pose_dict["t"][0]
-    signal = rot.reshape((-1, 9))[:, i]
-    den_signal = den_rot.reshape((-1, 9))[:, i]
-    den_dsignal = den_drot.reshape((-1, 9))[:, i]
-    period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
-    n = len(signal)
-    yf = fft(signal)
-    den_yf = fft(den_signal)
-    xf = fftfreq(n, d=period)
-    dyf = 2 * np.pi * complex(0, 1) * xf * yf
-
-    # Filter coefficients
-    fc_signal = 10.  # Hz
-    yf_filtered = low_pass_filter(yf, xf, fc_signal)
-
-    fc_dsignal = 10.  # Hz
-    dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
-
-    # Compute back signal
-    filtered_signal = np.real(ifft(yf_filtered))
-    dfourier_signal = np.real(ifft(dyf))
-    dfourier_low_pass = np.real(ifft(dyf_filtered))
+    # # FOURIER ANALYSIS
+    # def low_pass_filter(fft_coef, freqs, threshold):
+    #     output = fft_coef.copy()
+    #     output[np.abs(freqs) > threshold] = 0
+    #     return output
     #
-    # Compute and compare derivative
-    fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # ax.plot(time, dfourier_signal, label="fourier derivative")
-    # ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
-    ax.plot(time, den_dsignal, label="Spline derivative")
-    ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
-    ax.set_xlabel("Time [s]")
-    ax.set_ylabel("Matrix coefficient")
-    ax.set_title(flight)
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
+    # def coefficient_determination(y, y_hat):
+    #     assert len(y) == len(y_hat) and (isinstance(y, np.ndarray) and isinstance(y_hat, np.ndarray))
+    #     ss_tot = len(y) * np.var(y)
+    #     ss_res = np.sum((y - y_hat) ** 2)
+    #     return 1 - ss_res / ss_tot
+    #
+    # # Analyse signal fft
+    # i = 0
+    # time = pose_dict["t"] - pose_dict["t"][0]
+    # signal = rot.reshape((-1, 9))[:, i]
+    # den_signal = den_rot.reshape((-1, 9))[:, i]
+    # den_dsignal = den_drot.reshape((-1, 9))[:, i]
+    # period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
+    # n = len(signal)
+    # yf = fft(signal)
+    # den_yf = fft(den_signal)
+    # xf = fftfreq(n, d=period)
+    # dyf = 2 * np.pi * complex(0, 1) * xf * yf
+    #
+    # # Filter coefficients
+    # fc_signal = 10.  # Hz
+    # yf_filtered = low_pass_filter(yf, xf, fc_signal)
+    #
+    # fc_dsignal = 10.  # Hz
+    # dyf_filtered = low_pass_filter(dyf, xf, fc_dsignal)
+    #
+    # # Compute back signal
+    # filtered_signal = np.real(ifft(yf_filtered))
+    # dfourier_signal = np.real(ifft(dyf))
+    # dfourier_low_pass = np.real(ifft(dyf_filtered))
+    #
+    # # Compute and compare derivative
+    # fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # # ax.plot(time, dfourier_signal, label="fourier derivative")
+    # # ax.plot(time[1:], (signal[1:] - signal[:-1]) / (time[1:] - time[:-1]), label="Euler derivative")
+    # ax.plot(time, den_dsignal, label="Spline derivative")
+    # ax.plot(time, dfourier_low_pass, label=f"dfourier_low_pass f: {fc_dsignal}Hz")
+    # ax.set_xlabel("Time [s]")
+    # ax.set_ylabel("Matrix coefficient")
+    # ax.set_title(flight)
+    # ax.legend()
+    # ax.grid()
+    # plt.tight_layout()
 
+    # # Compare signal and low pass filter
     # fix, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
     # ax.plot(time, signal, label="raw")
     # ax.plot(time, den_signal, c="r", label=f"denoised r2: {coefficient_determination(signal, den_signal):10.6f}")
@@ -397,6 +404,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # ax.grid()
     # plt.tight_layout()
 
+    # # Check Fourier coeficients
     # plt.plot(xf[:n // 2], np.abs(yf[:n // 2]), label="raw")
     # plt.plot(xf[:n // 2], np.abs(den_yf[:n // 2]), label="denoised")
     # plt.plot(xf[:n // 2], np.abs(dyf[:n // 2]), label="raw derivative")
@@ -574,11 +582,11 @@ def main():
     # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
-    flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
-    raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-    print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
-    load_clean_data(raw_flight_path, intermediate_flight_path)
+    # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
+    # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
+    # load_clean_data(raw_flight_path, intermediate_flight_path)
 
     # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
     # processing_time = {}
@@ -590,8 +598,8 @@ def main():
     #     load_clean_data(raw_flight_path, intermediate_flight_path)
     #     processing_time[flight] = time.time() - tic
     # pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
-    #
-    # building_data_and_splitting()
+
+    building_data_and_splitting()
 
     # madiha_laurent_csv()
 
