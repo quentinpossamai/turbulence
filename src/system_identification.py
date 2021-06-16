@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from src.data.blackbird.blackbird_loading import BlackbirdDataset, load_flight, SPLITTING_CONFIG_PATH
 from src.drone_models.learned_sabatino import Quadrotor
+from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
@@ -67,7 +68,7 @@ def si_blackbird_quadrotor():
     print("Tensorboard logdir: ", training_path)
     writer = SummaryWriter(training_path)
 
-    model = Quadrotor().to(device)
+    model = MLPQuadrotor().to(device)
     train_data = DataLoader(BlackbirdDataset("train"), batch_size=batch_size, shuffle=True, num_workers=1,
                             pin_memory=True)
     validation_data_set = BlackbirdDataset("validation")
