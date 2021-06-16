@@ -184,6 +184,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
         time = np.array([float(e[0]) * 1e-9 for e in data])
         trans = np.array([np.array([float(e[9]), float(e[10]), float(e[11])]) for e in data])
         quat = np.array([np.array([float(e[13]), float(e[14]), float(e[15]), float(e[16])]) for e in data])
+        quat = Rotation.from_quat(quat).as_quat()
         quat_trans = np.concatenate([quat, trans], axis=1)
         pose_dict = {"t": time, "quat_trans": quat_trans}
 
@@ -207,26 +208,22 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     den_rot = np.real(ifft(low_pass_filter(fourier_rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
     den_drot = np.real(ifft(low_pass_filter(fourier_drot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
     den_d2rot = np.real(ifft(low_pass_filter(fourier_d2rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
-    # plt.plot(rot, label="gt")
-    # plt.plot(den_rot, label="fourier")
+    angles = Rotation.from_quat(quat).as_euler("zyx", False)[:, ::-1]
+    den_angles = Rotation.from_matrix(den_rot).as_euler("zyx", False)[:, ::-1]
+    den_dangles = Rotation.from_matrix(den_drot).as_euler("zyx", False)[:, ::-1]
+    # plt.plot(rot.reshape((-1, 9)), label="gt")
+    # plt.plot(den_rot.reshape((-1, 9)), label="fourier")
     # plt.legend()
     # plt.plot(frequencies, fourier_d2rot)
     # plt.plot(den_drot.reshape((-1, 9)))
 
-    # DENOISING solution: Spline interpolation and smoothing
+    # # DENOISING solution: Spline interpolation and smoothing
     # rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))  # Rot is rot_fixed_body
     # rot_reps = [splrep(pose_dict["t"], rot[:, i], k=5, s=5e-2) for i in range(9)]
     # rot = rot.reshape((-1, 3, 3))
-    # den_rot = np.stack([splev(pose_dict["t"], rot_reps[i]) for i in range(9)], axis=1).reshape((-1, 3, 3))
-    # den_drot = np.stack([splev(pose_dict["t"], rot_reps[i], der=1) for i in range(9)], axis=1).reshape((-1, 3, 3))
-    # den_d2rot = np.stack([splev(pose_dict["t"], rot_reps[i], der=2) for i in range(9)], axis=1).reshape((-1, 3, 3))
-
-    # angles = Rotation.from_quat(quat).as_euler("zyx", False)[:, ::-1]
-    den_angles = Rotation.from_matrix(den_rot).as_euler("zyx", False)[:, ::-1]
-    den_dangles = Rotation.from_matrix(den_drot).as_euler("zyx", False)[:, ::-1]
-    # plt.plot(angles)
-    # plt.plot(den_angles)
-    # plt.plot(den_d2rot.reshape((-1, 9)))
+    # sp_den_rot = np.stack([splev(pose_dict["t"], rot_reps[i]) for i in range(9)], axis=1).reshape((-1, 3, 3))
+    # sp_den_drot = np.stack([splev(pose_dict["t"], rot_reps[i], der=1) for i in range(9)], axis=1).reshape((-1, 3, 3))
+    # sp_den_d2rot = np.stack([splev(pose_dict["t"], rot_reps[i], der=2) for i in range(9)], axis=1).reshape((-1, 3, 3))
 
     # Computing angular velocity
     omega = Rotation.from_matrix(den_rot).inv().as_matrix() @ den_drot
@@ -238,7 +235,6 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     wx1 = -omega[1, 2, :]
     wx2 = omega[2, 1, :]
     den_angular_velocity_matrix = np.stack([(wx1 + wx2) / 2, (wy1 + wy2) / 2, (wz1 + wz2) / 2], axis=1)
-    plt.plot(den_angular_velocity_matrix)
 
     # Compute angular acceleration
     domega = Rotation.from_matrix(den_rot).inv().as_matrix() @ den_d2rot
@@ -256,8 +252,8 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # den_dquat = np.stack([splev(pose_dict["t"], quat_reps[i], der=1) for i in range(4)], axis=1)
 
     # # Quaternion's way to compute the angular velocity. However it needs to derive the quaternion and it is not
-    # trivial: Euler differentiator and smoothed spline interpolation differentiator leads to a bad quaternion
-    # derivative estimate. It has spikes where the quaternion is not differentiable.
+    # # trivial: Euler differentiator and smoothed spline interpolation differentiator leads to a bad quaternion
+    # # derivative estimate. It has spikes where the quaternion is not differentiable.
     # dt = (pose_dict["t"][1:] - pose_dict["t"][:-1]).reshape((-1, 1))
     # dq_dt = (quat[1:] - quat[:-1]) / dt
     # dq_dt = np.concatenate([np.zeros((1, 4)), dq_dt], axis=0)
@@ -269,10 +265,11 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # angular_velocity = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
 
     # Computing linear speed
-    dt = pose_dict["t"][1:] - pose_dict["t"][:-1]
-    euler_linear_speed = (trans[1:] - trans[:-1]) / dt.reshape((-1, 1))
-    euler_linear_speed = np.concatenate([np.zeros((1, 3)), euler_linear_speed])
-    euler_linear_speed = (Rotation.from_quat(quat).inv().as_matrix() @ euler_linear_speed.reshape((-1, 3, 1))).squeeze()
+    # dt = pose_dict["t"][1:] - pose_dict["t"][:-1]
+    # euler_linear_speed = (trans[1:] - trans[:-1]) / dt.reshape((-1, 1))
+    # euler_linear_speed = np.concatenate([np.zeros((1, 3)), euler_linear_speed])
+    # euler_linear_speed = (Rotation.from_quat(quat).inv().as_matrix() @
+    #                       euler_linear_speed.reshape((-1, 3, 1))).squeeze()
     # trans_rep = [splrep(pose_dict["t"], trans[:, i], k=5, s=1e-3) for i in range(3)]
     # den_trans = np.stack([splev(pose_dict["t"], trans_rep[i]) for i in range(3)], axis=1)
     # den_dtrans = np.stack([splev(pose_dict["t"], trans_rep[i], der=1) for i in range(3)], axis=1)
@@ -328,7 +325,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.tight_layout()
     # plt.show()
 
-    # PLOT Angular velocity denoising
+    # # PLOT Angular velocity denoising
     # fig, ax = plt.subplots(1, 1)
     # for i, label in zip(range(3), ("x", "y", "z")):
     #     ax.plot(pose_dict["t"] - pose_dict["t"][0], angular_velocity[:, i], label=f"Euler quat derivative {label}")
@@ -414,19 +411,19 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # plt.legend()
 
     # # Check motor timestamps
-    # fig, ax = plt.subplots(2, 1, figsize=(19.2, 10.8))
-    # ax[0].plot(pose_dict["t"], trans)
+    # t = 1.525748e9
+    # fig, axs = plt.subplots(2, 1, figsize=(19.2, 10.8))
     # for i in range(4):
-    #     ax[1].plot(motors_dict[f"m{i}"][:, 0], motors_dict[f"m{i}"][:, 1])
-    # ax[0].grid()
-    # ax[1].grid()
-    #
-    # fig, ax = plt.subplots(2, 1, figsize=(19.2, 10.8))
-    # ax[0].plot(pose_dict["t"], trans)
-    # for i in range(4):
-    #     ax[1].plot(motors_dict["rosbag_t"], motors_dict[f"m{i}"][:, 1])
-    # ax[0].grid()
-    # ax[1].grid()
+    #     axs[0].plot(motors_dict["rosbag_t"], motors_dict[f"m{i}"][:, 1])
+    #     axs[1].plot(motors_dict[f"m{i}"][:, 0], motors_dict[f"m{i}"][:, 1])
+    # axs[0].grid()
+    # axs[0].set_xlabel("rosbagTimestamp [s]")
+    # axs[0].set_ylabel("Motor speed [rad/s]")
+    # axs[0].set_xlim(t + 600, t + 950)
+    # axs[1].grid()
+    # axs[1].set_xlabel("Sampe timestamp [s]")
+    # axs[1].set_ylabel("Motor speed [rad/s]")
+    # axs[1].set_xlim(t + 600, t + 950)
 
     state = np.concatenate([den_angles, den_angular_velocity_matrix, den_linear_speed, trans], axis=1)
 
@@ -437,7 +434,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
                                    xp=imu_dict["t"],
                                    fp=imu_dict["ang_acc"][:, i]) for i in range(6)], axis=1)
     motor_sync = np.stack([np.interp(x=pose_dict["t"],
-                                     xp=motors_dict["rosbag_t"],
+                                     xp=motors_dict[f"m{i}"][:, 0],
                                      fp=motors_dict[f"m{i}"][:, 1]) for i in range(4)], axis=1)
 
     synchronisation = {"t": pose_dict["t"], "imu_ang_acc": imu_sync, "motor": motor_sync,
@@ -480,6 +477,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     save_path = intermediate_flight_path + "data.pkl"
     p = pathlib.Path(intermediate_flight_path)
     p.mkdir(parents=True, exist_ok=True)
+
     pickle.dump(res, open(save_path, "wb"))
 
 
@@ -547,6 +545,41 @@ class BlackbirdDataset(Dataset):
                 "dstate": data[24:36], "next_state": data[36:]}
 
 
+def load_flight(flight_name, flight_yaw, flight_speed):
+    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
+
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
+    return data
+
+
+def main():
+    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
+    # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
+    # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
+    # flight_name, flight_yaw, flight_speed = "star", "yawConstant", "maxSpeed3p0"
+    # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
+    # load_clean_data(raw_flight_path, intermediate_flight_path)
+
+    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
+    processing_time = {}
+    for i in tqdm(range(len(FLIGHT_LIST))):
+        flight = FLIGHT_LIST[i]
+        raw_flight_path = DATASET_PATH + f"raw/{flight}"
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+        tic = time.time()
+        load_clean_data(raw_flight_path, intermediate_flight_path)
+        processing_time[flight] = time.time() - tic
+    pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
+
+    building_data_and_splitting()
+
+    # madiha_laurent_csv()
+
+
 def madiha_laurent_csv():
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
@@ -576,40 +609,6 @@ def madiha_laurent_csv():
         writer.writerow(header)
         for row in ml_data:
             writer.writerow(row)
-
-
-def main():
-    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
-    # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
-    # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
-    # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
-    # load_clean_data(raw_flight_path, intermediate_flight_path)
-
-    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
-    processing_time = {}
-    for i in tqdm(range(len(FLIGHT_LIST))):
-        flight = FLIGHT_LIST[i]
-        raw_flight_path = DATASET_PATH + f"raw/{flight}"
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        tic = time.time()
-        load_clean_data(raw_flight_path, intermediate_flight_path)
-        processing_time[flight] = time.time() - tic
-    pickle.dump(processing_time, open(ANALYSIS_SECTION_PATH + "processing_time.pkl", "wb"))
-
-    building_data_and_splitting()
-
-    # madiha_laurent_csv()
-
-
-def load_flight(flight_name, flight_yaw, flight_speed):
-    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
-
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
-    return data
 
 
 def plot_final_data():
@@ -683,4 +682,5 @@ def plot_final_data():
 
 if __name__ == '__main__':
     main()
+    # madiha_laurent_csv()
     # plot_final_data()

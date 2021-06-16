@@ -95,12 +95,11 @@ def si_blackbird_quadrotor():
         writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
         if validation_loss < memory:
             memory = validation_loss
-            torch.save(model.state_dict(), training_path + f"weights.pt")
+            torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
 
 
 def test_model_on_training():
-    weights = torch.load(ANALYSIS_PATH + "training/20210613_115328_batch_size_64000/"
-                                         "20210613_115328_batch_size_64000.pt")
+    weights = torch.load(ANALYSIS_PATH + "training/20210615_114637_batch_size_64000/weights.pt")
     print(weights)
     model = Quadrotor().to(device)
     model.load_state_dict(weights)
@@ -131,9 +130,9 @@ def test_model_on_training():
     time = torch.from_numpy(data[:, 23])
     dt = torch.from_numpy(data[:, 23]) - torch.from_numpy(data[:, 0])
     next_state = torch.from_numpy(data[:, 36:])
-    # with torch.no_grad():
-    #     hat_dstate = model(state, motor)  # predict dstate
-    #     hat_ns = state + dt.reshape((-1, 1)) * hat_dstate
+    with torch.no_grad():
+        hat_dstate = model(state, motor)  # predict dstate
+        hat_ns = state + dt.reshape((-1, 1)) * hat_dstate
 
     traj = [state[0, :]]
     with torch.no_grad():
@@ -187,5 +186,5 @@ def test_model_on_training():
 
 
 if __name__ == "__main__":
-    si_blackbird_quadrotor()
-    # test_model_on_training()
+    # si_blackbird_quadrotor()
+    test_model_on_training()
