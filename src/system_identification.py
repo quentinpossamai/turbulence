@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from src.data.blackbird.blackbird_loading import BlackbirdDataset, load_flight, SPLITTING_CONFIG_PATH
 from src.drone_models.learned_sabatino import Quadrotor
+from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
@@ -56,18 +57,19 @@ def si_blackbird_quadrotor():
     batch_size = 64000
     epochs = 100
     memory = 100000
+    model = MLPQuadrotor().to(device)
 
     # Tensorboard
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
+
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = now + f"_batch_size_{batch_size}"
+    name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
     writer = SummaryWriter(training_path)
 
-    model = Quadrotor().to(device)
     train_data = DataLoader(BlackbirdDataset("train"), batch_size=batch_size, shuffle=True, num_workers=1,
                             pin_memory=True)
     validation_data_set = BlackbirdDataset("validation")
