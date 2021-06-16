@@ -12,7 +12,7 @@ class MLPQuadrotor(nn.Module):
         self.linear4 = nn.Linear(in_features=256, out_features=12, bias=True).double()
 
     def forward(self, state, motor):
-        state_motor = torch.stack([state, motor], dim=1)
+        state_motor = torch.cat([state, motor], dim=1)
         out = relu(self.linear1(state_motor))
         out = relu(self.linear2(out))
         out = relu(self.linear3(out))
