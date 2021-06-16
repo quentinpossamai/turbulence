@@ -47,6 +47,7 @@ def validate(model, dataloader, global_iteration, epoch):
             output = model(state, motor)  # dstate
             validation_loss = loss(state=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
             loss_log.append(validation_loss)
+        assert len(loss_log) == 1
     return torch.mean(torch.tensor(loss_log).float())
 
 
@@ -69,7 +70,8 @@ def si_blackbird_quadrotor():
     model = Quadrotor().to(device)
     train_data = DataLoader(BlackbirdDataset("train"), batch_size=batch_size, shuffle=True, num_workers=1,
                             pin_memory=True)
-    validation_data = DataLoader(BlackbirdDataset("validation"), batch_size=batch_size, shuffle=True, num_workers=1,
+    validation_data_set = BlackbirdDataset("validation")
+    validation_data = DataLoader(validation_data_set, batch_size=len(validation_data_set), shuffle=True, num_workers=1,
                                  pin_memory=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
