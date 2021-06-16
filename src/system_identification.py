@@ -25,15 +25,17 @@ def loss(state, dstate_hat, next_state_gt, dt):
     next_state_hat = state + dstate_hat * dt
 
     # Todo use cos sin
-    angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
-                  torch.mean(torch.fmod(next_state_hat[:, 1] - next_state_gt[:, 1], np.pi / 2) ** 2) +
-                  torch.mean(torch.fmod(next_state_hat[:, 2] - next_state_gt[:, 2], np.pi) ** 2))
+    # angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
+    #               torch.mean(torch.fmod(next_state_hat[:, 1] - next_state_gt[:, 1], np.pi / 2) ** 2) +
+    #               torch.mean(torch.fmod(next_state_hat[:, 2] - next_state_gt[:, 2], np.pi) ** 2))
 
     angular_velocity_loss = mse_loss(next_state_hat[:, 3:6], next_state_gt[:, 3:6])
     linear_speed_loss = mse_loss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
-    position_loss = mse_loss(next_state_hat[:, 9:], next_state_gt[:, 9:])
+    # position_loss = mse_loss(next_state_hat[:, 9:], next_state_gt[:, 9:])
+
     # return angle_loss + angular_velocity_loss + linear_speed_loss + position_loss
-    return 10. * angle_loss + angular_velocity_loss + linear_speed_loss + 1/10. * position_loss
+    # return 10. * angle_loss + angular_velocity_loss + linear_speed_loss + 1/10. * position_loss
+    return angular_velocity_loss + linear_speed_loss
 
 
 def validate(model, dataloader, global_iteration, epoch):
@@ -73,7 +75,7 @@ def si_blackbird_quadrotor():
     train_data = DataLoader(BlackbirdDataset("train"), batch_size=batch_size, shuffle=True, num_workers=1,
                             pin_memory=True)
     validation_data_set = BlackbirdDataset("validation")
-    validation_data = DataLoader(validation_data_set, batch_size=len(validation_data_set), shuffle=True, num_workers=1,
+    validation_data = DataLoader(validation_data_set, batch_size=1, shuffle=True, num_workers=1,
                                  pin_memory=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
