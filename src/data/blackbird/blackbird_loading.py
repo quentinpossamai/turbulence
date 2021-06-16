@@ -583,11 +583,10 @@ def main():
 def madiha_laurent_csv():
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
     # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
     #         "dstate": data[24:36], "next_state": data[36:]}
 
+    data = None  # Must load from raw not intermediate because of denoising.
     t = data[:, 0]
     state = data[:, 1:13]
     motor = data[:, 13:17]
