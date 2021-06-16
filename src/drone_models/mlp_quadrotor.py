@@ -17,4 +17,6 @@ class MLPQuadrotor(nn.Module):
         out = relu(self.linear2(out))
         out = relu(self.linear3(out))
         out = self.linear4(out)
+        wb = out[:, 3:6]
+        vb = out[:, 6:9]
         return out

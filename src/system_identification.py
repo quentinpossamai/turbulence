@@ -19,10 +19,10 @@ use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
 
-def loss(state, dstate_hat, next_state_gt, dt):
+def loss(state_gt, dstate_hat, next_state_gt, dt):
     mse_loss = nn.MSELoss()
     # Without the angles
-    next_state_hat = state + dstate_hat * dt
+    next_state_hat = state_gt + dstate_hat * dt
 
     # Todo use cos sin
     # angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
@@ -43,14 +43,16 @@ def validate(model, dataloader, global_iteration, epoch):
     loss_log = []
     with torch.no_grad():
         for batch in tqdm(dataloader, desc=f"Validation: {epoch}"):
+            # time_tracker = tqdm(dataloader, desc="Validation")
+            batch = next(iter(dataloader))
             state = batch["state"].to(device)
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
             output = model(state, motor)  # dstate
-            validation_loss = loss(state=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
+            validation_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
             loss_log.append(validation_loss)
-        assert len(loss_log) == 1
+        # time_tracker.update(1)
     return torch.mean(torch.tensor(loss_log).float())
 
 
@@ -72,10 +74,11 @@ def si_blackbird_quadrotor():
     print("Tensorboard logdir: ", training_path)
     writer = SummaryWriter(training_path)
 
-    train_data = DataLoader(BlackbirdDataset("train"), batch_size=batch_size, shuffle=True, num_workers=1,
+    train_dataset = BlackbirdDataset("train")
+    train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1,
                             pin_memory=True)
-    validation_data_set = BlackbirdDataset("validation")
-    validation_data = DataLoader(validation_data_set, batch_size=1, shuffle=True, num_workers=1,
+    validation_dataset = BlackbirdDataset("validation")
+    validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True, num_workers=1,
                                  pin_memory=True)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
@@ -88,7 +91,7 @@ def si_blackbird_quadrotor():
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
             output = model(state, motor)  # dstate
-            training_loss = loss(state=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
+            training_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
 
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
 
@@ -104,8 +107,8 @@ def si_blackbird_quadrotor():
             torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
 
 
-def test_model_on_training():
-    weights = torch.load(ANALYSIS_PATH + "training/20210615_114637_batch_size_64000/weights.pt")
+def test_learned_quadrotor_on_training():
+    weights = torch.load(ANALYSIS_PATH + "training/20210615_111629_batch_size_64000/weights.pt")
     print(weights)
     model = Quadrotor().to(device)
     model.load_state_dict(weights)
@@ -122,6 +125,7 @@ def test_model_on_training():
     #         [-1.8498e-06,  1.2445e-06, -3.2462e-06,  3.5668e-06],
     #         [ 6.7813e-06,  7.5055e-06, -2.7151e-06, -5.9875e-06]]))])
 
+    # Training flight
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
     data = load_flight(flight_name, flight_yaw, flight_speed)
@@ -191,6 +195,74 @@ def test_model_on_training():
     # plt.show()
 
 
+def test_mlp():
+    splitting_config = pickle.load(open(SPLITTING_CONFIG_PATH, "rb"))  # train_flights, validation_flights, test_flights
+
+    weights = torch.load(ANALYSIS_PATH + "training/20210616_122350_MLPQuadrotor_bs_64000/678_weights.pt")
+    print(weights)
+    model = MLPQuadrotor().to(device)
+    model.load_state_dict(weights)
+    model.eval()
+
+    # Training flight
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
+    data = load_flight(flight_name, flight_yaw, flight_speed)
+    assert flight in splitting_config["train_flights"]
+    print("Testing on training")
+
+    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
+    #         "dstate": data[24:36], "next_state": data[36:]}
+    time = torch.from_numpy(data[:, 0])
+    state = torch.from_numpy(data[:, 1:13])
+    motor = torch.from_numpy(data[:, 13:17])
+    next_time = torch.from_numpy(data[:, 23])
+    next_state = torch.from_numpy(data[:, 36:])
+    dt = (next_time - time).unsqueeze(-1)
+
+    # Without integration
+    with torch.no_grad():
+        dstate_hat = model(state, motor)
+    state_velocities_only_hat = state + dstate_hat * dt
+
+    # # Testing on validation flight
+    # flight = splitting_config["validation_flights"][0]
+    # flight_name, flight_yaw, flight_speed = flight.split("/")[:-1]
+    # data = load_flight(flight_name, flight_yaw, flight_speed)
+    # print("Testing on validation")
+    #
+    # # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
+    # #         "dstate": data[24:36], "next_state": data[36:]}
+    # time = torch.from_numpy(data[:, 0])
+    # state = torch.from_numpy(data[:, 1:13])
+    # motor = torch.from_numpy(data[:, 13:17])
+    # next_time = torch.from_numpy(data[:, 23])
+    # next_state = torch.from_numpy(data[:, 36:])
+    # dt = (next_time - time).unsqueeze(-1)
+    #
+    # # Without integration
+    # with torch.no_grad():
+    #     dstate_hat = model(state, motor)
+    # state_velocities_only_hat = state + dstate_hat * dt
+
+    # With integration
+    start = 0
+    stop = 100
+    fig, axs = plt.subplots(2, 3, figsize=(19.2, 10.8), dpi=100)
+    for i, name in zip(range(4), ["angular_velocity [rad/s]", "linear_speed [m/s]"]):
+        for j, axe in zip(range(3), ["x", "y", "z"]):
+            ax = axs[i, j]
+            ax.plot(next_time[start:stop], next_state[start:stop, 3 + i * 3 + j], label="GT")
+            ax.plot(next_time[start:stop], state_velocities_only_hat[start:stop, 3 + i * 3 + j], label="Model")
+            ax.set_ylabel(f"{name} {axe}")
+            ax.set_xlabel(f"Time [s]")
+            ax.grid()
+            ax.legend()
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
-    si_blackbird_quadrotor()
-    # test_model_on_training()
+    # si_blackbird_quadrotor()
+    # test_learned_quadrotor_on_training()
+    test_mlp()

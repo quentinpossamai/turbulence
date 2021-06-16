@@ -208,9 +208,13 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     den_rot = np.real(ifft(low_pass_filter(fourier_rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
     den_drot = np.real(ifft(low_pass_filter(fourier_drot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
     den_d2rot = np.real(ifft(low_pass_filter(fourier_d2rot, frequencies, fc_rot), axis=0)).reshape((-1, 3, 3))
+
     angles = Rotation.from_quat(quat).as_euler("zyx", False)[:, ::-1]
     den_angles = Rotation.from_matrix(den_rot).as_euler("zyx", False)[:, ::-1]
     den_dangles = Rotation.from_matrix(den_drot).as_euler("zyx", False)[:, ::-1]
+    den_quat = Rotation.from_matrix(den_rot).as_quat()
+    den_dquat = Rotation.from_matrix(den_drot).as_quat()
+
     # plt.plot(rot.reshape((-1, 9)), label="gt")
     # plt.plot(den_rot.reshape((-1, 9)), label="fourier")
     # plt.legend()
