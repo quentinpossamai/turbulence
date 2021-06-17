@@ -213,13 +213,9 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     den_angles = Rotation.from_matrix(den_rot).as_euler("zyx", False)[:, ::-1]
     den_dangles = Rotation.from_matrix(den_drot).as_euler("zyx", False)[:, ::-1]
     den_quat = Rotation.from_matrix(den_rot).as_quat()
-    den_dquat = Rotation.from_matrix(den_drot).as_quat()
-
-    # plt.plot(rot.reshape((-1, 9)), label="gt")
-    # plt.plot(den_rot.reshape((-1, 9)), label="fourier")
-    # plt.legend()
-    # plt.plot(frequencies, fourier_d2rot)
-    # plt.plot(den_drot.reshape((-1, 9)))
+    fourier_den_quat = fft(den_quat, axis=0)
+    fourier_den_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_den_quat
+    den_dquat = np.real(ifft(fourier_den_dquat, axis=0))
 
     # # DENOISING solution: Spline interpolation and smoothing
     # rot = Rotation.from_quat(quat).as_matrix().reshape((-1, 9))  # Rot is rot_fixed_body
@@ -429,9 +425,9 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # axs[1].set_ylabel("Motor speed [rad/s]")
     # axs[1].set_xlim(t + 600, t + 950)
 
-    state = np.concatenate([den_angles, den_angular_velocity_matrix, den_linear_speed, trans], axis=1)
+    state = np.concatenate([den_quat, den_angular_velocity_matrix, den_linear_speed, trans], axis=1)
 
-    dstate = np.concatenate([den_dangles, den_angular_acc_matrix, den_linear_acc, den_dtrans], axis=1)
+    dstate = np.concatenate([den_dquat, den_angular_acc_matrix, den_linear_acc, den_dtrans], axis=1)
 
     # Synchronisation
     imu_sync = np.stack([np.interp(x=pose_dict["t"],
