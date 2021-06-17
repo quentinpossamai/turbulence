@@ -133,13 +133,13 @@ def test_learned_quadrotor_on_training():
     assert flight in splitting_config["train_flights"]
     print("Testing on training")
 
-    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
-    #         "dstate": data[24:36], "next_state": data[36:]}
-    state = torch.from_numpy(data[:, 1:13])
-    motor = torch.from_numpy(data[:, 13:17])
-    time = torch.from_numpy(data[:, 23])
-    dt = torch.from_numpy(data[:, 23]) - torch.from_numpy(data[:, 0])
-    next_state = torch.from_numpy(data[:, 36:])
+    # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
+    #         "dstate": data[25:38], "next_state": data[38:]}
+    state = torch.from_numpy(data[:, 1:14])
+    motor = torch.from_numpy(data[:, 14:18])
+    time = torch.from_numpy(data[:, 24])
+    dt = torch.from_numpy(data[:, 24]) - torch.from_numpy(data[:, 0])
+    next_state = torch.from_numpy(data[:, 38:])
     with torch.no_grad():
         hat_dstate = model(state, motor)  # predict dstate
         hat_ns = state + dt.reshape((-1, 1)) * hat_dstate
@@ -211,13 +211,13 @@ def test_mlp():
     assert flight in splitting_config["train_flights"]
     print("Testing on training")
 
-    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
-    #         "dstate": data[24:36], "next_state": data[36:]}
-    time = torch.from_numpy(data[:, 0])
-    state = torch.from_numpy(data[:, 1:13])
-    motor = torch.from_numpy(data[:, 13:17])
-    next_time = torch.from_numpy(data[:, 23])
-    next_state = torch.from_numpy(data[:, 36:])
+    # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
+    #         "dstate": data[25:38], "next_state": data[38:]}
+    state = torch.from_numpy(data[:, 1:14])
+    motor = torch.from_numpy(data[:, 14:18])
+    time = torch.from_numpy(data[:, 24])
+    next_time = torch.from_numpy(data[:, 24])
+    next_state = torch.from_numpy(data[:, 38:])
     dt = (next_time - time).unsqueeze(-1)
 
     # Without integration

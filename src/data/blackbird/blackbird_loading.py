@@ -537,12 +537,12 @@ class BlackbirdDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        One sample is time:1, state:12, motor:4, imu_ang_acc:6, time_next_state:1, dstate:12, next_state:12 = 48
+        One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, dstate:13, next_state:13 = 51
 
         """
         data = self.data[idx]
-        return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
-                "dstate": data[24:36], "next_state": data[36:]}
+        return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
+                "dstate": data[25:38], "next_state": data[38:]}
 
 
 def load_flight(flight_name, flight_yaw, flight_speed):
