@@ -7,11 +7,11 @@ import random
 from scipy.fft import fft, fftfreq, ifft
 from scipy import interpolate
 from scipy.spatial.transform import Rotation
-import time
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from tqdm import tqdm
 
+from src.trace_trajectory import trace_trajectory
 from src.utils.transform import Transform
 import src.utils.paths
 
@@ -91,7 +91,6 @@ CSV_FILE = ["blackbird_slash_imu.csv",
 
 def load_clean_data(raw_flight_path, intermediate_flight_path):
     flight = "/".join(raw_flight_path.split("/")[-4:-1])
-
     name = "blackbird_slash_imu"
     with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
@@ -143,8 +142,9 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     pose = Transform.from_quat_trans(quat, trans).as_matrix()
     pi_rotation = Transform.from_euler_trans("zyx", np.array([0, 0, np.pi]),
                                              degrees=False, trans=np.array([0, 0, 0])).as_matrix()
-    pose = pi_rotation @ pose
-    quat, trans = Transform.from_matrix(pose).as_quat_trans()
+    pose = pi_rotation @ pose @ pi_rotation
+    quat = Transform.from_matrix(pose).as_quat_trans()[:, :4]
+    trans = Transform.from_matrix(pose).as_quat_trans()[:, 4:]
 
     # Centering position
     trans = trans - np.mean(trans, axis=0)
@@ -164,10 +164,10 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     fc_rot = 5  # Hz
     fourier_quat = fft(quat, axis=0)
     fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
-    fourier_d2quat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dquat
+    # fourier_d2quat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dquat
     den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_rot), axis=0))
     den_dquat = np.real(ifft(low_pass_filter(fourier_dquat, frequencies, fc_rot), axis=0))
-    den_d2quat = np.real(ifft(low_pass_filter(fourier_d2quat, frequencies, fc_rot), axis=0))
+    # den_d2quat = np.real(ifft(low_pass_filter(fourier_d2quat, frequencies, fc_rot), axis=0))
 
     # Compute angular velocity
     dq_dt_convention = den_dquat[:, [3, 0, 1, 2]]
@@ -181,10 +181,10 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     fc_trans = 5  # Hz
     fourier_trans = fft(trans, axis=0)
     fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
-    fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
+    # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
     den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
     den_dtrans = np.real(ifft(low_pass_filter(fourier_dtrans, frequencies, fc_trans), axis=0))
-    den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
+    # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
 
     state = np.concatenate([den_trans, den_quat, den_dtrans, angular_velocity], axis=1)
 
@@ -213,6 +213,8 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     save_path = intermediate_flight_path + "data.pkl"
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(cut_data, open(save_path, "wb"))
+
+    # trace_trajectory(state[:, :3], state[:, 3:7])
 
 
 def building_data_and_splitting():
@@ -288,14 +290,24 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
+    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
+    # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
+    # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
+    # flight_name, flight_yaw, flight_speed = "star", "yawConstant", "maxSpeed3p0"
+    # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
+    # load_clean_data(raw_flight_path, intermediate_flight_path)
+
     print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
     for i in tqdm(range(len(FLIGHT_LIST))):
         flight = FLIGHT_LIST[i]
         raw_flight_path = DATASET_PATH + f"raw/{flight}"
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
         load_clean_data(raw_flight_path, intermediate_flight_path)
-
-    building_data_and_splitting()
+    #
+    # building_data_and_splitting()
 
 
 def madiha_laurent_csv():
