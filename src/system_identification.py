@@ -24,18 +24,18 @@ def loss(state_gt, dstate_hat, next_state_gt, dt):
     # Without the angles
     next_state_hat = state_gt + dstate_hat * dt
 
-    # Todo use cos sin
     # angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
     #               torch.mean(torch.fmod(next_state_hat[:, 1] - next_state_gt[:, 1], np.pi / 2) ** 2) +
     #               torch.mean(torch.fmod(next_state_hat[:, 2] - next_state_gt[:, 2], np.pi) ** 2))
 
-    angular_velocity_loss = mse_loss(next_state_hat[:, 3:6], next_state_gt[:, 3:6])
-    linear_speed_loss = mse_loss(next_state_hat[:, 6:9], next_state_gt[:, 6:9])
-    # position_loss = mse_loss(next_state_hat[:, 9:], next_state_gt[:, 9:])
+    # position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
+    # quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
+    linear_speed_loss = mse_loss(next_state_hat[:, 7:10], next_state_gt[:, 7:10])
+    angular_velocity_loss = mse_loss(next_state_hat[:, 10:], next_state_gt[:, 10:])
 
-    # return angle_loss + angular_velocity_loss + linear_speed_loss + position_loss
-    # return 10. * angle_loss + angular_velocity_loss + linear_speed_loss + 1/10. * position_loss
-    return angular_velocity_loss + linear_speed_loss
+    # return position_loss + quat_loss + linear_speed_loss + angular_velocity_loss
+    # return 1/10 * position_loss + 10 * quat_loss + linear_speed_loss + angular_velocity_loss
+    return linear_speed_loss + angular_velocity_loss
 
 
 def validate(model, dataloader, global_iteration, epoch):
@@ -263,6 +263,6 @@ def test_mlp():
 
 
 if __name__ == "__main__":
-    # si_blackbird_quadrotor()
+    si_blackbird_quadrotor()
     # test_learned_quadrotor_on_training()
-    test_mlp()
+    # test_mlp()

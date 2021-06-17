@@ -19,7 +19,6 @@ import src.utils.paths
 ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
 DATASET_PATH = src.utils.paths.WD_PATH + "data/blackbird/"
 TORCH_DATASET_PATH = DATASET_PATH + f"intermediate_torch_dataset/"
-SPLITTING_CONFIG_PATH = TORCH_DATASET_PATH + "flight_split.pkl"
 
 src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, TORCH_DATASET_PATH])
 
@@ -89,6 +88,15 @@ CSV_FILE = ["blackbird_slash_imu.csv",
             "tf.csv"]
 
 
+def quaternion_fix_swap(q):
+    result = q.copy()
+    dot_products = np.sum(q[1:] * q[:-1], axis=-1)
+    mask = dot_products < 0
+    mask = (np.cumsum(mask, axis=0) % 2).astype(bool)
+    result[1:][mask] *= -1
+    return result
+
+
 def load_clean_data(raw_flight_path, intermediate_flight_path):
     flight = "/".join(raw_flight_path.split("/")[-4:-1])
     name = "blackbird_slash_imu"
@@ -143,8 +151,12 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     pi_rotation = Transform.from_euler_trans("zyx", np.array([0, 0, np.pi]),
                                              degrees=False, trans=np.array([0, 0, 0])).as_matrix()
     pose = pi_rotation @ pose @ pi_rotation
-    quat = Transform.from_matrix(pose).as_quat_trans()[:, :4]
-    trans = Transform.from_matrix(pose).as_quat_trans()[:, 4:]
+    quat = Transform.from_matrix(pose).as_rot_quat()
+    trans = Transform.from_matrix(pose).as_trans()
+
+    # Fix quaternion discontinuity
+    quat = quaternion_fix_swap(quat)
+    plt.plot(quat)
 
     # Centering position
     trans = trans - np.mean(trans, axis=0)
@@ -199,8 +211,20 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
 
     synchronisation = {"t": pose_dict["t"], "imu_ang_acc": imu_sync, "motor": motor_sync, "state": state}
 
-    start = 6000
-    stop = -6000
+    # Take data only when drone is flying
+    start, stop = 0, 0
+    has_started = False
+    for i, ms in enumerate(synchronisation["motor"]):
+        if i < 6000:
+            continue
+        if (ms > 1100).any() and not has_started:
+            start = i
+            has_started = True
+        if has_started and (ms < 500).any():
+            stop = i
+            break
+    stop = min(len(synchronisation["motor"]) - 4000, stop)
+    assert start != stop
 
     # return start, stop
     cut_data = {}
@@ -214,51 +238,65 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(cut_data, open(save_path, "wb"))
 
-    # trace_trajectory(state[:, :3], state[:, 3:7])
 
-
-def building_data_and_splitting():
+def splitting_txt():
     idx = list(range(len(FLIGHT_LIST)))
     random.shuffle(idx)
     idx = np.array(idx)
-    train_validation_idx = round(len(idx) * 0.6)
-    validation_test_idx = round(len(idx) * 0.8)
+    train_val_idx = round(len(idx) * 0.6)
+    val_test_idx = round(len(idx) * 0.8)
+    shuffled_list = np.asarray(FLIGHT_LIST)[idx]
 
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     special_flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
 
-    while special_flight not in FLIGHT_LIST[:train_validation_idx]:
-        idx = list(range(len(FLIGHT_LIST)))
+    while special_flight not in shuffled_list[:train_val_idx]:
         random.shuffle(idx)
-        idx = np.array(idx)
-        train_validation_idx = round(len(idx) * 0.6)
-        validation_test_idx = round(len(idx) * 0.8)
+        shuffled_list = np.asarray(FLIGHT_LIST)[idx]
+
+    for name, flight_list in zip(["train.txt", "validation.txt", "test.txt"],
+                                 [sorted(shuffled_list[:train_val_idx]),
+                                  sorted(shuffled_list[train_val_idx:val_test_idx]),
+                                  sorted(shuffled_list[val_test_idx:])]):
+        with open(TORCH_DATASET_PATH + name, "w") as file:
+            for flight in flight_list:
+                file.write(flight + "\n")
+
+
+def torch_splitting():
+    train_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "train.txt", "r"))
+    validation_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "validation.txt", "r"))
+    test_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "test.txt", "r"))
+
+    def concatenate(data_pkl):
+        t = data_pkl["t"][:-1].reshape((-1, 1))
+        state = data_pkl["state"][:-1]
+        motor = data_pkl["motor"][:-1]
+        imu = data_pkl["imu_ang_acc"][:-1]
+        next_t = data_pkl["t"][1:].reshape((-1, 1))
+        next_state = data_pkl["state"][1:]
+        return np.concatenate([t, state, motor, imu, next_t, next_state], axis=1)
 
     train = []
-    for flight in FLIGHT_LIST[:train_validation_idx]:
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        train.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
+    for flight in train_list:
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
+        train.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
     train = torch.from_numpy(np.concatenate(train, axis=0))
     torch.save(train, TORCH_DATASET_PATH + "train.pt")
 
     validation = []
-    for flight in FLIGHT_LIST[train_validation_idx:validation_test_idx]:
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        validation.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
+    for flight in validation_list:
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
+        validation.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
     validation = torch.from_numpy(np.concatenate(validation, axis=0))
     torch.save(validation, TORCH_DATASET_PATH + "validation.pt")
 
     test = []
-    for flight in FLIGHT_LIST[validation_test_idx:]:
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        test.append(pickle.load(open(intermediate_flight_path + "data.pkl", "rb")))
+    for flight in test_list:
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
+        test.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
     test = torch.from_numpy(np.concatenate(test, axis=0))
     torch.save(test, TORCH_DATASET_PATH + "test.pt")
-
-    pickle.dump({"train_flights": FLIGHT_LIST[:train_validation_idx],
-                 "validation_flights": FLIGHT_LIST[train_validation_idx:validation_test_idx],
-                 "test_flights": FLIGHT_LIST[validation_test_idx:]},
-                open(SPLITTING_CONFIG_PATH, "wb"))
 
 
 class BlackbirdDataset(Dataset):
@@ -273,12 +311,12 @@ class BlackbirdDataset(Dataset):
 
     def __getitem__(self, idx):
         """
-        One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, dstate:13, next_state:13 = 51
+        One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
 
         """
         data = self.data[idx]
         return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-                "dstate": data[25:38], "next_state": data[38:]}
+                "next_state": data[25:]}
 
 
 def load_flight(flight_name, flight_yaw, flight_speed):
@@ -290,7 +328,7 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
-    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
     # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
@@ -299,15 +337,15 @@ def main():
     # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
-
-    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
-    for i in tqdm(range(len(FLIGHT_LIST))):
-        flight = FLIGHT_LIST[i]
-        raw_flight_path = DATASET_PATH + f"raw/{flight}"
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        load_clean_data(raw_flight_path, intermediate_flight_path)
     #
-    # building_data_and_splitting()
+    # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
+    # for i in tqdm(range(len(FLIGHT_LIST))):
+    #     flight = FLIGHT_LIST[i]
+    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
+    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    #     load_clean_data(raw_flight_path, intermediate_flight_path)
+
+    # torch_splitting()
 
 
 def madiha_laurent_csv():
