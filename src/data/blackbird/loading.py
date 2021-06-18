@@ -191,24 +191,24 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # Denoising motor speed
     # Computing a denoised state.
-    den_motor = []
+    # den_motor = []
     for i in range(4):
         period = np.mean(motors_dict[f"m{i}"][1:, 0] - motors_dict[f"m{i}"][:-1, 0])
         n = len(motors_dict[f"m{i}"])
         frequencies = fftfreq(n, d=period)
         fc_motor = 10  # Hz
         fourier_motor = fft(motors_dict[f"m{i}"][:, 1])
-        den_motor.append(np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))))
-        # motors_dict[f"m{i}"][:, 1] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
-    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    time = motors_dict[f"m{i}"][:, 0] - motors_dict[f"m{i}"][0, 0]
-    [ax.plot(time, motors_dict[f"m{i}"][:, 1], label="raw") for i in range(4)]
-    [ax.plot(time, den_motor[i], label="denoised") for i in range(4)]
-    ax.grid()
-    ax.set_title(flight)
-    ax.set_ylabel("[rad/s]")
-    ax.set_xlabel("Time [s]")
-    ax.legend()
+        # den_motor.append(np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))))
+        motors_dict[f"m{i}"][:, 1] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # time = motors_dict[f"m{i}"][:, 0] - motors_dict[f"m{i}"][0, 0]
+    # [ax.plot(time, motors_dict[f"m{i}"][:, 1], label="raw") for i in range(4)]
+    # [ax.plot(time, den_motor[i], label="denoised") for i in range(4)]
+    # ax.grid()
+    # ax.set_title(flight)
+    # ax.set_ylabel("[rad/s]")
+    # ax.set_xlabel("Time [s]")
+    # ax.legend()
 
     state = np.concatenate([den_trans, den_quat, den_dtrans, angular_velocity], axis=1)
 
