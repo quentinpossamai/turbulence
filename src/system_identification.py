@@ -307,6 +307,6 @@ def compare_traj(state_gt, state_hat, time, start, stop):
 
 
 if __name__ == "__main__":
-    # si_blackbird_quadrotor()
+    si_blackbird_quadrotor()
     # test_learned_quadrotor_on_training()
-    test_mlp()
+    # test_mlp()
