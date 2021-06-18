@@ -1,6 +1,5 @@
 import datetime
 import matplotlib.pyplot as plt
-import numpy as np
 import pickle
 import torch
 import torch.nn as nn
@@ -8,25 +7,21 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from src.data.blackbird.blackbird_loading import BlackbirdDataset, load_flight, SPLITTING_CONFIG_PATH
+from src.data.blackbird.loading import BlackbirdDataset, load_flight
 from src.drone_models.learned_sabatino import Quadrotor
 from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
 mkdir_if_not_exist([ANALYSIS_PATH])
+
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
 
 def loss(state_gt, dstate_hat, next_state_gt, dt):
     mse_loss = nn.MSELoss()
-    # Without the angles
     next_state_hat = state_gt + dstate_hat * dt
-
-    # angle_loss = (torch.mean(torch.fmod(next_state_hat[:, 0] - next_state_gt[:, 0], np.pi) ** 2) +
-    #               torch.mean(torch.fmod(next_state_hat[:, 1] - next_state_gt[:, 1], np.pi / 2) ** 2) +
-    #               torch.mean(torch.fmod(next_state_hat[:, 2] - next_state_gt[:, 2], np.pi) ** 2))
 
     # position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
     # quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
@@ -75,8 +70,7 @@ def si_blackbird_quadrotor():
 
     # Datasets
     train_dataset = BlackbirdDataset("train")
-    train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1,
-                            pin_memory=True)
+    train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataset = BlackbirdDataset("validation")
     validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True, num_workers=1,
                                  pin_memory=True)

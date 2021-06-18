@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import relu
 
+from src.utils.quaternion import qrot, qmul
+
 
 class MLPQuadrotor(nn.Module):
     def __init__(self):
@@ -23,12 +25,11 @@ class MLPQuadrotor(nn.Module):
         out = relu(self.linear3(out))
         out = self.linear4(out)
 
-        # dot_pos = quat linear_speed quat_bar
-        # dot_quat = 1/2 * g_matrix_transpose @ angular_velocity
+        dot_pos = linear_speed
+        dot_quat = 1 / 2 * qmul(quat, torch.cat([angular_velocity, torch.zeros(len(state), 1)], dim=1))
         dot_v = out[:, :3]  # Global linear speed
         dot_wb = out[:, 3:]  # Body's angular velocity
-
-        return torch.cat([dot_pos, dot_quat, dot_v, dot_wb])
+        return torch.cat([dot_pos, dot_quat, dot_v, dot_wb], dim=1)
 
 
 def _test():
@@ -39,12 +40,12 @@ def _test():
     linear_speed = torch.randn(n, 3, dtype=float)
     angular_velocity = torch.randn(n, 3, dtype=float)
 
-    state = torch.cat([trans, quat, linear_speed, angular_velocity], axis=1)
+    state = torch.cat([trans, quat, linear_speed, angular_velocity], dim=1)
 
     motor = torch.randn(n, 4, dtype=float, requires_grad=True)
 
     model = MLPQuadrotor()
-    model(state, motor)
+    output = model(state, motor)
 
 
 if __name__ == '__main__':

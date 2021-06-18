@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation
 from tqdm import tqdm
 import torch
 
-from src.data.blackbird.blackbird_loading import BlackbirdDataset
+from src.data.blackbird.loading import BlackbirdDataset
 
 
 plt.style.use('seaborn')

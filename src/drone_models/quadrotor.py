@@ -8,7 +8,7 @@ import torch.nn as nn
 from torchdiffeq import odeint
 from typing import Callable, Iterable
 
-from src.data.blackbird.blackbird_processing import BlackbirdDataset
+from src.data.blackbird.loading import BlackbirdDataset
 
 
 class Quadrotor(nn.Module):
