@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from src.data.blackbird.loading import BlackbirdDataset, load_flight
+from src.data.blackbird.loading import BlackbirdDataset, load_flight, TORCH_DATASET_PATH
 from src.drone_models.learned_sabatino import Quadrotor
 from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
@@ -55,8 +55,12 @@ def si_blackbird_quadrotor():
     batch_size = 64000
     epochs = 100
     memory = 100000
+
     model = MLPQuadrotor().to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+    weights = torch.load(ANALYSIS_PATH + "training/20210618_153656_MLPQuadrotor_bs_64000/1160_weights.pt")
+    model.load_state_dict(weights)
 
     # Tensorboard
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
@@ -189,34 +193,46 @@ def test_learned_quadrotor_on_training():
 
 
 def test_mlp():
-    splitting_config = pickle.load(open(SPLITTING_CONFIG_PATH, "rb"))  # train_flights, validation_flights, test_flights
+    # train_flights, validation_flights, test_flights
+    flight_train_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "train.txt", "r"))
 
-    weights = torch.load(ANALYSIS_PATH + "training/20210616_122350_MLPQuadrotor_bs_64000/678_weights.pt")
-    print(weights)
+    weights = torch.load(ANALYSIS_PATH + "training/20210618_153656_MLPQuadrotor_bs_64000/1160_weights.pt")
+    # print(weights)
     model = MLPQuadrotor().to(device)
     model.load_state_dict(weights)
     model.eval()
 
     # Training flight
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
+    flight = f"{flight_name}/{flight_yaw}/{flight_speed}"
     data = load_flight(flight_name, flight_yaw, flight_speed)
-    assert flight in splitting_config["train_flights"]
+    assert flight in flight_train_list
     print("Testing on training")
 
     # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-    #         "dstate": data[25:38], "next_state": data[38:]}
-    state = torch.from_numpy(data[:, 1:14])
-    motor = torch.from_numpy(data[:, 14:18])
-    time = torch.from_numpy(data[:, 24])
-    next_time = torch.from_numpy(data[:, 24])
-    next_state = torch.from_numpy(data[:, 38:])
-    dt = (next_time - time).unsqueeze(-1)
+    # "next_state": data[25:]}
+    state = torch.from_numpy(data["state"][:-1])
+    motor = torch.from_numpy(data["motor"][:-1])
+    time = torch.from_numpy(data["t"][:-1])
+    next_time = torch.from_numpy(data["t"][1:])
+    next_state = torch.from_numpy(data["state"][1:])
+    dt = (next_time - time)
 
-    # Without integration
+    # # Without integration
+    # with torch.no_grad():
+    #     dstate_hat = model(state, motor)
+    # state_velocities_only_hat = state + dstate_hat * dt
+
+    # With integration
+    traj = [state[0]]
     with torch.no_grad():
-        dstate_hat = model(state, motor)
-    state_velocities_only_hat = state + dstate_hat * dt
+        for i in range(len(state) - 1):
+            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0)).squeeze() * dt[i] + traj[-1])
+    traj_stack = torch.stack(traj, dim=0)
+
+    compare_traj(next_state, traj_stack, next_time, 0, 100)
+
+    print()
 
     # # Testing on validation flight
     # flight = splitting_config["validation_flights"][0]
@@ -238,24 +254,59 @@ def test_mlp():
     #     dstate_hat = model(state, motor)
     # state_velocities_only_hat = state + dstate_hat * dt
 
-    # With integration
-    start = 0
-    stop = 100
-    fig, axs = plt.subplots(2, 3, figsize=(19.2, 10.8), dpi=100)
-    for i, name in zip(range(4), ["angular_velocity [rad/s]", "linear_speed [m/s]"]):
-        for j, axe in zip(range(3), ["x", "y", "z"]):
-            ax = axs[i, j]
-            ax.plot(next_time[start:stop], next_state[start:stop, 3 + i * 3 + j], label="GT")
-            ax.plot(next_time[start:stop], state_velocities_only_hat[start:stop, 3 + i * 3 + j], label="Model")
-            ax.set_ylabel(f"{name} {axe}")
-            ax.set_xlabel(f"Time [s]")
-            ax.grid()
-            ax.legend()
+
+def compare_traj(state_gt, state_hat, time, start, stop):
+    """Plotting trajectory with model vs ground truth"""
+    fig = plt.figure(figsize=(19.2, 10.8), dpi=100)
+
+    # Position
+    for i, name in zip(range(1, 4), ["x", "y", "z"]):
+        n = i
+        ax = fig.add_subplot(4, 3, n)
+        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Position [m]")
+        ax.grid()
+        ax.legend()
+
+    # Linear speed
+    for i, name in zip(range(1, 4), ["x", "y", "z"]):
+        n = i + 6
+        ax = fig.add_subplot(4, 3, n)
+        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Linear speed [m/s]")
+        ax.grid()
+        ax.legend()
+
+    # Angular velocity
+    for i, name in zip(range(1, 4), ["x", "y", "z"]):
+        n = i + 9
+        ax = fig.add_subplot(4, 3, n)
+        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Angular velocity [rad/s]")
+        ax.grid()
+        ax.legend()
     plt.tight_layout()
+
+    # Quaternion
+    for i, name in zip(range(1, 5), ["q0", "q1", "q2", "q3"]):
+        n = i+4
+        ax = fig.add_subplot(4, 4, n)
+        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Quaternion")
+        ax.grid()
+        ax.legend()
     plt.show()
 
 
 if __name__ == "__main__":
-    si_blackbird_quadrotor()
+    # si_blackbird_quadrotor()
     # test_learned_quadrotor_on_training()
-    # test_mlp()
+    test_mlp()
