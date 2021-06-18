@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from src.trace_trajectory import trace_trajectory
+from src.trajectory import trace_trajectory3d
 from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion
