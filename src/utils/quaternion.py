@@ -65,7 +65,7 @@ def qfix(q):
     assert q.shape[-1] == 4
 
     result = q.copy()
-    dot_products = np.sum(q[1:] * q[:-1], axis=2)
+    dot_products = np.sum(q[1:] * q[:-1], axis=-1)
     mask = dot_products < 0
     mask = (np.cumsum(mask, axis=0) % 2).astype(bool)
     result[1:][mask] *= -1

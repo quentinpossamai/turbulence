@@ -191,14 +191,24 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # Denoising motor speed
     # Computing a denoised state.
+    den_motor = []
     for i in range(4):
         period = np.mean(motors_dict[f"m{i}"][1:, 0] - motors_dict[f"m{i}"][:-1, 0])
         n = len(motors_dict[f"m{i}"])
         frequencies = fftfreq(n, d=period)
         fc_motor = 10  # Hz
         fourier_motor = fft(motors_dict[f"m{i}"][:, 1])
-        # den_motor = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
-        motors_dict[f"m{i}"][:, 1] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+        den_motor.append(np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))))
+        # motors_dict[f"m{i}"][:, 1] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    time = motors_dict[f"m{i}"][:, 0] - motors_dict[f"m{i}"][0, 0]
+    [ax.plot(time, motors_dict[f"m{i}"][:, 1], label="raw") for i in range(4)]
+    [ax.plot(time, den_motor[i], label="denoised") for i in range(4)]
+    ax.grid()
+    ax.set_title(flight)
+    ax.set_ylabel("[rad/s]")
+    ax.set_xlabel("Time [s]")
+    ax.legend()
 
     state = np.concatenate([den_trans, den_quat, den_dtrans, angular_velocity], axis=1)
 
@@ -329,7 +339,7 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
-    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
     # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
@@ -339,14 +349,14 @@ def main():
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
-    for i in tqdm(range(len(FLIGHT_LIST))):
-        flight = FLIGHT_LIST[i]
-        raw_flight_path = DATASET_PATH + f"raw/{flight}"
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-        load_clean_data(raw_flight_path, intermediate_flight_path)
+    # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
+    # for i in tqdm(range(len(FLIGHT_LIST))):
+    #     flight = FLIGHT_LIST[i]
+    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
+    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    #     load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    torch_splitting()
+    # torch_splitting()
 
 
 def madiha_laurent_csv():
