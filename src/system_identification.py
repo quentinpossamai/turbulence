@@ -44,7 +44,6 @@ def validate(model, dataloader, global_iteration, epoch):
     with torch.no_grad():
         for batch in tqdm(dataloader, desc=f"Validation: {epoch}"):
             # time_tracker = tqdm(dataloader, desc="Validation")
-            batch = next(iter(dataloader))
             state = batch["state"].to(device)
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
@@ -62,25 +61,25 @@ def si_blackbird_quadrotor():
     epochs = 100
     memory = 100000
     model = MLPQuadrotor().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Tensorboard
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
-
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
     writer = SummaryWriter(training_path)
 
+    # Datasets
     train_dataset = BlackbirdDataset("train")
     train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1,
                             pin_memory=True)
     validation_dataset = BlackbirdDataset("validation")
     validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True, num_workers=1,
                                  pin_memory=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     global_iteration = 0
     for epoch in range(epochs):

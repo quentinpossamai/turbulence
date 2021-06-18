@@ -14,6 +14,7 @@ from tqdm import tqdm
 from src.trace_trajectory import trace_trajectory
 from src.utils.transform import Transform
 import src.utils.paths
+from src.utils import quaternion
 
 # Path
 ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
@@ -88,15 +89,6 @@ CSV_FILE = ["blackbird_slash_imu.csv",
             "tf.csv"]
 
 
-def quaternion_fix_swap(q):
-    result = q.copy()
-    dot_products = np.sum(q[1:] * q[:-1], axis=-1)
-    mask = dot_products < 0
-    mask = (np.cumsum(mask, axis=0) % 2).astype(bool)
-    result[1:][mask] *= -1
-    return result
-
-
 def load_clean_data(raw_flight_path, intermediate_flight_path):
     flight = "/".join(raw_flight_path.split("/")[-4:-1])
     name = "blackbird_slash_imu"
@@ -155,8 +147,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     trans = Transform.from_matrix(pose).as_trans()
 
     # Fix quaternion discontinuity
-    quat = quaternion_fix_swap(quat)
-    plt.plot(quat)
+    quat = quaternion.qfix(quat)
 
     # Centering position
     trans = trans - np.mean(trans, axis=0)
@@ -197,6 +188,17 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
     den_dtrans = np.real(ifft(low_pass_filter(fourier_dtrans, frequencies, fc_trans), axis=0))
     # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
+
+    # Denoising motor speed
+    # Computing a denoised state.
+    for i in range(4):
+        period = np.mean(motors_dict[f"m{i}"][1:, 0] - motors_dict[f"m{i}"][:-1, 0])
+        n = len(motors_dict[f"m{i}"])
+        frequencies = fftfreq(n, d=period)
+        fc_motor = 10  # Hz
+        fourier_motor = fft(motors_dict[f"m{i}"][:, 1])
+        # den_motor = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+        motors_dict[f"m{i}"][:, 1] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
 
     state = np.concatenate([den_trans, den_quat, den_dtrans, angular_velocity], axis=1)
 
@@ -301,10 +303,9 @@ def torch_splitting():
 
 class BlackbirdDataset(Dataset):
     def __init__(self, train_validation_test: str):
-        torch_dataset_path = DATASET_PATH + f"intermediate_torch_dataset/"
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
-        self.data = torch.load(torch_dataset_path + f"{train_validation_test}.pt")
+        self.data = torch.load(TORCH_DATASET_PATH + f"{train_validation_test}.pt")
 
     def __len__(self):
         return len(self.data)
@@ -328,7 +329,7 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
     # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
@@ -337,15 +338,15 @@ def main():
     # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
     # load_clean_data(raw_flight_path, intermediate_flight_path)
-    #
-    # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
-    # for i in tqdm(range(len(FLIGHT_LIST))):
-    #     flight = FLIGHT_LIST[i]
-    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
-    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    #     load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    # torch_splitting()
+    print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
+    for i in tqdm(range(len(FLIGHT_LIST))):
+        flight = FLIGHT_LIST[i]
+        raw_flight_path = DATASET_PATH + f"raw/{flight}"
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+        load_clean_data(raw_flight_path, intermediate_flight_path)
+
+    torch_splitting()
 
 
 def madiha_laurent_csv():
