@@ -72,8 +72,8 @@ def si_blackbird_quadrotor():
     train_dataset = BlackbirdDataset("train")
     train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     validation_dataset = BlackbirdDataset("validation")
-    validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True, num_workers=1,
-                                 pin_memory=True)
+    validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True)
+    # num_workers=1, pin_memory=True
 
     global_iteration = 0
     for epoch in range(epochs):
