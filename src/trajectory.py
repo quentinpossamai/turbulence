@@ -82,8 +82,8 @@ def compare_traj(state_gt, state_hat, time, start, stop):
     for i, name in zip(range(1, 5), ["q0", "q1", "q2", "q3"]):
         n = i + 4
         ax = fig.add_subplot(4, 4, n)
-        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
-        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+        ax.plot(time[start:stop], state_gt[start:stop, 2+i], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, 2+i], label=f"hat {name}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Quaternion")
         ax.grid()

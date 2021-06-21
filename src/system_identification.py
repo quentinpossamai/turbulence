@@ -1,6 +1,8 @@
 import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 import pickle
+import random
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -23,14 +25,14 @@ def loss(state_gt, dstate_hat, next_state_gt, dt):
     mse_loss = nn.MSELoss()
     next_state_hat = state_gt + dstate_hat * dt
 
-    # position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
-    # quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
+    position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
+    quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
     linear_speed_loss = mse_loss(next_state_hat[:, 7:10], next_state_gt[:, 7:10])
     angular_velocity_loss = mse_loss(next_state_hat[:, 10:], next_state_gt[:, 10:])
 
-    # return position_loss + quat_loss + linear_speed_loss + angular_velocity_loss
+    return position_loss + quat_loss + linear_speed_loss + angular_velocity_loss
     # return 1/10 * position_loss + 10 * quat_loss + linear_speed_loss + angular_velocity_loss
-    return linear_speed_loss + angular_velocity_loss
+    # return linear_speed_loss + angular_velocity_loss
 
 
 def validate(model, dataloader, global_iteration, epoch):
@@ -43,7 +45,7 @@ def validate(model, dataloader, global_iteration, epoch):
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor)  # dstate
+            output = model(state, motor, dt)  # dstate
             validation_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
             loss_log.append(validation_loss)
         # time_tracker.update(1)
@@ -51,6 +53,11 @@ def validate(model, dataloader, global_iteration, epoch):
 
 
 def si_blackbird_quadrotor():
+    # Reproducibility
+    torch.manual_seed(0)
+    random.seed(0)
+    np.random.seed(0)
+
     # Training parameters
     batch_size = 64000
     epochs = 100
@@ -59,8 +66,9 @@ def si_blackbird_quadrotor():
     model = MLPQuadrotor().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-    weights = torch.load(ANALYSIS_PATH + "training/20210618_153656_MLPQuadrotor_bs_64000/1160_weights.pt")
-    model.load_state_dict(weights)
+    # Load previous weights
+    # weights = torch.load(ANALYSIS_PATH + "training/20210618_153656_MLPQuadrotor_bs_64000/1160_weights.pt")
+    # model.load_state_dict(weights)
 
     # Tensorboard
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
@@ -87,7 +95,7 @@ def si_blackbird_quadrotor():
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor)  # dstate
+            output = model(state, motor, dt)  # dstate
             training_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
 
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
@@ -104,8 +112,5 @@ def si_blackbird_quadrotor():
             torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
 
 
-
-
 if __name__ == "__main__":
-    # si_blackbird_quadrotor()
-    # test_learned_quadrotor_on_training()
+    si_blackbird_quadrotor()
