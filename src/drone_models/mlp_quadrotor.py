@@ -13,7 +13,7 @@ class MLPQuadrotor(nn.Module):
         self.linear3 = nn.Linear(in_features=256, out_features=256, bias=True).double()
         self.linear4 = nn.Linear(in_features=256, out_features=6, bias=True).double()
 
-    def forward(self, state, motor, dt):
+    def forward(self, state, motor, dt=1/360.):
         position = state[:, :3]
         quat = state[:, 3:7]
         v = state[:, 7:10]
@@ -29,7 +29,8 @@ class MLPQuadrotor(nn.Module):
         dot_wb = out[:, 3:]  # Body's angular velocity
         dot_pos = dot_v * dt + v
         dot_quat = 1 / 2 * qmul(quat, torch.cat([dot_wb * dt + wb, torch.zeros(len(state), 1)], dim=1))
-        return torch.cat([dot_pos, dot_quat, dot_v, dot_wb], dim=1)
+        dstate = torch.cat([dot_pos, dot_quat, dot_v, dot_wb], dim=1)
+        return dstate * dt + state
 
 
 def _test():

@@ -3,6 +3,8 @@ import os
 import pickle
 from tqdm import tqdm
 
+from src.data.blackbird.loading import DATASET_PATH
+
 
 def load_flights(mode):
     assert mode in ["validation", "test"]
@@ -12,7 +14,7 @@ def load_flights(mode):
     if not os.path.isdir(datadir):
         datadir = "/Volumes/Samsung_T5/BlackBird/"  # Dataset location (Steeven)
     if not os.path.isdir(datadir):
-        datadir = "???"  # TODO : mettre le path vers les données sur le Mac de Quentin
+        datadir = DATASET_PATH + "intermediate/"  # TODO : mettre le path vers les données sur le Mac de Quentin
     assert os.path.isdir(datadir)
 
     ## Load test/val flights

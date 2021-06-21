@@ -312,12 +312,12 @@ def _torch_splitting():
 
 
 class BlackbirdDatasetHorizon(Dataset):
-    def __init__(self, train_validation_test: str, horizon: int, mode: str):
+    def __init__(self, train_validation_test: str, horizon: int):
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
         assert isinstance(horizon, int)
-        if mode not in ["random", "fixe"]:
-            raise ValueError("mode must be 'random' or 'fixe'.")
+        # if mode not in ["random", "fixe"]:
+        #     raise ValueError("mode must be 'random' or 'fixe'.")
         self.flight_length = pickle.load(open(TORCH_DATASET_PATH + "flight_length.pkl", "rb"))
         self.flight_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + f"{train_validation_test}.txt", "r"))
         self.h = horizon
@@ -342,7 +342,7 @@ class BlackbirdDatasetHorizon(Dataset):
 
         return {"state": data["state"][local_idx:local_idx+self.h+1],
                 "motor": data["state"][local_idx:local_idx+self.h],
-                "time": data["t"][local_idx:local_idx+self.h+1]}
+                "t": data["t"][local_idx:local_idx+self.h+1]}
 
 
 class BlackbirdDataset(Dataset):
@@ -373,7 +373,21 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
-    dataset = BlackbirdDatasetHorizon("train", 100, "random")
+    dataset = BlackbirdDatasetHorizon("train", 1, "random")
+
+    dt = []
+    for flight in FLIGHT_LIST:
+        flight_name, flight_yaw, flight_speed = flight.split("/")[:-1]
+        # dict_keys(['t', 'imu_ang_acc', 'motor', 'state'])
+        data = load_flight(flight_name, flight_yaw, flight_speed)
+        dt.append(data["t"][1:] - data["t"][:-1])
+    dt = np.concatenate(dt, 0)
+
+    plt.hist(dt, 2000)
+    plt.grid()
+
+
+    plt.hist(dt, 25)
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'

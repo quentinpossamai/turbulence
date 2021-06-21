@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from src.data.blackbird.loading import BlackbirdDataset, load_flight, TORCH_DATASET_PATH
+from src.data.blackbird.loading import BlackbirdDataset, BlackbirdDatasetHorizon
 from src.drone_models.learned_sabatino import Quadrotor
 from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
@@ -21,9 +21,8 @@ use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
 
-def loss(state_gt, dstate_hat, next_state_gt, dt):
+def loss(next_state_gt, next_state_hat):
     mse_loss = nn.MSELoss()
-    next_state_hat = state_gt + dstate_hat * dt
 
     position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
     quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
@@ -45,8 +44,8 @@ def validate(model, dataloader, global_iteration, epoch):
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor, dt)  # dstate
-            validation_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
+            output = model(state, motor, dt)  # state_hat
+            validation_loss = loss(next_state_gt=next_state, next_state_hat=output)
             loss_log.append(validation_loss)
         # time_tracker.update(1)
     return torch.mean(torch.tensor(loss_log).float())
@@ -78,12 +77,11 @@ def si_blackbird_quadrotor():
     name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
-    writer = SummaryWriter(training_path)
+    # writer = SummaryWriter(training_path)
 
     # Datasets
-    train_dataset = BlackbirdDataset("train")
-    train_data = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    validation_dataset = BlackbirdDataset("validation")
+    train_data = DataLoader(BlackbirdDatasetHorizon("train", horizon=100), batch_size=batch_size, shuffle=True)
+    validation_dataset = BlackbirdDatasetHorizon("validation", horizon=100)
     validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True)
     # num_workers=1, pin_memory=True
 
@@ -96,7 +94,7 @@ def si_blackbird_quadrotor():
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
             output = model(state, motor, dt)  # dstate
-            training_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
+            training_loss = loss(next_state_gt=next_state, next_state_hat=output)
 
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
 
