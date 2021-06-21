@@ -1,6 +1,7 @@
 import torch
+from torch.nn import MSELoss
 
-from src.data.blackbird.loading import BlackbirdDatasetHorizon, load_flight, INTERMEDIATE_DATASET_PATH
+from src.data.blackbird.loading import BlackbirdDatasetHorizon, load_flight, DATASET_PATH
 from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.trajectory import compare_traj
 from src.utils.quaternion import qmul
@@ -13,8 +14,8 @@ mkdir_if_not_exist([ANALYSIS_PATH])
 
 def test_mlp():
     # train_flights, validation_flights, test_flights
-    flight_train_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "train.txt", "r"))
-    flight_validation_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "validation.txt", "r"))
+    flight_train_list = list(e[:-2] for e in open(DATASET_PATH + "train.txt", "r"))
+    flight_validation_list = list(e[:-2] for e in open(DATASET_PATH + "validation.txt", "r"))
 
     weights = torch.load(ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/5336_weights.pt")
     # print(weights)
@@ -22,32 +23,33 @@ def test_mlp():
     model.load_state_dict(weights)
     model.eval()
 
-    # Training flight
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    flight = f"{flight_name}/{flight_yaw}/{flight_speed}"
-    data = load_flight(flight_name, flight_yaw, flight_speed)
-    assert flight in flight_train_list
-    print("Testing on training")
-
-    # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-    # "next_state": data[25:]}
-    state = torch.from_numpy(data["state"][:-1])
-    motor = torch.from_numpy(data["motor"][:-1])
-    time = torch.from_numpy(data["t"][:-1])
-    next_time = torch.from_numpy(data["t"][1:])
-    next_state = torch.from_numpy(data["state"][1:])
-    dt = (next_time - time)
-
-    # Test MLP formula
-    angular_velocity = state[:, 10:]
-    quat = state[:, 3:7]
-    dquat_hat = 1 / 2 * qmul(quat, torch.cat([angular_velocity, torch.zeros(len(state), 1)], dim=1))
-    quat_hat = torch.cumsum(dquat_hat * dt.view((-1, 1)), dim=0) + quat[:1, :]
-
-    # Without integration
-    with torch.no_grad():
-        dstate_hat = model(state, motor)
-    state_hat = state + dstate_hat * dt.unsqueeze(-1)  # Integrating with Euler
+    # # Training flight
+    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
+    # flight = f"{flight_name}/{flight_yaw}/{flight_speed}"
+    # data = load_flight(flight_name, flight_yaw, flight_speed)
+    # assert flight in flight_train_list
+    # print("Testing on training")
+    #
+    # # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
+    # # "next_state": data[25:]}
+    # state = torch.from_numpy(data["state"][:-1])
+    # motor = torch.from_numpy(data["motor"][:-1])
+    # time = torch.from_numpy(data["t"][:-1])
+    # next_time = torch.from_numpy(data["t"][1:])
+    # next_state = torch.from_numpy(data["state"][1:])
+    # dt = (next_time - time)
+    # dt = 1 / 360. * torch.ones(dt)
+    #
+    # # Test MLP formula
+    # angular_velocity = state[:, 10:]
+    # quat = state[:, 3:7]
+    # dquat_hat = 1 / 2 * qmul(quat, torch.cat([angular_velocity, torch.zeros(len(state), 1)], dim=1))
+    # quat_hat = torch.cumsum(dquat_hat * dt.view((-1, 1)), dim=0) + quat[:1, :]
+    #
+    # # Without integration
+    # with torch.no_grad():
+    #     dstate_hat = model(state, motor)
+    # state_hat = state + dstate_hat * dt.unsqueeze(-1)  # Integrating with Euler
 
     # # Integrating with Fourier
     # period = torch.mean(dt).item()
@@ -58,19 +60,19 @@ def test_mlp():
     # state_hat = np.real(ifft(fourier_state_hat, axis=0)) + state[0, :].numpy().reshape((1, 13))
 
     # compare_traj(next_state[1:], state_hat, next_time, 0, 360)
-
-    # With integration
-    first_state_idx = 4000
-    traj = [state[first_state_idx]]
-    with torch.no_grad():
-        for i in range(len(state) - 1 - first_state_idx):
-            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0)).squeeze() * dt[i] + traj[-1])
-    traj_stack = torch.stack(traj, dim=0)
-
-    start = 0
-    compare_traj(next_state[first_state_idx:], traj_stack, next_time[first_state_idx:], start, start + 360)
-
-    print()
+    #
+    # # With integration
+    # first_state_idx = 4000
+    # traj = [state[first_state_idx]]
+    # with torch.no_grad():
+    #     for i in range(len(state) - 1 - first_state_idx):
+    #         traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0)).squeeze() * dt[i] + traj[-1])
+    # traj_stack = torch.stack(traj, dim=0)
+    #
+    # start = 0
+    # compare_traj(next_state[first_state_idx:], traj_stack, next_time[first_state_idx:], start, start + 360)
+    #
+    # print()
 
     # # Testing on validation flight
     # flight = splitting_config["validation_flights"][0]
@@ -91,6 +93,9 @@ def test_mlp():
     next_time = torch.from_numpy(data["t"][1:])
     next_state = torch.from_numpy(data["state"][1:])
     dt = (next_time - time)
+    dt = 1 / 360. * torch.ones_like(dt)
+
+    loss = MSELoss()
 
     # # Without integration
     # with torch.no_grad():
@@ -102,8 +107,10 @@ def test_mlp():
     traj = [state[first_state_idx]]
     with torch.no_grad():
         for i in range(len(state) - 1 - first_state_idx):
-            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0)).squeeze() * dt[i] + traj[-1])
+            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze() * dt[i] + traj[-1])
     traj_stack = torch.stack(traj, dim=0)
+
+    loss(traj_stack)
 
     start = 0
     compare_traj(next_state[first_state_idx:], traj_stack, next_time[first_state_idx:], start, start + 360)
@@ -119,5 +126,5 @@ def test_mlp_metrics():
 
 
 if __name__ == '__main__':
-    # test_mlp()
-    test_mlp_metrics()
+    test_mlp()
+    # test_mlp_metrics()

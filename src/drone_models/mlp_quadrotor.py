@@ -8,12 +8,12 @@ from src.utils.quaternion import qrot, qmul
 class MLPQuadrotor(nn.Module):
     def __init__(self):
         super(MLPQuadrotor, self).__init__()
-        self.linear1 = nn.Linear(in_features=17, out_features=256, bias=True).double()
+        self.linear1 = nn.Linear(in_features=18, out_features=256, bias=True).double()
         self.linear2 = nn.Linear(in_features=256, out_features=256, bias=True).double()
         self.linear3 = nn.Linear(in_features=256, out_features=256, bias=True).double()
         self.linear4 = nn.Linear(in_features=256, out_features=6, bias=True).double()
 
-    def forward(self, state, motor, dt=1/360.):
+    def forward(self, state, motor, dt):
         position = state[:, :3]
         quat = state[:, 3:7]
         v = state[:, 7:10]
