@@ -24,30 +24,30 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 def loss(next_state_gt, next_state_hat):
     mse_loss = nn.MSELoss()
 
-    position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
-    quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
-    linear_speed_loss = mse_loss(next_state_hat[:, 7:10], next_state_gt[:, 7:10])
-    angular_velocity_loss = mse_loss(next_state_hat[:, 10:], next_state_gt[:, 10:])
+    position_loss = mse_loss(next_state_hat[:, :, :3], next_state_gt[:, :, :3])
+    quat_loss = mse_loss(next_state_hat[:, :, 3:7], next_state_gt[:, :, 3:7])
+    linear_speed_loss = mse_loss(next_state_hat[:, :, 7:10], next_state_gt[:, :, 7:10])
+    angular_velocity_loss = mse_loss(next_state_hat[:, :, 10:], next_state_gt[:, :, 10:])
 
     return position_loss + quat_loss + linear_speed_loss + angular_velocity_loss
     # return 1/10 * position_loss + 10 * quat_loss + linear_speed_loss + angular_velocity_loss
     # return linear_speed_loss + angular_velocity_loss
 
 
-def validate(model, dataloader, global_iteration, epoch):
+def validate(model, dataloader, horizon, epoch):
     model.eval()
     loss_log = []
     with torch.no_grad():
         for batch in tqdm(dataloader, desc=f"Validation: {epoch}"):
-            # time_tracker = tqdm(dataloader, desc="Validation")
-            state = batch["state"].to(device)
-            motor = batch["motor"].to(device)
-            next_state = batch["next_state"].to(device)
-            dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor, dt)  # state_hat
-            validation_loss = loss(next_state_gt=next_state, next_state_hat=output)
+            state = batch["state"].to(device).transpose(0, 1)
+            motor = batch["motor"].to(device).transpose(0, 1)
+            t = batch["t"].to(device).transpose(0, 1)
+            state_hat = [state[0, :, :]]
+            for j in range(horizon):
+                state_hat.append(model(state_hat[-1], motor[j], t[j+1] - t[j]))
+            state_hat = torch.stack(state_hat)
+            validation_loss = loss(next_state_gt=state, next_state_hat=state_hat)
             loss_log.append(validation_loss)
-        # time_tracker.update(1)
     return torch.mean(torch.tensor(loss_log).float())
 
 
@@ -58,9 +58,10 @@ def si_blackbird_quadrotor():
     np.random.seed(0)
 
     # Training parameters
-    batch_size = 64000
+    batch_size = 32
     epochs = 100
     memory = 100000
+    horizon = 100
 
     model = MLPQuadrotor().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -80,21 +81,24 @@ def si_blackbird_quadrotor():
     # writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(BlackbirdDatasetHorizon("train", horizon=100), batch_size=batch_size, shuffle=True)
-    validation_dataset = BlackbirdDatasetHorizon("validation", horizon=100)
-    validation_data = DataLoader(validation_dataset, batch_size=len(validation_dataset), shuffle=True)
+    train_data = DataLoader(BlackbirdDatasetHorizon("train", horizon=horizon), batch_size=batch_size, shuffle=True)
+    validation_dataset = BlackbirdDatasetHorizon("validation", horizon=horizon)
+    validation_data = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 
     global_iteration = 0
     for epoch in range(epochs):
         model.train()
         for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch}")):
-            state = batch["state"].to(device)
-            motor = batch["motor"].to(device)
-            next_state = batch["next_state"].to(device)
-            dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor, dt)  # dstate
-            training_loss = loss(next_state_gt=next_state, next_state_hat=output)
+            state = batch["state"].to(device).transpose(0, 1)
+            motor = batch["motor"].to(device).transpose(0, 1)
+            t = batch["t"].to(device).transpose(0, 1)
+
+            state_hat = [state[0, :, :]]
+            for j in range(horizon):
+                state_hat.append(model(state_hat[-1], motor[j], t[j+1] - t[j]))
+            state_hat = torch.stack(state_hat)
+            training_loss = loss(next_state_gt=state, next_state_hat=state_hat)
 
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
 
@@ -103,7 +107,7 @@ def si_blackbird_quadrotor():
             optimizer.step()
             global_iteration = global_iteration + 1
 
-        validation_loss = validate(model, validation_data, global_iteration, epoch)
+        validation_loss = validate(model, validation_data, horizon, epoch)
         writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
         if validation_loss < memory:
             memory = validation_loss

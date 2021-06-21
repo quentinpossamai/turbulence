@@ -340,9 +340,9 @@ class BlackbirdDatasetHorizon(Dataset):
 
         local_idx = idx - self.cum_flight_idx[flight_idx - 1] if flight_idx - 1 >= 0 else 0
 
-        return {"state": data["state"][local_idx:local_idx+self.h+1],
-                "motor": data["state"][local_idx:local_idx+self.h],
-                "t": data["t"][local_idx:local_idx+self.h+1]}
+        return {"state": torch.from_numpy(data["state"][local_idx:local_idx+self.h+1]),
+                "motor": torch.from_numpy(data["motor"][local_idx:local_idx+self.h]),
+                "t": torch.from_numpy(data["t"][local_idx:local_idx+self.h+1]).unsqueeze(-1)}
 
 
 class BlackbirdDataset(Dataset):
@@ -373,21 +373,6 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
-    dataset = BlackbirdDatasetHorizon("train", 1, "random")
-
-    dt = []
-    for flight in FLIGHT_LIST:
-        flight_name, flight_yaw, flight_speed = flight.split("/")[:-1]
-        # dict_keys(['t', 'imu_ang_acc', 'motor', 'state'])
-        data = load_flight(flight_name, flight_yaw, flight_speed)
-        dt.append(data["t"][1:] - data["t"][:-1])
-    dt = np.concatenate(dt, 0)
-
-    plt.hist(dt, 2000)
-    plt.grid()
-
-
-    plt.hist(dt, 25)
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     # flight_name, flight_yaw, flight_speed = 'egg', 'yawConstant', 'maxSpeed13p8'
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'

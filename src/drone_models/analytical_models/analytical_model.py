@@ -64,7 +64,7 @@ class DynamicalModel(nn.Module):
 
 
 if __name__ == '__main__':
-    from metrics import mse_error, visualise_metrics
+    from src.metrics import mse_error, visualise_metrics
 
     f = DynamicalModel()
     print(mse_error(f, 100, "train"))
