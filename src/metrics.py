@@ -27,7 +27,7 @@ def load_flights(mode):
     return flights
 
 
-def mse_error(f, horizon, mode="test"):
+def mse_error(f, horizon, mode="test", dt=None):
     """ Return the mean squared error on the selected split, controlled by the horizon
     args:
         - f(s_i, u_i) : the predictor (expect a Pytorch Module).
@@ -48,14 +48,14 @@ def mse_error(f, horizon, mode="test"):
     for k in tqdm(flights.keys()):  # Extract flight states and command
         states = torch.FloatTensor(flights[k]["state"])
         rpm = torch.FloatTensor(flights[k]["motor"])
-        error_per_flight[k] = _compute_error(states, rpm, horizon, f)
+        error_per_flight[k] = _compute_error(states, rpm, horizon, f, dt)
 
     # Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
     return total_error
 
 
-def _compute_error(states, rpm, H, f):
+def _compute_error(states, rpm, H, f, dt):
     crop_idx = states.shape[0] // (H + 1)  # remove last timestep of states to fit N*H points
 
     ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)  # Reformat with batch to go faster
@@ -64,7 +64,7 @@ def _compute_error(states, rpm, H, f):
     ## Prediction rollout
     prediction = [ground_truth[:, 0], ]
     for i in range(1, H + 1):
-        prediction.append(f(prediction[-1], command[:, i]))
+        prediction.append(f(prediction[-1], command[:, i], dt))
 
     prediction = torch.stack(prediction, dim=1)
     error = ((prediction - ground_truth) ** 2).mean()
