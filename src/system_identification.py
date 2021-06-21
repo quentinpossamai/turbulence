@@ -87,7 +87,7 @@ def si_blackbird_quadrotor():
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor)  # dstate
+            output = model(state, motor, dt)  # dstate
             training_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
 
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
