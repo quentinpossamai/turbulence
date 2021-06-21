@@ -5,7 +5,6 @@ theta3 = Km/Iz
 theta4 = Iz/Ixy"""
 
 import torch
-import os
 from tqdm import tqdm
 import itertools
 from src.metrics import load_flights
