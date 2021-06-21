@@ -59,8 +59,9 @@ def si_blackbird_quadrotor():
     model = MLPQuadrotor().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
-    weights = torch.load(ANALYSIS_PATH + "training/20210618_153656_MLPQuadrotor_bs_64000/1160_weights.pt")
-    model.load_state_dict(weights)
+    # Load previous weights
+    # weights = torch.load(ANALYSIS_PATH + "training/20210618_153656_MLPQuadrotor_bs_64000/1160_weights.pt")
+    # model.load_state_dict(weights)
 
     # Tensorboard
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
