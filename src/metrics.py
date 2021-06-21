@@ -4,17 +4,7 @@ import pickle
 from tqdm import tqdm
 
 
-def MSE_error(f, H, mode="test"):
-    """ Return the mean squared error on the selected split, controlled by the horizon
-    args:
-        - f(s_i, u_i) : the predictor (expect a Pytorch Module).
-                        s_i is the state at time i (p, q, v, w) and u_i the RPM
-                        Should return the future state : s_(i+1).
-                            s_i.shape = (Batch, 13)
-                            u_i.shape(Batch, 4)
-        - H : The prediction horizon (1, 10, 100, 1s, 2s, ...)
-        - mode : allows to switch between the test and the validation dataset"""
-
+def load_flights(mode):
     assert mode in ["validation", "test"]
 
     ## Dataset location
@@ -28,18 +18,35 @@ def MSE_error(f, H, mode="test"):
     ## Load test/val flights
     with open(datadir + mode + ".txt", "r") as file:
         flight_list = file.read().split("\n")[:-1]
-    flights = []
+    flights = {}
     for flight in flight_list:
         flight_data = pickle.load(open(f"{datadir}intermediate/{flight}data.pkl", 'rb'))
-        flights.append(flight_data)
+        flights[flight] = flight_data
+    return flights
+
+
+def MSE_error(f, H, mode="test"):
+    """ Return the mean squared error on the selected split, controlled by the horizon
+    args:
+        - f(s_i, u_i) : the predictor (expect a Pytorch Module).
+                        s_i is the state at time i (p, q, v, w) and u_i the RPM
+                        Should return the future state : s_(i+1).
+                            s_i.shape = (Batch, 13)
+                            u_i.shape(Batch, 4)
+        - H : The prediction horizon (1, 10, 100, 1s, 2s, ...)
+        - mode : allows to switch between the test and the validation dataset"""
+
+    assert mode in ["validation", "test"]
+
+    flights = load_flights(mode)
 
     ## Compute Error
-    error_per_flight = {flight_name: 0 for flight_name in flight_list}
+    error_per_flight = {flight_name: 0 for flight_name in flights.keys()}
 
-    for i, flight in enumerate(tqdm(flights, desc="MSE metrics")):  # Extract flight states and command
-        states = torch.FloatTensor(flight["state"])
-        rpm = torch.FloatTensor(flight["motor"])
-        error_per_flight[flight_list[i]] = _compute_error(states, rpm, H, f)
+    for k in flights.keys():  # Extract flight states and command
+        states = torch.FloatTensor(flights[k]["state"])
+        rpm = torch.FloatTensor(flights[k]["motor"])
+        error_per_flight[k] = _compute_error(states, rpm, H, f)
 
     ## Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
