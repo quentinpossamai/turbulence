@@ -8,7 +8,7 @@ from src.utils.quaternion import qrot, qmul
 class MLPQuadrotor(nn.Module):
     def __init__(self):
         super(MLPQuadrotor, self).__init__()
-        self.linear1 = nn.Linear(in_features=17, out_features=256, bias=True).double()
+        self.linear1 = nn.Linear(in_features=18, out_features=256, bias=True).double()
         self.linear2 = nn.Linear(in_features=256, out_features=256, bias=True).double()
         self.linear3 = nn.Linear(in_features=256, out_features=256, bias=True).double()
         self.linear4 = nn.Linear(in_features=256, out_features=6, bias=True).double()
@@ -34,6 +34,7 @@ class MLPQuadrotor(nn.Module):
 
 def _test():
     n = 1000
+    dt = torch.randn(n, 1, dtype=float)
     tmp = torch.randn(n, 4, dtype=float)
     trans = torch.randn(n, 3, dtype=float)
     quat = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
@@ -45,7 +46,8 @@ def _test():
     motor = torch.randn(n, 4, dtype=float, requires_grad=True)
 
     model = MLPQuadrotor()
-    output = model(state, motor)
+    output = model(state, motor, dt)
+    print("Test done")
 
 
 if __name__ == '__main__':
