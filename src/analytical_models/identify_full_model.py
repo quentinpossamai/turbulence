@@ -8,7 +8,7 @@ import torch
 import os
 from tqdm import tqdm
 import itertools
-from analytical_models.utils import load_flights
+from src.metrics import load_flights
 from scipy.spatial.transform import Rotation
 
 DT = 1 / 360
