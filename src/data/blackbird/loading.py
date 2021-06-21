@@ -89,7 +89,7 @@ CSV_FILE = ["blackbird_slash_imu.csv",
             "tf.csv"]
 
 
-def load_clean_data(raw_flight_path, intermediate_flight_path):
+def _load_clean_data(raw_flight_path, intermediate_flight_path):
     flight = "/".join(raw_flight_path.split("/")[-4:-1])
     name = "blackbird_slash_imu"
     with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
@@ -251,7 +251,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     pickle.dump(cut_data, open(save_path, "wb"))
 
 
-def splitting_txt():
+def _splitting_txt():
     idx = list(range(len(FLIGHT_LIST)))
     random.shuffle(idx)
     idx = np.array(idx)
@@ -275,7 +275,7 @@ def splitting_txt():
                 file.write(flight + "\n")
 
 
-def torch_splitting():
+def _torch_splitting():
     train_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "train.txt", "r"))
     validation_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "validation.txt", "r"))
     test_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "test.txt", "r"))
@@ -321,7 +321,7 @@ class BlackbirdDatasetHorizon(Dataset):
         self.flight_length = pickle.load(open(TORCH_DATASET_PATH + "flight_length.pkl", "rb"))
         self.flight_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + f"{train_validation_test}.txt", "r"))
         self.h = horizon
-        self.cum_flight_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
+        self.cum_flight_idx = np.cumsum([self.flight_length[name] - self.h - 1 for name in self.flight_list])
 
     def __len__(self):
         return self.cum_flight_idx[-1] + 1
@@ -331,16 +331,18 @@ class BlackbirdDatasetHorizon(Dataset):
         One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
 
         """
-        flight_idx = np.where(self.cum_flight_idx <= idx)[0][-1]
+        flight_idx = np.where(idx <= self.cum_flight_idx)[0][0]
         flight_to_load = self.flight_list[flight_idx]
         flight_name, flight_yaw, flight_speed = flight_to_load.split("/")
-        data = load_flight(flight_name, flight_yaw, flight_speed)
-        local_idx = idx - self.cum_flight_idx[flight_idx]
 
-        initial_state = data["state"][local_idx, :]
-        state = data["state"][local_idx:local_idx+self.h+1]
-        return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-                "next_state": data[25:]}
+        # dict_keys(['t', 'imu_ang_acc', 'motor', 'state'])
+        data = load_flight(flight_name, flight_yaw, flight_speed)
+
+        local_idx = idx - self.cum_flight_idx[flight_idx - 1] if flight_idx - 1 >= 0 else 0
+
+        return {"state": data["state"][local_idx:local_idx+self.h+1],
+                "motor": data["state"][local_idx:local_idx+self.h],
+                "time": data["t"][local_idx:local_idx+self.h+1]}
 
 
 class BlackbirdDataset(Dataset):
@@ -380,19 +382,19 @@ def main():
     # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
     # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
     # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
-    # load_clean_data(raw_flight_path, intermediate_flight_path)
+    # _load_clean_data(raw_flight_path, intermediate_flight_path)
 
     # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
     # for i in tqdm(range(len(FLIGHT_LIST))):
     #     flight = FLIGHT_LIST[i]
     #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
     #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    #     load_clean_data(raw_flight_path, intermediate_flight_path)
+    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
 
-    # torch_splitting()
+    # _torch_splitting()
 
 
-def madiha_laurent_csv():
+def _madiha_laurent_csv():
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
     # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
@@ -422,7 +424,7 @@ def madiha_laurent_csv():
             writer.writerow(row)
 
 
-def plot_final_data():
+def _test_plot_final_data():
     flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
     flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
 
@@ -493,5 +495,5 @@ def plot_final_data():
 
 if __name__ == '__main__':
     main()
-    # madiha_laurent_csv()
-    # plot_final_data()
+    # _madiha_laurent_csv()
+    # _test_plot_final_data()
