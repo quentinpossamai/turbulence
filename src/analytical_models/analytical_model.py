@@ -41,22 +41,21 @@ class DynamicalModel(nn.Module):
         wyz = (rpy[:, 1] * rpy[:, 2]).unsqueeze(-1)
         wxz = (rpy[:, 0] * rpy[:, 2]).unsqueeze(-1)
 
-        next_wx = rpy[:, 0] + self.DT * (self.theta[1] * motor_forces[:, 1] - wyz * (self.theta[3] - 1))
-        next_wy = rpy[:, 0] + self.DT * (self.theta[1] * motor_forces[:, 2] - wxz * (1 - self.theta[3]))
-        next_wz = rpy[:, 0] + self.DT * (self.theta[2] * motor_forces[:, 3])
+        next_wx = rpy[:, 0] + self.DT * (self.theta[1] * motor_forces[:, 1] - wyz * (self.theta[3] - 1)).squeeze()
+        next_wy = rpy[:, 0] + self.DT * (self.theta[1] * motor_forces[:, 2] - wxz * (1 - self.theta[3])).squeeze()
+        next_wz = rpy[:, 0] + self.DT * (self.theta[2] * motor_forces[:, 3]).squeeze()
 
-        next_rpy = torch.cat([next_wx, next_wy, next_wz], dim=-1)
+        next_rpy = torch.stack([next_wx, next_wy, next_wz], dim=-1)
         qx, qy, qz, qw = quat[:, 0], quat[:, 1], quat[:, 2], quat[:, 3]
         Q_1 = torch.stack([qw, -qz, qy], dim=-1)
         Q_2 = torch.stack([qz, qw, -qx], dim=-1)
         Q_3 = torch.stack([-qy, qx, qw], dim=-1)
         Q_4 = torch.stack([-qx, -qy, qz], dim=-1)
         Q = torch.stack([Q_1, Q_2, Q_3, Q_4], dim=1)
-
-        next_quat = quat + self.DT * 0.5 * Q @ next_rpy
+        next_quat = quat + (self.DT * 0.5 * Q @ next_rpy.unsqueeze(-1)).squeeze(-1)
         next_quat = next_quat / torch.sqrt(((next_quat) ** 2).sum(-1, keepdim=True))
 
-        return torch.cat([next_pos, next_quat, next_vel, next_rpy])
+        return torch.cat([next_pos, next_quat.squeeze(-1), next_vel, next_rpy], dim=-1)
 
 
 if __name__ == '__main__':
