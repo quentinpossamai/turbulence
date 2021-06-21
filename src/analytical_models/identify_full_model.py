@@ -8,7 +8,7 @@ import torch
 import os
 from tqdm import tqdm
 import itertools
-from Analytical_models.utils import load_flights
+from analytical_models.utils import load_flights
 from scipy.spatial.transform import Rotation
 
 DT = 1 / 360
@@ -77,6 +77,7 @@ def identify_model():
             best_theta = theta.clone()
             print(best_p, best_theta, best_error)
         # print(theta, error, p)
+
 
 if __name__ == '__main__':
     identify_model()
