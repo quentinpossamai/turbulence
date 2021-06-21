@@ -14,7 +14,7 @@ def load_flights(mode):
     if not os.path.isdir(datadir):
         datadir = "/Volumes/Samsung_T5/BlackBird/"  # Dataset location (Steeven)
     if not os.path.isdir(datadir):
-        datadir = DATASET_PATH + "intermediate/"  # TODO : mettre le path vers les données sur le Mac de Quentin
+        datadir = DATASET_PATH + "intermediate/"  # Dataset location (Quentin)
     assert os.path.isdir(datadir)
 
     ## Load test/val flights
