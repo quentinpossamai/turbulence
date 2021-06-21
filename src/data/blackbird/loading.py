@@ -311,6 +311,50 @@ def torch_splitting():
     torch.save(test, TORCH_DATASET_PATH + "test.pt")
 
 
+class BlackbirdDatasetHorizon(Dataset):
+    def __init__(self, train_validation_test: str, horizon: int, mode:str):
+        if train_validation_test not in ["train", "validation", "test"]:
+            raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
+        assert isinstance(horizon, int)
+        if mode not in ["random", "fixe"]:
+            raise ValueError("mode must be 'random' or 'fixe'.")
+
+        flight_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + f"{train_validation_test}.txt", "r"))
+        flight = flight_list[0]
+        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
+        data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
+
+        def get_sample(data_pkl, i):
+            t = data_pkl["t"][:-1].reshape((-1, 1))
+            state = data_pkl["state"][:-1]
+            motor = data_pkl["motor"][:-1]
+            imu = data_pkl["imu_ang_acc"][:-1]
+            future_t = data_pkl["t"][1:].reshape((-1, 1))
+            future_test = data_pkl["state"][1:]
+            return 1
+
+        for i in range(len(data["state"]) - horizon):
+            sample = get_sample(data, i)
+
+        # TODO
+        data_idx = len(flight_list) * len(flight) - len(flight_list) * horizon
+
+
+        self.data = torch.load(TORCH_DATASET_PATH + f"{train_validation_test}.pt")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        """
+        One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
+
+        """
+        data = self.data[idx]
+        return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
+                "next_state": data[25:]}
+
+
 class BlackbirdDataset(Dataset):
     def __init__(self, train_validation_test: str):
         if train_validation_test not in ["train", "validation", "test"]:

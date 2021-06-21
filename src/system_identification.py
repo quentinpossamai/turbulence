@@ -23,14 +23,14 @@ def loss(state_gt, dstate_hat, next_state_gt, dt):
     mse_loss = nn.MSELoss()
     next_state_hat = state_gt + dstate_hat * dt
 
-    # position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
-    # quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
+    position_loss = mse_loss(next_state_hat[:, :3], next_state_gt[:, :3])
+    quat_loss = mse_loss(next_state_hat[:, 3:7], next_state_gt[:, 3:7])
     linear_speed_loss = mse_loss(next_state_hat[:, 7:10], next_state_gt[:, 7:10])
     angular_velocity_loss = mse_loss(next_state_hat[:, 10:], next_state_gt[:, 10:])
 
-    # return position_loss + quat_loss + linear_speed_loss + angular_velocity_loss
+    return position_loss + quat_loss + linear_speed_loss + angular_velocity_loss
     # return 1/10 * position_loss + 10 * quat_loss + linear_speed_loss + angular_velocity_loss
-    return linear_speed_loss + angular_velocity_loss
+    # return linear_speed_loss + angular_velocity_loss
 
 
 def validate(model, dataloader, global_iteration, epoch):
