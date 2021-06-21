@@ -19,9 +19,9 @@ from src.utils import quaternion
 # Path
 ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
 DATASET_PATH = src.utils.paths.WD_PATH + "data/blackbird/"
-TORCH_DATASET_PATH = DATASET_PATH + f"intermediate_torch_dataset/"
+INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
-src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, TORCH_DATASET_PATH])
+src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, INTERMEDIATE_DATASET_PATH])
 
 FLIGHT_COMBINATIONS = {"3dFigure8": {"yawConstant": [0.5, 1, 2, 3, 4, 5],
                                      "yawForward": []},
@@ -270,15 +270,15 @@ def _splitting_txt():
                                  [sorted(shuffled_list[:train_val_idx]),
                                   sorted(shuffled_list[train_val_idx:val_test_idx]),
                                   sorted(shuffled_list[val_test_idx:])]):
-        with open(TORCH_DATASET_PATH + name, "w") as file:
+        with open(INTERMEDIATE_DATASET_PATH + name, "w") as file:
             for flight in flight_list:
                 file.write(flight + "\n")
 
 
 def _torch_splitting():
-    train_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "train.txt", "r"))
-    validation_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "validation.txt", "r"))
-    test_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + "test.txt", "r"))
+    train_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "train.txt", "r"))
+    validation_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "validation.txt", "r"))
+    test_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "test.txt", "r"))
 
     def concatenate(data_pkl):
         t = data_pkl["t"][:-1].reshape((-1, 1))
@@ -294,21 +294,21 @@ def _torch_splitting():
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
         train.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
     train = torch.from_numpy(np.concatenate(train, axis=0))
-    torch.save(train, TORCH_DATASET_PATH + "train.pt")
+    torch.save(train, INTERMEDIATE_DATASET_PATH + "train.pt")
 
     validation = []
     for flight in validation_list:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
         validation.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
     validation = torch.from_numpy(np.concatenate(validation, axis=0))
-    torch.save(validation, TORCH_DATASET_PATH + "validation.pt")
+    torch.save(validation, INTERMEDIATE_DATASET_PATH + "validation.pt")
 
     test = []
     for flight in test_list:
         intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
         test.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
     test = torch.from_numpy(np.concatenate(test, axis=0))
-    torch.save(test, TORCH_DATASET_PATH + "test.pt")
+    torch.save(test, INTERMEDIATE_DATASET_PATH + "test.pt")
 
 
 class BlackbirdDatasetHorizon(Dataset):
@@ -318,8 +318,8 @@ class BlackbirdDatasetHorizon(Dataset):
         assert isinstance(horizon, int)
         # if mode not in ["random", "fixe"]:
         #     raise ValueError("mode must be 'random' or 'fixe'.")
-        self.flight_length = pickle.load(open(TORCH_DATASET_PATH + "flight_length.pkl", "rb"))
-        self.flight_list = list(e[:-2] for e in open(TORCH_DATASET_PATH + f"{train_validation_test}.txt", "r"))
+        self.flight_length = pickle.load(open(INTERMEDIATE_DATASET_PATH + "flight_length.pkl", "rb"))
+        self.flight_list = list(e[:-2] for e in open(DATASET_PATH + f"{train_validation_test}.txt", "r"))
         self.h = horizon
         self.cum_flight_idx = np.cumsum([self.flight_length[name] - self.h - 1 for name in self.flight_list])
 
@@ -345,23 +345,23 @@ class BlackbirdDatasetHorizon(Dataset):
                 "t": torch.from_numpy(data["t"][local_idx:local_idx+self.h+1]).unsqueeze(-1)}
 
 
-class BlackbirdDataset(Dataset):
-    def __init__(self, train_validation_test: str):
-        if train_validation_test not in ["train", "validation", "test"]:
-            raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
-        self.data = torch.load(TORCH_DATASET_PATH + f"{train_validation_test}.pt")
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        """
-        One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
-
-        """
-        data = self.data[idx]
-        return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-                "next_state": data[25:]}
+# class BlackbirdDataset(Dataset):
+#     def __init__(self, train_validation_test: str):
+#         if train_validation_test not in ["train", "validation", "test"]:
+#             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
+#         self.data = torch.load(INTERMEDIATE_DATASET_PATH + f"{train_validation_test}.pt")
+#
+#     def __len__(self):
+#         return len(self.data)
+#
+#     def __getitem__(self, idx):
+#         """
+#         One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
+#
+#         """
+#         data = self.data[idx]
+#         return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
+#                 "next_state": data[25:]}
 
 
 def load_flight(flight_name, flight_yaw, flight_speed):

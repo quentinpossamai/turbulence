@@ -14,7 +14,7 @@ def load_flights(mode):
     if not os.path.isdir(datadir):
         datadir = "/Volumes/Samsung_T5/BlackBird/"  # Dataset location (Steeven)
     if not os.path.isdir(datadir):
-        datadir = DATASET_PATH + "intermediate/"  # Dataset location (Quentin)
+        datadir = DATASET_PATH  # Dataset location (Quentin)
     assert os.path.isdir(datadir)
 
     ## Load test/val flights
@@ -76,7 +76,7 @@ def dummy_f(s_i, u_i):
 
 
 def visualise_metrics(f, H, mode="test", plotrange=None):
-    """ Create vizualisation of the prediction made by the model
+    """ Create visualization of the prediction made by the model
     args:
         - f(s_i, u_i) : the predictor (expect a Pytorch Module).
                         s_i is the state at time i (p, q, v, w) and u_i the RPM
