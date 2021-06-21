@@ -104,8 +104,5 @@ def si_blackbird_quadrotor():
             torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
 
 
-
-
 if __name__ == "__main__":
-    # si_blackbird_quadrotor()
-    # test_learned_quadrotor_on_training()
+    si_blackbird_quadrotor()
