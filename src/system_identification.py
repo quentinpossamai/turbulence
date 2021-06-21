@@ -1,6 +1,8 @@
 import datetime
 import matplotlib.pyplot as plt
+import numpy as np
 import pickle
+import random
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -43,7 +45,7 @@ def validate(model, dataloader, global_iteration, epoch):
             motor = batch["motor"].to(device)
             next_state = batch["next_state"].to(device)
             dt = batch["next_t"].to(device) - batch["t"].to(device)
-            output = model(state, motor)  # dstate
+            output = model(state, motor, dt)  # dstate
             validation_loss = loss(state_gt=state, dstate_hat=output, next_state_gt=next_state, dt=dt)
             loss_log.append(validation_loss)
         # time_tracker.update(1)
@@ -51,6 +53,11 @@ def validate(model, dataloader, global_iteration, epoch):
 
 
 def si_blackbird_quadrotor():
+    # Reproducibility
+    torch.manual_seed(0)
+    random.seed(0)
+    np.random.seed(0)
+
     # Training parameters
     batch_size = 64000
     epochs = 100
