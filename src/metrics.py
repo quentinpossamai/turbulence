@@ -2,11 +2,10 @@ import torch
 import os
 import pickle
 from tqdm import tqdm
-import numpy as np
 
 
 def load_flights(mode):
-    assert mode in ["validation", "test"]
+    # assert mode in ["validation", "test"]
 
     ## Dataset location
     datadir = "/storage/Datasets/BlackBird/"  # Dataset location on cluster
@@ -26,7 +25,7 @@ def load_flights(mode):
     return flights
 
 
-def MSE_error(f, H, mode="test"):
+def mse_error(f, horizon, mode="test"):
     """ Return the mean squared error on the selected split, controlled by the horizon
     args:
         - f(s_i, u_i) : the predictor (expect a Pytorch Module).
@@ -37,19 +36,19 @@ def MSE_error(f, H, mode="test"):
         - H : The prediction horizon (1, 10, 100, 1s, 2s, ...)
         - mode : allows to switch between the test and the validation dataset"""
 
-    assert mode in ["validation", "test"]
+    # assert mode in ["validation", "test"]
 
     flights = load_flights(mode)
 
-    ## Compute Error
+    # Compute Error
     error_per_flight = {flight_name: 0 for flight_name in flights.keys()}
 
     for k in tqdm(flights.keys()):  # Extract flight states and command
         states = torch.FloatTensor(flights[k]["state"])
         rpm = torch.FloatTensor(flights[k]["motor"])
-        error_per_flight[k] = _compute_error(states, rpm, H, f)
+        error_per_flight[k] = _compute_error(states, rpm, horizon, f)
 
-    ## Sum of error for all flights
+    # Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
     return total_error
 
@@ -93,8 +92,7 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
 
     flights = load_flights(mode)
 
-    ## Compute Error
-    error_per_flight = {flight_name: 0 for flight_name in flights.keys()}
+    # Compute Error
 
     for k in tqdm(flights.keys()):  # Extract flight states and command
         states = torch.FloatTensor(flights[k]["state"])
@@ -121,7 +119,6 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
         ax_vel = [fig.add_subplot(4, 4, 9), fig.add_subplot(4, 4, 10), fig.add_subplot(4, 4, 11)]
         ax_rpy = [fig.add_subplot(4, 4, 13), fig.add_subplot(4, 4, 14), fig.add_subplot(4, 4, 15)]
 
-        ticks = np.round(np.linspace(0, prediction.shape[0] * 1 / 360, 5), 3)
         t = torch.arange(states.shape[0]) * 1 / 260
         ax_pos[0].set_title("X", pad=0, fontsize=8)
         ax_pos[1].set_title("Y", pad=0, fontsize=8)

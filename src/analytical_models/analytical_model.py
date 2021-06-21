@@ -6,10 +6,15 @@ from scipy.spatial.transform import Rotation
 class DynamicalModel(nn.Module):
     def __init__(self):
         super(DynamicalModel, self).__init__()
-        self.theta = torch.tensor([[2.0574e-06],
-                                   [3.6350e-06],
-                                   [1.9637e-06],
-                                   [1.5637e-03]])
+        # self.theta = torch.tensor([[2.0574e-06],
+        #                            [3.6350e-06],
+        #                            [1.9637e-06],
+        #                            [1.5637e-03]])  # MSE results
+
+        self.theta = torch.tensor([[2.08e-6],
+                                   [3.58e-6],
+                                   [3.77e-8],
+                                   [1.40]])  # Parameter from blackbird paper
         self.permutation = [1, 0, 3, 2]
         self.DT = 1 / 360
 
@@ -59,7 +64,8 @@ class DynamicalModel(nn.Module):
 
 
 if __name__ == '__main__':
-    from metrics import MSE_error
+    from metrics import mse_error, visualise_metrics
 
     f = DynamicalModel()
-    print(MSE_error(f, 1, "test"))
+    print(mse_error(f, 100, "train"))
+    # visualise_metrics(f, 1000, mode="test", plotrange=[15000, 16000])
