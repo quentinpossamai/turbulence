@@ -40,7 +40,7 @@ def trace_trajectory3d(position, quaternion: np.ndarray):
     plt.show()
 
 
-def compare_traj(state_gt, state_hat, time, start, stop):
+def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
     """Plotting trajectory with model vs ground truth"""
     fig = plt.figure(figsize=(19.2, 10.8), dpi=100)
 
@@ -54,6 +54,8 @@ def compare_traj(state_gt, state_hat, time, start, stop):
         ax.set_ylabel("Position [m]")
         ax.grid()
         ax.legend()
+        if i == 2:
+            ax.set_title(traj_name)
 
     # Linear speed
     for i, name in zip(range(1, 4), ["x", "y", "z"]):

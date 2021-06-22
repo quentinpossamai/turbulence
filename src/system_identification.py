@@ -4,6 +4,7 @@ import random
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from src.data.blackbird.loading import BlackbirdDatasetHorizon
@@ -74,7 +75,7 @@ def si_blackbird_quadrotor():
     name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
-    # writer = SummaryWriter(training_path)
+    writer = SummaryWriter(training_path)
 
     # Datasets
     train_data = DataLoader(BlackbirdDatasetHorizon("train", horizon=horizon), batch_size=batch_size, shuffle=True)
