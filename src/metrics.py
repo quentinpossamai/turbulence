@@ -27,7 +27,7 @@ def load_flights(mode):
     return flights
 
 
-def mse_error(f, horizon, mode="test", dt=None):
+def mse_error(f, horizon, mode="test"):
     """ Return the mean squared error on the selected split, controlled by the horizon
     args:
         - f(s_i, u_i) : the predictor (expect a Pytorch Module).
@@ -48,30 +48,35 @@ def mse_error(f, horizon, mode="test", dt=None):
     for k in tqdm(flights.keys()):  # Extract flight states and command
         states = torch.FloatTensor(flights[k]["state"])
         rpm = torch.FloatTensor(flights[k]["motor"])
-        error_per_flight[k] = _compute_error(states, rpm, horizon, f, dt)
+        time = torch.FloatTensor(flights[k]['t'])
+        error_per_flight[k] = _compute_error(states, rpm, time, horizon, f)
 
     # Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
     return total_error
 
 
-def _compute_error(states, rpm, H, f, dt):
+def _compute_error(states, rpm, time, H, f):
     crop_idx = states.shape[0] // (H + 1)  # remove last timestep of states to fit N*H points
 
-    ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)  # Reformat with batch to go faster
+    # Batchify the trajectories to speed up computation
+    # First step is to crop the trajectory to an whole number of horizon
+    # Next, tensor are reshaped in batch of h-length array
+    ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)
     command = rpm[:crop_idx * (H + 1)].view(-1, H + 1, 4)
+    dt = (time[1:] - time[:-1])[:crop_idx * (H + 1)].view(-1, H + 1)
 
     ## Prediction rollout
     prediction = [ground_truth[:, 0], ]
     for i in range(1, H + 1):
-        prediction.append(f(prediction[-1], command[:, i], dt))
+        prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
 
     prediction = torch.stack(prediction, dim=1)
     error = ((prediction - ground_truth) ** 2).mean()
     return error
 
 
-def dummy_f(s_i, u_i):
+def dummy_f(s_i, u_i, dt):
     return s_i.clone()
 
 
@@ -162,4 +167,4 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
 
 
 if __name__ == '__main__':
-    visualise_metrics(dummy_f, 100, "test", plotrange=(15000, 15500))
+    mse_error(dummy_f, 100, "test")
