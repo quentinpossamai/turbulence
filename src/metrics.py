@@ -105,15 +105,18 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
     for k in tqdm(flights.keys()):  # Extract flight states and command
         states = torch.FloatTensor(flights[k]["state"])
         rpm = torch.FloatTensor(flights[k]["motor"])
-        crop_idx = states.shape[0] // (H + 1)  # remove last timestep of states to fit N*H points
+        time = torch.FloatTensor(flights[k]['t'])
+
+        crop_idx = (time.shape[0] - 1) // (H + 1)  # remove last timestep of states to fit N*H points
 
         ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)  # Reformat with batch to go faster
         command = rpm[:crop_idx * (H + 1)].view(-1, H + 1, 4)
+        dt = (time[1:] - time[:-1])[:crop_idx * (H + 1)].view(-1, H + 1)
 
         ## Prediction rollout
         prediction = [ground_truth[:, 0], ]
         for i in range(1, H + 1):
-            prediction.append(f(prediction[-1], command[:, i]))
+            prediction.append(f(prediction[-1], command[:, i], dt[:, i]))
 
         prediction = torch.stack(prediction, dim=1).view(-1, 13)
         if plotrange is not None:
@@ -168,4 +171,4 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
 
 
 if __name__ == '__main__':
-    mse_error(dummy_f, 10, "test")
+    visualise_metrics(dummy_f, 100, "test", plotrange=[15000, 15500])

@@ -67,5 +67,5 @@ if __name__ == '__main__':
     from src.metrics import mse_error, visualise_metrics
 
     f = DynamicalModel()
-    print(mse_error(f, 100, "test"))
+    print(mse_error(f, 1000, "test"))
     # visualise_metrics(f, 1000, mode="test", plotrange=[15000, 16000])
