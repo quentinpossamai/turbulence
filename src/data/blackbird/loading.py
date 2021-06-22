@@ -340,9 +340,9 @@ class BlackbirdDatasetHorizon(Dataset):
 
         local_idx = idx - self.cum_flight_idx[flight_idx - 1] if flight_idx - 1 >= 0 else 0
 
-        return {"state": torch.from_numpy(data["state"][local_idx:local_idx+self.h+1]),
-                "motor": torch.from_numpy(data["motor"][local_idx:local_idx+self.h]),
-                "t": torch.from_numpy(data["t"][local_idx:local_idx+self.h+1]).unsqueeze(-1)}
+        return {"state": torch.from_numpy(data["state"][local_idx:local_idx+self.h+1]).float(),
+                "motor": torch.from_numpy(data["motor"][local_idx:local_idx+self.h]).float(),
+                "t": torch.from_numpy(data["t"][local_idx:local_idx+self.h+1]).unsqueeze(-1).float()}
 
 
 # class BlackbirdDataset(Dataset):

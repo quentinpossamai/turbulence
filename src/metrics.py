@@ -2,6 +2,7 @@ import torch
 import os
 import pickle
 from tqdm import tqdm
+import torch
 
 from src.data.blackbird.loading import DATASET_PATH
 
@@ -70,6 +71,9 @@ def _compute_error(states, rpm, time, H, f):
     prediction = [ground_truth[:, 0], ]
     for i in range(1, H + 1):
         prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
+        f.float()
+        torch.save(f.state_dict(), "/Users/quentin/phd/turbulence/weights.pt")
+
 
     prediction = torch.stack(prediction, dim=1)
     error = ((prediction - ground_truth) ** 2).mean()

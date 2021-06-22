@@ -32,13 +32,12 @@ def test_mlp():
     #
     # # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
     # # "next_state": data[25:]}
-    # state = torch.from_numpy(data["state"][:-1])
-    # motor = torch.from_numpy(data["motor"][:-1])
-    # time = torch.from_numpy(data["t"][:-1])
-    # next_time = torch.from_numpy(data["t"][1:])
-    # next_state = torch.from_numpy(data["state"][1:])
-    # dt = (next_time - time)
-    # dt = 1 / 360. * torch.ones(dt)
+    # state = torch.from_numpy(data["state"][:-1]).float()
+    # motor = torch.from_numpy(data["motor"][:-1]).float()
+    # time = torch.from_numpy(data["t"][:-1]).float()
+    # next_time = torch.from_numpy(data["t"][1:]).float()
+    # next_state = torch.from_numpy(data["state"][1:]).float()
+    # dt = (next_time - time).float()
     #
     # # Test MLP formula
     # angular_velocity = state[:, 10:]
@@ -87,28 +86,28 @@ def test_mlp():
 
     # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
     # "next_state": data[25:]}
-    state = torch.from_numpy(data["state"][:-1])
-    motor = torch.from_numpy(data["motor"][:-1])
-    time = torch.from_numpy(data["t"][:-1])
-    next_time = torch.from_numpy(data["t"][1:])
-    next_state = torch.from_numpy(data["state"][1:])
-    dt = (next_time - time)
+    state = torch.from_numpy(data["state"][:-1]).float()
+    motor = torch.from_numpy(data["motor"][:-1]).float()
+    time = torch.from_numpy(data["t"][:-1]).float()
+    next_time = torch.from_numpy(data["t"][1:]).float()
+    next_state = torch.from_numpy(data["state"][1:]).float()
+    dt = (next_time - time).float()
     # dt = 1 / 360. * torch.ones_like(dt)
 
     # Without integration
     with torch.no_grad():
         next_state_hat = model(state, motor, dt.reshape((-1, 1)))
 
-    # With integration
-    traj = [state[0]]
-    with torch.no_grad():
-        for i in range(len(state) - 1):
-            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze())
-    traj_stack = torch.stack(traj, dim=0)
+    # # With integration
+    # traj = [state[0]]
+    # with torch.no_grad():
+    #     for i in range(len(state) - 1):
+    #         traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze())
+    # traj_stack = torch.stack(traj, dim=0)
 
     start = 0
-    compare_traj(next_state, traj_stack, next_time, start, start + 360)
-    compare_traj(next_state, next_state_hat, next_time, start, start + 360)
+    # compare_traj(next_state, traj_stack, next_time, start, start + 360)
+    # compare_traj(next_state, next_state_hat, next_time, start, start + 360)
 
     print(mse_error(model, 100, "train"))
 
