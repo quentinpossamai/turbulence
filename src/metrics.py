@@ -57,7 +57,7 @@ def mse_error(f, horizon, mode="test"):
 
 
 def _compute_error(states, rpm, time, H, f):
-    crop_idx = (time.shape[0]-1) // (H + 1)  # remove last timestep of states to fit N*H points
+    crop_idx = (time.shape[0] - 1) // (H + 1)  # remove last timestep of states to fit N*H points
 
     # Batchify the trajectories to speed up computation
     # First step is to crop the trajectory to an whole number of horizon
@@ -65,11 +65,11 @@ def _compute_error(states, rpm, time, H, f):
     ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)
     command = rpm[:crop_idx * (H + 1)].view(-1, H + 1, 4)
     dt = (time[1:] - time[:-1])[:crop_idx * (H + 1)].view(-1, H + 1)
-
-    ## Prediction rollout
-    prediction = [ground_truth[:, 0], ]
-    for i in range(1, H + 1):
-        prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
+    with torch.no_grad():
+        ## Prediction rollout
+        prediction = [ground_truth[:, 0], ]
+        for i in range(1, H + 1):
+            prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
 
     prediction = torch.stack(prediction, dim=1)
     error = ((prediction - ground_truth) ** 2).mean()

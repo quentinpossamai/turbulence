@@ -16,7 +16,7 @@ DT = 1 / 360
 def identify_model():
     """Solve the Ax = y problem where x is the parameters of the model"""
 
-    flights = load_flights("test")
+    flights = load_flights("train")
 
     ## Load flights in a big vector column
     states, future_states, command = [], [], []
