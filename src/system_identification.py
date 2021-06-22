@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from src.data.blackbird.loading import BlackbirdDataset, BlackbirdDatasetHorizon
+from src.data.blackbird.loading import BlackbirdDatasetHorizon
 from src.drone_models.learned_sabatino import Quadrotor
 from src.drone_models.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
