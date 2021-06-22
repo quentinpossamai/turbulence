@@ -57,7 +57,7 @@ def mse_error(f, horizon, mode="test"):
 
 
 def _compute_error(states, rpm, time, H, f):
-    crop_idx = states.shape[0] // (H + 1)  # remove last timestep of states to fit N*H points
+    crop_idx = (time.shape[0]-1) // (H + 1)  # remove last timestep of states to fit N*H points
 
     # Batchify the trajectories to speed up computation
     # First step is to crop the trajectory to an whole number of horizon
@@ -167,4 +167,4 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
 
 
 if __name__ == '__main__':
-    mse_error(dummy_f, 100, "test")
+    mse_error(dummy_f, 10, "test")
