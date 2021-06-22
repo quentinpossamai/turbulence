@@ -17,7 +17,7 @@ def test_mlp():
     flight_train_list = list(e[:-2] for e in open(DATASET_PATH + "train.txt", "r"))
     flight_validation_list = list(e[:-2] for e in open(DATASET_PATH + "validation.txt", "r"))
 
-    weights = torch.load(ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/5336_weights.pt")
+    weights = torch.load(ANALYSIS_PATH + "training/20210621_145132_MLPQuadrotor_bs_64000/11136_weights.pt")
     # print(weights)
     model = MLPQuadrotor()
     model.load_state_dict(weights)
@@ -93,27 +93,25 @@ def test_mlp():
     next_time = torch.from_numpy(data["t"][1:])
     next_state = torch.from_numpy(data["state"][1:])
     dt = (next_time - time)
-    dt = 1 / 360. * torch.ones_like(dt)
+    # dt = 1 / 360. * torch.ones_like(dt)
 
-    loss = MSELoss()
-
-    # # Without integration
-    # with torch.no_grad():
-    #     dstate_hat = model(state, motor)
-    # state_velocities_only_hat = state + dstate_hat * dt
+    # Without integration
+    with torch.no_grad():
+        next_state_hat = model(state, motor, dt.reshape((-1, 1)))
 
     # With integration
-    first_state_idx = 4000
-    traj = [state[first_state_idx]]
+    traj = [state[0]]
     with torch.no_grad():
-        for i in range(len(state) - 1 - first_state_idx):
-            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze() * dt[i] + traj[-1])
+        for i in range(len(state) - 1):
+            traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze())
     traj_stack = torch.stack(traj, dim=0)
 
-    loss(traj_stack)
-
     start = 0
-    compare_traj(next_state[first_state_idx:], traj_stack, next_time[first_state_idx:], start, start + 360)
+    compare_traj(next_state, traj_stack, next_time, start, start + 360)
+    compare_traj(next_state, next_state_hat, next_time, start, start + 360)
+
+    print(mse_error(model, 100, "train"))
+
 
 
 def test_mlp_metrics():
