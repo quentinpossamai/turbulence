@@ -18,10 +18,13 @@ GENERAL_ANALYSIS_PATH = WD_PATH + "analysis/"
 
 
 def mkdir_if_not_exist(paths: list):
-    assert isinstance(paths, list)
-    assert WD_PATH in ["/Users/quentin/phd/turbulence/", "/home/qpossamai/phd/turbulence/"]
-    for path in paths:
-        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+    if "steeven" in os.getcwd():
+        pass
+    else:
+        assert isinstance(paths, list)
+        assert WD_PATH in ["/Users/quentin/phd/turbulence/", "/home/qpossamai/phd/turbulence/"]
+        for path in paths:
+            pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
 mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
