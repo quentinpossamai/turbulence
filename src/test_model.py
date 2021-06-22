@@ -1,12 +1,11 @@
 import torch
-from torch.nn import MSELoss
 
-from src.data.blackbird.loading import BlackbirdDatasetHorizon, load_flight, DATASET_PATH
-from src.drone_models.mlp_quadrotor import MLPQuadrotor
+from src.data.blackbird.loading import load_flight, DATASET_PATH
+from src.drone_models.mlp.mlp_quadrotor import MLPQuadrotor
+from src.drone_models.mlp.old_mlp_quadrotor import OldMLPQuadrotor
 from src.trajectory import compare_traj
-from src.utils.quaternion import qmul
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
-from src.metrics import mse_error, visualise_metrics
+from src.metrics import mse_error
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
 mkdir_if_not_exist([ANALYSIS_PATH])
@@ -17,9 +16,9 @@ def test_mlp():
     flight_train_list = list(e[:-2] for e in open(DATASET_PATH + "train.txt", "r"))
     flight_validation_list = list(e[:-2] for e in open(DATASET_PATH + "validation.txt", "r"))
 
-    weights = torch.load(ANALYSIS_PATH + "training/20210621_145132_MLPQuadrotor_bs_64000/11136_weights.pt")
+    weights = torch.load(ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/torch_float_5336_weights.pt")
     # print(weights)
-    model = MLPQuadrotor()
+    model = OldMLPQuadrotor()
     model.load_state_dict(weights)
     model.eval()
 
@@ -107,15 +106,17 @@ def test_mlp():
 
     start = 0
     # compare_traj(next_state, traj_stack, next_time, start, start + 360)
-    # compare_traj(next_state, next_state_hat, next_time, start, start + 360)
+    compare_traj(next_state, next_state_hat, next_time, start, start + 360)
 
-    print(mse_error(model, 1000, "test"))
-
+    print(mse_error(model, 1, "test"))
+    print(mse_error(model, 10, "test"))
+    print(mse_error(model, 100, "test"))
+    # visualise_metrics(model, 500, "test", plotrange=[15000, 15500])
 
 
 def test_mlp_metrics():
     weights = torch.load(ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/5336_weights.pt")
-    model = MLPQuadrotor()
+    model = OldMLPQuadrotor()
     model.load_state_dict(weights)
     model.eval()
     print(mse_error(model, 100, "train"))

@@ -1,17 +1,13 @@
 import datetime
-import matplotlib.pyplot as plt
 import numpy as np
-import pickle
 import random
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from src.data.blackbird.loading import BlackbirdDatasetHorizon
-from src.drone_models.learned_sabatino import Quadrotor
-from src.drone_models.mlp_quadrotor import MLPQuadrotor
+from src.drone_models.mlp.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
@@ -67,8 +63,8 @@ def si_blackbird_quadrotor():
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     # Load previous weights
-    weights = torch.load(ANALYSIS_PATH + "training/20210621_111255_MLPQuadrotor_bs_64000/2204_weights.pt")
-    model.load_state_dict(weights)
+    # weights = torch.load(ANALYSIS_PATH + "training/20210621_111255_MLPQuadrotor_bs_64000/2204_weights.pt")
+    # model.load_state_dict(weights)
 
     # Tensorboard
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/

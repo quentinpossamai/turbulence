@@ -112,10 +112,11 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
         command = rpm[:crop_idx * (H + 1)].view(-1, H + 1, 4)
         dt = (time[1:] - time[:-1])[:crop_idx * (H + 1)].view(-1, H + 1)
 
-        ## Prediction rollout
-        prediction = [ground_truth[:, 0], ]
-        for i in range(1, H + 1):
-            prediction.append(f(prediction[-1], command[:, i], dt[:, i]))
+        with torch.no_grad():
+            ## Prediction rollout
+            prediction = [ground_truth[:, 0], ]
+            for i in range(1, H + 1):
+                prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
 
         prediction = torch.stack(prediction, dim=1).view(-1, 13)
         if plotrange is not None:
