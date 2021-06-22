@@ -109,7 +109,7 @@ def test_mlp():
     # compare_traj(next_state, traj_stack, next_time, start, start + 360)
     # compare_traj(next_state, next_state_hat, next_time, start, start + 360)
 
-    print(mse_error(model, 100, "train"))
+    print(mse_error(model, 1000, "test"))
 
 
 

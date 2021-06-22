@@ -2,7 +2,6 @@ import torch
 import os
 import pickle
 from tqdm import tqdm
-import torch
 
 from src.data.blackbird.loading import DATASET_PATH
 
