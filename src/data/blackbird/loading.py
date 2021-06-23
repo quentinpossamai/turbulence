@@ -315,41 +315,43 @@ class BlackbirdDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, horizon: int):
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
-        assert isinstance(horizon, int)
-        # if mode not in ["random", "fixe"]:
-        #     raise ValueError("mode must be 'random' or 'fixe'.")
         self.flight_length = pickle.load(open(INTERMEDIATE_DATASET_PATH + "flight_length.pkl", "rb"))
         self.flight_list = list(e[:-2] for e in open(DATASET_PATH + f"{train_validation_test}.txt", "r"))
+
+        assert isinstance(horizon, int) and (horizon + 1) < min(self.flight_length.values())
         self.h = horizon
-        self.cum_flight_idx = np.cumsum([self.flight_length[name] - self.h - 1 for name in self.flight_list])
+        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - 1 - self.h
+        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
+
+        # Loading data
+        loading = {flight: pickle.load(open(DATASET_PATH + f"intermediate/{flight}/data.pkl", "rb"))
+                   for flight in self.flight_list}
+        for key, val in loading.items():
+            loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"]], axis=1)
+            # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:18]
+        self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
 
     def __len__(self):
-        return self.cum_flight_idx[-1] + 1
+        return self.cum_dataset_idx[-1] + 1
 
     def __getitem__(self, idx):
         """
         One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
 
         """
-        flight_idx = np.where(idx <= self.cum_flight_idx)[0][0]
-        flight_to_load = self.flight_list[flight_idx]
-        flight_name, flight_yaw, flight_speed = flight_to_load.split("/")
+        flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
+        data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.h + 1, :]
 
-        # dict_keys(['t', 'imu_ang_acc', 'motor', 'state'])
-        data = load_flight(flight_name, flight_yaw, flight_speed)
-
-        local_idx = idx - self.cum_flight_idx[flight_idx - 1] if flight_idx - 1 >= 0 else 0
-
-        return {"state": torch.from_numpy(data["state"][local_idx:local_idx+self.h+1]).float(),
-                "motor": torch.from_numpy(data["motor"][local_idx:local_idx+self.h]).float(),
-                "t": torch.from_numpy(data["t"][local_idx:local_idx+self.h+1]).unsqueeze(-1).float()}
+        return {"t": torch.from_numpy(data[:, :1]).float(),
+                "state": torch.from_numpy(data[:, 1:14]).float(),
+                "motor": torch.from_numpy(data[:, 14:18]).float()}
 
 
 # class BlackbirdDataset(Dataset):
 #     def __init__(self, train_validation_test: str):
 #         if train_validation_test not in ["train", "validation", "test"]:
 #             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
-#         self.data = torch.load(INTERMEDIATE_DATASET_PATH + f"{train_validation_test}.pt")
+#         self.data = torch.load(DATASET_PATH + f"intermediate_torch_dataset/{train_validation_test}.pt")
 #
 #     def __len__(self):
 #         return len(self.data)

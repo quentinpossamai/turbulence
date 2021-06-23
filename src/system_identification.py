@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from src.data.blackbird.loading import BlackbirdDatasetHorizon
+from src.drone_models.mlp.old_mlp_quadrotor import OldMLPQuadrotor
 from src.drone_models.mlp.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
@@ -55,12 +56,12 @@ def si_blackbird_quadrotor():
     np.random.seed(0)
 
     # Training parameters
-    batch_size = 32
+    batch_size = 64000
     epochs = 100
     memory = 100000
-    horizon = 100
+    horizon = 1
 
-    model = MLPQuadrotor().to(device)
+    model = OldMLPQuadrotor().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     # Load previous weights

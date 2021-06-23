@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import relu
 
-from src.system_identification import ANALYSIS_PATH
 from src.utils.quaternion import qrot, qmul
 
 
@@ -51,7 +50,8 @@ def _test():
     output = model(state, motor, dt)
     print("Test done")
 
-    path = ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/"
+    path = "/Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/" \
+           "training/20210618_171105_OldMLPQuadrotor_bs_64000/"
     weights = torch.load(path + "5336_weights.pt")
     model.load_state_dict(weights)
     model.float()
