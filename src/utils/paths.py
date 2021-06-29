@@ -1,6 +1,6 @@
 from __future__ import print_function
 
-from matplotlib import rc
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
@@ -29,13 +29,10 @@ def mkdir_if_not_exist(paths: list):
 
 mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
 
-
-def matplotlib_latex_font():
-    rc('font', **{'family': 'serif',
-                  'serif': ['Computer Modern Roman']})
-    # 'sans-serif': ['Computer Modern Sans serif'],
-    # "monospace": ["Computer Modern Typewriter"]})
-    rc('text', usetex=False)
+plt.rcParams.update({
+    "text.usetex": False,
+    "font.family": "serif",
+    "font.sans-serif": ["Computer Modern Roman"]})
 
 
 class Progress(object):

@@ -24,7 +24,7 @@ def trace_trajectory3d(position, quaternion: np.ndarray):
     fig = plt.figure(figsize=(6, 6))
     ax = fig.add_subplot(111, projection='3d')
     fig.tight_layout()
-    for t in range(6000, state.shape[0], 20):
+    for t in range(0, state.shape[0], 20):
         ax.clear()
         ax.plot(state[:, 0], state[:, 1], state[:, 2])
         ax.set_xlim(-3 + state[t, 0], state[t, 0] + 3)
@@ -38,6 +38,32 @@ def trace_trajectory3d(position, quaternion: np.ndarray):
         ax.set_title(str(t))
         plt.pause(0.0001)
     plt.show()
+
+
+def timestamp_analysis(timestamps):
+    dt = timestamps[1:] - timestamps[:-1]
+    mean = np.mean(dt)
+    std = np.std(dt)
+
+    fig, axs = plt.subplots(2, 1, figsize=(19.2, 10.8), dpi=100)
+    ax = axs[0]
+    ax.plot(timestamps[1:], dt)
+    ax.set_xlabel("Time [s]")
+    ax.set_ylabel("Time steps [s]")
+    ax.grid()
+
+    ax = axs[1]
+    ax.hist(dt, bins=1000)
+    ax.set_title(f"Mean and std: {mean:.4E} $\pm$ {std:.4E}")
+    ax.set_xlabel("Time steps [s]")
+    ax.set_ylabel("# of sample")
+    ax.grid()
+
+    plt.tight_layout()
+    plt.show()
+
+
+
 
 
 def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
@@ -84,8 +110,8 @@ def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
     for i, name in zip(range(1, 5), ["q0", "q1", "q2", "q3"]):
         n = i + 4
         ax = fig.add_subplot(4, 4, n)
-        ax.plot(time[start:stop], state_gt[start:stop, 2+i], label=f"GT {name}")
-        ax.plot(time[start:stop], state_hat[start:stop, 2+i], label=f"hat {name}")
+        ax.plot(time[start:stop], state_gt[start:stop, 2 + i], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, 2 + i], label=f"hat {name}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Quaternion")
         ax.grid()

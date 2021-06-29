@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from src.trajectory import trace_trajectory3d
+from src import trajectory
 from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion
@@ -28,77 +28,71 @@ FLIGHT_LIST = ["V1_01_easy/V1_01_easy.pkl", "V1_02_medium/V1_02_medium.pkl", "V1
 
 
 def _load_clean_data(raw_flight_path, intermediate_flight_path):
+    # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
+    # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
+    # '/imu0__sensor_msgs/Imu'])
     raw = pickle.load(open(raw_flight_path, "rb"), encoding="latin1")
 
+    # IMU Loading
+    # dict_keys(['orientation_covariance', 'orientation', 'angular_velocity_covariance', 'nsecs',
+    # 'linear_acceleration_covariance', 'frame_id', 'secs', 'linear_acceleration', 'angular_velocity'])
+    imu_key = "/fcu/imu__sensor_msgs/Imu"  # '/imu0__sensor_msgs/Imu' also exist
+    orientation = np.array([raw[imu_key][i]["orientation"] for i in range(len(raw[imu_key]))])
+    orientation_covariance = np.array([raw[imu_key][i]["orientation_covariance"] for i in range(len(raw[imu_key]))])
+    assert np.linalg.norm(orientation_covariance) == 0  # not usable
+    ang_vel = np.array([raw[imu_key][i]["angular_velocity"] for i in range(len(raw[imu_key]))])
+    ang_vel_cov = np.array([raw[imu_key][i]["angular_velocity_covariance"] for i in range(len(raw[imu_key]))])
+    assert np.linalg.norm(ang_vel_cov) != 0  # usable
+    lin_acc = np.array([raw[imu_key][i]["linear_acceleration"] for i in range(len(raw[imu_key]))])
+    lin_acc_cov = np.array([raw[imu_key][i]["linear_acceleration_covariance"] for i in range(len(raw[imu_key]))])
+    assert np.linalg.norm(lin_acc_cov) != 0  # usable
+    frame_id = np.array([raw[imu_key][i]["frame_id"] for i in range(len(raw[imu_key]))])
+    assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
+    time = np.array([raw[imu_key][i]["secs"] + raw[imu_key][i]["nsecs"] * 1e-9 for i in range(len(raw[imu_key]))])
+    # plt.plot(time - time[0])
+    imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1)}
 
+    # MOTOR SPEED Loading
+    # dict_keys(['frame_id', 'secs', 'motor_speed', 'nsecs'])
+    ms_key = '/fcu/motor_speed__asctec_hl_comm/MotorSpeed'
+    frame_id = np.array([raw[ms_key][i]["frame_id"] for i in range(len(raw[ms_key]))])
+    assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
+    time = np.array([raw[ms_key][i]["secs"] + raw[ms_key][i]["nsecs"] * 1e-9 for i in range(len(raw[ms_key]))])
+    ms = np.array([raw[ms_key][i]["motor_speed"] for i in range(len(raw[ms_key]))], dtype=float)  # Assumed in rad/s
+    motor_dict = {"t": time, "ms": ms}
 
-    flight = "/".join(raw_flight_path.split("/")[-4:-1])
-    name = "blackbird_slash_imu"
-    with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        header = next(csv_reader)
-        # print(f"{name}: {header}")
-        data = [e for e in csv_reader]
-        assert len(data[0]) == 23
-        time = np.array([float(e[0]) * 1e-9 for e in data])
-        imu_angular_velocity = np.array([np.array([float(e[14]), float(e[15]), float(e[16])]) for e in data])
-        imu_linear_acceleration = np.array([np.array([float(e[19]), float(e[20]), float(e[21])]) for e in data])
-        imu_orientation = np.array([np.array([float(e[8]), float(e[9]), float(e[10]), float(e[11])]) for e in data])
-        assert (np.linalg.norm(imu_orientation, axis=-1) == 0).all()  # Orientation is empty and not normed.
-        ang_acc = np.concatenate([imu_angular_velocity, imu_linear_acceleration], axis=1)
-        imu_dict = {"t": time, "ang_acc": ang_acc}
+    # STATE Loading
+    # dict_keys(['child_frame_id', 'nsecs', 'frame_id', 'secs', 'translation', 'rotation'])
+    state_key = "/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped"
+    child_frame_id = np.array([raw[state_key][i]["child_frame_id"] for i in range(len(raw[state_key]))])
+    # Check if it is all the time 'vicon/firefly_sbx/firefly_sbx'
+    assert np.sum("vicon/firefly_sbx/firefly_sbx" == child_frame_id) == len(child_frame_id)
+    time = np.array([raw[state_key][i]["secs"] + raw[state_key][i]["nsecs"] * 1e-9 for i in range(len(raw[state_key]))])
+    frame_id = np.array([raw[state_key][i]["frame_id"] for i in range(len(raw[state_key]))])
+    assert np.sum("/world" == frame_id) == len(frame_id)  # All the time "/world"
+    trans = np.array([raw[state_key][i]["translation"] for i in range(len(raw[state_key]))])
+    quat = np.array([raw[state_key][i]["rotation"] for i in range(len(raw[state_key]))])  # x, y, z, w
+    pose_dict = {"t": time}
 
-    name = "blackbird_slash_rotor_rpm"
-    with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        header = next(csv_reader)
-        # print(f"{name}: {header}")
-        data = [e for e in csv_reader]
-        assert len(data[0]) == 17
-        time = np.array([float(e[0]) * 1e-9 for e in data])
-        time0 = np.array([float(e[8]) + float(e[9]) * 1e-9 for e in data])
-        time1 = np.array([float(e[10]) + float(e[11]) * 1e-9 for e in data])
-        time2 = np.array([float(e[12]) + float(e[13]) * 1e-9 for e in data])
-        time3 = np.array([float(e[14]) + float(e[15]) * 1e-9 for e in data])
-        motors = np.array([np.array(e[16].strip("[]").split(","), dtype=float) for e in data]) * np.pi / 30
-        motors_dict = {"m0": np.stack([time0, motors[:, 0]], 1),
-                       "m1": np.stack([time1, motors[:, 1]], 1),
-                       "m2": np.stack([time2, motors[:, 2]], 1),
-                       "m3": np.stack([time3, motors[:, 3]], 1),
-                       "rosbag_t": time}
-
-    name = "blackbird_slash_state"
-    with open(raw_flight_path + f"csv/{name}.csv", newline='') as csv_file:
-        csv_reader = csv.reader(csv_file, delimiter=',')
-        header = next(csv_reader)
-        # print(f"{name}: {header}")
-        data = [e for e in csv_reader]
-        assert len(data[0]) == 17
-        time = np.array([float(e[0]) * 1e-9 for e in data])
-        trans = np.array([np.array([float(e[9]), float(e[10]), float(e[11])]) for e in data])
-        quat = np.array([np.array([float(e[13]), float(e[14]), float(e[15]), float(e[16])]) for e in data])
-        quat = Rotation.from_quat(quat).as_quat()
-        pose_dict = {"t": time}
-
-    # Pi rotation of all data
-    pose = Transform.from_quat_trans(quat, trans).as_matrix()
-    pi_rotation = Transform.from_euler_trans("zyx", np.array([0, 0, np.pi]),
-                                             degrees=False, trans=np.array([0, 0, 0])).as_matrix()
-    pose = pi_rotation @ pose @ pi_rotation
-    quat = Transform.from_matrix(pose).as_rot_quat()
-    trans = Transform.from_matrix(pose).as_trans()
-
+    # Body and World reference frame are in FLU! Nice!
     # Fix quaternion discontinuity
     quat = quaternion.qfix(quat)
 
     # Centering position
     trans = trans - np.mean(trans, axis=0)
 
+    # trajectory.trace_trajectory3d(trans, quat)  # Check data by tracing drone trajectory
+
     # FOURIER noise reduction
     def low_pass_filter(fft_coef, fourier_freq, freq_cut):
         output = fft_coef.copy()
         output[np.abs(fourier_freq) > freq_cut] = 0
         return output
+
+    # trajectory.timestamp_analysis(pose_dict["t"])  # Check timestamps for each timeseries
+    # trajectory.timestamp_analysis(imu_dict["t"])
+    # trajectory.timestamp_analysis(motor_dict["t"])
+    # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
 
     # Computing a denoised state.
     period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
@@ -120,7 +114,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     g_matrix = np.array([[-q1, q0, q3, -q2],
                          [-q2, -q3, q0, q1],
                          [-q3, q2, -q1, q0]]).transpose((2, 0, 1))
-    angular_velocity = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
+    den_ang_vel = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
 
     # Compute linear speed
     fc_trans = 5  # Hz
@@ -132,52 +126,52 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
 
     # Denoising motor speed
-    # Computing a denoised state.
-    # den_motor = []
-    for i in range(4):
-        period = np.mean(motors_dict[f"m{i}"][1:, 0] - motors_dict[f"m{i}"][:-1, 0])
-        n = len(motors_dict[f"m{i}"])
-        frequencies = fftfreq(n, d=period)
-        fc_motor = 10  # Hz
-        fourier_motor = fft(motors_dict[f"m{i}"][:, 1])
+    period = np.mean(motor_dict["t"][1:] - motor_dict["t"][:-1])
+    n = len(motor_dict["t"])
+    frequencies = fftfreq(n, d=period)
+    den_motor_dict = {}
+    for key, val in motor_dict.items():
+        den_motor_dict[key] = val.copy()
+    for i in range(6):
+        fc_motor = 5  # Hz
+        fourier_motor = fft(motor_dict["ms"][:, i])
         # den_motor.append(np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))))
-        motors_dict[f"m{i}"][:, 1] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+        den_motor_dict["ms"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
     # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # time = motors_dict[f"m{i}"][:, 0] - motors_dict[f"m{i}"][0, 0]
-    # [ax.plot(time, motors_dict[f"m{i}"][:, 1], label="raw") for i in range(4)]
-    # [ax.plot(time, den_motor[i], label="denoised") for i in range(4)]
+    # time = motor_dict["t"] - motor_dict["t"][0]
+    # # [ax.plot(time, motor_dict["ms"][:, i], label="raw") for i in range(6)]
+    # # [ax.plot(time, den_motor_dict["ms"][:, i], label="denoised") for i in range(6)]
+    # ax.plot(time, motor_dict["ms"][:, 0], label="raw")
+    # ax.plot(time, den_motor_dict["ms"][:, 0], label="denoised")
     # ax.grid()
-    # ax.set_title(flight)
+    # ax.set_title(raw_flight_path.split("/")[-1])
     # ax.set_ylabel("[rad/s]")
     # ax.set_xlabel("Time [s]")
     # ax.legend()
-
-    state = np.concatenate([den_trans, den_quat, den_dtrans, angular_velocity], axis=1)
+    state = np.concatenate([den_trans, den_quat, den_dtrans, den_ang_vel], axis=1)
+    pose_dict["state"] = state
 
     # Synchronisation
     imu_sync = np.stack([interpolate.interp1d(imu_dict["t"], imu_dict["ang_acc"][:, i], bounds_error=False,
                                               fill_value=(imu_dict["ang_acc"][0, i], imu_dict["ang_acc"][-1, i]))(
-        pose_dict["t"]) for i in range(6)], axis=1)
-    motor_sync = np.stack([interpolate.interp1d(motors_dict[f"m{i}"][:, 0], motors_dict[f"m{i}"][:, 1],
-                                                bounds_error=False,
-                                                fill_value=(motors_dict[f"m{i}"][0, 1], motors_dict[f"m{i}"][-1, 1]))(
-        pose_dict["t"]) for i in range(4)], axis=1)
+        den_motor_dict["t"]) for i in range(6)], axis=1)
+    state_sync = np.stack([interpolate.interp1d(pose_dict["t"], pose_dict["state"][:, i], bounds_error=False,
+                                                fill_value=(pose_dict["state"][0, i], pose_dict["state"][-1, i]))(
+        den_motor_dict["t"]) for i in range(13)], axis=1)
 
-    synchronisation = {"t": pose_dict["t"], "imu_ang_acc": imu_sync, "motor": motor_sync, "state": state}
+    synchronisation = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["ms"],
+                       "state": state_sync}
 
     # Take data only when drone is flying
     start, stop = 0, 0
     has_started = False
     for i, ms in enumerate(synchronisation["motor"]):
-        if i < 6000:
-            continue
-        if (ms > 1100).any() and not has_started:
+        if (ms > 120).any() and not has_started:
             start = i
             has_started = True
-        if has_started and (ms < 500).any():
+        if has_started and (ms < 80).any():
             stop = i
             break
-    stop = min(len(synchronisation["motor"]) - 4000, stop)
     assert start != stop
 
     # return start, stop
@@ -191,8 +185,6 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     save_path = intermediate_flight_path + "data.pkl"
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(cut_data, open(save_path, "wb"))
-
-    plt.plot(cut_data["imu_ang_acc"])
 
 
 def _splitting_txt():
@@ -319,10 +311,11 @@ def load_flight(flight_name, flight_yaw, flight_speed):
 
 
 def main():
-    raw_flight_path = RAW_DATASET_PATH + FLIGHT_LIST[0]
-    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + FLIGHT_LIST[0]
-    print(FLIGHT_LIST[0])
-    _load_clean_data(raw_flight_path, intermediate_flight_path)
+    for flight in FLIGHT_LIST:
+        raw_flight_path = RAW_DATASET_PATH + flight
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+        print(flight)
+        _load_clean_data(raw_flight_path, intermediate_flight_path)
 
     # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
     # for i in tqdm(range(len(FLIGHT_LIST))):

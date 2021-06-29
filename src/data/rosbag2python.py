@@ -329,7 +329,7 @@ def main_euroc_mav():
     """
     # Data to extract parameters
     loading_path = "/Users/quentin/phd/turbulence/data/euroc_mav/raw/"
-    saving_folder = "/Users/quentin/phd/turbulence/data/euroc_mav/intermediate/"
+    saving_folder = "/Users/quentin/phd/turbulence/data/euroc_mav/raw_python/"
     flight_list = ["V1_01_easy",
                    "V1_02_medium",
                    "V1_03_difficult",
@@ -347,8 +347,8 @@ def main_euroc_mav():
         data_extracted = e.extract()
 
         # Saving file
-        # print("Saving at : {}".format(saving_path))
-        # pickle.dump(data_extracted, open(saving_path, "wb"))
+        print("Saving at : {}".format(saving_path))
+        pickle.dump(data_extracted, open(saving_path, "wb"))
 
 
 def main_blackbird():
