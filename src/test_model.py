@@ -16,7 +16,7 @@ def test_mlp():
     flight_train_list = list(e[:-2] for e in open(DATASET_PATH + "train.txt", "r"))
     flight_validation_list = list(e[:-2] for e in open(DATASET_PATH + "validation.txt", "r"))
 
-    weights = torch.load(ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/torch_float_5336_weights.pt")
+    weights = torch.load(ANALYSIS_PATH + "training/20210623_113455_OldMLPQuadrotor_bs_64000/8004_weights.pt")
     # print(weights)
     model = OldMLPQuadrotor()
     model.load_state_dict(weights)
@@ -106,7 +106,7 @@ def test_mlp():
 
     start = 0
     # compare_traj(next_state, traj_stack, next_time, start, start + 360)
-    compare_traj(next_state, next_state_hat, next_time, start, start + 360)
+    compare_traj(next_state, next_state_hat, next_time, start, start + 360, flight)
 
     print(mse_error(model, 1, "test"))
     print(mse_error(model, 10, "test"))

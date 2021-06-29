@@ -250,6 +250,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(cut_data, open(save_path, "wb"))
 
+    plt.plot(cut_data["imu_ang_acc"])
+
 
 def _splitting_txt():
     idx = list(range(len(FLIGHT_LIST)))
@@ -380,10 +382,10 @@ def main():
     # flight_name, flight_yaw, flight_speed = 'halfMoon', 'yawForward', 'maxSpeed4p0'
     # flight_name, flight_yaw, flight_speed = 'clover', 'yawForward', 'maxSpeed0p5'
     # flight_name, flight_yaw, flight_speed = "star", "yawConstant", "maxSpeed3p0"
-    # raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
-    # _load_clean_data(raw_flight_path, intermediate_flight_path)
+    raw_flight_path = DATASET_PATH + f"raw/{flight_name}/{flight_yaw}/{flight_speed}/"
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight_name}/{flight_yaw}/{flight_speed}/"
+    print(f"/{flight_name}/{flight_yaw}/{flight_speed}/")
+    _load_clean_data(raw_flight_path, intermediate_flight_path)
 
     # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
     # for i in tqdm(range(len(FLIGHT_LIST))):
