@@ -63,43 +63,37 @@ def timestamp_analysis(timestamps):
     plt.show()
 
 
-
-
-
 def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
     """Plotting trajectory with model vs ground truth"""
     fig = plt.figure(figsize=(19.2, 10.8), dpi=100)
 
     # Position
-    for i, name in zip(range(1, 4), ["x", "y", "z"]):
-        n = i
-        ax = fig.add_subplot(4, 3, n)
-        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
-        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+    for i, name in zip(range(3), ["x", "y", "z"]):
+        ax = fig.add_subplot(4, 3, i + 1)
+        ax.plot(time[start:stop], state_gt[start:stop, i], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, i], label=f"hat {name}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Position [m]")
         ax.grid()
         ax.legend()
-        if i == 2:
+        if i == 1:
             ax.set_title(traj_name)
 
     # Linear speed
-    for i, name in zip(range(1, 4), ["x", "y", "z"]):
-        n = i + 6
-        ax = fig.add_subplot(4, 3, n)
-        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
-        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+    for i, name in zip(range(7, 10), ["x", "y", "z"]):
+        ax = fig.add_subplot(4, 3, i)
+        ax.plot(time[start:stop], state_gt[start:stop, i], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, i], label=f"hat {name}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Linear speed [m/s]")
         ax.grid()
         ax.legend()
 
     # Angular velocity
-    for i, name in zip(range(1, 4), ["x", "y", "z"]):
-        n = i + 9
-        ax = fig.add_subplot(4, 3, n)
-        ax.plot(time[start:stop], state_gt[start:stop, n], label=f"GT {name}")
-        ax.plot(time[start:stop], state_hat[start:stop, n], label=f"hat {name}")
+    for i, name in zip(range(10, 13), ["x", "y", "z"]):
+        ax = fig.add_subplot(4, 3, i)
+        ax.plot(time[start:stop], state_gt[start:stop, i], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, i], label=f"hat {name}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Angular velocity [rad/s]")
         ax.grid()
@@ -107,11 +101,10 @@ def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
     plt.tight_layout()
 
     # Quaternion
-    for i, name in zip(range(1, 5), ["q0", "q1", "q2", "q3"]):
-        n = i + 4
-        ax = fig.add_subplot(4, 4, n)
-        ax.plot(time[start:stop], state_gt[start:stop, 2 + i], label=f"GT {name}")
-        ax.plot(time[start:stop], state_hat[start:stop, 2 + i], label=f"hat {name}")
+    for i, name in zip(range(3, 7), ["q0", "q1", "q2", "q3"]):
+        ax = fig.add_subplot(4, 4, i + 2)
+        ax.plot(time[start:stop], state_gt[start:stop, i], label=f"GT {name}")
+        ax.plot(time[start:stop], state_hat[start:stop, i], label=f"hat {name}")
         ax.set_xlabel("Time [s]")
         ax.set_ylabel("Quaternion")
         ax.grid()

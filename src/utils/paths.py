@@ -29,10 +29,9 @@ def mkdir_if_not_exist(paths: list):
 
 mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
 
-plt.rcParams.update({
-    "text.usetex": False,
-    "font.family": "serif",
-    "font.sans-serif": ["Computer Modern Roman"]})
+plt.rcParams.update({"text.usetex": True,
+                     "font.family": "serif",
+                     "font.sans-serif": ["Computer Modern Roman"]})
 
 
 class Progress(object):

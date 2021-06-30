@@ -75,6 +75,8 @@ def si_blackbird_quadrotor():
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
+    # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_learned_quadrotor_training/training/
+    # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
