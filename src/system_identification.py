@@ -59,12 +59,12 @@ def si_blackbird_quadrotor():
     np.random.seed(seed)
 
     # Training parameters
-    batch_size = 64000
+    batch_size = 32
     epochs = 100
     memory = 100000
     horizon = 1
 
-    model = MLPQuadrotor().to(device)
+    model = MLPQuadrotor(motor_size=6).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     # Load previous weights

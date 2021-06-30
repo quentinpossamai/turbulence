@@ -7,7 +7,7 @@ theta4 = Iz/Ixy"""
 import torch
 from tqdm import tqdm
 import itertools
-from src.metrics import load_flights
+from src.metrics import load_blackbird_flights
 from scipy.spatial.transform import Rotation
 
 DT = 1 / 360
@@ -16,7 +16,7 @@ DT = 1 / 360
 def identify_model():
     """Solve the Ax = y problem where x is the parameters of the model"""
 
-    flights = load_flights("train")
+    flights = load_blackbird_flights("train")
 
     ## Load flights in a big vector column
     states, future_states, command = [], [], []

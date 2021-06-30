@@ -13,118 +13,49 @@ EUROC_MAV_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_learned_quadrotor_t
 mkdir_if_not_exist([BLACKBIRD_ANALYSIS_PATH])
 
 
-def test_blackbird_mlp():
-    # train_flights, validation_flights, test_flights
-    flight_train_list = list(e[:-2] for e in open(blackbird.DATASET_PATH + "train.txt", "r"))
-    flight_validation_list = list(e[:-2] for e in open(blackbird.DATASET_PATH + "validation.txt", "r"))
+def test_blackbird_mlp(horizon, train_validation_test, model_name):
+    assert train_validation_test in ["train", "validation", "test"]
 
-    weights = torch.load(BLACKBIRD_ANALYSIS_PATH + "training/20210623_113455_OldMLPQuadrotor_bs_64000/8004_weights.pt")
-    # print(weights)
-    model = OldMLPQuadrotor()
+    weights = torch.load(BLACKBIRD_ANALYSIS_PATH + f"training/{model_name}")
+    model = MLPQuadrotor(motor_size=4)
     model.load_state_dict(weights)
     model.eval()
 
-    # # Training flight
-    # flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    # flight = f"{flight_name}/{flight_yaw}/{flight_speed}"
-    # data = load_flight(flight_name, flight_yaw, flight_speed)
-    # assert flight in flight_train_list
-    # print("Testing on training")
-    #
-    # # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-    # # "next_state": data[25:]}
-    # state = torch.from_numpy(data["state"][:-1]).float()
-    # motor = torch.from_numpy(data["motor"][:-1]).float()
-    # time = torch.from_numpy(data["t"][:-1]).float()
-    # next_time = torch.from_numpy(data["t"][1:]).float()
-    # next_state = torch.from_numpy(data["state"][1:]).float()
-    # dt = (next_time - time).float()
-    #
-    # # Test MLP formula
-    # angular_velocity = state[:, 10:]
-    # quat = state[:, 3:7]
-    # dquat_hat = 1 / 2 * qmul(quat, torch.cat([angular_velocity, torch.zeros(len(state), 1)], dim=1))
-    # quat_hat = torch.cumsum(dquat_hat * dt.view((-1, 1)), dim=0) + quat[:1, :]
-    #
-    # # Without integration
-    # with torch.no_grad():
-    #     dstate_hat = model(state, motor)
-    # state_hat = state + dstate_hat * dt.unsqueeze(-1)  # Integrating with Euler
-
-    # # Integrating with Fourier
-    # period = torch.mean(dt).item()
-    # n = len(dstate_hat)
-    # frequencies = fftfreq(n, d=period) + 0.0000001
-    # fourier_dstate_hat = fft(dstate_hat.numpy(), axis=0)
-    # fourier_state_hat = fourier_dstate_hat / (2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)))
-    # state_hat = np.real(ifft(fourier_state_hat, axis=0)) + state[0, :].numpy().reshape((1, 13))
-
-    # compare_traj(next_state[1:], state_hat, next_time, 0, 360)
-    #
-    # # With integration
-    # first_state_idx = 4000
-    # traj = [state[first_state_idx]]
-    # with torch.no_grad():
-    #     for i in range(len(state) - 1 - first_state_idx):
-    #         traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0)).squeeze() * dt[i] + traj[-1])
-    # traj_stack = torch.stack(traj, dim=0)
-    #
-    # start = 0
-    # compare_traj(next_state[first_state_idx:], traj_stack, next_time[first_state_idx:], start, start + 360)
-    #
-    # print()
-
-    # # Testing on validation flight
-    # flight = splitting_config["validation_flights"][0]
-    # flight_name, flight_yaw, flight_speed = flight.split("/")[:-1]
-    # data = load_flight(flight_name, flight_yaw, flight_speed)
-    # print("Testing on validation")
-    # Training flight
-    flight = flight_validation_list[0]
+    flight = list(e[:-2] for e in open(blackbird.DATASET_PATH + f"{train_validation_test}.txt", "r"))[0]
+    print(f"Testing on {train_validation_test}")
     flight_name, flight_yaw, flight_speed = flight.split("/")
     data = blackbird.load_flight(flight_name, flight_yaw, flight_speed)
-    print("Testing on Validation")
 
-    # return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-    # "next_state": data[25:]}
     state = torch.from_numpy(data["state"][:-1]).float()
     motor = torch.from_numpy(data["motor"][:-1]).float()
     time = torch.from_numpy(data["t"][:-1]).float()
     next_time = torch.from_numpy(data["t"][1:]).float()
     next_state = torch.from_numpy(data["state"][1:]).float()
     dt = (next_time - time).float()
-    # dt = 1 / 360. * torch.ones_like(dt)
 
-    # Without integration
-    with torch.no_grad():
-        next_state_hat = model(state, motor, dt.reshape((-1, 1)))
-
-    # # With integration
-    # traj = [state[0]]
-    # with torch.no_grad():
-    #     for i in range(len(state) - 1):
-    #         traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze())
-    # traj_stack = torch.stack(traj, dim=0)
+    next_state_hat = src.utils.trajectory.gen_traj(model, state, motor, dt, horizon=horizon)
 
     start = 0
-    # compare_traj(next_state, traj_stack, next_time, start, start + 360)
-    src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + 360, flight)
+    if horizon == 1:
+        length = 100
+    else:
+        length = horizon
+    src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + length,
+                                      train_validation_test,
+                                      EUROC_MAV_ANALYSIS_PATH + f"training/{model_name.split('/')[0]}/"
+                                                                f"traj_{train_validation_test}_horizon{horizon}.svg")
+    # visualise_metrics(model, 500, "test", plot_range=[15000, 15500])
 
-    print(mse_error(model, 1, "test"))
-    print(mse_error(model, 10, "test"))
-    print(mse_error(model, 100, "test"))
-    # visualise_metrics(model, 500, "test", plotrange=[15000, 15500])
 
-
-def test_euroc_mav_mlp(horizon, train_validation_test):
+def test_euroc_mav_mlp(horizon, train_validation_test, model_name):
     assert train_validation_test in ["train", "validation", "test"]
     assert horizon < 3156, "horizon too big, maximum possible horizon is 3156"
     train_flight = euroc.EurocMAVDatasetHorizon("train", horizon=3155)[0]
     validation_flight = euroc.EurocMAVDatasetHorizon("validation", horizon=3155)[0]
     test_flight = euroc.EurocMAVDatasetHorizon("test", horizon=3155)[0]
 
-    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + "training/20210630_095602_MLPQuadrotor_bs_64000/30_weights.pt")
-    model = MLPQuadrotor()
+    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{model_name}")
+    model = MLPQuadrotor(motor_size=6)
     model.load_state_dict(weights)
     model.eval()
 
@@ -150,26 +81,44 @@ def test_euroc_mav_mlp(horizon, train_validation_test):
         length = horizon
     src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + length,
                                       train_validation_test,
-                                      EUROC_MAV_ANALYSIS_PATH + f"training/20210630_095602_MLPQuadrotor_bs_64000/"
+                                      EUROC_MAV_ANALYSIS_PATH + f"training/{model_name.split('/')[0]}/"
                                                                 f"traj_{train_validation_test}_horizon{horizon}.svg")
 
 
-def test_blackbird_mlp_metrics():
-    weights = torch.load(BLACKBIRD_ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/5336_weights.pt")
-    model = OldMLPQuadrotor()
+def test_blackbird_mlp_metrics(model_name):
+    weights = torch.load(BLACKBIRD_ANALYSIS_PATH + f"training/{model_name}")
+    model = MLPQuadrotor(motor_size=4)
     model.load_state_dict(weights)
     model.eval()
-    print(mse_error(model, 100, "train"))
-    # visualise_metrics(f, 1000, mode="test", plotrange=[15000, 16000])
+    for i in [9, 180, 360]:
+        print(f"Metric {i} on test: {mse_error(model, i, 'blackbird', 'test'):.4E}")
+
+
+def test_euroc_mav_mlp_metrics(model_name):
+    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{model_name}")
+    model = MLPQuadrotor(motor_size=6)
+    model.load_state_dict(weights)
+    model.eval()
+
+    for i in [5, 100, 200]:
+        print(f"Metric {i} on test: {mse_error(model, i, 'euroc_mav', 'test'):.4E}")
+    # visualise_metrics(f, 1000, mode="test", plot_range=[15000, 16000])
+
+
+def main():
+    # BLACKBIRD
+    # mlp_symplectic_blackbird = "20210621_145132_MLPQuadrotor_bs_64000/11136_weights.pt"
+    old_mlp_blackbird = "20210623_113455_OldMLPQuadrotor_bs_64000/8004_weights.pt"
+    test_blackbird_mlp_metrics(old_mlp_blackbird)
+
+    # EUROC MAV
+    # mlp_symplectic_euroc_mav = "20210630_144438_MLPQuadrotor_bs_32/9416_weights.pt"
+    # for horizon in [1, 100]:
+    #     for dataset in ["train", "validation", "test"]:
+    #         test_euroc_mav_mlp(horizon=horizon, train_validation_test=dataset,
+    #                            model_name=model_name)
+    # test_euroc_mav_mlp_metrics(model_name=mlp_symplectic_euroc_mav)
 
 
 if __name__ == '__main__':
-    # test_blackbird_mlp()
-    test_euroc_mav_mlp(horizon=1, train_validation_test="train")
-    test_euroc_mav_mlp(horizon=100, train_validation_test="train")
-    test_euroc_mav_mlp(horizon=1, train_validation_test="validation")
-    test_euroc_mav_mlp(horizon=100, train_validation_test="validation")
-    test_euroc_mav_mlp(horizon=1, train_validation_test="test")
-    test_euroc_mav_mlp(horizon=100, train_validation_test="test")
-
-    # test_blackbird_mlp_metrics()
+    main()

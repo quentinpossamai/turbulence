@@ -3,21 +3,22 @@ import os
 import pickle
 from tqdm import tqdm
 
-from src.data.blackbird.loading import DATASET_PATH
+import src.data.blackbird.loading as blackbird
+import src.data.euroc_mav.loading as euroc
 
 
-def load_flights(mode):
+def load_blackbird_flights(mode):
     # assert mode in ["validation", "test"]
 
-    ## Dataset location
+    # Dataset location
     datadir = "/storage/Datasets/BlackBird/"  # Dataset location on cluster
     if not os.path.isdir(datadir):
         datadir = "/Volumes/Samsung_T5/BlackBird/"  # Dataset location (Steeven)
     if not os.path.isdir(datadir):
-        datadir = DATASET_PATH  # Dataset location (Quentin)
+        datadir = blackbird.DATASET_PATH  # Dataset location (Quentin)
     assert os.path.isdir(datadir)
 
-    ## Load test/val flights
+    # Load test/val flights
     with open(datadir + mode + ".txt", "r") as file:
         flight_list = file.read().split("\n")[:-1]
     flights = {}
@@ -27,7 +28,18 @@ def load_flights(mode):
     return flights
 
 
-def mse_error(f, horizon, mode="test"):
+def load_euroc_mav_flights(mode):
+    assert mode in ["train", "validation", "test"]
+    split = [e.split(",") for e in open(euroc.INTERMEDIATE_DATASET_PATH + f"split.txt", "r")]
+    split = {e[0]: (int(e[1]), int(e[2]), int(e[3])) for e in split}
+    flight_list = list(split.keys())
+
+    flights = {flight: pickle.load(open(euroc.INTERMEDIATE_DATASET_PATH + flight + mode + ".pkl",
+                                        "rb")) for flight in flight_list}
+    return flights
+
+
+def mse_error(f, horizon, dataset, mode="test"):
     """ Return the mean squared error on the selected split, controlled by the horizon
     args:
         - f(s_i, u_i) : the predictor (expect a Pytorch Module).
@@ -36,11 +48,17 @@ def mse_error(f, horizon, mode="test"):
                             s_i.shape = (Batch, 13)
                             u_i.shape(Batch, 4)
         - H : The prediction horizon (1, 10, 100, 1s, 2s, ...)
+        - dataset: The name of the dataset to use. euroc_mav or blackbird
         - mode : allows to switch between the test and the validation dataset"""
 
-    # assert mode in ["validation", "test"]
+    assert mode in ["validation", "test"]
+    assert dataset in ["blackbird", "euroc_mav"]
 
-    flights = load_flights(mode)
+    if dataset == "blackbird":
+        flights = load_blackbird_flights(mode)
+    else:
+        assert dataset == "euroc_mav"
+        flights = load_euroc_mav_flights(mode)
 
     # Compute Error
     error_per_flight = {flight_name: 0 for flight_name in flights.keys()}
@@ -56,19 +74,20 @@ def mse_error(f, horizon, mode="test"):
     return total_error
 
 
-def _compute_error(states, rpm, time, H, f):
-    crop_idx = (time.shape[0] - 1) // (H + 1)  # remove last timestep of states to fit N*H points
+def _compute_error(states, rpm, time, h, f):
+    crop_idx = (time.shape[0] - 1) // (h + 1)  # remove last time step of states to fit N*H points
 
-    # Batchify the trajectories to speed up computation
+    # Batch-ify the trajectories to speed up computation
     # First step is to crop the trajectory to an whole number of horizon
     # Next, tensor are reshaped in batch of h-length array
-    ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)
-    command = rpm[:crop_idx * (H + 1)].view(-1, H + 1, 4)
-    dt = (time[1:] - time[:-1])[:crop_idx * (H + 1)].view(-1, H + 1)
+    motor_size = rpm.shape[1]
+    ground_truth = states[:crop_idx * (h + 1)].view(-1, h + 1, 13)
+    command = rpm[:crop_idx * (h + 1)].view(-1, h + 1, motor_size)
+    dt = (time[1:] - time[:-1])[:crop_idx * (h + 1)].view(-1, h + 1)
     with torch.no_grad():
-        ## Prediction rollout
+        # Prediction rollout
         prediction = [ground_truth[:, 0], ]
-        for i in range(1, H + 1):
+        for i in range(1, h + 1):
             prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
 
     prediction = torch.stack(prediction, dim=1)
@@ -80,7 +99,7 @@ def dummy_f(s_i, u_i, dt):
     return s_i.clone()
 
 
-def visualise_metrics(f, H, mode="test", plotrange=None):
+def visualise_metrics(f, h, mode="test", plot_range=None):
     """ Create visualization of the prediction made by the model
     args:
         - f(s_i, u_i) : the predictor (expect a Pytorch Module).
@@ -97,7 +116,7 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
 
     assert mode in ["validation", "test"]
 
-    flights = load_flights(mode)
+    flights = load_blackbird_flights(mode)
 
     # Compute Error
 
@@ -106,22 +125,22 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
         rpm = torch.FloatTensor(flights[k]["motor"])
         time = torch.FloatTensor(flights[k]['t'])
 
-        crop_idx = (time.shape[0] - 1) // (H + 1)  # remove last timestep of states to fit N*H points
+        crop_idx = (time.shape[0] - 1) // (h + 1)  # remove last time step of states to fit N*H points
 
-        ground_truth = states[:crop_idx * (H + 1)].view(-1, H + 1, 13)  # Reformat with batch to go faster
-        command = rpm[:crop_idx * (H + 1)].view(-1, H + 1, 4)
-        dt = (time[1:] - time[:-1])[:crop_idx * (H + 1)].view(-1, H + 1)
+        ground_truth = states[:crop_idx * (h + 1)].view(-1, h + 1, 13)  # Reformat with batch to go faster
+        command = rpm[:crop_idx * (h + 1)].view(-1, h + 1, 4)
+        dt = (time[1:] - time[:-1])[:crop_idx * (h + 1)].view(-1, h + 1)
 
         with torch.no_grad():
-            ## Prediction rollout
+            # Prediction rollout
             prediction = [ground_truth[:, 0], ]
-            for i in range(1, H + 1):
+            for i in range(1, h + 1):
                 prediction.append(f(prediction[-1], command[:, i], dt[:, i].unsqueeze(-1)))
 
         prediction = torch.stack(prediction, dim=1).view(-1, 13)
-        if plotrange is not None:
-            states = states[plotrange[0]:plotrange[1]]
-            prediction = prediction[plotrange[0]:plotrange[1]]
+        if plot_range is not None:
+            states = states[plot_range[0]:plot_range[1]]
+            prediction = prediction[plot_range[0]:plot_range[1]]
 
         fig = plt.figure()
         ax_pos = [fig.add_subplot(4, 4, 1), fig.add_subplot(4, 4, 2), fig.add_subplot(4, 4, 3)]
@@ -171,4 +190,4 @@ def visualise_metrics(f, H, mode="test", plotrange=None):
 
 
 if __name__ == '__main__':
-    visualise_metrics(dummy_f, 100, "test", plotrange=[15000, 15500])
+    visualise_metrics(dummy_f, 100, "test", plot_range=[15000, 15500])

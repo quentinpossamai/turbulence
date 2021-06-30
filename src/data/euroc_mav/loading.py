@@ -209,8 +209,8 @@ class EurocMAVDatasetHorizon(Dataset):
         split = {e[0]: (int(e[1]), int(e[2]), int(e[3])) for e in split}
         self.flight_list = list(split.keys())
 
-        loading = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight.split("/")[0] + "/"
-                                            + train_validation_test + ".pkl", "rb")) for flight in self.flight_list}
+        loading = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight + train_validation_test + ".pkl",
+                                            "rb")) for flight in self.flight_list}
         self.flight_length = {flight: len(loading[flight]["t"]) for flight in self.flight_list}
         minimum_length = np.min([[split[flight][0], split[flight][1] - split[flight][0],
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
@@ -220,13 +220,12 @@ class EurocMAVDatasetHorizon(Dataset):
         self.h = horizon
 
         self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
-        # self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
         self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
 
         # Loading data
         for key, val in loading.items():
             loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"]], axis=1)
-            # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:18]
+            # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:20]
         self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
 
     def __len__(self):
@@ -242,7 +241,7 @@ class EurocMAVDatasetHorizon(Dataset):
 
         return {"t": torch.from_numpy(data[:, :1]).float(),
                 "state": torch.from_numpy(data[:, 1:14]).float(),
-                "motor": torch.from_numpy(data[:, 14:18]).float()}
+                "motor": torch.from_numpy(data[:, 14:20]).float()}
 
 
 # class BlackbirdDataset(Dataset):

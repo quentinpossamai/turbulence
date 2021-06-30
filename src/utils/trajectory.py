@@ -120,6 +120,11 @@ def compare_traj(state_gt, state_hat, time, start, stop, traj_name, save_path=No
         plt.savefig(save_path)
     else:
         plt.show()
+    plt.rcParams.update({"text.usetex": False,
+                         "font.family": ['sans-serif'],
+                         "font.sans-serif": ['DejaVu Sans', 'Bitstream Vera Sans', 'Computer Modern Sans Serif',
+                                             'Lucida Grande', 'Verdana', 'Geneva', 'Lucid', 'Arial', 'Helvetica',
+                                             'Avant Garde', 'sans-serif']})
 
 
 def gen_traj(model, state, motor, dt, horizon):
