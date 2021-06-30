@@ -339,7 +339,7 @@ def main_euroc_mav():
     for flight in flight_list:
         # Create saving path
         path = loading_path + flight + "/" + flight + ".bag"
-        saving_path = saving_folder + flight + "/" + flight + ".pkl"
+        saving_path = saving_folder + flight + "/" + "data.pkl"
 
         # Extract data
         e = Extractor(path)

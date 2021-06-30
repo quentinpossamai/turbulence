@@ -24,14 +24,14 @@ INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
 src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_DATASET_PATH, INTERMEDIATE_DATASET_PATH])
 
-FLIGHT_LIST = ["V1_01_easy/V1_01_easy.pkl", "V1_02_medium/V1_02_medium.pkl", "V1_03_difficult/V1_03_difficult.pkl"]
+FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 
 
 def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
     # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
     # '/imu0__sensor_msgs/Imu'])
-    raw = pickle.load(open(raw_flight_path, "rb"), encoding="latin1")
+    raw = pickle.load(open(raw_flight_path + "data.pkl", "rb"), encoding="latin1")
 
     # IMU Loading
     # dict_keys(['orientation_covariance', 'orientation', 'angular_velocity_covariance', 'nsecs',
@@ -187,81 +187,49 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     pickle.dump(cut_data, open(save_path, "wb"))
 
 
-def _splitting_txt():
-    idx = list(range(len(FLIGHT_LIST)))
-    random.shuffle(idx)
-    idx = np.array(idx)
-    train_val_idx = round(len(idx) * 0.6)
-    val_test_idx = round(len(idx) * 0.8)
-    shuffled_list = np.asarray(FLIGHT_LIST)[idx]
+def _splitting():
+    with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
+        for flight in FLIGHT_LIST:
+            print(flight)
+            data = load_flight(flight)
+            assert all(np.array([len(data[key]) for key in data]) == len(data["t"]))  # All keys have the same length
+            flight_len = len(data["t"])
 
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    special_flight = f"{flight_name}/{flight_yaw}/{flight_speed}/"
+            train_val_idx = round(flight_len * 0.6)
+            val_test_idx = round(flight_len * 0.8)
+            file.write(f"{flight},{train_val_idx},{val_test_idx},{flight_len}\n")
 
-    while special_flight not in shuffled_list[:train_val_idx]:
-        random.shuffle(idx)
-        shuffled_list = np.asarray(FLIGHT_LIST)[idx]
-
-    for name, flight_list in zip(["train.txt", "validation.txt", "test.txt"],
-                                 [sorted(shuffled_list[:train_val_idx]),
-                                  sorted(shuffled_list[train_val_idx:val_test_idx]),
-                                  sorted(shuffled_list[val_test_idx:])]):
-        with open(INTERMEDIATE_DATASET_PATH + name, "w") as file:
-            for flight in flight_list:
-                file.write(flight + "\n")
-
-
-def _torch_splitting():
-    train_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "train.txt", "r"))
-    validation_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "validation.txt", "r"))
-    test_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "test.txt", "r"))
-
-    def concatenate(data_pkl):
-        t = data_pkl["t"][:-1].reshape((-1, 1))
-        state = data_pkl["state"][:-1]
-        motor = data_pkl["motor"][:-1]
-        imu = data_pkl["imu_ang_acc"][:-1]
-        next_t = data_pkl["t"][1:].reshape((-1, 1))
-        next_state = data_pkl["state"][1:]
-        return np.concatenate([t, state, motor, imu, next_t, next_state], axis=1)
-
-    train = []
-    for flight in train_list:
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
-        train.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
-    train = torch.from_numpy(np.concatenate(train, axis=0))
-    torch.save(train, INTERMEDIATE_DATASET_PATH + "train.pt")
-
-    validation = []
-    for flight in validation_list:
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
-        validation.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
-    validation = torch.from_numpy(np.concatenate(validation, axis=0))
-    torch.save(validation, INTERMEDIATE_DATASET_PATH + "validation.pt")
-
-    test = []
-    for flight in test_list:
-        intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/"
-        test.append(concatenate(pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))))
-    test = torch.from_numpy(np.concatenate(test, axis=0))
-    torch.save(test, INTERMEDIATE_DATASET_PATH + "test.pt")
+            train_data = {key: data[key][:train_val_idx] for key in data}
+            pickle.dump(train_data, open(INTERMEDIATE_DATASET_PATH + flight + "/train.pkl", "wb"))
+            validation_data = {key: data[key][train_val_idx:val_test_idx] for key in data}
+            pickle.dump(validation_data, open(INTERMEDIATE_DATASET_PATH + flight + "/validation.pkl", "wb"))
+            test_data = {key: data[key][val_test_idx:flight_len] for key in data}
+            pickle.dump(test_data, open(INTERMEDIATE_DATASET_PATH + flight + "/test.pkl", "wb"))
 
 
 class BlackbirdDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, horizon: int):
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
-        self.flight_length = pickle.load(open(INTERMEDIATE_DATASET_PATH + "flight_length.pkl", "rb"))
-        self.flight_list = list(e[:-2] for e in open(DATASET_PATH + f"{train_validation_test}.txt", "r"))
+        split = [e.split(",") for e in open(INTERMEDIATE_DATASET_PATH + f"split.txt", "r")]
+        split = {e[0]: (int(e[1]), int(e[2]), int(e[3])) for e in split}
+        self.flight_list = list(split.keys())
 
-        assert isinstance(horizon, int) and (horizon + 1) < min(self.flight_length.values())
+        loading = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight.split("/")[0] + "/"
+                                            + train_validation_test + ".pkl", "rb")) for flight in self.flight_list}
+        self.flight_length = {flight: len(loading[flight]["t"]) for flight in self.flight_list}
+        minimum_length = np.min([[split[flight][0], split[flight][1] - split[flight][0],
+                                  split[flight][2] - split[flight][1]] for flight in self.flight_list])
+
+        assert isinstance(horizon, int)
+        assert (horizon + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 1}"
         self.h = horizon
-        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - 1 - self.h
+
+        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
+        # self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
         self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
 
         # Loading data
-        loading = {flight: pickle.load(open(DATASET_PATH + f"intermediate/{flight}/data.pkl", "rb"))
-                   for flight in self.flight_list}
         for key, val in loading.items():
             loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"]], axis=1)
             # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:18]
@@ -302,128 +270,19 @@ class BlackbirdDatasetHorizon(Dataset):
 #                 "next_state": data[25:]}
 
 
-def load_flight(flight_name, flight_yaw, flight_speed):
-    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
-
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
+def load_flight(flight):
+    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/data.pkl"
+    data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        raw_flight_path = RAW_DATASET_PATH + flight
-        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-        print(flight)
-        _load_clean_data(raw_flight_path, intermediate_flight_path)
-
-    # print(f"ANALYSIS_SECTION_PATH: ", ANALYSIS_SECTION_PATH)
-    # for i in tqdm(range(len(FLIGHT_LIST))):
-    #     flight = FLIGHT_LIST[i]
-    #     raw_flight_path = DATASET_PATH + f"raw/{flight}"
-    #     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
+    # for flight in FLIGHT_LIST:
+    #     raw_flight_path = RAW_DATASET_PATH + flight
+    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    #     print(flight)
     #     _load_clean_data(raw_flight_path, intermediate_flight_path)
-
-    # _torch_splitting()
-
-
-def _madiha_laurent_csv():
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
-    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
-    #         "dstate": data[24:36], "next_state": data[36:]}
-
-    data = None  # Must load from raw not intermediate because of denoising.
-    t = data[:, 0]
-    state = data[:, 1:13]
-    motor = data[:, 13:17]
-    imu_ang_acc = data[:, 17:23]
-    header = ["t[s]",
-              "phi[rad]", "theta[rad]", "psi[rad]",
-              "x[m]", "y[m]", "z[m]",
-              "motor0[rad/s]", "motor1[rad/s]", "motor2[rad/s]", "motor3[rad/s]",
-              "imu_ang_vel_x[rad/s]", "imu_ang_vel_y[rad/s]", "imu_ang_vel_z[rad/s]",
-              "imu_acc_x[m/s2]", "imu_acc_y[m/s2]", "imu_acc_z[m/s2]"]
-    ml_data = np.concatenate([t.reshape((-1, 1)),
-                              state[:, 0:3],
-                              state[:, 9:12],
-                              motor,
-                              imu_ang_acc], axis=1)
-    assert len(header) == ml_data.shape[1]
-    with open(DATASET_PATH + "intermediate/madiha_laurent.csv", 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(header)
-        for row in ml_data:
-            writer.writerow(row)
-
-
-def _test_plot_final_data():
-    flight_name, flight_yaw, flight_speed = 'mouse', 'yawForward', 'maxSpeed7p0'
-    flight = f"/{flight_name}/{flight_yaw}/{flight_speed}/"
-
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}"
-    data = pickle.load(open(intermediate_flight_path + "data.pkl", "rb"))
-    # return {"t": data[0:1], "state": data[1:13], "motor": data[13:17], "imu": data[17:23], "next_t": data[23:24],
-    #         "dstate": data[24:36], "next_state": data[36:]}
-
-    # State orientation
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    dt = 1 / 360
-    dphi = (data[1:, 0] - data[:-1, 0]) / dt
-    dtheta = (data[1:, 1] - data[:-1, 1]) / dt
-    dpsi = (data[1:, 2] - data[:-1, 2]) / dt
-
-    fig, ax = plt.subplots(1, 1)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(range(len(data)), data[:, 0 + i], label=name)
-    ax.set_xlabel("Sample number")
-    ax.set_ylabel("State orientation [rad]")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    # plt.savefig(fig_path + "state_orientation.png")
-    plt.show()
-
-    # Autre derivee
-    fig, ax = plt.subplots(1, 1)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for array, name in zip([dphi, dtheta, dpsi], ("phi", "theta", "psi")):
-        ax.plot(list(range(len(data)))[1:], array, label=name)
-    ax.set_xlabel("Sample number")
-    ax.set_ylabel("State orientation [rad]")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    # plt.savefig(fig_path + "state_orientation.png")
-    plt.show()
-
-    # State orientation
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    fig, ax = plt.subplots(1, 1)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(range(len(data)), data[:, 0 + i], label=name)
-    ax.set_xlabel("Sample number")
-    ax.set_ylabel("State orientation [rad]")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    # plt.savefig(fig_path + "state_orientation.png")
-    plt.show()
-
-    # State angular velocity
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=200)
-    fig, ax = plt.subplots(1, 1)
-    ax.set_title(f"Flight: {flight_name} - {flight_yaw} - {flight_speed}")
-    for i, name in zip(range(3), ("phi", "theta", "psi")):
-        ax.plot(range(len(data)), data[:, 3 + i], label=name)
-    ax.set_xlabel("Sample number")
-    ax.set_ylabel("State orientation [rad]")
-    ax.legend()
-    ax.grid()
-    plt.tight_layout()
-    plt.show()
+    data = BlackbirdDatasetHorizon("train", horizon=100)
 
 
 if __name__ == '__main__':
