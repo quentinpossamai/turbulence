@@ -207,7 +207,7 @@ def _splitting():
             pickle.dump(test_data, open(INTERMEDIATE_DATASET_PATH + flight + "/test.pkl", "wb"))
 
 
-class BlackbirdDatasetHorizon(Dataset):
+class EurocMAVDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, horizon: int):
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -282,7 +282,7 @@ def main():
     #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
     #     print(flight)
     #     _load_clean_data(raw_flight_path, intermediate_flight_path)
-    data = BlackbirdDatasetHorizon("train", horizon=100)
+    data = EurocMAVDatasetHorizon("train", horizon=100)
 
 
 if __name__ == '__main__':

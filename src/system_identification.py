@@ -8,11 +8,13 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from src.data.blackbird.loading import BlackbirdDatasetHorizon
+from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.drone_models.mlp.old_mlp_quadrotor import OldMLPQuadrotor
 from src.drone_models.mlp.mlp_quadrotor import MLPQuadrotor
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
-ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
+# ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
+ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_learned_quadrotor_training/"
 mkdir_if_not_exist([ANALYSIS_PATH])
 
 use_cuda = True
@@ -51,9 +53,10 @@ def validate(model, dataloader, horizon, epoch):
 
 def si_blackbird_quadrotor():
     # Reproducibility
-    torch.manual_seed(0)
-    random.seed(0)
-    np.random.seed(0)
+    seed = 0
+    torch.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
     # Training parameters
     batch_size = 64000
@@ -61,7 +64,7 @@ def si_blackbird_quadrotor():
     memory = 100000
     horizon = 1
 
-    model = OldMLPQuadrotor().to(device)
+    model = MLPQuadrotor().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
 
     # Load previous weights
@@ -79,9 +82,9 @@ def si_blackbird_quadrotor():
     writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(BlackbirdDatasetHorizon("train", horizon=horizon), batch_size=batch_size, shuffle=True)
-    validation_dataset = BlackbirdDatasetHorizon("validation", horizon=horizon)
-    validation_data = DataLoader(validation_dataset, batch_size=batch_size, shuffle=True)
+    train_data = DataLoader(EurocMAVDatasetHorizon("train", horizon=horizon), batch_size=batch_size, shuffle=True)
+    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", horizon=horizon),
+                                 batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 
     global_iteration = 0
