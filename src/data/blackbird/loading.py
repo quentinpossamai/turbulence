@@ -9,9 +9,8 @@ from scipy import interpolate
 from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
-from src.trajectory import trace_trajectory3d
+from src.utils.trajectory import trace_trajectory3d
 from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion

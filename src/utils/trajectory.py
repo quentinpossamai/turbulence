@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import numpy as np
+import torch
 from scipy.spatial.transform import Rotation
 
 
@@ -63,9 +64,15 @@ def timestamp_analysis(timestamps):
     plt.show()
 
 
-def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
+def compare_traj(state_gt, state_hat, time, start, stop, traj_name, save_path=None):
+    plt.rcParams.update({"text.usetex": True,
+                         "font.family": "serif",
+                         "font.sans-serif": ["Computer Modern Roman"]})
     """Plotting trajectory with model vs ground truth"""
-    fig = plt.figure(figsize=(19.2, 10.8), dpi=100)
+    if save_path is not None:
+        fig = plt.figure(figsize=(19.2, 10.8), dpi=200)
+    else:
+        fig = plt.figure(figsize=(19.2, 10.8), dpi=100)
 
     # Position
     for i, name in zip(range(3), ["x", "y", "z"]):
@@ -109,4 +116,23 @@ def compare_traj(state_gt, state_hat, time, start, stop, traj_name):
         ax.set_ylabel("Quaternion")
         ax.grid()
         ax.legend()
-    plt.show()
+    if save_path is not None:
+        plt.savefig(save_path)
+    else:
+        plt.show()
+
+
+def gen_traj(model, state, motor, dt, horizon):
+    assert isinstance(horizon, int) and horizon > 0
+    if horizon == 1:
+        with torch.no_grad():
+            next_state_hat = model(state, motor, dt.reshape((-1, 1)))
+        return next_state_hat
+    elif horizon > 1:
+        # With integration
+        traj = [state[0]]
+        with torch.no_grad():
+            for i in range(len(state) - 1):
+                traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze())
+        traj_stack = torch.stack(traj, dim=0)
+        return traj_stack

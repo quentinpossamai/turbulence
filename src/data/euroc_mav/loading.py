@@ -1,17 +1,11 @@
-import csv
-import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
-import random
 from scipy.fft import fft, fftfreq, ifft
 from scipy import interpolate
-from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
-from tqdm import tqdm
 
-from src import trajectory
 from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion
@@ -222,7 +216,7 @@ class EurocMAVDatasetHorizon(Dataset):
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
 
         assert isinstance(horizon, int)
-        assert (horizon + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 1}"
+        assert (horizon + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 2}"
         self.h = horizon
 
         self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1

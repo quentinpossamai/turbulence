@@ -7,7 +7,6 @@ import pandas as pd
 import pathlib
 import pickle
 import re
-import socket
 import sys
 import time
 from typing import Union, Tuple, List, Iterable
@@ -28,10 +27,6 @@ def mkdir_if_not_exist(paths: list):
 
 
 mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
-
-plt.rcParams.update({"text.usetex": True,
-                     "font.family": "serif",
-                     "font.sans-serif": ["Computer Modern Roman"]})
 
 
 class Progress(object):

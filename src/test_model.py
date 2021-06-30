@@ -4,7 +4,7 @@ import src.data.blackbird.loading as blackbird
 import src.data.euroc_mav.loading as euroc
 from src.drone_models.mlp.mlp_quadrotor import MLPQuadrotor
 from src.drone_models.mlp.old_mlp_quadrotor import OldMLPQuadrotor
-from src.trajectory import compare_traj
+import src.utils.trajectory
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 from src.metrics import mse_error
 
@@ -108,7 +108,7 @@ def test_blackbird_mlp():
 
     start = 0
     # compare_traj(next_state, traj_stack, next_time, start, start + 360)
-    compare_traj(next_state, next_state_hat, next_time, start, start + 360, flight)
+    src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + 360, flight)
 
     print(mse_error(model, 1, "test"))
     print(mse_error(model, 10, "test"))
@@ -116,49 +116,45 @@ def test_blackbird_mlp():
     # visualise_metrics(model, 500, "test", plotrange=[15000, 15500])
 
 
-def test_euroc_mav_mlp():
-    # train_flights, validation_flights, test_flights
-    train_flight = euroc.EurocMAVDatasetHorizon("train", horizon=1000)[0]
-    validation_flight = euroc.EurocMAVDatasetHorizon("validation", horizon=1000)[0]
+def test_euroc_mav_mlp(horizon, train_validation_test):
+    assert train_validation_test in ["train", "validation", "test"]
+    assert horizon < 3156, "horizon too big, maximum possible horizon is 3156"
+    train_flight = euroc.EurocMAVDatasetHorizon("train", horizon=3155)[0]
+    validation_flight = euroc.EurocMAVDatasetHorizon("validation", horizon=3155)[0]
+    test_flight = euroc.EurocMAVDatasetHorizon("test", horizon=3155)[0]
 
     weights = torch.load(EUROC_MAV_ANALYSIS_PATH + "training/20210630_095602_MLPQuadrotor_bs_64000/30_weights.pt")
     model = MLPQuadrotor()
     model.load_state_dict(weights)
     model.eval()
-    state = train_flight["state"][:-1]
-    motor = train_flight["motor"][:-1]
-    time = train_flight["t"][:-1]
-    next_state = train_flight["state"][1:]
-    next_time = train_flight["t"][1:]
+
+    if train_validation_test == "train":
+        data = train_flight
+    elif train_validation_test == "validation":
+        data = validation_flight
+    else:
+        data = test_flight
+    state = data["state"][:-1]
+    motor = data["motor"][:-1]
+    time = data["t"][:-1]
+    next_state = data["state"][1:]
+    next_time = data["t"][1:]
     dt = next_time - time
 
-    # Test on training
-    next_state_hat = gen_traj(model, state, motor, dt, horizon=100)
-    # Test on validation
-    # next_state_hat = gen_traj(model, state, motor, dt, horizon=100)
+    next_state_hat = src.utils.trajectory.gen_traj(model, state, motor, dt, horizon=horizon)
 
     start = 0
-    # compare_traj(next_state, traj_stack, next_time, start, start + 360)
-    compare_traj(next_state, next_state_hat, next_time, start, start + 360, "")
-
-
-def gen_traj(model, state, motor, dt, horizon):
-    assert isinstance(horizon, int) and horizon > 0
     if horizon == 1:
-        with torch.no_grad():
-            next_state_hat = model(state, motor, dt.reshape((-1, 1)))
-        return next_state_hat
-    elif horizon > 1:
-        # With integration
-        traj = [state[0]]
-        with torch.no_grad():
-            for i in range(len(state) - 1):
-                traj.append(model(traj[-1].unsqueeze(0), motor[i, :].unsqueeze(0), dt[i].reshape((1, 1))).squeeze())
-        traj_stack = torch.stack(traj, dim=0)
-        return traj_stack
+        length = 100
+    else:
+        length = horizon
+    src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + length,
+                                      train_validation_test,
+                                      EUROC_MAV_ANALYSIS_PATH + f"training/20210630_095602_MLPQuadrotor_bs_64000/"
+                                                                f"traj_{train_validation_test}_horizon{horizon}.svg")
 
 
-def test_mlp_metrics():
+def test_blackbird_mlp_metrics():
     weights = torch.load(BLACKBIRD_ANALYSIS_PATH + "training/20210618_171105_MLPQuadrotor_bs_64000/5336_weights.pt")
     model = OldMLPQuadrotor()
     model.load_state_dict(weights)
@@ -169,5 +165,11 @@ def test_mlp_metrics():
 
 if __name__ == '__main__':
     # test_blackbird_mlp()
-    test_euroc_mav_mlp()
-    # test_mlp_metrics()
+    test_euroc_mav_mlp(horizon=1, train_validation_test="train")
+    test_euroc_mav_mlp(horizon=100, train_validation_test="train")
+    test_euroc_mav_mlp(horizon=1, train_validation_test="validation")
+    test_euroc_mav_mlp(horizon=100, train_validation_test="validation")
+    test_euroc_mav_mlp(horizon=1, train_validation_test="test")
+    test_euroc_mav_mlp(horizon=100, train_validation_test="test")
+
+    # test_blackbird_mlp_metrics()
