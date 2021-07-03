@@ -29,12 +29,14 @@ import os
 from absl import app
 from absl import flags
 import matplotlib.image
+from tqdm import tqdm
 import numpy as np
 
-flags.DEFINE_string('room_path', '/Users/steevenjanny/Downloads/mav0', 'Path to the EuRoC data for one of the '
-                                                                       'rooms ')
+flags.DEFINE_string('room_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy',
+                    'Path to the EuRoC data for one of the rooms ')
 
-flags.DEFINE_string('output_path', '', 'Path where to store the outputs.')
+flags.DEFINE_string('output_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/depth/',
+                    'Path where to store the outputs.')
 
 FLAGS = flags.FLAGS
 
@@ -289,17 +291,6 @@ def sample_uniform(xyz, bin_size):
     return inds_to_keep
 
 
-def fill_gap(z):
-    for x in range(1, z.shape[0] - 1):
-        for y in range(1, z.shape[1] - 1):
-            if np.isnan(z[x, y]):
-                cpt = 0
-                filler = z[x - 1:x + 2, y - 1:y + 2].reshape((-1))
-                filler = filler[1 - np.isnan(filler)]
-                z[x,y] = filler.mean()
-    return z
-
-
 def main(argv):
     del argv  # unused
     gti = GroundTruthInterpolator(
@@ -314,23 +305,19 @@ def main(argv):
 
     imagesto_render = imagesto_render[0::5]  # render every fifth image
 
-    for imfile in imagesto_render:
+    for imfile in tqdm(imagesto_render):
         timestamp = float(imfile.split('.')[0])
         transform = gti.get_transform(timestamp)
         if transform is None:
-            print('Timestamp %d has no groundtruth.' % int(timestamp))
             continue
-        else:
-            print('Rendering timestamp %d...' % int(timestamp))
-
         xyz_view, c_view = get_camera_view_pointcloud(transform, xyz_homogeneous, c)
-        print('View pointcloud generated, %d points.' % xyz_view.shape[0])
+        # print('View pointcloud generated, %d points.' % xyz_view.shape[0])
         occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
         occluded_inds = set(occluded_inds)
         visible_indices = [
             i for i in range(xyz_view.shape[0]) if i not in occluded_inds
         ]
-        print('%d visible points found.' % len(visible_indices))
+        # print('%d visible points found.' % len(visible_indices))
         visible_xyz = xyz_view[visible_indices, :]
         visible_c = c_view[visible_indices]
         visible_xyz, visible_c = filter_out_ot_frame_points(visible_xyz, visible_c)
@@ -341,19 +328,13 @@ def main(argv):
 
         rgb_image = render_rgb(visible_xyz, visible_c)
 
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(1, 2)
         z_image = render_z(visible_xyz)
-        ax[0].imshow(z_image)
-        z_image = fill_gap(z_image)
-        ax[1].imshow(z_image)
-        plt.show()
         # matplotlib.image.imsave(
         #     os.path.join(FLAGS.output_path, '%dgrayscale.png' % int(timestamp)),
         #     rgb_image)
-        # matplotlib.image.imsave(
-        #     os.path.join(FLAGS.output_path, '%ddepth.png' % int(timestamp)),
-        #     z_image)
+        np.save(
+            os.path.join(FLAGS.output_path, '%ddepth.npy' % int(timestamp)),
+            z_image)
         # np.save(
         #     os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), visible_xyz)
 
