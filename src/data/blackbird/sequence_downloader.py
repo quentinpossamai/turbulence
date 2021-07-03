@@ -58,7 +58,7 @@ timestampFile = "nSecTimestamps.txt"
 
 
 def get_cam_file(cam_name):
-    return "lossless.tar" if ("Depth" in cam_name or "Segmented" in cam_name) else "lossless.mov"
+    return "lossless.tar" if ("depth" in cam_name or "Segmented" in cam_name) else "lossless.mov"
 
 
 def append(root, files):
