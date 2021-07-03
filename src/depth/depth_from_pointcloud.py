@@ -289,6 +289,17 @@ def sample_uniform(xyz, bin_size):
     return inds_to_keep
 
 
+def fill_gap(z):
+    for x in range(1, z.shape[0] - 1):
+        for y in range(1, z.shape[1] - 1):
+            if np.isnan(z[x, y]):
+                cpt = 0
+                filler = z[x - 1:x + 2, y - 1:y + 2].reshape((-1))
+                filler = filler[1 - np.isnan(filler)]
+                z[x,y] = filler.mean()
+    return z
+
+
 def main(argv):
     del argv  # unused
     gti = GroundTruthInterpolator(
@@ -324,16 +335,18 @@ def main(argv):
         visible_c = c_view[visible_indices]
         visible_xyz, visible_c = filter_out_ot_frame_points(visible_xyz, visible_c)
 
-        inds_to_keep = sample_uniform(visible_xyz, 1e-4)
-        visible_xyz = visible_xyz[inds_to_keep]
-        visible_c = visible_c[inds_to_keep]
+        # inds_to_keep = sample_uniform(visible_xyz, 1e-2)
+        # visible_xyz = visible_xyz[inds_to_keep]
+        # visible_c = visible_c[inds_to_keep]
 
         rgb_image = render_rgb(visible_xyz, visible_c)
-        z_image = render_z(visible_xyz)
-        import matplotlib.pyplot as plt
 
-        plt.imshow(z_image)
-        plt.colorbar()
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(1, 2)
+        z_image = render_z(visible_xyz)
+        ax[0].imshow(z_image)
+        z_image = fill_gap(z_image)
+        ax[1].imshow(z_image)
         plt.show()
         # matplotlib.image.imsave(
         #     os.path.join(FLAGS.output_path, '%dgrayscale.png' % int(timestamp)),
