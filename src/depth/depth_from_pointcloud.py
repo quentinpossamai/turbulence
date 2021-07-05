@@ -146,9 +146,9 @@ def render_z(xyz):
     v = np.floor(0.5 * v).astype(int)
     rendered_z = np.full((int(H / 2), int(W / 2)), -np.inf)
     rendered_z[v, u] = z
-    maxz = np.max(rendered_z)
+    # maxz = np.max(rendered_z)
     rendered_z = np.where(rendered_z == -np.inf, np.nan, rendered_z)
-    rendered_z /= maxz
+    # rendered_z /= maxz
     return rendered_z
 
 
@@ -240,17 +240,6 @@ def filter_out_ot_frame_points(xyz, c):
         (z > 0.0, u > 0, u < W, v > 0, v < H), axis=0)
     valid_points = valid_mask.nonzero()[0]
     return xyz[valid_points, :], c[valid_points]
-
-
-def smoother(render_z, size=10):
-    new_image = render_z.copy()
-    for x in range(size // 2, render_z.shape[0]):
-        for y in range(size // 2, render_z.shape[1]):
-            if np.isnan(render_z[x, y]):
-                neighborhood = render_z[x - size // 2:x + size // 2, y - size // 2:y + size // 2].reshape(-1)
-                neighborhood = neighborhood[1 - np.isnan(neighborhood)]
-                new_image[x, y] = np.mean(neighborhood)
-    return new_image
 
 
 def main(argv):
