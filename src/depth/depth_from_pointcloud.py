@@ -31,6 +31,7 @@ from absl import flags
 import matplotlib.image
 from tqdm import tqdm
 import numpy as np
+from skimage.restoration import inpaint
 
 flags.DEFINE_string('room_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy',
                     'Path to the EuRoC data for one of the rooms ')
@@ -80,17 +81,7 @@ def get_camera_view_pointcloud(transform, xyz, greyscale_color):
 
     overall_transform = np.linalg.inv(CAM0_TO_BODY).dot(np.linalg.inv(transform))
     transformed_xyz = xyz.dot(overall_transform.transpose())
-    x, y, z, _ = _split(transformed_xyz)
-    u, v = _project_and_distort(x, y, z)
-    # Remove points that are out of frame. Keep some margin (1.05), to make sure
-    # occlusions are addressed correctly at the edges of the field of view. For
-    # example a point that is just slightly out of frame can occlude a neighboring
-    # point inside the frame.
-    valid_mask = np.logical_and.reduce(
-        (z > 0.0, u > -0.05 * W, u < W * 1.05, v > -0.05 * H, v < H * 1.05),
-        axis=0)
-    valid_points = valid_mask.nonzero()[0]
-    return transformed_xyz[valid_points, :3], greyscale_color[valid_points]
+    return transformed_xyz[:, :3], greyscale_color
 
 
 def get_occluded_points(xyz, neighborhood_radius, z_threshold):
@@ -115,6 +106,7 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
     xzs = xs / zs
     yzs = ys / zs
     grid = collections.defaultdict(lambda: np.inf)
+    occluding_points = collections.defaultdict(lambda: np.inf)
     for ind in range(xyz.shape[0]):
         # Place each point in the bin where it belongs, and in the neighboring bins.
         # Keep only the closest point to the camera in each bin.
@@ -122,8 +114,10 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
         for i in range(-1, 2):
             for j in range(-1, 2):
                 grid[(xbin + i, ybin + j)] = min(grid[(xbin + i, ybin + j)], zs[ind])
-
+                if grid[(xbin + i, ybin + j)] == zs[ind]:
+                    occluding_points[(xbin + i, ybin + j)] = ind
     occluded_indices = []
+    new_pts = xyz.copy()
     for ind in range(xyz.shape[0]):
         # Loop over all points and see if they are occluded, by finding the closest
         # point to the camera within the same bin and testing for the occlusion
@@ -132,27 +126,10 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
         zmin = grid[get_bin(xzs[ind], yzs[ind])]
         if zmin < (1 - z_threshold) * zs[ind]:
             occluded_indices.append(ind)
-    return occluded_indices
-
-
-def render_rgb(xyz, c):
-    """Given a colored cloud in camera coordinates, render an image.
-    This function is useful for visualization / debugging.
-    Args:
-      xyz: A 3xN matrix representing the point cloud in the camera view.
-      c: A N-long vector containing (greyscale) colors of the points.
-    Returns:
-      A rendered image.
-    """
-    x, y, z = _split(xyz)
-    u, v = _project_and_distort(x, y, z)
-    u = np.floor(0.5 * u).astype(int)
-    v = np.floor(0.5 * v).astype(int)
-
-    rendered_c = np.full((int(H / 2), int(W / 2)), 0.0)
-    rendered_c[v, u] = c
-    rendered_c = np.stack([rendered_c] * 3, axis=2)
-    return rendered_c
+            new_pts[ind, -1] = zmin
+            new_pts[ind, 0] = xzs[ind] * zmin
+            new_pts[ind, 1] = yzs[ind] * zmin
+    return new_pts
 
 
 def render_z(xyz):
@@ -259,36 +236,21 @@ def filter_out_ot_frame_points(xyz, c):
     u, v = _project_and_distort(x, y, z)
     u = np.floor(u).astype(int)
     v = np.floor(v).astype(int)
-    valid_mask = np.logical_and.reduce((u >= 0, u < W, v >= 0, v < H), axis=0)
+    valid_mask = np.logical_and.reduce(
+        (z > 0.0, u > 0, u < W, v > 0, v < H), axis=0)
     valid_points = valid_mask.nonzero()[0]
     return xyz[valid_points, :], c[valid_points]
 
 
-def sample_uniform(xyz, bin_size):
-    """subsamples a point cloud to be more uniform in perspective coordinates.
-    Args:
-      xyz: A 3xN matrix representing the point cloud in the camera view.
-      bin_size: Size of a square in which we allow only a single point.
-    Returns:
-      A list of indices, corresponding to a subset of the original `xyz`, to keep.
-    """
-    x, y, z = _split(xyz)
-    xbins = (x / z / bin_size)
-    ybins = (y / z / bin_size)
-    xbins_rounded = np.round(xbins)
-    ybins_rounded = np.round(ybins)
-    xbins_diff = xbins_rounded - xbins
-    ybins_diff = ybins_rounded - ybins
-    diff_sq = xbins_diff ** 2 + ybins_diff ** 2
-
-    bin_to_ind = {}
-    for ind in range(len(diff_sq)):
-        bin_ = (xbins_rounded[ind], ybins_rounded[ind])
-        if bin_ not in bin_to_ind or diff_sq[ind] < bin_to_ind[bin_][1]:
-            bin_to_ind[bin_] = (ind, diff_sq[ind])
-
-    inds_to_keep = sorted([i[0] for i in bin_to_ind.values()])
-    return inds_to_keep
+def smoother(render_z, size=10):
+    new_image = render_z.copy()
+    for x in range(size // 2, render_z.shape[0]):
+        for y in range(size // 2, render_z.shape[1]):
+            if np.isnan(render_z[x, y]):
+                neighborhood = render_z[x - size // 2:x + size // 2, y - size // 2:y + size // 2].reshape(-1)
+                neighborhood = neighborhood[1 - np.isnan(neighborhood)]
+                new_image[x, y] = np.mean(neighborhood)
+    return new_image
 
 
 def main(argv):
@@ -303,7 +265,7 @@ def main(argv):
     imagesto_render = sorted(
         os.listdir(os.path.join(FLAGS.room_path, 'cam0/data')))
 
-    imagesto_render = imagesto_render[0::5]  # render every fifth image
+    imagesto_render = sorted(imagesto_render, key=lambda x: float(x.split(".")[0]))  # render every fifth image
 
     for imfile in tqdm(imagesto_render):
         timestamp = float(imfile.split('.')[0])
@@ -311,30 +273,28 @@ def main(argv):
         if transform is None:
             continue
         xyz_view, c_view = get_camera_view_pointcloud(transform, xyz_homogeneous, c)
-        # print('View pointcloud generated, %d points.' % xyz_view.shape[0])
-        occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
-        occluded_inds = set(occluded_inds)
-        visible_indices = [
-            i for i in range(xyz_view.shape[0]) if i not in occluded_inds
-        ]
-        # print('%d visible points found.' % len(visible_indices))
-        visible_xyz = xyz_view[visible_indices, :]
-        visible_c = c_view[visible_indices]
-        visible_xyz, visible_c = filter_out_ot_frame_points(visible_xyz, visible_c)
+        visible_xyz, visible_c = filter_out_ot_frame_points(xyz_view, c_view)
+
+        visible_xyz = get_occluded_points(visible_xyz, 0.02, 0.8)
 
         # inds_to_keep = sample_uniform(visible_xyz, 1e-2)
         # visible_xyz = visible_xyz[inds_to_keep]
         # visible_c = visible_c[inds_to_keep]
 
-        rgb_image = render_rgb(visible_xyz, visible_c)
-
         z_image = render_z(visible_xyz)
+
+        mask = np.isnan(z_image).astype(np.float32)
+        filled_data = inpaint.inpaint_biharmonic(z_image, mask)
+        # import matplotlib.pyplot as plt
+        # plt.imshow(filled_data)
+        # plt.show()
+
         # matplotlib.image.imsave(
         #     os.path.join(FLAGS.output_path, '%dgrayscale.png' % int(timestamp)),
         #     rgb_image)
         np.save(
             os.path.join(FLAGS.output_path, '%ddepth.npy' % int(timestamp)),
-            z_image)
+            filled_data)
         # np.save(
         #     os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), visible_xyz)
 
