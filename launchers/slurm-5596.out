@@ -1,0 +1,2 @@
+/var/lib/slurm-llnl/slurmd/job05596/slurm_script: line 3: cd: /home/sjanny/phd/turbulence/: No such file or directory
+FATAL:   could not open image /home/sjanny/codes/turbulence/launchers/launchers/turbulence.sif: failed to retrieve path for /home/sjanny/codes/turbulence/launchers/launchers/turbulence.sif: lstat /home/sjanny/codes/turbulence/launchers/launchers: no such file or directory
