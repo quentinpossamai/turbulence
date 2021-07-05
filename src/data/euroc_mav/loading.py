@@ -1,8 +1,9 @@
 import numpy as np
 import pathlib
 import pickle
-from scipy.fft import fft, fftfreq, ifft
 from scipy import interpolate
+from scipy.fft import fft, fftfreq, ifft
+from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
 
@@ -19,6 +20,7 @@ INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_DATASET_PATH, INTERMEDIATE_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
+# FLIGHT_LIST = ["V2_01_easy/", "V2_02_medium/", "V2_03_difficult/"]
 
 
 def _load_clean_data(raw_flight_path, intermediate_flight_path):
@@ -70,6 +72,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # Body and World reference frame are in FLU! Nice!
     # Fix quaternion discontinuity
+    quat = Rotation.from_quat(quat).as_quat()
     quat = quaternion.qfix(quat)
 
     # Centering position
@@ -184,7 +187,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 def _splitting():
     with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
         for flight in FLIGHT_LIST:
-            print(flight)
+            print("Splitting: ", flight)
             data = load_flight(flight)
             assert all(np.array([len(data[key]) for key in data]) == len(data["t"]))  # All keys have the same length
             flight_len = len(data["t"])
@@ -270,12 +273,13 @@ def load_flight(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    #     raw_flight_path = RAW_DATASET_PATH + flight
-    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-    #     print(flight)
-    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
-    data = EurocMAVDatasetHorizon("train", horizon=100)
+    for flight in FLIGHT_LIST:
+        raw_flight_path = RAW_DATASET_PATH + flight
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+        print("Loading", flight)
+        _load_clean_data(raw_flight_path, intermediate_flight_path)
+    _splitting()
+    # data = EurocMAVDatasetHorizon("train", horizon=100)
 
 
 if __name__ == '__main__':
