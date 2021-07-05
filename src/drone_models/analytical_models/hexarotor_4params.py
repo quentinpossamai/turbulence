@@ -41,7 +41,7 @@ class DynamicalModel(nn.Module):
         motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
                                           [-b, -b, +0, +b, +b, +0],
                                           [-1, +1, -1, +1, -1, +1],
-                                          [+1, +1, +1, +1]]).view(1, 4, 4)
+                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
 
         motor = command[:, self.permutation]
         omega_squared = motor ** 2
