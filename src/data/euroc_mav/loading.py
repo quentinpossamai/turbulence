@@ -171,6 +171,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
             break
     assert start != stop
 
+    print(f"start: {start} | stop: {stop} | total: {len(synchronisation['t'])}")
+
     # return start, stop
     cut_data = {}
     for key in synchronisation:
@@ -184,7 +186,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     pickle.dump(cut_data, open(save_path, "wb"))
 
 
-def _splitting():
+def splitting():
     with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
         for flight in FLIGHT_LIST:
             print("Splitting: ", flight)
@@ -206,6 +208,11 @@ def _splitting():
 
 class EurocMAVDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, horizon: int):
+        """
+        Create a torch Dataset to be used in training with Dataloader.
+        :param train_validation_test: Check if need to use
+        :param horizon:
+        """
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
         split = [e.split(",") for e in open(INTERMEDIATE_DATASET_PATH + f"split.txt", "r")]
@@ -227,7 +234,8 @@ class EurocMAVDatasetHorizon(Dataset):
 
         # Loading data
         for key, val in loading.items():
-            loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"]], axis=1)
+            loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
+                                          axis=1)
             # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:20]
         self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
 
@@ -236,7 +244,7 @@ class EurocMAVDatasetHorizon(Dataset):
 
     def __getitem__(self, idx):
         """
-        One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
+        One sample is time:1, state:13, motor:6, residual:6, not implemented (imu_ang_acc:6)
 
         """
         flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
@@ -244,7 +252,8 @@ class EurocMAVDatasetHorizon(Dataset):
 
         return {"t": torch.from_numpy(data[:, :1]).float(),
                 "state": torch.from_numpy(data[:, 1:14]).float(),
-                "motor": torch.from_numpy(data[:, 14:20]).float()}
+                "motor": torch.from_numpy(data[:, 14:20]).float(),
+                "residual": torch.from_numpy(data[:, 20:]).float()}
 
 
 def load_flight(flight):
@@ -260,7 +269,7 @@ def main():
         intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
         print("Loading", flight)
         _load_clean_data(raw_flight_path, intermediate_flight_path)
-    _splitting()
+    splitting()
     # data = EurocMAVDatasetHorizon("train", horizon=100)
 
 
