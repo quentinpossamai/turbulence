@@ -28,11 +28,11 @@ import os
 
 from absl import app
 from absl import flags
-import matplotlib.image
+
 from scipy import interpolate
 from tqdm import tqdm
 import numpy as np
-from skimage.restoration import inpaint
+import multiprocessing as mp
 
 flags.DEFINE_string('room_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy',
                     'Path to the EuRoC data for one of the rooms ')
@@ -64,7 +64,7 @@ H = 480
 W = 752
 
 
-def get_camera_view_pointcloud(transform, xyz, greyscale_color):
+def get_camera_view_pointcloud(transform, xyz):
     """Transform point cloud to camera view, prune points outside of the view.
     Args:
       transform: 4x4 transform matrix representing position and orientation of
@@ -92,7 +92,7 @@ def get_camera_view_pointcloud(transform, xyz, greyscale_color):
         (z > 0.0, u > -0.05 * W, u < W * 1.05, v > -0.05 * H, v < H * 1.05),
         axis=0)
     valid_points = valid_mask.nonzero()[0]
-    return transformed_xyz[valid_points, :3], greyscale_color[valid_points]
+    return transformed_xyz[valid_points, :3]
 
 
 def get_occluded_points(xyz, neighborhood_radius, z_threshold):
@@ -213,16 +213,14 @@ def read_ply(filename):
         lines = f.readlines()
     lines = lines[11:]
     xyz = []
-    c = []  # The color channel (just one, it's greyscale)
     for l in lines:
         tokens = l.split(' ')
         xyz.append([float(t) for t in tokens[:3]])
-        c.append(float(tokens[3]))
 
-    return np.array(xyz), np.array(c)
+    return np.array(xyz)
 
 
-def filter_out_ot_frame_points(xyz, c):
+def filter_out_ot_frame_points(xyz):
     """Remove all points in a camera-view pointcloud that are out of frame.
     Args:
       xyz: A 3xN matrix representing the point cloud in the camera view.
@@ -237,7 +235,30 @@ def filter_out_ot_frame_points(xyz, c):
     v = np.floor(v).astype(int)
     valid_mask = np.logical_and.reduce((u >= 0, u < W, v >= 0, v < H), axis=0)
     valid_points = valid_mask.nonzero()[0]
-    return xyz[valid_points, :], c[valid_points]
+    return xyz[valid_points, :]
+
+
+def gen_img(pipe, timestamp, transform, xyz_homogeneous):
+    xyz_view = get_camera_view_pointcloud(transform, xyz_homogeneous)
+
+    occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
+    occluded_inds = set(occluded_inds)
+    visible_indices = [
+        i for i in range(xyz_view.shape[0]) if i not in occluded_inds
+    ]
+    visible_xyz = xyz_view[visible_indices, :]
+    visible_xyz = filter_out_ot_frame_points(visible_xyz)
+
+    z_image = render_z(visible_xyz)
+
+    valid_mask = z_image != -1
+    coords = np.array(np.nonzero(valid_mask)).T
+    values = z_image[valid_mask]
+
+    it = interpolate.LinearNDInterpolator(coords, values, fill_value=np.mean(values))
+    filled = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
+    pipe.send(filled)
+    pipe.close()
 
 
 def main(argv):
@@ -245,47 +266,37 @@ def main(argv):
     gti = GroundTruthInterpolator(
         os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/data.csv'))
     print('Groundtruth loaded.')
-    # xyz = np.load("pointcloud_V1_01.npy")
-    # c = np.zeros_like(xyz)[:, 0]
-    xyz, c = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
+    xyz = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
+    for k in tqdm(range(0, gti.gt.shape[0], 8)):
+        timestamps, transforms = [], []
+        for i in range(8):
+            if k + i < gti.gt.shape[0]:
+                time, trans = gti.get_transform(k + i)
+                timestamps.append(time)
+                transforms.append(trans)
+        childPipes, parentPipes = [], []
+        processes = []
+        imgs = []
+        for pr in range(8):  # Create pipes to get the simulation
+            parentPipe, childPipe = mp.Pipe()
+            parentPipes.append(parentPipe)
+            childPipes.append(childPipe)
 
-    for k in tqdm(range(gti.gt.shape[0])):
-        timestamp, transform = gti.get_transform(k)
+        for rank in range(len(transforms)):  # Run the processes
+            p = mp.Process(target=gen_img, args=(childPipes[rank], timestamps[rank], transforms[rank], xyz_homogeneous))
+            p.start()
+            processes.append(p)
 
-        xyz_view, c_view = get_camera_view_pointcloud(transform, xyz_homogeneous, c)
+        for rank, p in enumerate(processes):  # Get the simulation
+            state = parentPipes[rank].recv()
+            imgs.append(state)
+            p.join()
 
-        occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
-        occluded_inds = set(occluded_inds)
-        visible_indices = [
-            i for i in range(xyz_view.shape[0]) if i not in occluded_inds
-        ]
-        visible_xyz = xyz_view[visible_indices, :]
-        visible_c = c_view[visible_indices]
-        visible_xyz, visible_c = filter_out_ot_frame_points(visible_xyz, visible_c)
-
-        z_image = render_z(visible_xyz)
-
-        valid_mask = z_image != -1
-        coords = np.array(np.nonzero(valid_mask)).T
-        values = z_image[valid_mask]
-
-        it = interpolate.LinearNDInterpolator(coords, values, fill_value=np.mean(values))
-        filled = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
-
-        filled = filled.astype(np.float32)
-        np.save(os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), filled)
-
-        # matplotlib.image.imsave(
-        #     os.path.join(FLAGS.output_path, '%dgrayscale.png' % int(timestamp)),
-        #     rgb_image)
-        # matplotlib.image.imsave(
-        #     os.path.join(FLAGS.output_path, '%ddepth.png' % int(timestamp)),
-        #     z_image)
-        # np.save(
-        #     os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), visible_xyz)
+        for i, img in enumerate(imgs):
+            np.save(os.path.join(FLAGS.output_path, '%d.npy' % int(timestamps[i])), img)
 
 
 def _split(matrix):
