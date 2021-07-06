@@ -13,5 +13,5 @@ if __name__ == '__main__':
         data = np.load("/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/depth/" + d)
         plt.imshow(data)
         plt.title(d)
-        plt.pause(0.5)
+        plt.pause(0.1)
     plt.show()

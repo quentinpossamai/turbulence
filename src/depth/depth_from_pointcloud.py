@@ -29,6 +29,7 @@ import os
 from absl import app
 from absl import flags
 import matplotlib.image
+from random import shuffle
 from tqdm import tqdm
 import numpy as np
 from skimage.restoration import inpaint
@@ -81,7 +82,17 @@ def get_camera_view_pointcloud(transform, xyz, greyscale_color):
 
     overall_transform = np.linalg.inv(CAM0_TO_BODY).dot(np.linalg.inv(transform))
     transformed_xyz = xyz.dot(overall_transform.transpose())
-    return transformed_xyz[:, :3], greyscale_color
+    x, y, z, _ = _split(transformed_xyz)
+    u, v = _project_and_distort(x, y, z)
+    # Remove points that are out of frame. Keep some margin (1.05), to make sure
+    # occlusions are addressed correctly at the edges of the field of view. For
+    # example a point that is just slightly out of frame can occlude a neighboring
+    # point inside the frame.
+    valid_mask = np.logical_and.reduce(
+        (z > 0.0, u > -0.05 * W, u < W * 1.05, v > -0.05 * H, v < H * 1.05),
+        axis=0)
+    valid_points = valid_mask.nonzero()[0]
+    return transformed_xyz[valid_points, :3], greyscale_color[valid_points]
 
 
 def get_occluded_points(xyz, neighborhood_radius, z_threshold):
@@ -106,7 +117,6 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
     xzs = xs / zs
     yzs = ys / zs
     grid = collections.defaultdict(lambda: np.inf)
-    occluding_points = collections.defaultdict(lambda: np.inf)
     for ind in range(xyz.shape[0]):
         # Place each point in the bin where it belongs, and in the neighboring bins.
         # Keep only the closest point to the camera in each bin.
@@ -114,10 +124,8 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
         for i in range(-1, 2):
             for j in range(-1, 2):
                 grid[(xbin + i, ybin + j)] = min(grid[(xbin + i, ybin + j)], zs[ind])
-                if grid[(xbin + i, ybin + j)] == zs[ind]:
-                    occluding_points[(xbin + i, ybin + j)] = ind
+
     occluded_indices = []
-    new_pts = xyz.copy()
     for ind in range(xyz.shape[0]):
         # Loop over all points and see if they are occluded, by finding the closest
         # point to the camera within the same bin and testing for the occlusion
@@ -126,10 +134,7 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
         zmin = grid[get_bin(xzs[ind], yzs[ind])]
         if zmin < (1 - z_threshold) * zs[ind]:
             occluded_indices.append(ind)
-            new_pts[ind, -1] = zmin
-            new_pts[ind, 0] = xzs[ind] * zmin
-            new_pts[ind, 1] = yzs[ind] * zmin
-    return new_pts
+    return occluded_indices
 
 
 def render_z(xyz):
@@ -146,9 +151,9 @@ def render_z(xyz):
     v = np.floor(0.5 * v).astype(int)
     rendered_z = np.full((int(H / 2), int(W / 2)), -np.inf)
     rendered_z[v, u] = z
-    # maxz = np.max(rendered_z)
+    maxz = np.max(rendered_z)
     rendered_z = np.where(rendered_z == -np.inf, np.nan, rendered_z)
-    # rendered_z /= maxz
+    rendered_z /= maxz
     return rendered_z
 
 
@@ -236,8 +241,7 @@ def filter_out_ot_frame_points(xyz, c):
     u, v = _project_and_distort(x, y, z)
     u = np.floor(u).astype(int)
     v = np.floor(v).astype(int)
-    valid_mask = np.logical_and.reduce(
-        (z > 0.0, u > 0, u < W, v > 0, v < H), axis=0)
+    valid_mask = np.logical_and.reduce((u >= 0, u < W, v >= 0, v < H), axis=0)
     valid_points = valid_mask.nonzero()[0]
     return xyz[valid_points, :], c[valid_points]
 
@@ -247,43 +251,56 @@ def main(argv):
     gti = GroundTruthInterpolator(
         os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/data.csv'))
     print('Groundtruth loaded.')
-    xyz, c = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
+    xyz = np.load("pointcloud_V1_01.npy")
+    c = np.zeros_like(xyz)[:, 0]
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
     imagesto_render = sorted(
         os.listdir(os.path.join(FLAGS.room_path, 'cam0/data')))
 
-    imagesto_render = sorted(imagesto_render, key=lambda x: float(x.split(".")[0]))  # render every fifth image
-
     for imfile in tqdm(imagesto_render):
         timestamp = float(imfile.split('.')[0])
         transform = gti.get_transform(timestamp)
         if transform is None:
+            print('Timestamp %d has no groundtruth.' % int(timestamp))
             continue
+        else:
+            print('Rendering timestamp %d...' % int(timestamp))
+
         xyz_view, c_view = get_camera_view_pointcloud(transform, xyz_homogeneous, c)
-        visible_xyz, visible_c = filter_out_ot_frame_points(xyz_view, c_view)
 
-        visible_xyz = get_occluded_points(visible_xyz, 0.02, 0.8)
-
-        # inds_to_keep = sample_uniform(visible_xyz, 1e-2)
-        # visible_xyz = visible_xyz[inds_to_keep]
-        # visible_c = visible_c[inds_to_keep]
+        print('View pointcloud generated, %d points.' % xyz_view.shape[0])
+        occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
+        occluded_inds = set(occluded_inds)
+        visible_indices = [
+            i for i in range(xyz_view.shape[0]) if i not in occluded_inds
+        ]
+        print('%d visible points found.' % len(visible_indices))
+        visible_xyz = xyz_view[visible_indices, :]
+        visible_c = c_view[visible_indices]
+        visible_xyz, visible_c = filter_out_ot_frame_points(visible_xyz, visible_c)
 
         z_image = render_z(visible_xyz)
 
         mask = np.isnan(z_image).astype(np.float32)
         filled_data = inpaint.inpaint_biharmonic(z_image, mask)
+
         # import matplotlib.pyplot as plt
-        # plt.imshow(filled_data)
+        # fig, ax = plt.subplots(1,1)
+        # ax.imshow(z_image)
+        # fig, ax = plt.subplots(1, 1)
+        # ax.imshow(z_before)
+        # fig, ax = plt.subplots(1, 1)
+        # ax.imshow(filled_data)
         # plt.show()
 
         # matplotlib.image.imsave(
         #     os.path.join(FLAGS.output_path, '%dgrayscale.png' % int(timestamp)),
         #     rgb_image)
-        np.save(
-            os.path.join(FLAGS.output_path, '%ddepth.npy' % int(timestamp)),
-            filled_data)
+        matplotlib.image.imsave(
+            os.path.join(FLAGS.output_path, '%ddepth.png' % int(timestamp)),
+            z_image)
         # np.save(
         #     os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), visible_xyz)
 
