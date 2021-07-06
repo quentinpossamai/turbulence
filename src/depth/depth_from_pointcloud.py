@@ -29,7 +29,7 @@ import os
 from absl import app
 from absl import flags
 import matplotlib.image
-from random import shuffle
+from scipy import interpolate
 from tqdm import tqdm
 import numpy as np
 from skimage.restoration import inpaint
@@ -151,9 +151,7 @@ def render_z(xyz):
     v = np.floor(0.5 * v).astype(int)
     rendered_z = np.full((int(H / 2), int(W / 2)), -np.inf)
     rendered_z[v, u] = z
-    maxz = np.max(rendered_z)
-    rendered_z = np.where(rendered_z == -np.inf, np.nan, rendered_z)
-    rendered_z /= maxz
+    rendered_z = np.where(rendered_z == -np.inf, -1, rendered_z)
     return rendered_z
 
 
@@ -173,26 +171,22 @@ class GroundTruthInterpolator(object):
         for l in lines:
             tokens = l.split(',')
             gt.append([float(t) for t in tokens[:8]])
-        self._gt = np.array(gt)
-        self._mint = np.min(self._gt[:, 0])
-        self._maxt = np.max(self._gt[:, 0])
+        self.gt = np.array(gt)
 
-    def get_transform(self, timestamp):
+    def get_transform(self, k):
         """Interpolates the MAV's transform matrix at a timestamp."""
-        if timestamp < self._mint or timestamp > self._maxt:
-            return None
 
         # self._gt[:, 0], the 0th column, is the timestamp. Columns 1-3 are x, y, z,
         # and columns 4-7 are quaternion components describing the rotation.
-        timestamps = self._gt[:, 0]
-        x = np.interp(timestamp, timestamps, self._gt[:, 1])
-        y = np.interp(timestamp, timestamps, self._gt[:, 2])
-        z = np.interp(timestamp, timestamps, self._gt[:, 3])
+        timestamps = self.gt[:, 0]
+        x = self.gt[k, 1]
+        y = self.gt[k, 2]
+        z = self.gt[k, 3]
 
-        qw = np.interp(timestamp, timestamps, self._gt[:, 4])
-        qx = np.interp(timestamp, timestamps, self._gt[:, 5])
-        qy = np.interp(timestamp, timestamps, self._gt[:, 6])
-        qz = np.interp(timestamp, timestamps, self._gt[:, 7])
+        qw = self.gt[k, 4]
+        qx = self.gt[k, 5]
+        qy = self.gt[k, 6]
+        qz = self.gt[k, 7]
 
         # Creates a matrix
         transform = np.array([[
@@ -210,7 +204,7 @@ class GroundTruthInterpolator(object):
                 1 - 2 * qx * qx - 2 * qy * qy, z
             ], [0.0, 0.0, 0.0, 1.0]])
 
-        return transform
+        return self.gt[k, 0], transform
 
 
 def read_ply(filename):
@@ -257,51 +251,39 @@ def main(argv):
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
-    imagesto_render = sorted(
-        os.listdir(os.path.join(FLAGS.room_path, 'cam0/data')))
 
-    for imfile in tqdm(imagesto_render):
-        timestamp = float(imfile.split('.')[0])
-        transform = gti.get_transform(timestamp)
-        if transform is None:
-            print('Timestamp %d has no groundtruth.' % int(timestamp))
-            continue
-        else:
-            print('Rendering timestamp %d...' % int(timestamp))
+    for k in tqdm(range(gti.gt.shape[0])):
+        timestamp, transform = gti.get_transform(k)
 
         xyz_view, c_view = get_camera_view_pointcloud(transform, xyz_homogeneous, c)
 
-        print('View pointcloud generated, %d points.' % xyz_view.shape[0])
         occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
         occluded_inds = set(occluded_inds)
         visible_indices = [
             i for i in range(xyz_view.shape[0]) if i not in occluded_inds
         ]
-        print('%d visible points found.' % len(visible_indices))
         visible_xyz = xyz_view[visible_indices, :]
         visible_c = c_view[visible_indices]
         visible_xyz, visible_c = filter_out_ot_frame_points(visible_xyz, visible_c)
 
         z_image = render_z(visible_xyz)
 
-        mask = np.isnan(z_image).astype(np.float32)
-        filled_data = inpaint.inpaint_biharmonic(z_image, mask)
+        valid_mask = z_image != -1
+        coords = np.array(np.nonzero(valid_mask)).T
+        values = z_image[valid_mask]
 
-        # import matplotlib.pyplot as plt
-        # fig, ax = plt.subplots(1,1)
-        # ax.imshow(z_image)
-        # fig, ax = plt.subplots(1, 1)
-        # ax.imshow(z_before)
-        # fig, ax = plt.subplots(1, 1)
-        # ax.imshow(filled_data)
-        # plt.show()
+        it = interpolate.LinearNDInterpolator(coords, values, fill_value=np.mean(values))
+        filled = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
+
+        filled = filled.astype(np.float32)
+        np.save(os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), filled)
 
         # matplotlib.image.imsave(
         #     os.path.join(FLAGS.output_path, '%dgrayscale.png' % int(timestamp)),
         #     rgb_image)
-        matplotlib.image.imsave(
-            os.path.join(FLAGS.output_path, '%ddepth.png' % int(timestamp)),
-            z_image)
+        # matplotlib.image.imsave(
+        #     os.path.join(FLAGS.output_path, '%ddepth.png' % int(timestamp)),
+        #     z_image)
         # np.save(
         #     os.path.join(FLAGS.output_path, '%d.npy' % int(timestamp)), visible_xyz)
 
