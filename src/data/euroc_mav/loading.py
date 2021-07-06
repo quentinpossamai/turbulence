@@ -247,26 +247,8 @@ class EurocMAVDatasetHorizon(Dataset):
                 "motor": torch.from_numpy(data[:, 14:20]).float()}
 
 
-# class BlackbirdDataset(Dataset):
-#     def __init__(self, train_validation_test: str):
-#         if train_validation_test not in ["train", "validation", "test"]:
-#             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
-#         self.data = torch.load(DATASET_PATH + f"intermediate_torch_dataset/{train_validation_test}.pt")
-#
-#     def __len__(self):
-#         return len(self.data)
-#
-#     def __getitem__(self, idx):
-#         """
-#         One sample is time:1, state:13, motor:4, imu_ang_acc:6, time_next_state:1, next_state:13 = 38
-#
-#         """
-#         data = self.data[idx]
-#         return {"t": data[0:1], "state": data[1:14], "motor": data[14:18], "imu": data[18:24], "next_t": data[24:25],
-#                 "next_state": data[25:]}
-
-
 def load_flight(flight):
+    #     data = {"t", "imu_ang_acc", "motor", "state"}
     intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/data.pkl"
     data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
