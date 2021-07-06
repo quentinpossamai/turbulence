@@ -1,5 +1,7 @@
 import pickle
 
+import matplotlib.pyplot as plt
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -7,15 +9,6 @@ from scipy.spatial.transform import Rotation
 
 import src.data.euroc_mav.loading as euroc
 import src.utils.quaternion as quaternion
-
-
-# Connected to pydev debugger (build 211.7628.24)
-# 100%|██████████| 35/35 [00:01<00:00, 24.62it/s]
-# Metric 9 on test: 3.6545E-04
-# 100%|██████████| 35/35 [00:04<00:00,  7.44it/s]
-# Metric 180 on test: 7.5337E-02
-# 100%|██████████| 35/35 [00:09<00:00,  3.74it/s]
-# Metric 360 on test: 3.9234E-01
 
 
 class DynamicalModel(nn.Module):
@@ -48,10 +41,10 @@ class DynamicalModel(nn.Module):
         # km = 1.2864e-7  # [N.m2.rad-1]
         # l = 0.215  # [m]
         # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
-        self.theta = torch.tensor([[1.0228e-05],
-                                   [1.4064e-04],
-                                   [1.5881e-05],
-                                   [8.0943e-01]])
+        # self.theta = torch.tensor([[1.0228e-05],
+        #                            [1.4064e-04],
+        #                            [1.5881e-05],
+        #                            [8.0943e-01]])
 
         # self.theta = torch.tensor([[2.08e-6],
         #                            [2 ** 0.5 * 3.58e-6],
@@ -66,16 +59,8 @@ class DynamicalModel(nn.Module):
         vel = state[:, 7:10]
         rpy = state[:, 10:]
 
-        a = 0.5
-        b = 3 ** 0.5 / 2
-        motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
-                                          [-b, -b, +0, +b, +b, +0],
-                                          [-1, +1, -1, +1, -1, +1],
-                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
+        motor_torsor = self.motor_dynamic(command)
 
-        motor = command[:, self.permutation]
-        omega_squared = motor ** 2
-        motor_torsor = motor_matrix @ omega_squared.unsqueeze(-1)  # [tx, ty, tz, T]
         batch_size = state.shape[0]
         # Linear PFD
         gravity = torch.FloatTensor([0, 0, 9.81]).view(1, 3)
@@ -99,6 +84,36 @@ class DynamicalModel(nn.Module):
         next_quat = next_quat / torch.sqrt((next_quat ** 2).sum(-1, keepdim=True))
 
         return torch.cat([next_pos, next_quat.squeeze(-1), next_vel, next_rpy], dim=-1)
+
+    def motor_dynamic(self, command):
+        a = 0.5
+        b = 3 ** 0.5 / 2
+        motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
+                                          [-b, -b, +0, +b, +b, +0],
+                                          [-1, +1, -1, +1, -1, +1],
+                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
+
+        motor = command[:, self.permutation]
+        omega_squared = motor ** 2
+        motor_torsor = motor_matrix @ omega_squared.unsqueeze(-1)  # [tx, ty, tz, T]
+        return motor_torsor.squeeze()
+
+    def forces(self, motor, state, next_state, dt):
+        quat = next_state[:, 3:7]
+        ang_vel = next_state[:, 10:]
+        lin_acc = (next_state[:, 7:10] - state[:, 7:10]) / dt
+        ang_acc = (next_state[:, 10:] - state[:, 10:]) / dt
+        motor_torsor = self.motor_dynamic(motor)
+
+        quat_bar = quat * torch.tensor([-1, -1, -1, 1]).view(1, 4)
+        batch_size = len(quat)
+        g = torch.tensor([0, 0, 9.81]).view(1, 3)
+        fu = torch.cat([torch.zeros((batch_size, 2)), self.theta[0] * motor_torsor[:, 3].view(-1, 1)], dim=1)
+        kfa = quaternion.qrot(quat_bar, lin_acc) - fu + g
+
+        ktaua = (ang_acc - torch.cross(torch.tensor([1, 1, self.theta[3]]) * ang_vel, ang_vel)
+                 - torch.tensor([self.theta[1], self.theta[1], self.theta[2]]).view(1, 3) - motor_torsor[:, :3])
+        return torch.cat([kfa, ktaua], dim=1)
 
 
 if __name__ == '__main__':
