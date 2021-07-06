@@ -251,8 +251,9 @@ def main(argv):
     gti = GroundTruthInterpolator(
         os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/data.csv'))
     print('Groundtruth loaded.')
-    xyz = np.load("pointcloud_V1_01.npy")
-    c = np.zeros_like(xyz)[:, 0]
+    # xyz = np.load("pointcloud_V1_01.npy")
+    # c = np.zeros_like(xyz)[:, 0]
+    xyz, c = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
