@@ -6,11 +6,12 @@ theta4 = Iz/Ixy"""
 
 import itertools
 import matplotlib.pyplot as plt
+import pickle
 import torch
 from tqdm import tqdm
 
-from src.utils.quaternion import qrot
 import src.data.euroc_mav.loading as euroc
+from src.utils.quaternion import qrot
 
 DT = 1 / 360
 
@@ -81,7 +82,6 @@ def identify_model():
             best_permutation = p
             best_theta = theta.clone()
             # print(best_permutation, best_theta, best_error)
-        print(theta, error, p)
     # Best permutation all: (3, 4, 5, 2, 1, 0) tensor([[ 1.1560e-04],
     #         [ 2.3920e-03],
     #         [ 6.8990e-05],
@@ -90,8 +90,33 @@ def identify_model():
     #         [2.6741e-03],
     #         [6.8990e-05],
     #         [1.3661e+01]]) tensor(7.6091e-06)
-    print(f"Best permutation:", best_permutation, best_theta, best_error)
-    plt.plot(sorted([e[2] for e in save_identifications]))
+    # print(f"Best permutation:", best_permutation, best_theta, best_error)
+    save_identifications = sorted(save_identifications, key=lambda e: e[2])
+
+    plt.rcParams.update({"text.usetex": False,
+                         "font.family": "serif",
+                         "font.sans-serif": ["Computer Modern Roman"]})
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=100)
+    ax.plot([e[2] for e in save_identifications], marker="x")
+    for i, e in enumerate(save_identifications):
+        ax.text(i, e[2], f"{i}")
+        if e[1][0] > 0 and e[1][1] > 0 and e[1][3] > 0:
+            ax.scatter(i, e[2], color="red", zorder=3)
+    ax.grid()
+    ax.set_xlabel("Configuration number")
+    ax.set_ylabel("Error on train set")
+
+    def print_point(idx):
+        e = save_identifications[idx]
+        print(f"Point: {idx}")
+        print(f"Permutation: {list(e[0])}")
+        print(f"Theta: {e[1].numpy()}")
+        print(f"Error: {e[2].item():0.4e}")
+
+    print_point(9)
+    pickle.dump(save_identifications, open(euroc.ANALYSIS_SECTION_PATH + "identifications.pkl", "wb"))
+
+    print()
     plt.show()
 
 

@@ -65,10 +65,10 @@ def timestamp_analysis(timestamps):
 
 
 def compare_traj(state_gt, state_hat, time, start, stop, traj_name, save_path=None):
+    """Plotting trajectory with model vs ground truth"""
     plt.rcParams.update({"text.usetex": True,
                          "font.family": "serif",
                          "font.sans-serif": ["Computer Modern Roman"]})
-    """Plotting trajectory with model vs ground truth"""
     if save_path is not None:
         fig = plt.figure(figsize=(19.2, 10.8), dpi=200)
     else:
