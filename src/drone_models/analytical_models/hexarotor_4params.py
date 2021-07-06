@@ -1,7 +1,11 @@
+import pickle
+
+import numpy as np
 import torch
 import torch.nn as nn
 from scipy.spatial.transform import Rotation
 
+import src.data.euroc_mav.loading as euroc
 import src.utils.quaternion as quaternion
 
 
@@ -17,16 +21,42 @@ import src.utils.quaternion as quaternion
 class DynamicalModel(nn.Module):
     def __init__(self):
         super(DynamicalModel, self).__init__()
-        self.theta = torch.tensor([[2.1019e-06],  # kt / m
-                                   [2 ** 0.5 * 4.2478e-06],  # kt l / Ix
-                                   [2.1783e-06],  # km / Iz
-                                   [2.3617e-01]])  # Iz / Ix MSE results
+        # Point: 6
+        self.permutation = [4, 5, 0, 1, 2, 3]
+        self.theta = torch.tensor([[1.1559688e-04],
+                                   [1.4442127e-03],
+                                   [-6.8990281e-05],
+                                   [1.8237591e+01]])
+
+        # self.identifications[0]
+        # ((3, 4, 5, 2, 1, 0), tensor([[ 1.1560e-04],
+        #         [ 2.3920e-03],
+        #         [ 6.8990e-05],
+        #         [-1.0757e+01]]), tensor(7.0828e-06))
+        # self.identifications = pickle.load(open(euroc.ANALYSIS_SECTION_PATH + "identifications.pkl", "rb"))
+        # self.theta = self.identifications[identification_nb][1]
+        # self.permutation = self.identifications[identification_nb][0]
+
+        # # Paper parameters from
+        # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and Redundancy’
+        # m = 0.64
+        # # From Akkinapalli et al. ‘Attitude Control of a Multicopter Using L1 Augmented Quaternion Based Backstepping’
+        # ix = 10.007e-3  # [kg.m2]
+        # iy = 10.2335e-3  # [kg.m2]  # Hypothesis ix == iy nearly confirmed
+        # iz = 8.1e-3  # [kg.m2]
+        # kt = 6.546e-6  # [N.s2.rad-1]
+        # km = 1.2864e-7  # [N.m2.rad-1]
+        # l = 0.215  # [m]
+        # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
+        self.theta = torch.tensor([[1.0228e-05],
+                                   [1.4064e-04],
+                                   [1.5881e-05],
+                                   [8.0943e-01]])
 
         # self.theta = torch.tensor([[2.08e-6],
         #                            [2 ** 0.5 * 3.58e-6],
         #                            [3.77e-8],
-        #                            [1.40]])  # Parameter from blackbird paper
-        self.permutation = [0, 1, 2, 3, 4, 5]
+        #                            [1.40]])  # Parameter from euroc mav paper
         self.dt = 1 / 200
 
     def forward(self, state, command, dt=None):
@@ -41,7 +71,7 @@ class DynamicalModel(nn.Module):
         motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
                                           [-b, -b, +0, +b, +b, +0],
                                           [-1, +1, -1, +1, -1, +1],
-                                          [+1, +1, +1, +1]]).view(1, 4, 4)
+                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
 
         motor = command[:, self.permutation]
         omega_squared = motor ** 2
@@ -74,7 +104,14 @@ class DynamicalModel(nn.Module):
 if __name__ == '__main__':
     from src.metrics import mse_error, visualise_metrics
 
+    res = np.zeros(3)
     f = DynamicalModel()
-    for i in [9, 180, 360]:
-        print(f"Metric {i} on test: {mse_error(f, i, 'blackbird', 'test'):.4E}")
+    for i, e_i in enumerate([5, 100, 200]):
+        res[i] = (mse_error(f, e_i, 'euroc_mav', 'test').item())
+    np.set_printoptions(precision=4)
+    print(res)
+
+    # f = DynamicalModel(k)
+    # for i in [5, 100, 200]:
+    #     print(f"Metric {i} on test: {mse_error(f, i, 'euroc_mav', 'validation'):.4E}")
     # visualise_metrics(f, 1000, mode="test", plot_range=[15000, 16000])
