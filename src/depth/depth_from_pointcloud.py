@@ -33,11 +33,12 @@ from scipy import interpolate
 from tqdm import tqdm
 import numpy as np
 import multiprocessing as mp
+import open3d as o3d
 
 flags.DEFINE_string('room_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy',
                     'Path to the EuRoC data for one of the rooms ')
 
-flags.DEFINE_string('output_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/depth/',
+flags.DEFINE_string('output_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/',
                     'Path where to store the outputs.')
 
 FLAGS = flags.FLAGS
@@ -134,10 +135,14 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
         zmin = grid[get_bin(xzs[ind], yzs[ind])]
         if zmin < (1 - z_threshold) * zs[ind]:
             occluded_indices.append(ind)
-    return occluded_indices
+    occluded_inds = set(occluded_indices)
+    visible_indices = [
+        i for i in range(xyz.shape[0]) if i not in occluded_inds
+    ]
+    return visible_indices
 
 
-def render_z(xyz):
+def render_z_and_normal(xyz, normal):
     """Given a colored cloud in camera coordinates, render a depth map.
     This function is useful for visualization / debugging.
     Args:
@@ -150,9 +155,12 @@ def render_z(xyz):
     u = np.floor(0.5 * u).astype(int)
     v = np.floor(0.5 * v).astype(int)
     rendered_z = np.full((int(H / 2), int(W / 2)), -np.inf)
+    rendered_n = np.full((int(H / 2), int(W / 2), 3), -np.inf)
     rendered_z[v, u] = z
-    rendered_z = np.where(rendered_z == -np.inf, -1, rendered_z)
-    return rendered_z
+    rendered_n[v, u] = normal
+    rendered_z = np.where(rendered_z == -np.inf, np.nan, rendered_z)
+    rendered_n = np.where(rendered_n == -np.inf, np.nan, rendered_n)
+    return rendered_z, rendered_n
 
 
 class GroundTruthInterpolator(object):
@@ -235,29 +243,48 @@ def filter_out_ot_frame_points(xyz):
     v = np.floor(v).astype(int)
     valid_mask = np.logical_and.reduce((u >= 0, u < W, v >= 0, v < H), axis=0)
     valid_points = valid_mask.nonzero()[0]
-    return xyz[valid_points, :]
+    return valid_points
 
 
-def gen_img(pipe, timestamp, transform, xyz_homogeneous):
-    xyz_view = get_camera_view_pointcloud(transform, xyz_homogeneous)
+def gen_img(pipe, transform, xyz):
+    xyz_view = get_camera_view_pointcloud(transform, xyz)
 
-    occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
-    occluded_inds = set(occluded_inds)
-    visible_indices = [
-        i for i in range(xyz_view.shape[0]) if i not in occluded_inds
-    ]
-    visible_xyz = xyz_view[visible_indices, :]
-    visible_xyz = filter_out_ot_frame_points(visible_xyz)
+    visible_indices = get_occluded_points(xyz_view, 0.02, 0.08)
 
-    z_image = render_z(visible_xyz)
+    xyz_view = xyz_view[visible_indices, :]
 
-    valid_mask = z_image != -1
+    visible_indices = filter_out_ot_frame_points(xyz_view)
+
+    xyz_view = xyz_view[visible_indices, :]
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(xyz_view)
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1, max_nn=1000),
+                         fast_normal_computation=True)
+    pcd.orient_normals_towards_camera_location(camera_location=transform[:-1, -1])
+    pcd.normalize_normals()
+    # o3d.visualization.draw_geometries([pcd])
+
+    visible_normal = np.asarray(pcd.normals)
+
+    z_image, n_image = render_z_and_normal(xyz_view, visible_normal)
+
+    valid_mask = (1 - np.isnan(z_image)).astype(bool)
     coords = np.array(np.nonzero(valid_mask)).T
-    values = z_image[valid_mask]
 
-    it = interpolate.LinearNDInterpolator(coords, values, fill_value=np.mean(values))
-    filled = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
-    pipe.send(filled)
+    values_z = z_image[valid_mask]
+    it = interpolate.LinearNDInterpolator(coords, values_z, fill_value=np.mean(values_z))
+    filled_z = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
+
+    values_n = n_image[valid_mask]
+    it = interpolate.LinearNDInterpolator(coords, values_n)
+    filled_n = it(list(np.ndindex(z_image.shape))).reshape(n_image.shape)
+    #
+    # import matplotlib.pyplot as plt
+    # plt.matshow((filled_n + 1) / 2)
+    # plt.show()
+
+    pipe.send((filled_z, filled_n))
     pipe.close()
 
 
@@ -267,11 +294,13 @@ def main(argv):
         os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/data.csv'))
     print('Groundtruth loaded.')
     xyz = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
+    # xyz = np.load("pointcloud.npy")
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
     for k in tqdm(range(0, gti.gt.shape[0], 8)):
         timestamps, transforms = [], []
+        gen_img(0, gti.get_transform(k)[1], xyz_homogeneous)
         for i in range(8):
             if k + i < gti.gt.shape[0]:
                 time, trans = gti.get_transform(k + i)
@@ -279,24 +308,27 @@ def main(argv):
                 transforms.append(trans)
         childPipes, parentPipes = [], []
         processes = []
-        imgs = []
+        imgs_z, imgs_n = [], []
         for pr in range(8):  # Create pipes to get the simulation
             parentPipe, childPipe = mp.Pipe()
             parentPipes.append(parentPipe)
             childPipes.append(childPipe)
 
         for rank in range(len(transforms)):  # Run the processes
-            p = mp.Process(target=gen_img, args=(childPipes[rank], timestamps[rank], transforms[rank], xyz_homogeneous))
+            p = mp.Process(target=gen_img,
+                           args=(childPipes[rank], transforms[rank], xyz_homogeneous, normal_homogeneous))
             p.start()
             processes.append(p)
 
         for rank, p in enumerate(processes):  # Get the simulation
-            state = parentPipes[rank].recv()
-            imgs.append(state)
+            z, n = parentPipes[rank].recv()
+            imgs_z.append(z)
+            imgs_n.append(n)
             p.join()
 
-        for i, img in enumerate(imgs):
-            np.save(os.path.join(FLAGS.output_path, '%d.npy' % int(timestamps[i])), img)
+        for i in range(len(imgs_z)):
+            np.save(os.path.join(FLAGS.output_path, 'depth/%d.npy' % int(timestamps[i])), imgs_z[i])
+            np.save(os.path.join(FLAGS.output_path, 'normal/%d.npy' % int(timestamps[i])), imgs_n[i])
 
 
 def _split(matrix):
