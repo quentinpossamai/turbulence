@@ -280,9 +280,9 @@ def gen_img(pipe, transform, xyz):
     it = interpolate.LinearNDInterpolator(coords, values_n)
     filled_n = it(list(np.ndindex(z_image.shape))).reshape(n_image.shape)
     #
-    # import matplotlib.pyplot as plt
-    # plt.matshow((filled_n + 1) / 2)
-    # plt.show()
+    import matplotlib.pyplot as plt
+    plt.matshow((filled_n + 1) / 2)
+    plt.show()
 
     pipe.send((filled_z, filled_n))
     pipe.close()
