@@ -5,9 +5,9 @@ from torch.nn.functional import relu
 from src.utils.quaternion import qrot, qmul
 
 
-class MLPQuadrotor(nn.Module):
+class MLPResidual(nn.Module):
     def __init__(self, motor_size: int):
-        super(MLPQuadrotor, self).__init__()
+        super(MLPResidual, self).__init__()
         self.motor_size = motor_size
         self.linear1 = nn.Linear(in_features=14 + motor_size, out_features=256, bias=True)
         self.linear2 = nn.Linear(in_features=256, out_features=256, bias=True)
