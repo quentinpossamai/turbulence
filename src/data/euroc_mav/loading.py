@@ -190,7 +190,10 @@ def splitting():
     with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
         for flight in FLIGHT_LIST:
             print("Splitting: ", flight)
-            data = load_flight(flight)
+            data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
+            for key in ['t', 'imu_ang_acc', 'motor', 'state']:
+                data[key] = data[key][1:]
+            print(flight, len(data["t"]))
             assert all(np.array([len(data[key]) for key in data]) == len(data["t"]))  # All keys have the same length
             flight_len = len(data["t"])
 
@@ -210,8 +213,8 @@ class EurocMAVDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, horizon: int):
         """
         Create a torch Dataset to be used in training with Dataloader.
-        :param train_validation_test: Check if need to use
-        :param horizon:
+        :param train_validation_test: train, validation or test to load the appropriate dataset
+        :param horizon: number of next state to load
         """
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -236,8 +239,12 @@ class EurocMAVDatasetHorizon(Dataset):
         for key, val in loading.items():
             loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
                                           axis=1)
-            # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:20]
+
         self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
+        self.min_res = torch.tensor([[-2.56919551e+00, -1.69808650e+00, -2.45562077e+00, -6.20543506e+03,
+                                      -6.59456299e+03, -2.57263867e+04]])
+        self.max_res = torch.tensor([4.07108498e+00, 2.69354105e+00, 2.62223434e+00, 6.93979785e+03,
+                                     8.79834277e+03, 3.03239160e+04])
 
     def __len__(self):
         return self.cum_dataset_idx[-1] + 1
@@ -249,28 +256,27 @@ class EurocMAVDatasetHorizon(Dataset):
         """
         flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
         data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.h + 1, :]
-
         return {"t": torch.from_numpy(data[:, :1]).float(),
                 "state": torch.from_numpy(data[:, 1:14]).float(),
                 "motor": torch.from_numpy(data[:, 14:20]).float(),
-                "residual": torch.from_numpy(data[:, 20:]).float()}
+                "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
 
 
 def load_flight(flight):
     #     data = {"t", "imu_ang_acc", "motor", "state"}
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/data.pkl"
+    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
     data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        raw_flight_path = RAW_DATASET_PATH + flight
-        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-        print("Loading", flight)
-        _load_clean_data(raw_flight_path, intermediate_flight_path)
-    splitting()
-    # data = EurocMAVDatasetHorizon("train", horizon=100)
+    # for flight in FLIGHT_LIST:
+    #     raw_flight_path = RAW_DATASET_PATH + flight
+    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    #     print("Loading", flight)
+    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
+    # splitting()
+    data = EurocMAVDatasetHorizon("train", horizon=1)
 
 
 if __name__ == '__main__':

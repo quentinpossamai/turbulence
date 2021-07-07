@@ -48,11 +48,14 @@ def euroc_mav_residual():
 
         plot_residual_torsor(time, residual_torsor, flight)
 
-        data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor]).numpy()
+        data["residual"] = residual_torsor
+        # data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor]).numpy()
+        # data["residual"][0] = float("nan")
+        # assert len(data["residual"]) == len(data["t"]) - 1
 
-        intermediate_flight_path = euroc.DATASET_PATH + f"intermediate/{flight}/data.pkl"
-        # pickle.dump(data, open(intermediate_flight_path, "wb"))
-    # euroc.splitting()
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
+    euroc.splitting()
 
 
 if __name__ == '__main__':

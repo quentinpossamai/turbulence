@@ -15,7 +15,7 @@ def qmul(q, r):
     Multiply quaternion(s) q with quaternion(s) r.
     Expects two equally-sized tensors of shape (*, 4), where * denotes any number of dimensions.
     Returns q*r as a tensor of shape (*, 4).
-    Quaternion is in x, y, z, w shape.
+    Quaternion is in x, y, z, w convention.
     """
     assert q.shape[-1] == 4
     assert r.shape[-1] == 4
@@ -36,7 +36,7 @@ def qrot(q, v):
     """
     Rotate vector(s) v about the rotation described by quaternion(s) q.
     Expects a tensor of shape (*, 4) for q and a tensor of shape (*, 3) for v,
-    where * denotes any number of dimensions.
+    where * denotes any number of dimensions. q in x, y, z, w convention.
     Returns a tensor of shape (*, 3).
     """
     assert q.shape[-1] == 4
@@ -73,77 +73,59 @@ def qfix(q):
     return result
 
 
-def _test():
-    random.seed(0)
-    np.random.seed(0)
-    torch.manual_seed(0)
-
-    n = 1000
-    tmp = torch.randn(n, 4, dtype=float)
-    quat_a = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
-    tmp = torch.randn(n, 4, dtype=float)
-    quat_b = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
-
-    vect = torch.randn(n, 3, dtype=float)
-
-    quat_origin_a = torch.clone(quat_a[:, [3, 0, 1, 2]])
-    quat_origin_b = torch.clone(quat_b[:, [3, 0, 1, 2]])
-
-    assert (quat_a == quat_origin_a[:, [1, 2, 3, 0]]).all()
-
-    res = qmul(quat_a, quat_b)
-    res_origin = qmul_old_convention(quat_origin_a, quat_origin_b)
-    assert torch.isclose(res, res_origin[:, [1, 2, 3, 0]]).all()
-
-    res1 = qrot(quat_a, vect)
-    res1_origin = qrot_origin(quat_origin_a, vect)
-    assert torch.isclose(res1, res1_origin).all()
-
-    rot_a = torch.from_numpy(Rotation.from_quat(quat_a).as_matrix())
-    roted_vect = (rot_a @ vect.unsqueeze(-1)).squeeze()
-    assert torch.isclose(res1, roted_vect).all()
+# Numpy-backed implementations
+def qmul_np(q, r):
+    q = torch.from_numpy(q).contiguous()
+    r = torch.from_numpy(r).contiguous()
+    return qmul(q, r).numpy()
 
 
-def qmul_old_convention(q, r):
-    """
-    Multiply quaternion(s) q with quaternion(s) r.
-    Expects two equally-sized tensors of shape (*, 4), where * denotes any number of dimensions.
-    Returns q*r as a tensor of shape (*, 4).
-    """
-    assert q.shape[-1] == 4
-    assert r.shape[-1] == 4
-
-    original_shape = q.shape
-
-    # Compute outer product
-    terms = torch.bmm(r.view(-1, 4, 1), q.view(-1, 1, 4))
-
-    w = terms[:, 0, 0] - terms[:, 1, 1] - terms[:, 2, 2] - terms[:, 3, 3]
-    x = terms[:, 0, 1] + terms[:, 1, 0] - terms[:, 2, 3] + terms[:, 3, 2]
-    y = terms[:, 0, 2] + terms[:, 1, 3] + terms[:, 2, 0] - terms[:, 3, 1]
-    z = terms[:, 0, 3] - terms[:, 1, 2] + terms[:, 2, 1] + terms[:, 3, 0]
-    return torch.stack((w, x, y, z), dim=1).view(original_shape)
+def qrot_np(q, v):
+    q = torch.from_numpy(q).contiguous()
+    v = torch.from_numpy(v).contiguous()
+    return qrot(q, v).numpy()
 
 
-def qrot_origin(q, v):
-    """
-    Rotate vector(s) v about the rotation described by quaternion(s) q.
-    Expects a tensor of shape (*, 4) for q and a tensor of shape (*, 3) for v,
-    where * denotes any number of dimensions.
-    Returns a tensor of shape (*, 3).
-    """
-    assert q.shape[-1] == 4
-    assert v.shape[-1] == 3
-    assert q.shape[:-1] == v.shape[:-1]
-
-    original_shape = list(v.shape)
-    q = q.view(-1, 4)
-    v = v.view(-1, 3)
-
-    qvec = q[:, 1:]
-    uv = torch.cross(qvec, v, dim=1)
-    uuv = torch.cross(qvec, uv, dim=1)
-    return (v + 2 * (q[:, :1] * uv + uuv)).view(original_shape)
+# def qmul_old_convention(q, r):
+#     """
+#     Multiply quaternion(s) q with quaternion(s) r.
+#     Expects two equally-sized tensors of shape (*, 4), where * denotes any number of dimensions.
+#     Returns q*r as a tensor of shape (*, 4).
+#     """
+#     assert q.shape[-1] == 4
+#     assert r.shape[-1] == 4
+#
+#     original_shape = q.shape
+#
+#     # Compute outer product
+#     terms = torch.bmm(r.view(-1, 4, 1), q.view(-1, 1, 4))
+#
+#     w = terms[:, 0, 0] - terms[:, 1, 1] - terms[:, 2, 2] - terms[:, 3, 3]
+#     x = terms[:, 0, 1] + terms[:, 1, 0] - terms[:, 2, 3] + terms[:, 3, 2]
+#     y = terms[:, 0, 2] + terms[:, 1, 3] + terms[:, 2, 0] - terms[:, 3, 1]
+#     z = terms[:, 0, 3] - terms[:, 1, 2] + terms[:, 2, 1] + terms[:, 3, 0]
+#     return torch.stack((w, x, y, z), dim=1).view(original_shape)
+#
+#
+# def qrot_origin(q, v):
+#     """
+#     Rotate vector(s) v about the rotation described by quaternion(s) q.
+#     Expects a tensor of shape (*, 4) for q and a tensor of shape (*, 3) for v,
+#     where * denotes any number of dimensions.
+#     Returns a tensor of shape (*, 3).
+#     """
+#     assert q.shape[-1] == 4
+#     assert v.shape[-1] == 3
+#     assert q.shape[:-1] == v.shape[:-1]
+#
+#     original_shape = list(v.shape)
+#     q = q.view(-1, 4)
+#     v = v.view(-1, 3)
+#
+#     qvec = q[:, 1:]
+#     uv = torch.cross(qvec, v, dim=1)
+#     uuv = torch.cross(qvec, uv, dim=1)
+#     return (v + 2 * (q[:, :1] * uv + uuv)).view(original_shape)
 
 
 # def qeuler(q, order, epsilon=0):
@@ -191,20 +173,6 @@ def qrot_origin(q, v):
 #         raise
 #
 #     return torch.stack((x, y, z), dim=1).view(original_shape)
-
-
-# # Numpy-backed implementations
-#
-# def qmul_np(q, r):
-#     q = torch.from_numpy(q).contiguous()
-#     r = torch.from_numpy(r).contiguous()
-#     return qmul(q, r).numpy()
-
-
-# def qrot_np(q, v):
-#     q = torch.from_numpy(q).contiguous()
-#     v = torch.from_numpy(v).contiguous()
-#     return qrot(q, v).numpy()
 
 
 # def qeuler_np(q, order, epsilon=0, use_gpu=False):
@@ -275,7 +243,37 @@ def qrot_origin(q, v):
 #
 #     return result.reshape(original_shape)
 
+# def _test():
+#     random.seed(0)
+#     np.random.seed(0)
+#     torch.manual_seed(0)
+#
+#     n = 1000
+#     tmp = torch.randn(n, 4, dtype=float)
+#     quat_a = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
+#     tmp = torch.randn(n, 4, dtype=float)
+#     quat_b = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
+#
+#     vect = torch.randn(n, 3, dtype=float)
+#
+#     quat_origin_a = torch.clone(quat_a[:, [3, 0, 1, 2]])
+#     quat_origin_b = torch.clone(quat_b[:, [3, 0, 1, 2]])
+#
+#     assert (quat_a == quat_origin_a[:, [1, 2, 3, 0]]).all()
+#
+#     res = qmul(quat_a, quat_b)
+#     res_origin = qmul_old_convention(quat_origin_a, quat_origin_b)
+#     assert torch.isclose(res, res_origin[:, [1, 2, 3, 0]]).all()
+#
+#     res1 = qrot(quat_a, vect)
+#     res1_origin = qrot_origin(quat_origin_a, vect)
+#     assert torch.isclose(res1, res1_origin).all()
+#
+#     rot_a = torch.from_numpy(Rotation.from_quat(quat_a).as_matrix())
+#     roted_vect = (rot_a @ vect.unsqueeze(-1)).squeeze()
+#     assert torch.isclose(res1, roted_vect).all()
+
 
 if __name__ == '__main__':
     pass
-    _test()
+    # _test()

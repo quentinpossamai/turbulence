@@ -108,11 +108,11 @@ class DynamicalModel(nn.Module):
         quat_bar = quat * torch.tensor([-1, -1, -1, 1]).view(1, 4)
         batch_size = len(quat)
         g = torch.tensor([0, 0, 9.81]).view(1, 3)
-        fu = torch.cat([torch.zeros((batch_size, 2)), self.theta[0] * motor_torsor[:, 3].view(-1, 1)], dim=1)
-        kfa = quaternion.qrot(quat_bar, lin_acc + g) - fu
+        thrust = torch.cat([torch.zeros((batch_size, 2)), self.theta[0] * motor_torsor[:, 3].view(-1, 1)], dim=1)
+        kfa = quaternion.qrot(quat_bar, lin_acc + g) - thrust
 
-        ktaua = (ang_acc - torch.cross(torch.tensor([1, 1, self.theta[3]]) * ang_vel, ang_vel)
-                 - torch.tensor([self.theta[1], self.theta[1], self.theta[2]]).view(1, 3) - motor_torsor[:, :3])
+        ktaua = (ang_acc - torch.cross(torch.tensor([1, 1, self.theta[3]]).view(1, 3) * ang_vel, ang_vel)
+                 - torch.tensor([self.theta[1], self.theta[1], self.theta[2]]).view(1, 3) * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1)
 
 
