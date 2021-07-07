@@ -280,6 +280,8 @@ def main():
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
+    os.makedirs(args.output_path + "depth", exist_ok=True)
+    os.makedirs(args.output_path + "normal", exist_ok=True)
     for k in tqdm(range(0, gti.gt.shape[0], 8)):
         timestamps, transforms = [], []
         # gen_img(0, gti.get_transform(k)[1], xyz_homogeneous)
@@ -309,8 +311,9 @@ def main():
             p.join()
 
         for i in range(len(imgs_z)):
-            plt.imsave("depth.png", np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))
-            plt.imsave("normal.png", imgs_n[i])
+            plt.imsave(args.output_path + "depth/%d.png" % int(timestamps[i]),
+                       np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))
+            plt.imsave(args.output_path + "normal/%d.png" % int(timestamps[i]), imgs_n[i])
 
 
 def _split(matrix):
