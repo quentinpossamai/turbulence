@@ -20,6 +20,8 @@ INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_DATASET_PATH, INTERMEDIATE_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
+
+
 # FLIGHT_LIST = ["V2_01_easy/", "V2_02_medium/", "V2_03_difficult/"]
 
 
@@ -190,9 +192,10 @@ def splitting():
     with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
         for flight in FLIGHT_LIST:
             print("Splitting: ", flight)
-            data = load_flight(flight)
+            data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
             assert all(np.array([len(data[key]) for key in data]) == len(data["t"]))  # All keys have the same length
             flight_len = len(data["t"])
+            print(flight, flight_len)
 
             train_val_idx = round(flight_len * 0.6)
             val_test_idx = round(flight_len * 0.8)
@@ -210,8 +213,8 @@ class EurocMAVDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, horizon: int):
         """
         Create a torch Dataset to be used in training with Dataloader.
-        :param train_validation_test: Check if need to use
-        :param horizon:
+        :param train_validation_test: train, validation or test to load the appropriate dataset
+        :param horizon: number of next state to load
         """
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -236,8 +239,16 @@ class EurocMAVDatasetHorizon(Dataset):
         for key, val in loading.items():
             loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
                                           axis=1)
-            # t = self.data1[0:1], state = self.data1[1:14], motor = self.data1[14:20]
+
         self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
+
+        # print(np.min(self.data[:, 20:], axis=0))
+        # print(np.max(self.data[:, 20:], axis=0))
+
+        # self.min_res = torch.tensor([-2.56919551, -1.6980865, -2.45562077,
+        #                              -14.32858562, -11.89167309, -4.79519939]).view(1, 6)
+        # self.max_res = torch.tensor([4.07108498, 2.69354105, 2.62223434,
+        #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
     def __len__(self):
         return self.cum_dataset_idx[-1] + 1
@@ -249,28 +260,31 @@ class EurocMAVDatasetHorizon(Dataset):
         """
         flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
         data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.h + 1, :]
+        # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
+        res = {"t": torch.from_numpy(data[:, :1]).float(),
+               "state": torch.from_numpy(data[:, 1:14]).float(),
+               "motor": torch.from_numpy(data[:, 14:20]).float(),
+               # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
+               "residual": torch.from_numpy(data[:, 20:]).float()}
 
-        return {"t": torch.from_numpy(data[:, :1]).float(),
-                "state": torch.from_numpy(data[:, 1:14]).float(),
-                "motor": torch.from_numpy(data[:, 14:20]).float(),
-                "residual": torch.from_numpy(data[:, 20:]).float()}
+        return res
 
 
 def load_flight(flight):
     #     data = {"t", "imu_ang_acc", "motor", "state"}
-    intermediate_flight_path = DATASET_PATH + f"intermediate/{flight}/data.pkl"
+    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
     data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        raw_flight_path = RAW_DATASET_PATH + flight
-        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-        print("Loading", flight)
-        _load_clean_data(raw_flight_path, intermediate_flight_path)
-    splitting()
-    # data = EurocMAVDatasetHorizon("train", horizon=100)
+    # for flight in FLIGHT_LIST:
+    #     raw_flight_path = RAW_DATASET_PATH + flight
+    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    #     print("Loading", flight)
+    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
+    # splitting()
+    data = EurocMAVDatasetHorizon("train", horizon=1)
 
 
 if __name__ == '__main__':
