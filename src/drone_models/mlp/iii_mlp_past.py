@@ -12,13 +12,13 @@ class MLP(nn.Module):
         self.n_past = n_past
 
         input_size = n_past * (1 + 13 + motor_size)
-        self.batch_norm0 = nn.BatchNorm2d(input_size)
+        self.batch_norm0 = nn.BatchNorm2d(1)
         self.linear1 = nn.Linear(in_features=input_size, out_features=256, bias=True)
-        self.batch_norm1 = nn.BatchNorm2d(256)
+        self.batch_norm1 = nn.BatchNorm2d(1)
         self.linear2 = nn.Linear(in_features=256, out_features=256, bias=True)
-        self.batch_norm2 = nn.BatchNorm2d(256)
+        self.batch_norm2 = nn.BatchNorm2d(1)
         self.linear3 = nn.Linear(in_features=256, out_features=256, bias=True)
-        self.batch_norm3 = nn.BatchNorm2d(256)
+        self.batch_norm3 = nn.BatchNorm2d(1)
         self.linear4 = nn.Linear(in_features=256, out_features=6, bias=True)
 
     def forward(self, state, motor, dt):
@@ -41,13 +41,14 @@ class MLP(nn.Module):
                                  dt.view((batch_size, -1))], dim=1)
         input_size = state_motor.shape[1]
 
-        # out = self.batch_norm0(state_motor.view((batch_size, input_size, 1, 1))).view(batch_size, input_size)
-        out = relu(self.linear1(state_motor))
-        # out = self.batch_norm1(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
+        out = state_motor
+        out = self.batch_norm0(out.view((batch_size, 1, input_size, 1))).view(batch_size, input_size)
+        out = relu(self.linear1(out))
+        out = self.batch_norm1(out.view((batch_size, 1, 256, 1))).view((batch_size, 256))
         out = relu(self.linear2(out))
-        # out = self.batch_norm2(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
+        out = self.batch_norm2(out.view((batch_size, 1, 256, 1))).view((batch_size, 256))
         out = relu(self.linear3(out))
-        # out = self.batch_norm3(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
+        out = self.batch_norm3(out.view((batch_size, 1, 256, 1))).view((batch_size, 256))
         out = self.linear4(out)
 
         dot_v = out[:, :3]  # Global linear speed

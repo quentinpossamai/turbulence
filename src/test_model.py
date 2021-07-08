@@ -158,24 +158,24 @@ def main():
     # phi_mse_param = hexarotor_4params.DynamicalModel(paper=False)
     # test_model(phi_mse_param, "euroc_mav", "test", "normal")
 
-    # mlp_symplectic = "20210630_144438_MLPHexarotor_bs_32/9416_weights.pt"
+    # mlp_symplectic = "20210630_144438_MLP_bs_32/9416_weights.pt"
     # test_euroc_mav_mlp_metrics(mlp_symplectic)
 
-    # mlp_symplectic_past = "20210708_114237_MLPHexarotor_bs_32/45864_weights.pt"
-    # weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
-    # n_past = 10
-    # model = iii_mlp_past.MLPHexarotor(6, n_past)
-    # model.load_state_dict(weights)
-    # model.eval()
-    # test_model(model, "euroc_mav", "test", "past")
-
-    mlp_symplectic_sanity_check = "20210708_134238_MLPHexarotor_bs_32/28248_weights.pt"
-    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_sanity_check}")
+    mlp_symplectic_batch_norm = "20210708_150757_MLP_bs_32/9416_weights.pt"
+    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_batch_norm}")
     n_past = 1
     model = iii_mlp_past.MLP(6, n_past)
     model.load_state_dict(weights)
     model.eval()
     test_model(model, "euroc_mav", "test", "past")
+
+    # mlp_symplectic_sanity_check = "20210708_134238_MLP_bs_32/28248_weights.pt"
+    # weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_sanity_check}")
+    # n_past = 1
+    # model = iii_mlp_past.MLP(6, n_past)
+    # model.load_state_dict(weights)
+    # model.eval()
+    # test_model(model, "euroc_mav", "test", "past")
 
 
 if __name__ == '__main__':
