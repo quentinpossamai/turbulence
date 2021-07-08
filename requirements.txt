@@ -37,9 +37,10 @@ termcolor==1.1.0
 torch==1.8.1
 torchaudio==0.8.1
 torchdiffeq==0.2.2
-torchvision==0.9.1
+torchvision~=0.8.2
 tqdm~=4.61.1
 typing-extensions==3.10.0.0
 urllib3==1.26.5
 Werkzeug==2.0.1
 wget==3.2
+openexr~=2.5.5

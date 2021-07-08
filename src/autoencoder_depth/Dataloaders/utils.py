@@ -15,11 +15,8 @@ __imagenet_pca = {
 
 
 def default_transform(scale_size=None):
-    normalize = __imagenet_stats
-
     rgb_list = [
         transforms.ToTensor(),
-        transforms.Normalize(**normalize),
     ]
     if scale_size is not None:
         rgb_list.append(transforms.Resize(scale_size))
