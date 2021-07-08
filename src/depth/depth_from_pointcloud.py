@@ -261,12 +261,13 @@ def gen_img(pipe, transform, xyz):
     filled_z = (filled_z / ZMAX)
     filled_n = ((filled_n + 1) / 2)
 
+    # plt.imsave("depth.png", filled_z)
+
     # np.save("depth.npy", filled_z.astype(np.float32))
     # np.save("normal.npy", filled_n.astype(np.float32))
 
     # plt.matshow((filled_n + 1) / 2)
     # plt.show()
-
     pipe.send((filled_z, filled_n))
     pipe.close()
 
