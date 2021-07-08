@@ -261,7 +261,10 @@ def gen_img(pipe, transform, xyz):
     filled_z = (filled_z / ZMAX)
     filled_n = ((filled_n + 1) / 2)
 
-    # plt.imsave("depth.png", filled_z)
+    # plt.imsave("depth.png", np.stack([filled_z, filled_z, filled_z], axis=-1))
+    # p = plt.imread("depth.png").astype(np.float64)[:, :, 0]
+    #
+    # delta = ((filled_z - p) ** 2)
 
     # np.save("depth.npy", filled_z.astype(np.float32))
     # np.save("normal.npy", filled_n.astype(np.float32))
@@ -276,8 +279,8 @@ def main():
     gti = GroundTruthInterpolator(
         os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
     print('Groundtruth loaded.')
-    xyz = read_ply(os.path.join(args.room_path, 'pointcloud0/data.ply'))
-    # xyz = np.load("pointcloud.npy")
+    # xyz = read_ply(os.path.join(args.room_path, 'pointcloud0/data.ply'))
+    xyz = np.load("pointcloud.npy")
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
@@ -285,7 +288,7 @@ def main():
     os.makedirs(args.output_path + "normal", exist_ok=True)
     for k in tqdm(range(0, gti.gt.shape[0], 8)):
         timestamps, transforms = [], []
-        # gen_img(0, gti.get_transform(k)[1], xyz_homogeneous)
+        gen_img(0, gti.get_transform(k)[1], xyz_homogeneous)
         for i in range(8):
             if k + i < gti.gt.shape[0]:
                 time, trans = gti.get_transform(k + i)

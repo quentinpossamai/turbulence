@@ -5,10 +5,10 @@ import torch.nn as nn
 # Depth Image is 240x376
 
 class Autoencoder(nn.Module):
-    def __init__(self, feature_size=1024):
+    def __init__(self, feature_size=1024, in_channel=1, out_channel=1):
         super(Autoencoder, self).__init__()
-        self.encoder = Encoder(feature_size)
-        self.decoder = Decoder(feature_size)
+        self.encoder = Encoder(feature_size, in_channel)
+        self.decoder = Decoder(feature_size, out_channel)
 
     def forward(self, x):
         f = self.encoder(x)
@@ -36,10 +36,10 @@ class Block(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, feature_size):
+    def __init__(self, feature_size, channel):
         super(Encoder, self).__init__()
         self.net = nn.Sequential(
-            Block(1, 16, kernel_size=(7, 7), stride=1, padding=3),
+            Block(channel, 16, kernel_size=(7, 7), stride=1, padding=3),
             Block(16, 32, kernel_size=(3, 3), stride=1),
             Block(32, 64, kernel_size=(3, 3), stride=2),
             Block(64, 64, kernel_size=(3, 3), stride=1),
@@ -57,7 +57,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, feature_size):
+    def __init__(self, feature_size, channel):
         super(Decoder, self).__init__()
         self.linear = nn.Linear(feature_size, 4 * 60 * 94)
         self.net = nn.Sequential(
@@ -70,7 +70,7 @@ class Decoder(nn.Module):
             nn.UpsamplingBilinear2d(scale_factor=2),
             Block(32, 32, kernel_size=(3, 3), stride=1),  # 2
             Block(32, 32, kernel_size=(7, 7), stride=1, padding=3),  # 1
-            nn.Conv2d(32, 1, 1)
+            nn.Conv2d(32, channel, 1)
         )
 
     def forward(self, x):
