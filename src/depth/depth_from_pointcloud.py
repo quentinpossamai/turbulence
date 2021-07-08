@@ -1,46 +1,28 @@
-# coding=utf-8
-# Copyright 2021 The Google Research Authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Renders depth maps from EuRoC MAV point clouds.
 https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets
 Some of the rooms of the EuRoC MAV dataset have point clouds. This script
 renders depth maps from the point clouds.
-"""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+TO GET THE DEPTH MAP AND NORMAL MAP BACK :
+- DEPTH MAP : Read with plt.imread(), then multiple by ZMAX
+- NORMAL MAP : Read with plt.imread(), then n*2 -1"""
 
 import collections
 import os
 
-from absl import app
-from absl import flags
+import argparse
 
 from scipy import interpolate
 from tqdm import tqdm
 import numpy as np
 import multiprocessing as mp
+import open3d as o3d
+import matplotlib.pyplot as plt
 
-flags.DEFINE_string('room_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy',
-                    'Path to the EuRoC data for one of the rooms ')
-
-flags.DEFINE_string('output_path', '/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/depth/',
-                    'Path where to store the outputs.')
-
-FLAGS = flags.FLAGS
+parser = argparse.ArgumentParser()
+parser.add_argument('--room_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy', type=str)
+parser.add_argument('--output_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/', type=str)
+args = parser.parse_args()
 
 # A 4D transform that connects the Cam0 to the body of the MAV. This is taken
 # from the sensor.yaml file. To project the point cloud on Cam1, please replace
@@ -63,6 +45,8 @@ K2 = 0.07395907
 H = 480
 W = 752
 
+ZMAX = 7.48
+
 
 def get_camera_view_pointcloud(transform, xyz):
     """Transform point cloud to camera view, prune points outside of the view.
@@ -71,8 +55,6 @@ def get_camera_view_pointcloud(transform, xyz):
         the body of the MAV.
       xyz: A 4xN matrix, point cloud in homogeneous coordinates. The k-th column
         is (x, y, z, 1), where x, y, z are the coordinates of the k-th point.
-      greyscale_color: N-vector, vertex grayscale value. The k-th entry is the
-        greyscale color of the k-th point.
     Returns:
       3xM (M < N) matrix representing the point cloud in the camera view.
       M vector, vertex grayscale value.
@@ -109,9 +91,7 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
     """
 
     def get_bin(xz, yz):
-        xbin = int(round(xz / neighborhood_radius))
-        ybin = int(round(yz / neighborhood_radius))
-        return xbin, ybin
+        return int(round(xz / neighborhood_radius)), int(round(yz / neighborhood_radius))
 
     xs, ys, zs = _split(xyz)
     xzs = xs / zs
@@ -134,14 +114,19 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
         zmin = grid[get_bin(xzs[ind], yzs[ind])]
         if zmin < (1 - z_threshold) * zs[ind]:
             occluded_indices.append(ind)
-    return occluded_indices
+    occluded_inds = set(occluded_indices)
+    visible_indices = [
+        i for i in range(xyz.shape[0]) if i not in occluded_inds
+    ]
+    return visible_indices
 
 
-def render_z(xyz):
+def render_z_and_normal(xyz, normal):
     """Given a colored cloud in camera coordinates, render a depth map.
     This function is useful for visualization / debugging.
     Args:
       xyz: A 3xN matrix representing the point cloud in the camera view.
+      normal: normal of each point in xyz
     Returns:
       A rendered depth map.
     """
@@ -150,9 +135,12 @@ def render_z(xyz):
     u = np.floor(0.5 * u).astype(int)
     v = np.floor(0.5 * v).astype(int)
     rendered_z = np.full((int(H / 2), int(W / 2)), -np.inf)
+    rendered_n = np.full((int(H / 2), int(W / 2), 3), -np.inf)
     rendered_z[v, u] = z
-    rendered_z = np.where(rendered_z == -np.inf, -1, rendered_z)
-    return rendered_z
+    rendered_n[v, u] = normal
+    rendered_z = np.where(rendered_z == -np.inf, np.nan, rendered_z)
+    rendered_n = np.where(rendered_n == -np.inf, np.nan, rendered_n)
+    return rendered_z, rendered_n
 
 
 class GroundTruthInterpolator(object):
@@ -168,8 +156,8 @@ class GroundTruthInterpolator(object):
         lines = lines[1:]  # skip the first line
 
         gt = []
-        for l in lines:
-            tokens = l.split(',')
+        for line in lines:
+            tokens = line.split(',')
             gt.append([float(t) for t in tokens[:8]])
         self.gt = np.array(gt)
 
@@ -178,7 +166,6 @@ class GroundTruthInterpolator(object):
 
         # self._gt[:, 0], the 0th column, is the timestamp. Columns 1-3 are x, y, z,
         # and columns 4-7 are quaternion components describing the rotation.
-        timestamps = self.gt[:, 0]
         x = self.gt[k, 1]
         y = self.gt[k, 2]
         z = self.gt[k, 3]
@@ -213,8 +200,8 @@ def read_ply(filename):
         lines = f.readlines()
     lines = lines[11:]
     xyz = []
-    for l in lines:
-        tokens = l.split(' ')
+    for line in lines:
+        tokens = line.split(' ')
         xyz.append([float(t) for t in tokens[:3]])
 
     return np.array(xyz)
@@ -224,7 +211,6 @@ def filter_out_ot_frame_points(xyz):
     """Remove all points in a camera-view pointcloud that are out of frame.
     Args:
       xyz: A 3xN matrix representing the point cloud in the camera view.
-      c: A N-long vector containing (greyscale) colors of the points.
     Returns:
       A 3xM matrix and a M-long vector representing the filtered colored point
       cloud.
@@ -235,43 +221,70 @@ def filter_out_ot_frame_points(xyz):
     v = np.floor(v).astype(int)
     valid_mask = np.logical_and.reduce((u >= 0, u < W, v >= 0, v < H), axis=0)
     valid_points = valid_mask.nonzero()[0]
-    return xyz[valid_points, :]
+    return valid_points
 
 
-def gen_img(pipe, timestamp, transform, xyz_homogeneous):
-    xyz_view = get_camera_view_pointcloud(transform, xyz_homogeneous)
+def gen_img(pipe, transform, xyz):
+    xyz_view = get_camera_view_pointcloud(transform, xyz)
 
-    occluded_inds = get_occluded_points(xyz_view, 0.02, 0.08)
-    occluded_inds = set(occluded_inds)
-    visible_indices = [
-        i for i in range(xyz_view.shape[0]) if i not in occluded_inds
-    ]
-    visible_xyz = xyz_view[visible_indices, :]
-    visible_xyz = filter_out_ot_frame_points(visible_xyz)
+    visible_indices = get_occluded_points(xyz_view, 0.02, 0.08)
 
-    z_image = render_z(visible_xyz)
+    xyz_view = xyz_view[visible_indices, :]
 
-    valid_mask = z_image != -1
+    visible_indices = filter_out_ot_frame_points(xyz_view)
+
+    xyz_view = xyz_view[visible_indices, :]
+
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(xyz_view)
+    pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1, max_nn=1000),
+                         fast_normal_computation=True)
+    pcd.orient_normals_towards_camera_location(camera_location=transform[:-1, -1])
+    pcd.normalize_normals()
+    # o3d.visualization.draw_geometries([pcd])
+
+    visible_normal = np.asarray(pcd.normals)
+
+    z_image, n_image = render_z_and_normal(xyz_view, visible_normal)
+
+    valid_mask = (1 - np.isnan(z_image)).astype(bool)
     coords = np.array(np.nonzero(valid_mask)).T
-    values = z_image[valid_mask]
 
-    it = interpolate.LinearNDInterpolator(coords, values, fill_value=np.mean(values))
-    filled = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
-    pipe.send(filled)
+    values_z = z_image[valid_mask]
+    it = interpolate.LinearNDInterpolator(coords, values_z, fill_value=np.mean(values_z))
+    filled_z = it(list(np.ndindex(z_image.shape))).reshape(z_image.shape)
+
+    values_n = n_image[valid_mask]
+    it = interpolate.LinearNDInterpolator(coords, values_n)
+    filled_n = it(list(np.ndindex(z_image.shape))).reshape(n_image.shape)
+
+    filled_z = (filled_z / ZMAX)
+    filled_n = ((filled_n + 1) / 2)
+
+    # np.save("depth.npy", filled_z.astype(np.float32))
+    # np.save("normal.npy", filled_n.astype(np.float32))
+
+    # plt.matshow((filled_n + 1) / 2)
+    # plt.show()
+
+    pipe.send((filled_z, filled_n))
     pipe.close()
 
 
-def main(argv):
-    del argv  # unused
+def main():
     gti = GroundTruthInterpolator(
-        os.path.join(FLAGS.room_path, 'state_groundtruth_estimate0/data.csv'))
+        os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
     print('Groundtruth loaded.')
-    xyz = read_ply(os.path.join(FLAGS.room_path, 'pointcloud0/data.ply'))
+    xyz = read_ply(os.path.join(args.room_path, 'pointcloud0/data.ply'))
+    # xyz = np.load("pointcloud.npy")
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
+    os.makedirs(args.output_path + "depth", exist_ok=True)
+    os.makedirs(args.output_path + "normal", exist_ok=True)
     for k in tqdm(range(0, gti.gt.shape[0], 8)):
         timestamps, transforms = [], []
+        # gen_img(0, gti.get_transform(k)[1], xyz_homogeneous)
         for i in range(8):
             if k + i < gti.gt.shape[0]:
                 time, trans = gti.get_transform(k + i)
@@ -279,24 +292,28 @@ def main(argv):
                 transforms.append(trans)
         childPipes, parentPipes = [], []
         processes = []
-        imgs = []
+        imgs_z, imgs_n = [], []
         for pr in range(8):  # Create pipes to get the simulation
             parentPipe, childPipe = mp.Pipe()
             parentPipes.append(parentPipe)
             childPipes.append(childPipe)
 
         for rank in range(len(transforms)):  # Run the processes
-            p = mp.Process(target=gen_img, args=(childPipes[rank], timestamps[rank], transforms[rank], xyz_homogeneous))
+            p = mp.Process(target=gen_img,
+                           args=(childPipes[rank], transforms[rank], xyz_homogeneous))
             p.start()
             processes.append(p)
 
         for rank, p in enumerate(processes):  # Get the simulation
-            state = parentPipes[rank].recv()
-            imgs.append(state)
+            z, n = parentPipes[rank].recv()
+            imgs_z.append(z)
+            imgs_n.append(n)
             p.join()
 
-        for i, img in enumerate(imgs):
-            np.save(os.path.join(FLAGS.output_path, '%d.npy' % int(timestamps[i])), img)
+        for i in range(len(imgs_z)):
+            plt.imsave(args.output_path + "depth/%d.png" % int(timestamps[i]),
+                       np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))
+            plt.imsave(args.output_path + "normal/%d.png" % int(timestamps[i]), imgs_n[i])
 
 
 def _split(matrix):
@@ -329,4 +346,4 @@ def _project_and_distort(x, y, z):
 
 
 if __name__ == '__main__':
-    app.run(main)
+    main()
