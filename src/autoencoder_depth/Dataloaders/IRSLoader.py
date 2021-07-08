@@ -2,17 +2,15 @@ from __future__ import print_function, division
 import os
 import OpenEXR
 import Imath
-from skimage import io, transform
+import cv2
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
-from PIL import Image, ImageOps
-from torchvision import transforms
-from IRS.Dataloaders.utils import *
+from torch.utils.data import Dataset
+from autoencoder_depth.Dataloaders.utils import *
 
 
-class IRSDataset(Dataset):
+class IRSLoader(Dataset):
 
-    def __init__(self, split='test', scale_size=(576, 960), with_stereo=False):
+    def __init__(self, split='test', scale_size=(240, 376), with_stereo=False):
         """
         Args:
             txt_file [string]: Path to the image list
@@ -24,11 +22,11 @@ class IRSDataset(Dataset):
             self.dataloc = "/home/sjanny/IRS/"
 
         try:
-            file = f"splits/{split}.txt"
+            file = f"splits/irs_{split}.txt"
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
         except FileNotFoundError:
-            file = f"../splits/{split}.txt"
+            file = f"../splits/irs_{split}.txt"
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
 
@@ -36,8 +34,7 @@ class IRSDataset(Dataset):
         self.split = split
         self.with_stereo = with_stereo
 
-        self.fx = 480.0
-        self.fy = 480.0
+        self.F = 480.0
         self.sx = 540
         self.sy = 960
 
@@ -54,7 +51,7 @@ class IRSDataset(Dataset):
         gt_norm_name = os.path.join(self.dataloc, img_names[3])
 
         def load_rgb(filename):
-            img = io.imread(filename)
+            img = cv2.imread(filename)
             if len(img.shape) == 2:
                 img = img[:, :, np.newaxis]
                 img = np.pad(img, ((0, 0), (0, 0), (0, 2)), 'constant')
@@ -69,41 +66,30 @@ class IRSDataset(Dataset):
             return load_exr(filename)
 
         def load_norm(filename):
-            gt_norm = None
-            if filename.endswith('exr'):
-                gt_norm = load_exr(filename)
-                gt_norm = gt_norm * 2.0 - 1.0
+            normal = load_exr(filename) * 2.0 - 1.0
+            ncv = cv2.imread(filename, cv2.IMREAD_UNCHANGED) * 2 - 1
+            # fix opposite normal
+            m = normal >= 0
+            m[:, :, 0:2] = False
+            normal[m] = - normal[m]
+            return normal
 
-                # fix opposite normal
-                m = gt_norm >= 0
-                m[:, :, 0] = False
-                m[:, :, 1] = False
-                gt_norm[m] = - gt_norm[m]
+        resize_transform = default_transform(self.scale_size)
 
-            return gt_norm
+        gt_disp = resize_transform(load_disp(gt_disp_name))
+        normalmap = resize_transform(load_norm(gt_norm_name))
 
-        if self.split == 'test':
-            rgb_transform = default_transform(self.scale_size)
-        else:
-            rgb_transform = inception_color_preproccess(self.scale_size)
+        gt_disp[gt_disp == 0] = 0.001
+        depthmap = self.F * 0.1 / gt_disp
 
-        gt_disp = load_disp(gt_disp_name)
-        gt_norm = load_norm(gt_norm_name)
-
-        gt_disp = gt_disp[np.newaxis, :]
-        gt_disp = torch.from_numpy(gt_disp.copy()).float()
-
-        gt_norm = gt_norm.transpose([2, 0, 1])
-        gt_norm = torch.from_numpy(gt_norm.copy()).float()
-
-        sample = {'img_names': img_names, 'gt_disp': gt_disp,
-                  'gt_norm': gt_norm}
+        sample = {'img_names': img_names, 'depth': depthmap,
+                  'normal': normalmap}
 
         if self.with_stereo:
             img_left = load_rgb(img_left_name)
             img_right = load_rgb(img_right_name)
-            img_left = rgb_transform(img_left)
-            img_right = rgb_transform(img_right)
+            img_left = resize_transform(img_left)
+            img_right = resize_transform(img_right)
             sample['img_left'] = img_left
             sample['img_right'] = img_right
 
@@ -115,7 +101,7 @@ def load_exr(filename):
     PixType = Imath.PixelType(Imath.PixelType.FLOAT)
     DW = File.header()['dataWindow']
     CNum = len(File.header()['channels'].keys())
-    if (CNum > 1):
+    if CNum > 1:
         Channels = ['R', 'G', 'B']
         CNum = 3
     else:
@@ -123,7 +109,7 @@ def load_exr(filename):
     Size = (DW.max.x - DW.min.x + 1, DW.max.y - DW.min.y + 1)
     Pixels = [np.fromstring(File.channel(c, PixType), dtype=np.float32) for c in Channels]
     hdr = np.zeros((Size[1], Size[0], CNum), dtype=np.float32)
-    if (CNum == 1):
+    if CNum == 1:
         hdr[:, :, 0] = np.reshape(Pixels[0], (Size[1], Size[0]))
     else:
         hdr[:, :, 0] = np.reshape(Pixels[0], (Size[1], Size[0]))
@@ -136,30 +122,5 @@ def load_exr(filename):
 
 
 if __name__ == '__main__':
-    d = IRSDataset(scale_size=(240, 376), with_stereo=False)
+    d = IRSLoader(scale_size=(240, 376), with_stereo=True)
     x = d[0]
-
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(2, 2)
-
-    l = x["img_left"].numpy().transpose(1, 2, 0)
-    r = x["img_right"].numpy().transpose(1, 2, 0)
-    d = x["gt_disp"].numpy().transpose(1, 2, 0)
-    n = x["gt_norm"].numpy().transpose(1, 2, 0)
-
-    ax[0][0].imshow(l)
-    ax[0][1].imshow(r)
-    ax[1][0].imshow(d)
-    ax[1][1].imshow(n)
-
-    ax[0][0].axis("off")
-    ax[0][1].axis("off")
-    ax[1][0].axis("off")
-    ax[1][1].axis("off")
-
-    plt.show()
-    print(x["img_left"].shape)
-    print(x["img_right"].shape)
-    print(x["gt_disp"].shape)
-    print(x["gt_norm"].shape)

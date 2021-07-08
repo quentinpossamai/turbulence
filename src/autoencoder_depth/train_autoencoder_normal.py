@@ -1,6 +1,7 @@
 import torch
 import argparse
-from src.autoencoder_depth.EurocMAVLoader import Normalmap_Loader
+from src.autoencoder_depth.Dataloaders.EurocMAVLoader import EurocMavLoader
+from src.autoencoder_depth.Dataloaders.IRSLoader import IRSLoader
 import torch.nn as nn
 from src.autoencoder_depth.model import Autoencoder
 import random
@@ -12,6 +13,7 @@ import torch.nn.functional as F
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', default=10, type=int)
 parser.add_argument('--lr', default=1e-4, type=float)
+parser.add_argument('--dataset', default="irs", type=str)
 parser.add_argument('--feature_size', default=1024, type=int)
 parser.add_argument('--weight_grad', default=10, type=int)
 parser.add_argument('--name', default='autoencoder_normal', type=str)
@@ -23,20 +25,21 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 
 MSE = nn.MSELoss()
 
+datasets = {'eurocmav': EurocMavLoader, 'irs': IRSLoader}
 
 def evaluate():
-    dataloader = DataLoader(Normalmap_Loader(split='train'), batch_size=2,
+    dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,
                             shuffle=False,
                             num_workers=0,
                             pin_memory=True)
 
     model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=3).to(device)
     try:
-        state_dict = torch.load(f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn",
+        state_dict = torch.load(f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn",
                                 map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
-            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn",
+            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn",
             map_location=device)
 
     model.load_state_dict(state_dict)
@@ -75,7 +78,7 @@ def validate(model, dataloader, viz=False, epoch=1000):
     l_cost, l_normal, l_grad, l_psnr = [], [], [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
-            depthmap = x["depth_estimation"].to(device).unsqueeze(1)
+            depthmap = x["depth"].to(device)
             normal = x['normal'].to(device)
 
             out = model(depthmap)
@@ -118,13 +121,13 @@ def main():
     random.seed(0)
     np.random.seed(0)
 
-    train_dataloader = DataLoader(Normalmap_Loader(split='train'), batch_size=2,
+    train_dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,
                                   shuffle=True,
                                   num_workers=0,
                                   pin_memory=True)
 
     ######################
-    val_dataloader = DataLoader(Normalmap_Loader(split='train'), batch_size=2,  #############@
+    val_dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,  #############@
                                 shuffle=False,
                                 num_workers=0,
                                 pin_memory=True)
@@ -139,7 +142,7 @@ def main():
         model.train()
         print("=== EPOCH ", epoch + 1, " ===")
         for i, x in enumerate(tqdm(train_dataloader, desc="Training")):
-            depthmap = x['depth_estimation'].to(device).unsqueeze(1)
+            depthmap = x['depth'].to(device)
             normal = x['normal'].to(device)
 
             out = model(depthmap)
@@ -154,10 +157,10 @@ def main():
             memory = error
             try:
                 torch.save(model.state_dict(),
-                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn")
+                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn")
             except FileNotFoundError:
                 torch.save(model.state_dict(),
-                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn")
+                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn")
             print("Saved!")
 
     evaluate()

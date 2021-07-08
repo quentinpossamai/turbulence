@@ -4,7 +4,7 @@ import random
 
 random.seed(0)
 
-DIR = "/Volumes/Samsung_T5/IRS"
+DIR = "/home/sjanny/IRS/"
 ex = []
 for scene in os.listdir(DIR):
     for detail in os.listdir(DIR + "/" + scene):
@@ -20,5 +20,20 @@ for scene in os.listdir(DIR):
             str = f"{scene}/{detail}/{dict[key]['l']} {scene}/{detail}/{dict[key]['r']} {scene}/{detail}/{dict[key]['d']} {scene}/{detail}/{dict[key]['n']}"
             ex.append(str)
 
+for _ in range(50):
+    random.shuffle(ex)
+
+val_size = int(len(ex) * 0.2)
+
+val = ex[:val_size]
+test = ex[val_size:2 * val_size]
+train = ex[val_size * 2:]
+
 with open("irs_test.txt", 'w') as f:
-    f.write('\n'.join(ex))
+    f.write('\n'.join(test))
+
+with open("irs_train.txt", 'w') as f:
+    f.write('\n'.join(train))
+
+with open("irs_val.txt", 'w') as f:
+    f.write('\n'.join(val))
