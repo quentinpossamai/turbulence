@@ -146,7 +146,70 @@ def _compute_error_residual(states, rpm, time, residual, h, f):
         # Prediction rollout
         prediction = [ground_truth[:, 0]]
         for i in range(0, h):
-            prediction.append(f(prediction[-1], command[:, i], dt[:, i], residual_fa[:, i+1]))
+            prediction.append(f(prediction[-1], command[:, i], dt[:, i], residual_fa[:, i + 1]))
+
+    prediction = torch.stack(prediction, dim=1)
+    error = ((prediction - ground_truth) ** 2).mean()
+    return error
+
+
+def mse_error_past(f, horizon, dataset, mode="test"):
+    """ Return the mean squared error on the selected split, controlled by the horizon
+    args:
+        - f(s_i, u_i) : the predictor (expect a Pytorch Module).
+                        s_i is the state at time i (p, q, v, w) and u_i the RPM
+                        Should return the future state : s_(i+1).
+                            s_i.shape = (Batch, 13)
+                            u_i.shape(Batch, 4)
+        - H : The prediction horizon (1, 10, 100, 1s, 2s, ...)
+        - dataset: The name of the dataset to use. euroc_mav or blackbird
+        - mode : allows to switch between the test and the validation dataset
+        """
+
+    assert mode in ["validation", "test"]
+    assert dataset in ["blackbird", "euroc_mav"]
+
+    if dataset == "blackbird":
+        flights = load_blackbird_flights(mode)
+    else:
+        assert dataset == "euroc_mav"
+        flights = load_euroc_mav_flights(mode)
+
+    # Compute Error
+    error_per_flight = {flight_name: 0 for flight_name in flights.keys()}
+
+    for k in tqdm(flights.keys()):  # Extract flight states and command
+        states = torch.FloatTensor(flights[k]["state"])
+        motor = torch.FloatTensor(flights[k]["motor"])
+        time = torch.FloatTensor(flights[k]['t'])
+        residual = torch.FloatTensor(flights[k]["residual"])
+        error_per_flight[k] = _compute_error_past_states(states, motor, time, f.n_past, horizon, f)
+
+    # Sum of error for all flights
+    total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
+    return total_error
+
+
+def _compute_error_past_states(states, rpm, time, n_past, h, f):
+    crop_idx = (time.shape[0] - 1) // (n_past + h)  # remove last time step of states to fit N*(H+1) points
+
+    # Batch-ify the trajectories to speed up computation
+    # First step is to crop the trajectory to an whole number of horizon
+    # Next, tensor are reshaped in batch of h-length array
+    motor_size = rpm.shape[1]
+    cropped_states = states[:crop_idx * (n_past + h)].view(-1, n_past + h, 13)
+    cropped_command = rpm[:crop_idx * (n_past + h)].view(-1, n_past + h, motor_size)
+    cropped_dt = (time[1:] - time[:-1])[:crop_idx * (n_past + h)].view(-1, n_past + h, 1)
+
+    # past_states = cropped_states[:, :n_past_state, :]
+    ground_truth = cropped_states[:, n_past - 1:, :]
+    with torch.no_grad():
+        # Prediction rollout
+        prediction = [ground_truth[:, 0]]
+        for i in range(0, h):
+            prediction.append(f(cropped_states[:, i:n_past + i, :],
+                                cropped_command[:, i:n_past + i, :],
+                                cropped_dt[:, i:n_past + i, :]))
 
     prediction = torch.stack(prediction, dim=1)
     error = ((prediction - ground_truth) ** 2).mean()

@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-from scipy.spatial.transform import Rotation
 
 import src.utils.quaternion as quaternion
 
@@ -15,17 +14,22 @@ import src.utils.quaternion as quaternion
 
 
 class DynamicalModel(nn.Module):
-    def __init__(self):
+    def __init__(self, paper: bool):
+        """
+        :param paper: True, load paper parameters. False, load mse parameters
+        """
         super(DynamicalModel, self).__init__()
-        self.theta = torch.tensor([[2.1019e-06],  # kt / m
-                                   [2 ** 0.5 * 4.2478e-06],  # kt l / Ix
-                                   [2.1783e-06],  # km / Iz
-                                   [2.3617e-01]])  # Iz / Ix MSE results
+        if paper:
+            self.theta = torch.tensor([[2.08e-6],
+                                       [2 ** 0.5 * 3.58e-6],
+                                       [3.77e-8],
+                                       [1.40]])  # Parameter from blackbird paper
+        else:
+            self.theta = torch.tensor([[2.1019e-06],  # kt / m
+                                       [2 ** 0.5 * 4.2478e-06],  # kt l / Ix
+                                       [2.1783e-06],  # km / Iz
+                                       [2.3617e-01]])  # Iz / Ix MSE results
 
-        # self.theta = torch.tensor([[2.08e-6],
-        #                            [2 ** 0.5 * 3.58e-6],
-        #                            [3.77e-8],
-        #                            [1.40]])  # Parameter from blackbird paper
         self.permutation = [1, 0, 3, 2]
         self.dt = 1 / 360
 
@@ -73,9 +77,4 @@ class DynamicalModel(nn.Module):
 
 
 if __name__ == '__main__':
-    from src.metrics import mse_error, visualise_metrics
-
-    f = DynamicalModel()
-    for i in [9, 180, 360]:
-        print(f"Metric {i} on test: {mse_error(f, i, 'blackbird', 'test'):.4E}")
-    # visualise_metrics(f, 1000, mode="test", plot_range=[15000, 16000])
+    pass
