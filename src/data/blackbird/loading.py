@@ -267,7 +267,7 @@ def _splitting_txt():
         random.shuffle(idx)
         shuffled_list = np.asarray(FLIGHT_LIST)[idx]
 
-    for name, flight_list in zip(["train.txt", "validation.txt", "test.txt"],
+    for name, flight_list in zip(["test.txt", "validation.txt", "test.txt"],
                                  [sorted(shuffled_list[:train_val_idx]),
                                   sorted(shuffled_list[train_val_idx:val_test_idx]),
                                   sorted(shuffled_list[val_test_idx:])]):
@@ -277,7 +277,7 @@ def _splitting_txt():
 
 
 def _torch_splitting():
-    train_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "train.txt", "r"))
+    train_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "test.txt", "r"))
     validation_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "validation.txt", "r"))
     test_list = list(e[:-2] for e in open(INTERMEDIATE_DATASET_PATH + "test.txt", "r"))
 
