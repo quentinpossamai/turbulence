@@ -1,5 +1,8 @@
 import os
 import re
+import random
+
+random.seed(0)
 
 DIR = "/Volumes/Samsung_T5/IRS"
 ex = []
@@ -17,5 +20,5 @@ for scene in os.listdir(DIR):
             str = f"{scene}/{detail}/{dict[key]['l']} {scene}/{detail}/{dict[key]['r']} {scene}/{detail}/{dict[key]['d']} {scene}/{detail}/{dict[key]['n']}"
             ex.append(str)
 
-with open("test.txt", 'w') as f:
+with open("irs_test.txt", 'w') as f:
     f.write('\n'.join(ex))

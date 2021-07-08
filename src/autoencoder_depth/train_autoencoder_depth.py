@@ -1,6 +1,6 @@
 import torch
 import argparse
-from src.autoencoder_depth.dataloaders import Depthmap_Loader
+from src.autoencoder_depth.EurocMAVLoader import Depthmap_Loader
 import torch.nn as nn
 from src.autoencoder_depth.model import Autoencoder
 import random
