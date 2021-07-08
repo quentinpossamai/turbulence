@@ -112,7 +112,7 @@ class DynamicalModel(nn.Module):
 def main():
     model = DynamicalModel(paper=False)
     # Sanity check
-    data = euroc.EurocMAVDatasetHorizon("train", horizon=1)
+    data = euroc.EurocMAVDatasetHorizon("train", traj_len=1)
     test = torch.zeros(len(data), 13)
     for i in range(len(data)):
         state = data[i]["state"][:-1]

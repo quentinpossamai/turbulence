@@ -19,7 +19,7 @@ DT = 1 / 360
 def identify_model():
     """Solve the Ax = y problem where x is the parameters of the model"""
 
-    flights = euroc.EurocMAVDatasetHorizon("train", horizon=1)
+    flights = euroc.EurocMAVDatasetHorizon("train", traj_len=1)
 
     # Load flights in a big vector column
     states, future_states, command = [], [], []

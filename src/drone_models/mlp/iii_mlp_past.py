@@ -5,9 +5,9 @@ from torch.nn.functional import relu
 from src.utils.quaternion import qrot, qmul
 
 
-class MLPHexarotor(nn.Module):
+class MLP(nn.Module):
     def __init__(self, motor_size: int, n_past):
-        super(MLPHexarotor, self).__init__()
+        super(MLP, self).__init__()
         self.motor_size = motor_size
         self.n_past = n_past
 
@@ -41,13 +41,13 @@ class MLPHexarotor(nn.Module):
                                  dt.view((batch_size, -1))], dim=1)
         input_size = state_motor.shape[1]
 
-        out = self.batch_norm0(state_motor.view((batch_size, input_size, 1, 1))).view(batch_size, input_size)
-        out = relu(self.linear1(out))
-        out = self.batch_norm1(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
+        # out = self.batch_norm0(state_motor.view((batch_size, input_size, 1, 1))).view(batch_size, input_size)
+        out = relu(self.linear1(state_motor))
+        # out = self.batch_norm1(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
         out = relu(self.linear2(out))
-        out = self.batch_norm2(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
+        # out = self.batch_norm2(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
         out = relu(self.linear3(out))
-        out = self.batch_norm3(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
+        # out = self.batch_norm3(out.view((batch_size, 256, 1, 1))).view((batch_size, 256))
         out = self.linear4(out)
 
         dot_v = out[:, :3]  # Global linear speed
@@ -71,7 +71,7 @@ def _test():
 
     motor = torch.randn(n, 4, dtype=float, requires_grad=True)
 
-    model = MLPHexarotor()
+    model = MLP()
     output = model(state, motor, dt)
     print("Test done")
 

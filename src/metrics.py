@@ -182,15 +182,14 @@ def mse_error_past(f, horizon, dataset, mode="test"):
         states = torch.FloatTensor(flights[k]["state"])
         motor = torch.FloatTensor(flights[k]["motor"])
         time = torch.FloatTensor(flights[k]['t'])
-        residual = torch.FloatTensor(flights[k]["residual"])
-        error_per_flight[k] = _compute_error_past_states(states, motor, time, f.n_past, horizon, f)
+        error_per_flight[k] = _compute_error_past(states, motor, time, f.n_past, horizon, f)
 
     # Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
     return total_error
 
 
-def _compute_error_past_states(states, rpm, time, n_past, h, f):
+def _compute_error_past(states, rpm, time, n_past, h, f):
     crop_idx = (time.shape[0] - 1) // (n_past + h)  # remove last time step of states to fit N*(H+1) points
 
     # Batch-ify the trajectories to speed up computation
@@ -207,9 +206,12 @@ def _compute_error_past_states(states, rpm, time, n_past, h, f):
         # Prediction rollout
         prediction = [ground_truth[:, 0]]
         for i in range(0, h):
-            prediction.append(f(cropped_states[:, i:n_past + i, :],
-                                cropped_command[:, i:n_past + i, :],
-                                cropped_dt[:, i:n_past + i, :]))
+            past_states = torch.cat([cropped_states[:, i:n_past - 1, :],
+                                     torch.stack(prediction, dim=1)[:, -n_past:, :]],
+                                    dim=1)
+            past_motor = cropped_command[:, i:n_past + i, :]
+            past_dt = cropped_dt[:, i:n_past + i, :]
+            prediction.append(f(past_states, past_motor, past_dt))
 
     prediction = torch.stack(prediction, dim=1)
     error = ((prediction - ground_truth) ** 2).mean()

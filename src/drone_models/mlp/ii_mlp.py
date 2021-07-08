@@ -5,9 +5,9 @@ from torch.nn.functional import relu
 from src.utils.quaternion import qrot, qmul
 
 
-class MLPQuadrotor(nn.Module):
+class MLP(nn.Module):
     def __init__(self, motor_size: int):
-        super(MLPQuadrotor, self).__init__()
+        super(MLP, self).__init__()
         self.motor_size = motor_size
         self.linear1 = nn.Linear(in_features=14 + motor_size, out_features=256, bias=True)
         self.linear2 = nn.Linear(in_features=256, out_features=256, bias=True)
@@ -47,7 +47,7 @@ def _test():
 
     motor = torch.randn(n, 4, dtype=float, requires_grad=True)
 
-    model = MLPQuadrotor()
+    model = MLP()
     output = model(state, motor, dt)
     print("Test done")
 

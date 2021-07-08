@@ -210,11 +210,11 @@ def splitting():
 
 
 class EurocMAVDatasetHorizon(Dataset):
-    def __init__(self, train_validation_test: str, horizon: int):
+    def __init__(self, train_validation_test: str, traj_len: int):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
-        :param horizon: number of next state to load
+        :param traj_len: number of next state to load
         """
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -228,9 +228,9 @@ class EurocMAVDatasetHorizon(Dataset):
         minimum_length = np.min([[split[flight][0], split[flight][1] - split[flight][0],
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
 
-        assert isinstance(horizon, int)
-        assert (horizon + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 2}"
-        self.h = horizon
+        assert isinstance(traj_len, int)
+        assert (traj_len + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 2}"
+        self.h = traj_len
 
         self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
         self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
@@ -284,7 +284,7 @@ def main():
     #     print("Loading", flight)
     #     _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
-    data = EurocMAVDatasetHorizon("train", horizon=1)
+    data = EurocMAVDatasetHorizon("train", traj_len=1)
 
 
 if __name__ == '__main__':

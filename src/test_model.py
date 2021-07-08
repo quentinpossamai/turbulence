@@ -8,7 +8,7 @@ import src.data.euroc_mav.loading as euroc
 # Models
 from src.drone_models.analytical_models import quadrotor_4parms, hexarotor_4params
 from src.drone_models.mlp import iii_mlp_past
-from src.drone_models.mlp.ii_mlp_quadrotor import MLPQuadrotor
+from src.drone_models.mlp.ii_mlp import MLP
 from src.drone_models.mlp.i_old_mlp_quadrotor import OldMLPQuadrotor
 import src.utils.trajectory
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
@@ -23,7 +23,7 @@ def test_blackbird_mlp(horizon, train_validation_test, model_name):
     assert train_validation_test in ["train", "validation", "test"]
 
     weights = torch.load(BLACKBIRD_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLPQuadrotor(motor_size=4)
+    model = MLP(motor_size=4)
     model.load_state_dict(weights)
     model.eval()
 
@@ -56,12 +56,12 @@ def test_blackbird_mlp(horizon, train_validation_test, model_name):
 def test_euroc_mav_mlp(horizon, train_validation_test, model_name):
     assert train_validation_test in ["train", "validation", "test"]
     assert horizon < 3156, "horizon too big, maximum possible horizon is 3156"
-    train_flight = euroc.EurocMAVDatasetHorizon("train", horizon=3155)[0]
-    validation_flight = euroc.EurocMAVDatasetHorizon("validation", horizon=3155)[0]
-    test_flight = euroc.EurocMAVDatasetHorizon("test", horizon=3155)[0]
+    train_flight = euroc.EurocMAVDatasetHorizon("train", traj_len=3155)[0]
+    validation_flight = euroc.EurocMAVDatasetHorizon("validation", traj_len=3155)[0]
+    test_flight = euroc.EurocMAVDatasetHorizon("test", traj_len=3155)[0]
 
     weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLPQuadrotor(motor_size=6)
+    model = MLP(motor_size=6)
     model.load_state_dict(weights)
     model.eval()
 
@@ -93,7 +93,7 @@ def test_euroc_mav_mlp(horizon, train_validation_test, model_name):
 
 def test_blackbird_mlp_metrics(model_name):
     weights = torch.load(BLACKBIRD_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLPQuadrotor(motor_size=4)
+    model = MLP(motor_size=4)
     model.load_state_dict(weights)
     model.eval()
     test_model(model, "blackbird", "test", "normal")
@@ -101,7 +101,7 @@ def test_blackbird_mlp_metrics(model_name):
 
 def test_euroc_mav_mlp_metrics(model_name):
     weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLPQuadrotor(motor_size=6)
+    model = MLP(motor_size=6)
     model.load_state_dict(weights)
     model.eval()
     test_model(model, "euroc_mav", "test", "normal")
@@ -161,10 +161,18 @@ def main():
     # mlp_symplectic = "20210630_144438_MLPHexarotor_bs_32/9416_weights.pt"
     # test_euroc_mav_mlp_metrics(mlp_symplectic)
 
-    mlp_symplectic_past = "20210708_114237_MLPHexarotor_bs_32/45864_weights.pt"
-    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
-    n_past = 10
-    model = iii_mlp_past.MLPHexarotor(6, n_past)
+    # mlp_symplectic_past = "20210708_114237_MLPHexarotor_bs_32/45864_weights.pt"
+    # weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
+    # n_past = 10
+    # model = iii_mlp_past.MLPHexarotor(6, n_past)
+    # model.load_state_dict(weights)
+    # model.eval()
+    # test_model(model, "euroc_mav", "test", "past")
+
+    mlp_symplectic_sanity_check = "20210708_134238_MLPHexarotor_bs_32/28248_weights.pt"
+    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_sanity_check}")
+    n_past = 1
+    model = iii_mlp_past.MLP(6, n_past)
     model.load_state_dict(weights)
     model.eval()
     test_model(model, "euroc_mav", "test", "past")

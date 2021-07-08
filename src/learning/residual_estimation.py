@@ -67,8 +67,8 @@ def euroc_mav_fa():
     writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(EurocMAVDatasetHorizon("train", horizon=horizon), batch_size=batch_size, shuffle=True)
-    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", horizon=horizon),
+    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=horizon), batch_size=batch_size, shuffle=True)
+    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=horizon),
                                  batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 
