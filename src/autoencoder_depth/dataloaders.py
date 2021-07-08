@@ -40,11 +40,11 @@ class Normalmap_Loader(Base):
         depth_map = depth_map / 255
         depth_map = depth_map * 2 - 1
 
-        dir = dir.replace("depth", "normal")
+        dir = dir.replace("depth_estimation", "normal")
         normal_map = torch.FloatTensor(cv2.imread(dir).transpose(2, 0, 1))
         normal_map = normal_map / 255
         normal_map = normal_map * 2 - 1
-        return {"depth": depth_map, "normal": normal_map}
+        return {"depth_estimation": depth_map, "normal": normal_map}
 
 
 if __name__ == '__main__':

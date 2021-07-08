@@ -1,7 +1,7 @@
-"""Renders depth maps from EuRoC MAV point clouds.
+"""Renders depth_estimation maps from EuRoC MAV point clouds.
 https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets
 Some of the rooms of the EuRoC MAV dataset have point clouds. This script
-renders depth maps from the point clouds.
+renders depth_estimation maps from the point clouds.
 
 TO GET THE DEPTH MAP AND NORMAL MAP BACK :
 - DEPTH MAP : Read with plt.imread(), then multiple by ZMAX
@@ -122,13 +122,13 @@ def get_occluded_points(xyz, neighborhood_radius, z_threshold):
 
 
 def render_z_and_normal(xyz, normal):
-    """Given a colored cloud in camera coordinates, render a depth map.
+    """Given a colored cloud in camera coordinates, render a depth_estimation map.
     This function is useful for visualization / debugging.
     Args:
       xyz: A 3xN matrix representing the point cloud in the camera view.
       normal: normal of each point in xyz
     Returns:
-      A rendered depth map.
+      A rendered depth_estimation map.
     """
     x, y, z = _split(xyz)
     u, v = _project_and_distort(x, y, z)
@@ -261,12 +261,12 @@ def gen_img(pipe, transform, xyz):
     filled_z = (filled_z / ZMAX)
     filled_n = ((filled_n + 1) / 2)
 
-    # plt.imsave("depth.png", np.stack([filled_z, filled_z, filled_z], axis=-1))
-    # p = plt.imread("depth.png").astype(np.float64)[:, :, 0]
+    # plt.imsave("depth_estimation.png", np.stack([filled_z, filled_z, filled_z], axis=-1))
+    # p = plt.imread("depth_estimation.png").astype(np.float64)[:, :, 0]
     #
     # delta = ((filled_z - p) ** 2)
 
-    # np.save("depth.npy", filled_z.astype(np.float32))
+    # np.save("depth_estimation.npy", filled_z.astype(np.float32))
     # np.save("normal.npy", filled_n.astype(np.float32))
 
     # plt.matshow((filled_n + 1) / 2)
@@ -284,7 +284,7 @@ def main():
     print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
-    os.makedirs(args.output_path + "depth", exist_ok=True)
+    os.makedirs(args.output_path + "depth_estimation", exist_ok=True)
     os.makedirs(args.output_path + "normal", exist_ok=True)
     for k in tqdm(range(0, gti.gt.shape[0], 8)):
         timestamps, transforms = [], []
@@ -315,7 +315,7 @@ def main():
             p.join()
 
         for i in range(len(imgs_z)):
-            plt.imsave(args.output_path + "depth/%d.png" % int(timestamps[i]),
+            plt.imsave(args.output_path + "depth_estimation/%d.png" % int(timestamps[i]),
                        np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))
             plt.imsave(args.output_path + "normal/%d.png" % int(timestamps[i]), imgs_n[i])
 

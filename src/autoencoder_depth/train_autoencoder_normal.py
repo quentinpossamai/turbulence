@@ -73,7 +73,7 @@ def validate(model, dataloader, viz=False, epoch=1000):
     l_cost, l_psnr = [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
-            depthmap = x["depth"].to(device).unsqueeze(1)
+            depthmap = x["depth_estimation"].to(device).unsqueeze(1)
             normal = x['normal'].to(device)
 
             out = model(depthmap)
@@ -121,7 +121,7 @@ def main():
         model.train()
         print("=== EPOCH ", epoch + 1, " ===")
         for i, x in enumerate(tqdm(train_dataloader, desc="Training")):
-            depthmap = x['depth'].to(device).unsqueeze(1)
+            depthmap = x['depth_estimation'].to(device).unsqueeze(1)
             normal = x['normal'].to(device)
 
             out = model(depthmap)
