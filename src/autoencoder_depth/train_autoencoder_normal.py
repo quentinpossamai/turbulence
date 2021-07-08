@@ -7,11 +7,13 @@ import random
 import numpy as np
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', default=0, type=int)
+parser.add_argument('--epoch', default=10, type=int)
 parser.add_argument('--lr', default=1e-4, type=float)
 parser.add_argument('--feature_size', default=1024, type=int)
+parser.add_argument('--weight_grad', default=10, type=int)
 parser.add_argument('--name', default='autoencoder_normal', type=str)
 
 args = parser.parse_args()
@@ -70,28 +72,44 @@ def vizualize(gt, pred):
 
 def validate(model, dataloader, viz=False, epoch=1000):
     model.eval()
-    l_cost, l_psnr = [], []
+    l_cost, l_normal, l_grad, l_psnr = [], [], [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
             depthmap = x["depth_estimation"].to(device).unsqueeze(1)
             normal = x['normal'].to(device)
 
             out = model(depthmap)
-            cost = get_loss(normal, out)
-            psnr = 10 * torch.log10(4 / cost)
+            costs = get_loss(normal, out)
+            psnr = 10 * torch.log10(4 / costs[1])
 
-            l_cost.append(cost.detach().cpu().numpy())
+            l_cost.append(costs[0].detach().cpu().numpy())
+            l_normal.append(costs[1].detach().cpu().numpy())
+            l_grad.append(costs[2].detach().cpu().numpy())
             l_psnr.append(psnr.detach().cpu().numpy())
 
             if viz == True:
                 vizualize(depthmap, out)
-    print(f"!*  loss : {np.mean(l_cost):.4f},  PSNR : {np.mean(l_psnr):.2f} dB")
+    print(
+        f"!*  loss : {np.mean(l_cost):.4f},  MSE : {np.mean(l_normal):.4f}, Grad : {np.mean(l_grad):.4f}, PSNR : {np.mean(l_psnr):.2f} dB")
     loss = np.mean(l_cost)
     return loss
 
 
-def get_loss(gt, predicition):
-    return MSE(gt, predicition["output"])
+def compute_grad(rgb):
+    a = torch.Tensor([[1, 0, -1],
+                      [2, 0, -2],
+                      [1, 0, -1]]).expand(1, 3, 3, 3).to(device)
+    b = torch.Tensor([[1, 2, 1],
+                      [0, 0, 0],
+                      [-1, -2, -1]]).expand(1, 3, 3, 3).to(device)
+    sobel = (F.conv2d(rgb, a, padding=1) ** 2 + F.conv2d(rgb, b, padding=1) ** 2).squeeze(1)
+    return sobel
+
+
+def get_loss(gt, prediction):
+    mse_normal = MSE(gt, prediction["output"])
+    mse_grad = MSE(compute_grad(gt), compute_grad(prediction["output"]))
+    return 10000 * mse_normal + args.weight_grad * mse_grad, mse_normal, mse_grad
 
 
 def main():
@@ -125,10 +143,10 @@ def main():
             normal = x['normal'].to(device)
 
             out = model(depthmap)
-            cost = get_loss(normal, out)
+            costs = get_loss(normal, out)
 
             optim.zero_grad()
-            cost.backward()
+            costs[0].backward()
             optim.step()
 
         error = validate(model, val_dataloader, epoch=epoch)

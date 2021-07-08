@@ -12,7 +12,7 @@ from IRS.Dataloaders.utils import *
 
 class IRSDataset(Dataset):
 
-    def __init__(self, split='test', scale_size=(576, 960)):
+    def __init__(self, split='test', scale_size=(576, 960), with_stereo=False):
         """
         Args:
             txt_file [string]: Path to the image list
@@ -32,9 +32,9 @@ class IRSDataset(Dataset):
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
 
-        self.to_angle = False
         self.scale_size = scale_size
         self.split = split
+        self.with_stereo = with_stereo
 
         self.fx = 480.0
         self.fy = 480.0
@@ -72,8 +72,6 @@ class IRSDataset(Dataset):
             gt_norm = None
             if filename.endswith('exr'):
                 gt_norm = load_exr(filename)
-
-                # transform visualization normal to its true value
                 gt_norm = gt_norm * 2.0 - 1.0
 
                 # fix opposite normal
@@ -84,18 +82,13 @@ class IRSDataset(Dataset):
 
             return gt_norm
 
-        img_left = load_rgb(img_left_name)
-        img_right = load_rgb(img_right_name)
-        gt_disp = load_disp(gt_disp_name)
-        gt_norm = load_norm(gt_norm_name)
-
         if self.split == 'test':
             rgb_transform = default_transform(self.scale_size)
         else:
             rgb_transform = inception_color_preproccess(self.scale_size)
 
-        img_left = rgb_transform(img_left)
-        img_right = rgb_transform(img_right)
+        gt_disp = load_disp(gt_disp_name)
+        gt_norm = load_norm(gt_norm_name)
 
         gt_disp = gt_disp[np.newaxis, :]
         gt_disp = torch.from_numpy(gt_disp.copy()).float()
@@ -103,8 +96,16 @@ class IRSDataset(Dataset):
         gt_norm = gt_norm.transpose([2, 0, 1])
         gt_norm = torch.from_numpy(gt_norm.copy()).float()
 
-        sample = {'img_left': img_left, 'img_right': img_right, 'img_names': img_names, 'gt_disp': gt_disp,
+        sample = {'img_names': img_names, 'gt_disp': gt_disp,
                   'gt_norm': gt_norm}
+
+        if self.with_stereo:
+            img_left = load_rgb(img_left_name)
+            img_right = load_rgb(img_right_name)
+            img_left = rgb_transform(img_left)
+            img_right = rgb_transform(img_right)
+            sample['img_left'] = img_left
+            sample['img_right'] = img_right
 
         return sample
 
@@ -135,7 +136,7 @@ def load_exr(filename):
 
 
 if __name__ == '__main__':
-    d = IRSDataset(scale_size=(240, 376))
+    d = IRSDataset(scale_size=(240, 376), with_stereo=False)
     x = d[0]
 
     import matplotlib.pyplot as plt

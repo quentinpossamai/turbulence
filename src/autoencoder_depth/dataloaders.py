@@ -3,6 +3,8 @@ import torch
 import os
 import cv2
 
+ZMAX = 7.48
+
 
 class Base(Dataset):
     def __init__(self, split="train"):
@@ -29,7 +31,7 @@ class Depthmap_Loader(Base):
         dir = self.dataloc + self.index[item]
         depth_map = torch.FloatTensor(cv2.imread(dir)[:, :, 0])
         depth_map = depth_map / 255
-        depth_map = depth_map * 2 - 1
+        depth_map = depth_map * ZMAX
         return depth_map
 
 
@@ -38,7 +40,7 @@ class Normalmap_Loader(Base):
         dir = self.dataloc + self.index[item]
         depth_map = torch.FloatTensor(cv2.imread(dir)[:, :, 0])
         depth_map = depth_map / 255
-        depth_map = depth_map * 2 - 1
+        depth_map = depth_map * ZMAX
 
         dir = dir.replace("depth_estimation", "normal")
         normal_map = torch.FloatTensor(cv2.imread(dir).transpose(2, 0, 1))
