@@ -1,7 +1,3 @@
-import matplotlib.pyplot as plt
-import numpy as np
-import pickle
-from scipy.spatial.transform import Rotation
 import torch
 import torch.nn as nn
 
@@ -10,30 +6,36 @@ import src.utils.quaternion as quaternion
 
 
 class DynamicalModel(nn.Module):
-    def __init__(self):
+    def __init__(self, paper):
+        """
+        :param paper: True, load paper parameters. False, load mse parameters
+        """
         super(DynamicalModel, self).__init__()
         # Point: 6
         self.permutation = [4, 5, 0, 1, 2, 3]
-        self.theta = torch.tensor([[1.1559688e-04],
-                                   [1.4442127e-03],
-                                   [-6.8990281e-05],
-                                   [1.8237591e+01]])
-
-        # # Paper parameters from
-        # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and Redundancy’
-        # m = 0.64
-        # # From Akkinapalli et al. ‘Attitude Control of a Multicopter Using L1 Augmented Quaternion Based Backstepping’
-        # ix = 10.007e-3  # [kg.m2]
-        # iy = 10.2335e-3  # [kg.m2]  # Hypothesis ix == iy nearly confirmed
-        # iz = 8.1e-3  # [kg.m2]
-        # kt = 6.546e-6  # [N.s2.rad-1]
-        # km = 1.2864e-7  # [N.m2.rad-1]
-        # l = 0.215  # [m]
-        # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
-        # self.theta = torch.tensor([[1.0228e-05],
-        #                            [1.4064e-04],
-        #                            [1.5881e-05],
-        #                            [8.0943e-01]])
+        if paper:
+            # # Paper parameters from
+            # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
+            # Redundancy’
+            # m = 0.64
+            # # From Akkinapalli et al. ‘Attitude Control of a Multicopter Using L1 Augmented Quaternion Based
+            # Backstepping’
+            # ix = 10.007e-3  # [kg.m2]
+            # iy = 10.2335e-3  # [kg.m2]  # Hypothesis ix == iy nearly confirmed
+            # iz = 8.1e-3  # [kg.m2]
+            # kt = 6.546e-6  # [N.s2.rad-1]
+            # km = 1.2864e-7  # [N.m2.rad-1]
+            # l = 0.215  # [m]
+            # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
+            self.theta = torch.tensor([[1.0228e-05],
+                                       [1.4064e-04],
+                                       [1.5881e-05],
+                                       [8.0943e-01]])
+        else:
+            self.theta = torch.tensor([[1.1559688e-04],
+                                       [1.4442127e-03],
+                                       [-6.8990281e-05],
+                                       [1.8237591e+01]])  # MSE
 
     def forward(self, state, command, dt, residual=None):
         assert command.shape[-1] == 6, "Motor len is not 6"
@@ -108,30 +110,19 @@ class DynamicalModel(nn.Module):
 
 
 def main():
-    from src.metrics import mse_error, mse_error_residual, visualise_metrics
-    model = DynamicalModel()
-
-    # Test metric
-    res = np.zeros(3)
-    for i, e_i in enumerate([5, 100, 200]):
-        res[i] = (mse_error(model, e_i, 'euroc_mav', 'test').item())
-    [print(f"{e:0.4e}") for e in res]
-
-    # # Sanity check
-    # data = euroc.EurocMAVDatasetHorizon("train", horizon=1)
-    # test = torch.zeros(len(data), 13)
-    # for i in range(len(data)):
-    #     state = data[i]["state"][:-1]
-    #     motor = data[i]["motor"][:-1]
-    #     residual = data[i]["residual"][1:]
-    #     next_state_gt = data[i]["state"][1:]
-    #     dt = data[i]["t"][1:] - data[i]["t"][:-1]
-    #     next_state_hat = model(state, motor, dt, residual)
-    #     test[i, :] = (next_state_gt - next_state_hat).abs()
-    # assert (torch.max(test, 0)[0] < 5e-4).all()
-
-
-
+    model = DynamicalModel(paper=False)
+    # Sanity check
+    data = euroc.EurocMAVDatasetHorizon("train", horizon=1)
+    test = torch.zeros(len(data), 13)
+    for i in range(len(data)):
+        state = data[i]["state"][:-1]
+        motor = data[i]["motor"][:-1]
+        residual = data[i]["residual"][1:]
+        next_state_gt = data[i]["state"][1:]
+        dt = data[i]["t"][1:] - data[i]["t"][:-1]
+        next_state_hat = model(state, motor, dt, residual)
+        test[i, :] = (next_state_gt - next_state_hat).abs()
+    assert (torch.max(test, 0)[0] < 5e-4).all()
 
     # pos = state[:, :3]
     # quat = state[:, 3:7]
@@ -172,7 +163,6 @@ def main():
     #                                + ktaua)
     # assert torch.isclose(next_lin_vel, next_state_gt[:, 7:10], 0, 8e-6).all()
     # assert torch.isclose(next_ang_vel, next_state_gt[:, 10:], 0, 8e-6).all()
-
 
 
 if __name__ == '__main__':
