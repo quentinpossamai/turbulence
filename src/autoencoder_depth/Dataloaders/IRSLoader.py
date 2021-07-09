@@ -77,7 +77,7 @@ class IRSLoader(Dataset):
 
         resize_transform = default_transform(self.scale_size)
 
-        depthmap = resize_transform(load_depth(gt_disp_name)) * ZMAX
+        depthmap = resize_transform(load_depth(gt_disp_name)) #* ZMAX
         normalmap = resize_transform(load_norm(gt_norm_name))
 
         sample = {'img_names': img_names, 'depth': depthmap.float(),

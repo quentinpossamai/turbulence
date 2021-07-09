@@ -29,7 +29,7 @@ class EurocMavLoader(Dataset):
         dir = self.dataloc + self.index[item]
         depth_map = torch.FloatTensor(cv2.imread(dir)[:, :, 0]).unsqueeze(0)
         depth_map = depth_map / 255
-        depth_map = depth_map * ZMAX
+        depth_map = depth_map #* ZMAX
 
         dir = dir.replace("depth", "normal")
         normal_map = torch.FloatTensor(cv2.imread(dir).transpose(2, 0, 1))
