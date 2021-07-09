@@ -85,7 +85,7 @@ def validate(model, dataloader, viz=False, epoch=1000):
             depthmap = x['depth'].to(device)
             out = model(depthmap)
             costs = get_loss(depthmap, out)
-            psnr = 10 * torch.log10(4 * ZMAX / costs[1])
+            psnr = 10 * torch.log10(4 / costs[1])
 
             l_cost.append(costs[0].detach().cpu().numpy())
             l_depth.append(costs[1].detach().cpu().numpy())
