@@ -65,7 +65,7 @@ class IRSLoader(Dataset):
             return img
 
         def load_depth(filename):
-            return cv2.imread(filename)[..., 0] / 255
+            return cv2.imread(filename)[..., 0] / 255 * 2.0 - 1.0
 
         def load_norm(filename):
             normal = cv2.imread(filename) / 255 * 2.0 - 1.0
@@ -77,7 +77,7 @@ class IRSLoader(Dataset):
 
         resize_transform = default_transform(self.scale_size)
 
-        depthmap = resize_transform(load_depth(gt_disp_name)) #* ZMAX
+        depthmap = resize_transform(load_depth(gt_disp_name))  # * ZMAX
         normalmap = resize_transform(load_norm(gt_norm_name))
 
         sample = {'img_names': img_names, 'depth': depthmap.float(),
