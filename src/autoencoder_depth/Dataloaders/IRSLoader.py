@@ -1,11 +1,9 @@
 from __future__ import print_function, division
 import os
-import OpenEXR
-import Imath
 import cv2
 import numpy as np
 from torch.utils.data import Dataset
-from autoencoder_depth.Dataloaders.utils import *
+from Dataloaders.utils import *
 
 ZMAX = 20
 
@@ -28,7 +26,7 @@ class IRSLoader(Dataset):
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
         except FileNotFoundError:
-            file = f"../splits/irs_{split}.txt"
+            file = f"/home/sjanny/codes/turbulence/src/autoencoder_depth/splits/irs_{split}.txt"
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
 
