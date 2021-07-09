@@ -7,6 +7,8 @@ import numpy as np
 from torch.utils.data import Dataset
 from autoencoder_depth.Dataloaders.utils import *
 
+ZMAX = 20
+
 
 class IRSLoader(Dataset):
 
@@ -30,6 +32,8 @@ class IRSLoader(Dataset):
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
 
+        if 'Samsung' in self.dataloc:
+            self.index = [k for k in self.index if 'Home' not in k]
         self.scale_size = scale_size
         self.split = split
         self.with_stereo = with_stereo
@@ -62,28 +66,24 @@ class IRSLoader(Dataset):
                 img = img[:, :, :3]
             return img
 
-        def load_disp(filename):
-            return load_exr(filename)
+        def load_depth(filename):
+            return cv2.imread(filename)[..., 0] / 255
 
         def load_norm(filename):
-            normal = load_exr(filename) * 2.0 - 1.0
-            ncv = cv2.imread(filename, cv2.IMREAD_UNCHANGED) * 2 - 1
+            normal = cv2.imread(filename) / 255 * 2.0 - 1.0
             # fix opposite normal
-            m = normal >= 0
-            m[:, :, 0:2] = False
-            normal[m] = - normal[m]
+            # m = normal >= 0
+            # m[:, :, 0:2] = False
+            # normal[m] = - normal[m]
             return normal
 
         resize_transform = default_transform(self.scale_size)
 
-        gt_disp = resize_transform(load_disp(gt_disp_name))
+        depthmap = resize_transform(load_depth(gt_disp_name)) * ZMAX
         normalmap = resize_transform(load_norm(gt_norm_name))
 
-        gt_disp[gt_disp == 0] = 0.001
-        depthmap = self.F * 0.1 / gt_disp
-
-        sample = {'img_names': img_names, 'depth': depthmap,
-                  'normal': normalmap}
+        sample = {'img_names': img_names, 'depth': depthmap.float(),
+                  'normal': normalmap.float()}
 
         if self.with_stereo:
             img_left = load_rgb(img_left_name)
@@ -96,31 +96,13 @@ class IRSLoader(Dataset):
         return sample
 
 
-def load_exr(filename):
-    File = OpenEXR.InputFile(filename)
-    PixType = Imath.PixelType(Imath.PixelType.FLOAT)
-    DW = File.header()['dataWindow']
-    CNum = len(File.header()['channels'].keys())
-    if CNum > 1:
-        Channels = ['R', 'G', 'B']
-        CNum = 3
-    else:
-        Channels = ['G']
-    Size = (DW.max.x - DW.min.x + 1, DW.max.y - DW.min.y + 1)
-    Pixels = [np.fromstring(File.channel(c, PixType), dtype=np.float32) for c in Channels]
-    hdr = np.zeros((Size[1], Size[0], CNum), dtype=np.float32)
-    if CNum == 1:
-        hdr[:, :, 0] = np.reshape(Pixels[0], (Size[1], Size[0]))
-    else:
-        hdr[:, :, 0] = np.reshape(Pixels[0], (Size[1], Size[0]))
-        hdr[:, :, 1] = np.reshape(Pixels[1], (Size[1], Size[0]))
-        hdr[:, :, 2] = np.reshape(Pixels[2], (Size[1], Size[0]))
-    h, w, c = hdr.shape
-    if c == 1:
-        hdr = np.squeeze(hdr)
-    return hdr
-
-
 if __name__ == '__main__':
     d = IRSLoader(scale_size=(240, 376), with_stereo=True)
     x = d[0]
+    # import matplotlib.pyplot as plt
+    #
+    # plt.figure()
+    # plt.imshow(x['depth'].numpy().transpose(1, 2, 0))
+    # plt.figure()
+    # plt.imshow(x['normal'].numpy().transpose(1, 2, 0))
+    # plt.show()
