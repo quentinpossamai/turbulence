@@ -11,9 +11,8 @@ class MLP(nn.Module):
         self.motor_size = motor_size
         self.n_past = n_past
 
-        input_size = n_past * (1 + 13 + motor_size)
         self.batch_norm0 = nn.BatchNorm2d(1)
-        self.linear1 = nn.Linear(in_features=input_size, out_features=256, bias=True)
+        self.linear1 = nn.Linear(in_features=self.n_past * (1 + 13 + self.motor_size), out_features=256, bias=True)
         self.batch_norm1 = nn.BatchNorm2d(1)
         self.linear2 = nn.Linear(in_features=256, out_features=256, bias=True)
         self.batch_norm2 = nn.BatchNorm2d(1)

@@ -203,13 +203,13 @@ def _compute_error_past(states, rpm, time, h, n_past, f):
     ground_truth = cropped_states[:, -h - 1:]
     with torch.no_grad():
         # Prediction rollout
-        prediction = [ground_truth[:, 0]]
+        prediction = [cropped_states[:, n_past - 1]]
         for i in range(h):
-            past_states = torch.cat([cropped_states[:, i:n_past - 1, :],
-                                     torch.stack(prediction, dim=1)[:, -n_past:, :]],
+            past_states = torch.cat([cropped_states[:, i:n_past - 1],
+                                     torch.stack(prediction, dim=1)[:, -n_past:]],
                                     dim=1)
-            past_motor = cropped_command[:, i:n_past + i, :]
-            past_dt = cropped_dt[:, i:n_past + i, :]
+            past_motor = cropped_command[:, i:n_past + i]
+            past_dt = cropped_dt[:, i:n_past + i]
             prediction.append(f(past_states, past_motor, past_dt))
 
     prediction = torch.stack(prediction, dim=1)

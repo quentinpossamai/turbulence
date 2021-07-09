@@ -1,6 +1,8 @@
+import argparse
 import datetime
 import numpy as np
 import random
+import sys
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -20,6 +22,7 @@ mkdir_if_not_exist([ANALYSIS_PATH])
 
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
+print(f"Device: {device}")
 
 
 def loss(next_state_gt, next_state_hat):
@@ -48,7 +51,7 @@ def validate(model, dataloader, horizon, past, epoch):
             next_state_gt = batch["state"][:, -horizon - 1:, :].to(device)
 
             # Horizon forward
-            next_state_hat = [state[:, 0, :]]
+            next_state_hat = [state[:, past - 1, :]]
             for j in range(horizon):
                 past_states = torch.cat([state[:, j:past - 1, :],
                                          torch.stack(next_state_hat, dim=1)[:, -past:, :]], dim=1)
@@ -62,7 +65,7 @@ def validate(model, dataloader, horizon, past, epoch):
     return torch.mean(torch.tensor(loss_log).float())
 
 
-def si_blackbird_quadrotor():
+def system_identification(batch_size, epochs, lr, horizon, past):
     # Reproducibility
     seed = 0
     torch.manual_seed(seed)
@@ -70,15 +73,15 @@ def si_blackbird_quadrotor():
     np.random.seed(seed)
 
     # Training parameters
-    batch_size = 32
-    epochs = 100
+    # batch_size = 32
+    # epochs = 100
+    # horizon = 1  # > 0
+    # past = 20  # > 0
     memory = 100000
-    horizon = 1
-    past = 1
 
     # model = ii_mlp.MLP(motor_size=6).to(device)
     model = iii_mlp_past.MLP(motor_size=6, n_past=past).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Load previous weights
     # weights = torch.load(ANALYSIS_PATH + "training/20210621_111255_MLPQuadrotor_bs_64000/2204_weights.pt")
@@ -88,7 +91,7 @@ def si_blackbird_quadrotor():
     # /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/tensorboard/
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/blackbird_learned_quadrotor_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
-    # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_learned_quadrotor_training/training/
+    # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_learned_hexarotor_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
@@ -104,9 +107,9 @@ def si_blackbird_quadrotor():
     # num_workers=1, pin_memory=True
 
     global_iteration = 0
-    for epoch in range(epochs):
+    for epoch_i in range(epochs):
         model.train()
-        for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch}")):
+        for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch_i}")):
             # Look in past states
             state = batch["state"].to(device)
             motor = batch["motor"].to(device)
@@ -115,7 +118,7 @@ def si_blackbird_quadrotor():
             next_state_gt = batch["state"][:, -horizon - 1:, :].to(device)
 
             # Horizon forward
-            next_state_hat = [state[:, 0, :]]
+            next_state_hat = [state[:, past - 1, :]]
             for j in range(horizon):
                 past_states = torch.cat([state[:, j:past - 1, :],
                                          torch.stack(next_state_hat, dim=1)[:, -past:, :]], dim=1)
@@ -132,12 +135,25 @@ def si_blackbird_quadrotor():
             optimizer.step()
             global_iteration = global_iteration + 1
 
-        validation_loss = validate(model, validation_data, horizon, past, epoch)
+        validation_loss = validate(model, validation_data, horizon, past, epoch_i)
         writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
         if validation_loss < memory:
             memory = validation_loss
             torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
 
 
+def main():
+    print(sys.argv)
+    parser = argparse.ArgumentParser(description="Identify model on data.")
+    parser.add_argument('--batch_size', default=32, type=int, help="Size of a batch")
+    parser.add_argument('--epochs', default=100, type=int, help="Number of epochs")
+    parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
+    parser.add_argument('--past', default=10, type=int, help="Number of past information to take in the model")
+    parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
+    args = parser.parse_args()
+    system_identification(args.batch_size, args.epochs, args.lr, args.horizon, args.past)
+    # system_identification(args.batch_size, args.epochs, args.lr, args.horizon, args.past)
+
+
 if __name__ == "__main__":
-    si_blackbird_quadrotor()
+    main()

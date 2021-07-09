@@ -1,3 +1,0 @@
-Working command:
-sbatch --gres=gpu:1 --mem 8G -p partition2 script.sh
-sbatch --gres=gpu:1 --mem 20G script.sh
