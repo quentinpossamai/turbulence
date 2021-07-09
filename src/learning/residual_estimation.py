@@ -120,7 +120,7 @@ def main():
     parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
-    parser.add_argument('--unit_size', default=256, type=int, help="Number of unit for the hidden layers")
+    parser.add_argument('--unit_size', default=16, type=int, help="Number of unit for the hidden layers")
     args = parser.parse_args()
     fit_residual(args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
 
