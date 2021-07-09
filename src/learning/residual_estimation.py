@@ -1,3 +1,4 @@
+import argparse
 import datetime
 import numpy as np
 import random
@@ -25,23 +26,33 @@ def loss(residual_gt, residual_hat):
     return fa_loss + tau_a_loss
 
 
-def validate(model, dataloader, horizon, epoch):
+def validate(model, dataloader, horizon, past, epoch):
     model.eval()
     loss_log = []
     with torch.no_grad():
         for batch in tqdm(dataloader, desc=f"Validation: {epoch}"):
-            state = batch["state"][:, :horizon, :].to(device)
-            motor = batch["motor"][:, :horizon, :].to(device)
+            # Look in past states
+            state = batch["state"].to(device)
+            motor = batch["motor"].to(device)
             t = batch["t"].to(device)
-            residual_gt = batch["residual"][:, -1:, :].to(device)
+            dt = t[:, 1:] - t[:, :-1]
+            residual_gt = batch["residual"][:, -1:].to(device)
 
-            residual_hat = model(state, motor, t[:, 1:, :] - t[:, :-1, :])
+            # Horizon forward
+            past_states = state[:, :past]
+            past_motor = motor[:, :past]
+            past_dt = dt[:, :past]
+            residual_hat = model(past_states, past_motor, past_dt)
+
             validation_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
             loss_log.append(validation_loss)
     return torch.mean(torch.tensor(loss_log).float())
 
 
-def euroc_mav_fa():
+def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
+    """
+    :param horizon: Here horizon is useless
+    """
     # Reproducibility
     seed = 0
     torch.manual_seed(seed)
@@ -49,26 +60,24 @@ def euroc_mav_fa():
     np.random.seed(seed)
 
     # Training parameters
-    batch_size = 32
-    epochs = 100
     memory = 100000
-    horizon = 10
 
-    model = MLPResidual(motor_size=6, n_past=horizon).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
+    model = MLPResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Tensorboard
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"{now}_{model.__class__.__name__}_bs_{batch_size}"
+    name = f"{now}_{model.__class__.__name__}_bs{batch_size}_bs{batch_size}_epch{epochs}_lr{lr}_h{horizon}_p{past}_us{unit_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
     writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=horizon), batch_size=batch_size, shuffle=True)
-    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=horizon),
+    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=horizon + past - 1),
+                            batch_size=batch_size, shuffle=True)
+    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=horizon + past - 1),
                                  batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 
@@ -76,14 +85,20 @@ def euroc_mav_fa():
     for epoch in range(epochs):
         model.train()
         for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch}")):
-            state = batch["state"][:, :horizon, :].to(device)
-            motor = batch["motor"][:, :horizon, :].to(device)
+            # Look in past states
+            state = batch["state"].to(device)
+            motor = batch["motor"].to(device)
             t = batch["t"].to(device)
-            residual_gt = batch["residual"][:, -1:, :].to(device)
+            dt = t[:, 1:] - t[:, :-1]
+            residual_gt = batch["residual"][:, -1:].to(device)
 
-            residual_hat = model(state, motor, t[:, 1:, :] - t[:, :-1, :])
+            # Horizon forward
+            past_states = state[:, :past]
+            past_motor = motor[:, :past]
+            past_dt = dt[:, :past]
+            residual_hat = model(past_states, past_motor, past_dt)
+
             training_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
-
             writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
 
             optimizer.zero_grad()
@@ -91,12 +106,24 @@ def euroc_mav_fa():
             optimizer.step()
             global_iteration = global_iteration + 1
 
-        validation_loss = validate(model, validation_data, horizon, epoch)
+        validation_loss = validate(model, validation_data, horizon, past, epoch)
         writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
         if validation_loss < memory:
             memory = validation_loss
             torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Identify model on data.")
+    parser.add_argument('--batch_size', default=32, type=int, help="Size of a batch")
+    parser.add_argument('--epochs', default=100, type=int, help="Number of epochs")
+    parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
+    parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
+    parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
+    parser.add_argument('--unit_size', default=256, type=int, help="Number of unit for the hidden layers")
+    args = parser.parse_args()
+    fit_residual(args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
+
+
 if __name__ == "__main__":
-    euroc_mav_fa()
+    main()

@@ -1,988 +1,0 @@
-Groundtruth loaded.
-PLY loaded.
-  0%|          | 0/1710 [00:00<?, ?it/s]Timestamp 1403715523912143104 has no groundtruth.
-Timestamp 1403715523962142976 has no groundtruth.
-Timestamp 1403715524012143104 has no groundtruth.
-Timestamp 1403715524062142976 has no groundtruth.
-Timestamp 1403715524112143104 has no groundtruth.
-Timestamp 1403715524162142976 has no groundtruth.
-Timestamp 1403715524212143104 has no groundtruth.
-Timestamp 1403715524262142976 has no groundtruth.
-Timestamp 1403715524312143104 has no groundtruth.
-Timestamp 1403715524362142976 has no groundtruth.
-Timestamp 1403715524412143104 has no groundtruth.
-Timestamp 1403715524462142976 has no groundtruth.
-Timestamp 1403715524512143104 has no groundtruth.
-Timestamp 1403715524562142976 has no groundtruth.
-Timestamp 1403715524612143104 has no groundtruth.
-Timestamp 1403715524662142976 has no groundtruth.
-Timestamp 1403715524712143104 has no groundtruth.
-Timestamp 1403715524762142976 has no groundtruth.
-Timestamp 1403715524812143104 has no groundtruth.
-Timestamp 1403715524862142976 has no groundtruth.
-Rendering timestamp 1403715524912143104...
-View pointcloud generated, 407063 points.
-119083 visible points found.
-  1%|          | 21/1710 [02:26<3:16:36,  6.98s/it]Rendering timestamp 1403715524962142976...
-View pointcloud generated, 407017 points.
-118893 visible points found.
-  1%|▏         | 22/1710 [04:54<7:29:26, 15.98s/it]Rendering timestamp 1403715525012143104...
-View pointcloud generated, 407003 points.
-118726 visible points found.
-  1%|▏         | 23/1710 [07:21<12:35:28, 26.87s/it]Rendering timestamp 1403715525062142976...
-View pointcloud generated, 406914 points.
-118535 visible points found.
-  1%|▏         | 24/1710 [09:47<18:31:22, 39.55s/it]Rendering timestamp 1403715525112143104...
-View pointcloud generated, 406824 points.
-118304 visible points found.
-  1%|▏         | 25/1710 [12:14<25:09:03, 53.73s/it]Rendering timestamp 1403715525162142976...
-View pointcloud generated, 406815 points.
-118189 visible points found.
-  2%|▏         | 26/1710 [14:42<32:07:52, 68.69s/it]Rendering timestamp 1403715525212143104...
-View pointcloud generated, 406775 points.
-118261 visible points found.
-  2%|▏         | 27/1710 [17:09<38:55:21, 83.26s/it]Rendering timestamp 1403715525262142976...
-View pointcloud generated, 406848 points.
-118257 visible points found.
-  2%|▏         | 28/1710 [19:37<45:12:46, 96.77s/it]Rendering timestamp 1403715525312143104...
-View pointcloud generated, 406722 points.
-118257 visible points found.
-  2%|▏         | 29/1710 [22:05<50:35:49, 108.36s/it]Rendering timestamp 1403715525362142976...
-View pointcloud generated, 406617 points.
-118275 visible points found.
-  2%|▏         | 30/1710 [24:32<55:07:50, 118.14s/it]Rendering timestamp 1403715525412143104...
-View pointcloud generated, 406535 points.
-118315 visible points found.
-  2%|▏         | 31/1710 [27:00<58:39:47, 125.78s/it]Rendering timestamp 1403715525462142976...
-View pointcloud generated, 406344 points.
-117974 visible points found.
-  2%|▏         | 32/1710 [29:27<61:16:06, 131.45s/it]Rendering timestamp 1403715525512143104...
-View pointcloud generated, 406363 points.
-118113 visible points found.
-  2%|▏         | 33/1710 [31:54<63:22:04, 136.03s/it]Rendering timestamp 1403715525562142976...
-View pointcloud generated, 406310 points.
-118057 visible points found.
-  2%|▏         | 34/1710 [34:22<64:55:48, 139.47s/it]Rendering timestamp 1403715525612143104...
-View pointcloud generated, 406296 points.
-118143 visible points found.
-  2%|▏         | 35/1710 [36:49<65:51:38, 141.55s/it]Rendering timestamp 1403715525662142976...
-View pointcloud generated, 406374 points.
-118305 visible points found.
-  2%|▏         | 36/1710 [39:15<66:26:24, 142.88s/it]Rendering timestamp 1403715525712143104...
-View pointcloud generated, 406418 points.
-118254 visible points found.
-  2%|▏         | 37/1710 [41:42<66:54:34, 143.98s/it]Rendering timestamp 1403715525762142976...
-View pointcloud generated, 406386 points.
-118320 visible points found.
-  2%|▏         | 38/1710 [44:10<67:23:59, 145.12s/it]Rendering timestamp 1403715525812143104...
-View pointcloud generated, 406359 points.
-118268 visible points found.
-  2%|▏         | 39/1710 [46:37<67:38:40, 145.73s/it]Rendering timestamp 1403715525862142976...
-View pointcloud generated, 406305 points.
-118332 visible points found.
-  2%|▏         | 40/1710 [49:03<67:40:13, 145.88s/it]Rendering timestamp 1403715525912143104...
-View pointcloud generated, 406491 points.
-118562 visible points found.
-  2%|▏         | 41/1710 [51:29<67:38:48, 145.91s/it]Rendering timestamp 1403715525962142976...
-View pointcloud generated, 406623 points.
-118490 visible points found.
-  2%|▏         | 42/1710 [53:56<67:45:26, 146.24s/it]Rendering timestamp 1403715526012143104...
-View pointcloud generated, 406616 points.
-118426 visible points found.
-  3%|▎         | 43/1710 [56:22<67:41:41, 146.19s/it]Rendering timestamp 1403715526062142976...
-View pointcloud generated, 406700 points.
-118526 visible points found.
-  3%|▎         | 44/1710 [58:49<67:42:04, 146.29s/it]Rendering timestamp 1403715526112143104...
-View pointcloud generated, 406632 points.
-118504 visible points found.
-  3%|▎         | 45/1710 [1:01:14<67:34:39, 146.11s/it]Rendering timestamp 1403715526162142976...
-View pointcloud generated, 406657 points.
-118517 visible points found.
-  3%|▎         | 46/1710 [1:03:40<67:32:10, 146.11s/it]Rendering timestamp 1403715526212143104...
-View pointcloud generated, 406649 points.
-118494 visible points found.
-  3%|▎         | 47/1710 [1:06:06<67:28:10, 146.06s/it]Rendering timestamp 1403715526262142976...
-View pointcloud generated, 406638 points.
-118607 visible points found.
-  3%|▎         | 48/1710 [1:08:33<67:33:56, 146.35s/it]Rendering timestamp 1403715526312143104...
-View pointcloud generated, 406650 points.
-118589 visible points found.
-  3%|▎         | 49/1710 [1:11:00<67:35:00, 146.48s/it]Rendering timestamp 1403715526362142976...
-View pointcloud generated, 406586 points.
-118603 visible points found.
-  3%|▎         | 50/1710 [1:13:26<67:29:23, 146.36s/it]Rendering timestamp 1403715526412143104...
-View pointcloud generated, 406589 points.
-118522 visible points found.
-  3%|▎         | 51/1710 [1:15:52<67:22:11, 146.19s/it]Rendering timestamp 1403715526462142976...
-View pointcloud generated, 406582 points.
-118593 visible points found.
-  3%|▎         | 52/1710 [1:18:19<67:22:18, 146.28s/it]Rendering timestamp 1403715526512143104...
-View pointcloud generated, 406596 points.
-118603 visible points found.
-  3%|▎         | 53/1710 [1:20:45<67:18:56, 146.25s/it]Rendering timestamp 1403715526562142976...
-View pointcloud generated, 406587 points.
-118594 visible points found.
-  3%|▎         | 54/1710 [1:23:11<67:16:30, 146.25s/it]Rendering timestamp 1403715526612143104...
-View pointcloud generated, 406557 points.
-118602 visible points found.
-  3%|▎         | 55/1710 [1:25:39<67:26:52, 146.71s/it]Rendering timestamp 1403715526662142976...
-View pointcloud generated, 406529 points.
-118581 visible points found.
-  3%|▎         | 56/1710 [1:28:05<67:20:13, 146.56s/it]Rendering timestamp 1403715526712143104...
-View pointcloud generated, 406506 points.
-118585 visible points found.
-  3%|▎         | 57/1710 [1:30:32<67:23:11, 146.76s/it]Rendering timestamp 1403715526762142976...
-View pointcloud generated, 406499 points.
-118627 visible points found.
-  3%|▎         | 58/1710 [1:32:58<67:13:33, 146.50s/it]Rendering timestamp 1403715526812143104...
-View pointcloud generated, 406489 points.
-118632 visible points found.
-  3%|▎         | 59/1710 [1:35:24<67:06:24, 146.33s/it]Rendering timestamp 1403715526862142976...
-View pointcloud generated, 406482 points.
-118649 visible points found.
-  4%|▎         | 60/1710 [1:37:49<66:55:29, 146.02s/it]Rendering timestamp 1403715526912143104...
-View pointcloud generated, 406535 points.
-118596 visible points found.
-  4%|▎         | 61/1710 [1:40:15<66:49:53, 145.90s/it]Rendering timestamp 1403715526962142976...
-View pointcloud generated, 406416 points.
-118670 visible points found.
-  4%|▎         | 62/1710 [1:42:41<66:47:30, 145.90s/it]Rendering timestamp 1403715527012143104...
-View pointcloud generated, 406466 points.
-118564 visible points found.
-  4%|▎         | 63/1710 [1:45:07<66:43:17, 145.84s/it]Rendering timestamp 1403715527062142976...
-View pointcloud generated, 406396 points.
-118610 visible points found.
-  4%|▎         | 64/1710 [1:47:33<66:41:36, 145.87s/it]Rendering timestamp 1403715527112143104...
-View pointcloud generated, 406392 points.
-118554 visible points found.
-  4%|▍         | 65/1710 [1:49:58<66:39:30, 145.88s/it]Rendering timestamp 1403715527162142976...
-View pointcloud generated, 406400 points.
-118565 visible points found.
-  4%|▍         | 66/1710 [1:52:24<66:38:14, 145.92s/it]Rendering timestamp 1403715527212143104...
-View pointcloud generated, 406259 points.
-118238 visible points found.
-  4%|▍         | 67/1710 [1:54:51<66:42:02, 146.15s/it]Rendering timestamp 1403715527262142976...
-View pointcloud generated, 406280 points.
-118198 visible points found.
-  4%|▍         | 68/1710 [1:57:19<66:50:20, 146.54s/it]Rendering timestamp 1403715527312143104...
-View pointcloud generated, 406297 points.
-118464 visible points found.
-  4%|▍         | 69/1710 [1:59:45<66:45:00, 146.44s/it]Rendering timestamp 1403715527362142976...
-View pointcloud generated, 406261 points.
-118598 visible points found.
-  4%|▍         | 70/1710 [2:02:11<66:43:44, 146.48s/it]Rendering timestamp 1403715527412143104...
-View pointcloud generated, 406128 points.
-118558 visible points found.
-  4%|▍         | 71/1710 [2:04:38<66:44:43, 146.60s/it]Rendering timestamp 1403715527462142976...
-View pointcloud generated, 406039 points.
-118642 visible points found.
-  4%|▍         | 72/1710 [2:07:04<66:36:08, 146.38s/it]Rendering timestamp 1403715527512143104...
-View pointcloud generated, 406078 points.
-118618 visible points found.
-  4%|▍         | 73/1710 [2:09:30<66:29:53, 146.24s/it]Rendering timestamp 1403715527562142976...
-View pointcloud generated, 406201 points.
-118536 visible points found.
-  4%|▍         | 74/1710 [2:11:57<66:29:21, 146.31s/it]Rendering timestamp 1403715527612143104...
-View pointcloud generated, 406044 points.
-118623 visible points found.
-  4%|▍         | 75/1710 [2:14:23<66:26:08, 146.28s/it]Rendering timestamp 1403715527662142976...
-View pointcloud generated, 405870 points.
-118558 visible points found.
-  4%|▍         | 76/1710 [2:16:51<66:39:21, 146.86s/it]Rendering timestamp 1403715527712143104...
-View pointcloud generated, 405844 points.
-118474 visible points found.
-  5%|▍         | 77/1710 [2:19:19<66:45:18, 147.16s/it]Rendering timestamp 1403715527762142976...
-View pointcloud generated, 405880 points.
-118468 visible points found.
-  5%|▍         | 78/1710 [2:21:45<66:38:34, 147.01s/it]Rendering timestamp 1403715527812143104...
-View pointcloud generated, 405766 points.
-118434 visible points found.
-  5%|▍         | 79/1710 [2:24:12<66:31:15, 146.83s/it]Rendering timestamp 1403715527862142976...
-View pointcloud generated, 405541 points.
-118291 visible points found.
-  5%|▍         | 80/1710 [2:26:39<66:33:40, 147.01s/it]Rendering timestamp 1403715527912143104...
-View pointcloud generated, 405497 points.
-118324 visible points found.
-  5%|▍         | 81/1710 [2:29:06<66:28:30, 146.91s/it]Rendering timestamp 1403715527962142976...
-View pointcloud generated, 405386 points.
-118191 visible points found.
-  5%|▍         | 82/1710 [2:31:34<66:31:25, 147.10s/it]Rendering timestamp 1403715528012143104...
-View pointcloud generated, 405631 points.
-118437 visible points found.
-  5%|▍         | 83/1710 [2:34:00<66:25:00, 146.96s/it]Rendering timestamp 1403715528062142976...
-View pointcloud generated, 405690 points.
-118417 visible points found.
-  5%|▍         | 84/1710 [2:36:27<66:18:56, 146.82s/it]Rendering timestamp 1403715528112143104...
-View pointcloud generated, 405660 points.
-118447 visible points found.
-  5%|▍         | 85/1710 [2:38:54<66:18:20, 146.89s/it]Rendering timestamp 1403715528162142976...
-View pointcloud generated, 405558 points.
-118326 visible points found.
-  5%|▌         | 86/1710 [2:41:20<66:12:51, 146.78s/it]Rendering timestamp 1403715528212143104...
-View pointcloud generated, 405357 points.
-118355 visible points found.
-  5%|▌         | 87/1710 [2:43:47<66:10:32, 146.79s/it]Rendering timestamp 1403715528262142976...
-View pointcloud generated, 405207 points.
-118378 visible points found.
-  5%|▌         | 88/1710 [2:46:14<66:07:14, 146.75s/it]Rendering timestamp 1403715528312143104...
-View pointcloud generated, 404555 points.
-118198 visible points found.
-  5%|▌         | 89/1710 [2:48:41<66:07:48, 146.87s/it]Rendering timestamp 1403715528362142976...
-View pointcloud generated, 403568 points.
-117728 visible points found.
-  5%|▌         | 90/1710 [2:51:09<66:15:08, 147.23s/it]Rendering timestamp 1403715528412143104...
-View pointcloud generated, 401693 points.
-115934 visible points found.
-  5%|▌         | 91/1710 [2:53:37<66:22:16, 147.58s/it]Rendering timestamp 1403715528462142976...
-View pointcloud generated, 398452 points.
-113774 visible points found.
-  5%|▌         | 92/1710 [2:56:08<66:47:49, 148.62s/it]Rendering timestamp 1403715528512143104...
-View pointcloud generated, 395415 points.
-113019 visible points found.
-  5%|▌         | 93/1710 [2:58:40<67:07:14, 149.43s/it]Rendering timestamp 1403715528562142976...
-View pointcloud generated, 394423 points.
-114038 visible points found.
-  5%|▌         | 94/1710 [3:01:10<67:13:53, 149.77s/it]Rendering timestamp 1403715528612143104...
-View pointcloud generated, 395536 points.
-118746 visible points found.
-  6%|▌         | 95/1710 [3:03:37<66:47:52, 148.90s/it]Rendering timestamp 1403715528662142976...
-View pointcloud generated, 397161 points.
-124339 visible points found.
-  6%|▌         | 96/1710 [3:05:57<65:36:21, 146.33s/it]Rendering timestamp 1403715528712143104...
-View pointcloud generated, 398957 points.
-130601 visible points found.
-  6%|▌         | 97/1710 [3:08:11<63:53:13, 142.59s/it]Rendering timestamp 1403715528762142976...
-View pointcloud generated, 400574 points.
-137225 visible points found.
-  6%|▌         | 98/1710 [3:10:18<61:41:31, 137.77s/it]Rendering timestamp 1403715528812143104...
-View pointcloud generated, 402129 points.
-143560 visible points found.
-  6%|▌         | 99/1710 [3:12:16<59:04:55, 132.03s/it]Rendering timestamp 1403715528862142976...
-View pointcloud generated, 404584 points.
-151349 visible points found.
-  6%|▌         | 100/1710 [3:14:06<56:02:31, 125.31s/it]Rendering timestamp 1403715528912143104...
-View pointcloud generated, 405993 points.
-157551 visible points found.
-  6%|▌         | 101/1710 [3:15:49<53:02:04, 118.66s/it]Rendering timestamp 1403715528962142976...
-View pointcloud generated, 407077 points.
-163602 visible points found.
-  6%|▌         | 102/1710 [3:17:25<49:59:12, 111.91s/it]Rendering timestamp 1403715529012143104...
-View pointcloud generated, 407021 points.
-169453 visible points found.
-  6%|▌         | 103/1710 [3:18:56<47:09:20, 105.64s/it]Rendering timestamp 1403715529062142976...
-View pointcloud generated, 405465 points.
-175885 visible points found.
-  6%|▌         | 104/1710 [3:20:21<44:22:16, 99.46s/it] Rendering timestamp 1403715529112143104...
-View pointcloud generated, 404112 points.
-184161 visible points found.
-  6%|▌         | 105/1710 [3:21:39<41:24:42, 92.89s/it]Rendering timestamp 1403715529162142976...
-View pointcloud generated, 402237 points.
-194026 visible points found.
-  6%|▌         | 106/1710 [3:22:47<38:03:17, 85.41s/it]Rendering timestamp 1403715529212143104...
-View pointcloud generated, 398993 points.
-203706 visible points found.
-  6%|▋         | 107/1710 [3:23:48<34:44:39, 78.03s/it]Rendering timestamp 1403715529262142976...
-View pointcloud generated, 394837 points.
-213590 visible points found.
-  6%|▋         | 108/1710 [3:24:38<31:04:30, 69.83s/it]Rendering timestamp 1403715529312143104...
-View pointcloud generated, 390256 points.
-221314 visible points found.
-  6%|▋         | 109/1710 [3:25:23<27:41:33, 62.27s/it]Rendering timestamp 1403715529362142976...
-View pointcloud generated, 384998 points.
-229628 visible points found.
-  6%|▋         | 110/1710 [3:26:03<24:42:02, 55.58s/it]Rendering timestamp 1403715529412143104...
-View pointcloud generated, 380108 points.
-235358 visible points found.
-  6%|▋         | 111/1710 [3:26:35<21:28:35, 48.35s/it]Rendering timestamp 1403715529462142976...
-View pointcloud generated, 375229 points.
-240112 visible points found.
-  7%|▋         | 112/1710 [3:27:03<18:48:29, 42.37s/it]Rendering timestamp 1403715529512143104...
-View pointcloud generated, 370749 points.
-245077 visible points found.
-  7%|▋         | 113/1710 [3:27:28<16:26:34, 37.07s/it]Rendering timestamp 1403715529562142976...
-View pointcloud generated, 365814 points.
-247836 visible points found.
-  7%|▋         | 114/1710 [3:27:50<14:27:56, 32.63s/it]Rendering timestamp 1403715529612143104...
-View pointcloud generated, 361171 points.
-249141 visible points found.
-  7%|▋         | 115/1710 [3:28:11<12:56:29, 29.21s/it]Rendering timestamp 1403715529662142976...
-View pointcloud generated, 357089 points.
-250838 visible points found.
-  7%|▋         | 116/1710 [3:28:31<11:37:37, 26.26s/it]Rendering timestamp 1403715529712143104...
-View pointcloud generated, 354073 points.
-252465 visible points found.
-  7%|▋         | 117/1710 [3:28:49<10:32:01, 23.80s/it]Rendering timestamp 1403715529762142976...
-View pointcloud generated, 350727 points.
-253345 visible points found.
-  7%|▋         | 118/1710 [3:29:05<9:35:17, 21.68s/it] Rendering timestamp 1403715529812143104...
-View pointcloud generated, 347673 points.
-254171 visible points found.
-  7%|▋         | 119/1710 [3:29:24<9:08:42, 20.69s/it]Rendering timestamp 1403715529862142976...
-View pointcloud generated, 345004 points.
-254503 visible points found.
-  7%|▋         | 120/1710 [3:29:39<8:22:45, 18.97s/it]Rendering timestamp 1403715529912143104...
-View pointcloud generated, 342647 points.
-255980 visible points found.
-  7%|▋         | 121/1710 [3:29:53<7:41:34, 17.43s/it]Rendering timestamp 1403715529962142976...
-View pointcloud generated, 341058 points.
-257119 visible points found.
-  7%|▋         | 122/1710 [3:30:07<7:17:49, 16.54s/it]Rendering timestamp 1403715530012143104...
-View pointcloud generated, 340892 points.
-259637 visible points found.
-  7%|▋         | 123/1710 [3:30:20<6:46:40, 15.38s/it]Rendering timestamp 1403715530062142976...
-View pointcloud generated, 341997 points.
-263114 visible points found.
-  7%|▋         | 124/1710 [3:30:31<6:14:33, 14.17s/it]Rendering timestamp 1403715530112143104...
-View pointcloud generated, 343723 points.
-267202 visible points found.
-  7%|▋         | 125/1710 [3:30:42<5:48:01, 13.17s/it]Rendering timestamp 1403715530162142976...
-View pointcloud generated, 344355 points.
-269221 visible points found.
-  7%|▋         | 126/1710 [3:30:53<5:31:30, 12.56s/it]Rendering timestamp 1403715530212143104...
-View pointcloud generated, 344262 points.
-270445 visible points found.
-  7%|▋         | 127/1710 [3:31:03<5:12:54, 11.86s/it]Rendering timestamp 1403715530262142976...
-View pointcloud generated, 344184 points.
-270824 visible points found.
-  7%|▋         | 128/1710 [3:31:15<5:12:40, 11.86s/it]Rendering timestamp 1403715530312143104...
-View pointcloud generated, 344332 points.
-272020 visible points found.
-  8%|▊         | 129/1710 [3:31:26<5:03:17, 11.51s/it]Rendering timestamp 1403715530362142976...
-View pointcloud generated, 343620 points.
-272238 visible points found.
-  8%|▊         | 130/1710 [3:31:37<4:58:12, 11.32s/it]Rendering timestamp 1403715530412143104...
-View pointcloud generated, 342538 points.
-272007 visible points found.
-  8%|▊         | 131/1710 [3:31:47<4:48:00, 10.94s/it]Rendering timestamp 1403715530462142976...
-View pointcloud generated, 340781 points.
-270210 visible points found.
-  8%|▊         | 132/1710 [3:31:56<4:38:48, 10.60s/it]Rendering timestamp 1403715530512143104...
-View pointcloud generated, 339299 points.
-269543 visible points found.
-  8%|▊         | 133/1710 [3:32:06<4:32:13, 10.36s/it]Rendering timestamp 1403715530562142976...
-View pointcloud generated, 336657 points.
-267729 visible points found.
-  8%|▊         | 134/1710 [3:32:16<4:28:27, 10.22s/it]Rendering timestamp 1403715530612143104...
-View pointcloud generated, 333611 points.
-265846 visible points found.
-  8%|▊         | 135/1710 [3:32:25<4:20:47,  9.93s/it]Rendering timestamp 1403715530662142976...
-View pointcloud generated, 330047 points.
-263721 visible points found.
-  8%|▊         | 136/1710 [3:32:35<4:14:40,  9.71s/it]Rendering timestamp 1403715530712143104...
-View pointcloud generated, 325266 points.
-260876 visible points found.
-  8%|▊         | 137/1710 [3:32:44<4:09:13,  9.51s/it]Rendering timestamp 1403715530762142976...
-View pointcloud generated, 318014 points.
-256957 visible points found.
-  8%|▊         | 138/1710 [3:32:53<4:05:31,  9.37s/it]Rendering timestamp 1403715530812143104...
-View pointcloud generated, 308623 points.
-252322 visible points found.
-  8%|▊         | 139/1710 [3:33:02<4:02:00,  9.24s/it]Rendering timestamp 1403715530862142976...
-View pointcloud generated, 297348 points.
-245902 visible points found.
-  8%|▊         | 140/1710 [3:33:10<3:57:44,  9.09s/it]Rendering timestamp 1403715530912143104...
-View pointcloud generated, 285616 points.
-240155 visible points found.
-  8%|▊         | 141/1710 [3:33:19<3:57:36,  9.09s/it]Rendering timestamp 1403715530962142976...
-View pointcloud generated, 275599 points.
-234870 visible points found.
-  8%|▊         | 142/1710 [3:33:28<3:54:23,  8.97s/it]Rendering timestamp 1403715531012143104...
-View pointcloud generated, 265242 points.
-228762 visible points found.
-  8%|▊         | 143/1710 [3:33:37<3:51:24,  8.86s/it]Rendering timestamp 1403715531062142976...
-View pointcloud generated, 256359 points.
-223187 visible points found.
-  8%|▊         | 144/1710 [3:33:45<3:49:22,  8.79s/it]Rendering timestamp 1403715531112143104...
-View pointcloud generated, 247655 points.
-218135 visible points found.
-  8%|▊         | 145/1710 [3:33:54<3:47:44,  8.73s/it]Rendering timestamp 1403715531162142976...
-View pointcloud generated, 240057 points.
-214042 visible points found.
-  9%|▊         | 146/1710 [3:34:02<3:45:29,  8.65s/it]Rendering timestamp 1403715531212143104...
-View pointcloud generated, 231096 points.
-209416 visible points found.
-  9%|▊         | 147/1710 [3:34:11<3:42:37,  8.55s/it]Rendering timestamp 1403715531262142976...
-View pointcloud generated, 223327 points.
-205295 visible points found.
-  9%|▊         | 148/1710 [3:34:20<3:45:21,  8.66s/it]Rendering timestamp 1403715531312143104...
-View pointcloud generated, 216963 points.
-202133 visible points found.
-  9%|▊         | 149/1710 [3:34:28<3:41:53,  8.53s/it]Rendering timestamp 1403715531362142976...
-View pointcloud generated, 211553 points.
-199361 visible points found.
-  9%|▉         | 150/1710 [3:34:36<3:41:28,  8.52s/it]Rendering timestamp 1403715531412143104...
-View pointcloud generated, 206998 points.
-196845 visible points found.
-  9%|▉         | 151/1710 [3:34:46<3:50:55,  8.89s/it]Rendering timestamp 1403715531462142976...
-View pointcloud generated, 203305 points.
-194379 visible points found.
-  9%|▉         | 152/1710 [3:34:56<3:59:51,  9.24s/it]Rendering timestamp 1403715531512143104...
-View pointcloud generated, 199521 points.
-191716 visible points found.
-  9%|▉         | 153/1710 [3:35:07<4:08:19,  9.57s/it]Rendering timestamp 1403715531562142976...
-View pointcloud generated, 195696 points.
-188730 visible points found.
-  9%|▉         | 154/1710 [3:35:18<4:20:04, 10.03s/it]Rendering timestamp 1403715531612143104...
-View pointcloud generated, 191698 points.
-185498 visible points found.
-  9%|▉         | 155/1710 [3:35:29<4:33:20, 10.55s/it]Rendering timestamp 1403715531662142976...
-View pointcloud generated, 187807 points.
-182380 visible points found.
-  9%|▉         | 156/1710 [3:35:41<4:41:53, 10.88s/it]Rendering timestamp 1403715531712143104...
-View pointcloud generated, 184769 points.
-179493 visible points found.
-  9%|▉         | 157/1710 [3:35:53<4:50:48, 11.24s/it]Rendering timestamp 1403715531762142976...
-View pointcloud generated, 182408 points.
-177303 visible points found.
-  9%|▉         | 158/1710 [3:36:05<4:57:51, 11.52s/it]Rendering timestamp 1403715531812143104...
-View pointcloud generated, 179991 points.
-174756 visible points found.
-  9%|▉         | 159/1710 [3:36:20<5:22:48, 12.49s/it]Rendering timestamp 1403715531862142976...
-View pointcloud generated, 177332 points.
-172061 visible points found.
-  9%|▉         | 160/1710 [3:36:35<5:39:23, 13.14s/it]Rendering timestamp 1403715531912143104...
-View pointcloud generated, 174269 points.
-169136 visible points found.
-  9%|▉         | 161/1710 [3:36:50<5:58:06, 13.87s/it]Rendering timestamp 1403715531962142976...
-View pointcloud generated, 171364 points.
-166233 visible points found.
-  9%|▉         | 162/1710 [3:37:07<6:17:28, 14.63s/it]Rendering timestamp 1403715532012143104...
-View pointcloud generated, 168545 points.
-163446 visible points found.
- 10%|▉         | 163/1710 [3:37:24<6:40:28, 15.53s/it]Rendering timestamp 1403715532062142976...
-View pointcloud generated, 166053 points.
-160941 visible points found.
- 10%|▉         | 164/1710 [3:37:43<7:01:35, 16.36s/it]Rendering timestamp 1403715532112143104...
-View pointcloud generated, 163831 points.
-158730 visible points found.
- 10%|▉         | 165/1710 [3:38:02<7:23:52, 17.24s/it]Rendering timestamp 1403715532162142976...
-View pointcloud generated, 161475 points.
-156388 visible points found.
- 10%|▉         | 166/1710 [3:38:22<7:48:21, 18.20s/it]Rendering timestamp 1403715532212143104...
-View pointcloud generated, 159035 points.
-153987 visible points found.
- 10%|▉         | 167/1710 [3:38:43<8:07:36, 18.96s/it]Rendering timestamp 1403715532262142976...
-View pointcloud generated, 156231 points.
-151490 visible points found.
- 10%|▉         | 168/1710 [3:39:05<8:26:51, 19.72s/it]Rendering timestamp 1403715532312143104...
-View pointcloud generated, 153401 points.
-148800 visible points found.
- 10%|▉         | 169/1710 [3:39:27<8:44:40, 20.43s/it]Rendering timestamp 1403715532362142976...
-View pointcloud generated, 150863 points.
-146205 visible points found.
- 10%|▉         | 170/1710 [3:39:49<8:57:20, 20.94s/it]Rendering timestamp 1403715532412143104...
-View pointcloud generated, 148381 points.
-143529 visible points found.
- 10%|█         | 171/1710 [3:40:12<9:16:44, 21.71s/it]Rendering timestamp 1403715532462142976...
-View pointcloud generated, 146300 points.
-141528 visible points found.
- 10%|█         | 172/1710 [3:40:36<9:28:53, 22.19s/it]Rendering timestamp 1403715532512143104...
-View pointcloud generated, 144318 points.
-139477 visible points found.
- 10%|█         | 173/1710 [3:40:59<9:39:44, 22.63s/it]Rendering timestamp 1403715532562142976...
-View pointcloud generated, 142221 points.
-137305 visible points found.
- 10%|█         | 174/1710 [3:41:23<9:50:34, 23.07s/it]Rendering timestamp 1403715532612143104...
-View pointcloud generated, 140076 points.
-134998 visible points found.
- 10%|█         | 175/1710 [3:41:48<10:04:24, 23.63s/it]Rendering timestamp 1403715532662142976...
-View pointcloud generated, 137931 points.
-132838 visible points found.
- 10%|█         | 176/1710 [3:42:14<10:17:27, 24.15s/it]Rendering timestamp 1403715532712143104...
-View pointcloud generated, 136080 points.
-130969 visible points found.
- 10%|█         | 177/1710 [3:42:40<10:30:08, 24.66s/it]Rendering timestamp 1403715532762142976...
-View pointcloud generated, 134674 points.
-129638 visible points found.
- 10%|█         | 178/1710 [3:43:06<10:41:25, 25.12s/it]Rendering timestamp 1403715532812143104...
-View pointcloud generated, 133941 points.
-128820 visible points found.
- 10%|█         | 179/1710 [3:43:33<10:54:28, 25.65s/it]Rendering timestamp 1403715532862142976...
-View pointcloud generated, 133875 points.
-128756 visible points found.
- 11%|█         | 180/1710 [3:43:59<11:01:46, 25.95s/it]Rendering timestamp 1403715532912143104...
-View pointcloud generated, 134548 points.
-129484 visible points found.
- 11%|█         | 181/1710 [3:44:26<11:08:52, 26.25s/it]Rendering timestamp 1403715532962142976...
-View pointcloud generated, 135766 points.
-130867 visible points found.
- 11%|█         | 182/1710 [3:44:52<11:08:49, 26.26s/it]Rendering timestamp 1403715533012143104...
-View pointcloud generated, 137528 points.
-132643 visible points found.
- 11%|█         | 183/1710 [3:45:20<11:14:51, 26.52s/it]Rendering timestamp 1403715533062142976...
-View pointcloud generated, 139791 points.
-135169 visible points found.
- 11%|█         | 184/1710 [3:45:46<11:11:53, 26.42s/it]Rendering timestamp 1403715533112143104...
-View pointcloud generated, 142314 points.
-137797 visible points found.
- 11%|█         | 185/1710 [3:46:12<11:11:54, 26.44s/it]Rendering timestamp 1403715533162142976...
-View pointcloud generated, 145056 points.
-139944 visible points found.
- 11%|█         | 186/1710 [3:46:39<11:10:46, 26.41s/it]Rendering timestamp 1403715533212143104...
-View pointcloud generated, 153783 points.
-144166 visible points found.
- 11%|█         | 187/1710 [3:47:05<11:12:33, 26.50s/it]Rendering timestamp 1403715533262142976...
-View pointcloud generated, 169455 points.
-149096 visible points found.
- 11%|█         | 188/1710 [3:47:32<11:13:11, 26.54s/it]Rendering timestamp 1403715533312143104...
-View pointcloud generated, 186271 points.
-156353 visible points found.
- 11%|█         | 189/1710 [3:47:58<11:10:10, 26.44s/it]Rendering timestamp 1403715533362142976...
-View pointcloud generated, 199021 points.
-164237 visible points found.
- 11%|█         | 190/1710 [3:48:23<10:59:18, 26.03s/it]Rendering timestamp 1403715533412143104...
-View pointcloud generated, 214803 points.
-171831 visible points found.
- 11%|█         | 191/1710 [3:48:48<10:45:56, 25.51s/it]Rendering timestamp 1403715533462142976...
-View pointcloud generated, 231900 points.
-179331 visible points found.
- 11%|█         | 192/1710 [3:49:11<10:32:06, 24.98s/it]Rendering timestamp 1403715533512143104...
-View pointcloud generated, 247556 points.
-187478 visible points found.
- 11%|█▏        | 193/1710 [3:49:34<10:10:57, 24.16s/it]Rendering timestamp 1403715533562142976...
-View pointcloud generated, 260981 points.
-195354 visible points found.
- 11%|█▏        | 194/1710 [3:49:56<9:57:21, 23.64s/it] Rendering timestamp 1403715533612143104...
-View pointcloud generated, 271739 points.
-202923 visible points found.
- 11%|█▏        | 195/1710 [3:50:16<9:32:30, 22.67s/it]Rendering timestamp 1403715533662142976...
-View pointcloud generated, 279709 points.
-209856 visible points found.
- 11%|█▏        | 196/1710 [3:50:37<9:16:25, 22.05s/it]Rendering timestamp 1403715533712143104...
-View pointcloud generated, 287259 points.
-217411 visible points found.
- 12%|█▏        | 197/1710 [3:50:56<8:49:41, 21.01s/it]Rendering timestamp 1403715533762142976...
-View pointcloud generated, 293125 points.
-223372 visible points found.
- 12%|█▏        | 198/1710 [3:51:15<8:35:18, 20.45s/it]Rendering timestamp 1403715533812143104...
-View pointcloud generated, 298962 points.
-229678 visible points found.
- 12%|█▏        | 199/1710 [3:51:33<8:19:47, 19.85s/it]Rendering timestamp 1403715533862142976...
-View pointcloud generated, 305422 points.
-236820 visible points found.
- 12%|█▏        | 200/1710 [3:51:51<8:01:40, 19.14s/it]Rendering timestamp 1403715533912143104...
-View pointcloud generated, 312898 points.
-245581 visible points found.
- 12%|█▏        | 201/1710 [3:52:07<7:42:48, 18.40s/it]Rendering timestamp 1403715533962142976...
-View pointcloud generated, 320040 points.
-253040 visible points found.
- 12%|█▏        | 202/1710 [3:52:23<7:25:32, 17.73s/it]Rendering timestamp 1403715534012143104...
-View pointcloud generated, 327096 points.
-260741 visible points found.
- 12%|█▏        | 203/1710 [3:52:39<7:10:14, 17.13s/it]Rendering timestamp 1403715534062142976...
-View pointcloud generated, 333974 points.
-268281 visible points found.
- 12%|█▏        | 204/1710 [3:52:54<6:51:42, 16.40s/it]Rendering timestamp 1403715534112143104...
-View pointcloud generated, 341132 points.
-276414 visible points found.
- 12%|█▏        | 205/1710 [3:53:08<6:34:58, 15.75s/it]Rendering timestamp 1403715534162142976...
-View pointcloud generated, 347236 points.
-284129 visible points found.
- 12%|█▏        | 206/1710 [3:53:22<6:19:10, 15.13s/it]Rendering timestamp 1403715534212143104...
-View pointcloud generated, 352325 points.
-291216 visible points found.
- 12%|█▏        | 207/1710 [3:53:35<6:02:34, 14.47s/it]Rendering timestamp 1403715534262142976...
-View pointcloud generated, 356082 points.
-297215 visible points found.
- 12%|█▏        | 208/1710 [3:53:46<5:39:53, 13.58s/it]Rendering timestamp 1403715534312143104...
-View pointcloud generated, 358345 points.
-301818 visible points found.
- 12%|█▏        | 209/1710 [3:53:57<5:22:25, 12.89s/it]Rendering timestamp 1403715534362142976...
-View pointcloud generated, 360273 points.
-305990 visible points found.
- 12%|█▏        | 210/1710 [3:54:08<5:07:53, 12.32s/it]Rendering timestamp 1403715534412143104...
-View pointcloud generated, 362130 points.
-309795 visible points found.
- 12%|█▏        | 211/1710 [3:54:19<4:56:29, 11.87s/it]Rendering timestamp 1403715534462142976...
-View pointcloud generated, 363797 points.
-312681 visible points found.
- 12%|█▏        | 212/1710 [3:54:30<4:46:31, 11.48s/it]Rendering timestamp 1403715534512143104...
-View pointcloud generated, 364986 points.
-315250 visible points found.
- 12%|█▏        | 213/1710 [3:54:40<4:39:01, 11.18s/it]Rendering timestamp 1403715534562142976...
-View pointcloud generated, 365994 points.
-317600 visible points found.
- 13%|█▎        | 214/1710 [3:54:51<4:32:14, 10.92s/it]Rendering timestamp 1403715534612143104...
-View pointcloud generated, 366697 points.
-319815 visible points found.
- 13%|█▎        | 215/1710 [3:55:01<4:24:36, 10.62s/it]Rendering timestamp 1403715534662142976...
-View pointcloud generated, 367409 points.
-321647 visible points found.
- 13%|█▎        | 216/1710 [3:55:10<4:18:41, 10.39s/it]Rendering timestamp 1403715534712143104...
-View pointcloud generated, 367701 points.
-323627 visible points found.
- 13%|█▎        | 217/1710 [3:55:20<4:12:03, 10.13s/it]Rendering timestamp 1403715534762142976...
-View pointcloud generated, 367502 points.
-324328 visible points found.
- 13%|█▎        | 218/1710 [3:55:29<4:02:54,  9.77s/it]Rendering timestamp 1403715534812143104...
-View pointcloud generated, 367382 points.
-325064 visible points found.
- 13%|█▎        | 219/1710 [3:55:38<3:54:35,  9.44s/it]Rendering timestamp 1403715534862142976...
-View pointcloud generated, 366669 points.
-325584 visible points found.
- 13%|█▎        | 220/1710 [3:55:46<3:45:58,  9.10s/it]Rendering timestamp 1403715534912143104...
-View pointcloud generated, 365371 points.
-324895 visible points found.
- 13%|█▎        | 221/1710 [3:55:54<3:40:57,  8.90s/it]Rendering timestamp 1403715534962142976...
-View pointcloud generated, 364270 points.
-324189 visible points found.
- 13%|█▎        | 222/1710 [3:56:02<3:35:07,  8.67s/it]Rendering timestamp 1403715535012143104...
-View pointcloud generated, 362844 points.
-322268 visible points found.
- 13%|█▎        | 223/1710 [3:56:10<3:29:40,  8.46s/it]Rendering timestamp 1403715535062142976...
-View pointcloud generated, 360138 points.
-319266 visible points found.
- 13%|█▎        | 224/1710 [3:56:18<3:22:51,  8.19s/it]Rendering timestamp 1403715535112143104...
-View pointcloud generated, 356775 points.
-316030 visible points found.
- 13%|█▎        | 225/1710 [3:56:26<3:19:52,  8.08s/it]Rendering timestamp 1403715535162142976...
-View pointcloud generated, 353158 points.
-312361 visible points found.
- 13%|█▎        | 226/1710 [3:56:33<3:15:33,  7.91s/it]Rendering timestamp 1403715535212143104...
-View pointcloud generated, 348970 points.
-308349 visible points found.
- 13%|█▎        | 227/1710 [3:56:41<3:11:13,  7.74s/it]Rendering timestamp 1403715535262142976...
-View pointcloud generated, 345352 points.
-303322 visible points found.
- 13%|█▎        | 228/1710 [3:56:48<3:07:49,  7.60s/it]Rendering timestamp 1403715535312143104...
-View pointcloud generated, 341553 points.
-298022 visible points found.
- 13%|█▎        | 229/1710 [3:56:55<3:05:40,  7.52s/it]Rendering timestamp 1403715535362142976...
-View pointcloud generated, 337216 points.
-291826 visible points found.
- 13%|█▎        | 230/1710 [3:57:02<3:03:18,  7.43s/it]Rendering timestamp 1403715535412143104...
-View pointcloud generated, 331392 points.
-283324 visible points found.
- 14%|█▎        | 231/1710 [3:57:10<3:02:39,  7.41s/it]Rendering timestamp 1403715535462142976...
-View pointcloud generated, 326018 points.
-276024 visible points found.
- 14%|█▎        | 232/1710 [3:57:17<3:04:19,  7.48s/it]Rendering timestamp 1403715535512143104...
-View pointcloud generated, 320475 points.
-269215 visible points found.
- 14%|█▎        | 233/1710 [3:57:25<3:06:24,  7.57s/it]Rendering timestamp 1403715535562142976...
-View pointcloud generated, 313643 points.
-263645 visible points found.
- 14%|█▎        | 234/1710 [3:57:33<3:06:24,  7.58s/it]Rendering timestamp 1403715535612143104...
-View pointcloud generated, 305613 points.
-258984 visible points found.
- 14%|█▎        | 235/1710 [3:57:40<3:04:08,  7.49s/it]Rendering timestamp 1403715535662142976...
-View pointcloud generated, 296382 points.
-253217 visible points found.
- 14%|█▍        | 236/1710 [3:57:47<3:01:48,  7.40s/it]Rendering timestamp 1403715535712143104...
-View pointcloud generated, 287297 points.
-247240 visible points found.
- 14%|█▍        | 237/1710 [3:57:54<2:59:11,  7.30s/it]Rendering timestamp 1403715535762142976...
-View pointcloud generated, 278579 points.
-241469 visible points found.
- 14%|█▍        | 238/1710 [3:58:01<2:57:20,  7.23s/it]Rendering timestamp 1403715535812143104...
-View pointcloud generated, 269989 points.
-235906 visible points found.
- 14%|█▍        | 239/1710 [3:58:08<2:55:27,  7.16s/it]Rendering timestamp 1403715535862142976...
-View pointcloud generated, 261706 points.
-230312 visible points found.
- 14%|█▍        | 240/1710 [3:58:15<2:53:56,  7.10s/it]Rendering timestamp 1403715535912143104...
-View pointcloud generated, 253800 points.
-225161 visible points found.
- 14%|█▍        | 241/1710 [3:58:23<2:54:28,  7.13s/it]Rendering timestamp 1403715535962142976...
-View pointcloud generated, 246220 points.
-219957 visible points found.
- 14%|█▍        | 242/1710 [3:58:30<2:55:45,  7.18s/it]Rendering timestamp 1403715536012143104...
-View pointcloud generated, 238874 points.
-214212 visible points found.
- 14%|█▍        | 243/1710 [3:58:37<2:57:41,  7.27s/it]Rendering timestamp 1403715536062142976...
-View pointcloud generated, 231179 points.
-208551 visible points found.
- 14%|█▍        | 244/1710 [3:58:45<3:00:17,  7.38s/it]Rendering timestamp 1403715536112143104...
-View pointcloud generated, 223671 points.
-203519 visible points found.
- 14%|█▍        | 245/1710 [3:58:53<3:04:49,  7.57s/it]Rendering timestamp 1403715536162142976...
-View pointcloud generated, 215978 points.
-198546 visible points found.
- 14%|█▍        | 246/1710 [3:59:01<3:07:57,  7.70s/it]Rendering timestamp 1403715536212143104...
-View pointcloud generated, 207629 points.
-192952 visible points found.
- 14%|█▍        | 247/1710 [3:59:09<3:13:12,  7.92s/it]Rendering timestamp 1403715536262142976...
-View pointcloud generated, 200459 points.
-187018 visible points found.
- 15%|█▍        | 248/1710 [3:59:19<3:21:47,  8.28s/it]Rendering timestamp 1403715536312143104...
-View pointcloud generated, 193893 points.
-181427 visible points found.
- 15%|█▍        | 249/1710 [3:59:28<3:31:52,  8.70s/it]Rendering timestamp 1403715536362142976...
-View pointcloud generated, 188066 points.
-176057 visible points found.
- 15%|█▍        | 250/1710 [3:59:39<3:43:38,  9.19s/it]Rendering timestamp 1403715536412143104...
-View pointcloud generated, 182162 points.
-170630 visible points found.
- 15%|█▍        | 251/1710 [3:59:49<3:55:26,  9.68s/it]Rendering timestamp 1403715536462142976...
-View pointcloud generated, 176152 points.
-164797 visible points found.
- 15%|█▍        | 252/1710 [4:00:01<4:10:54, 10.33s/it]Rendering timestamp 1403715536512143104...
-View pointcloud generated, 170070 points.
-158951 visible points found.
- 15%|█▍        | 253/1710 [4:00:14<4:29:19, 11.09s/it]Rendering timestamp 1403715536562142976...
-View pointcloud generated, 164005 points.
-153119 visible points found.
- 15%|█▍        | 254/1710 [4:00:29<4:57:19, 12.25s/it]Rendering timestamp 1403715536612143104...
-View pointcloud generated, 157940 points.
-147474 visible points found.
- 15%|█▍        | 255/1710 [4:00:45<5:24:00, 13.36s/it]Rendering timestamp 1403715536662142976...
-View pointcloud generated, 151823 points.
-142105 visible points found.
- 15%|█▍        | 256/1710 [4:01:02<5:50:02, 14.44s/it]Rendering timestamp 1403715536712143104...
-View pointcloud generated, 145702 points.
-137512 visible points found.
- 15%|█▌        | 257/1710 [4:01:20<6:15:31, 15.51s/it]Rendering timestamp 1403715536762142976...
-View pointcloud generated, 139497 points.
-132856 visible points found.
- 15%|█▌        | 258/1710 [4:01:38<6:35:50, 16.36s/it]Rendering timestamp 1403715536812143104...
-View pointcloud generated, 133213 points.
-127450 visible points found.
- 15%|█▌        | 259/1710 [4:01:57<6:54:42, 17.15s/it]Rendering timestamp 1403715536862142976...
-View pointcloud generated, 127485 points.
-122502 visible points found.
- 15%|█▌        | 260/1710 [4:02:25<8:11:14, 20.33s/it]Rendering timestamp 1403715536912143104...
-View pointcloud generated, 121942 points.
-117127 visible points found.
- 15%|█▌        | 261/1710 [4:02:55<9:21:59, 23.27s/it]Rendering timestamp 1403715536962142976...
-View pointcloud generated, 116306 points.
-111287 visible points found.
- 15%|█▌        | 262/1710 [4:03:29<10:36:01, 26.35s/it]Rendering timestamp 1403715537012143104...
-View pointcloud generated, 111311 points.
-106104 visible points found.
- 15%|█▌        | 263/1710 [4:04:05<11:49:10, 29.41s/it]Rendering timestamp 1403715537062142976...
-View pointcloud generated, 107261 points.
-101847 visible points found.
- 15%|█▌        | 264/1710 [4:04:45<13:00:58, 32.41s/it]Rendering timestamp 1403715537112143104...
-View pointcloud generated, 104481 points.
-98612 visible points found.
- 15%|█▌        | 265/1710 [4:05:27<14:14:32, 35.48s/it]Rendering timestamp 1403715537162142976...
-View pointcloud generated, 102640 points.
-96398 visible points found.
- 16%|█▌        | 266/1710 [4:06:13<15:26:20, 38.49s/it]Rendering timestamp 1403715537212143104...
-View pointcloud generated, 101371 points.
-94819 visible points found.
- 16%|█▌        | 267/1710 [4:07:01<16:32:00, 41.25s/it]Rendering timestamp 1403715537262142976...
-View pointcloud generated, 100621 points.
-93890 visible points found.
- 16%|█▌        | 268/1710 [4:07:49<17:25:44, 43.51s/it]Rendering timestamp 1403715537312143104...
-View pointcloud generated, 100102 points.
-93408 visible points found.
- 16%|█▌        | 269/1710 [4:08:38<18:05:03, 45.18s/it]Rendering timestamp 1403715537362142976...
-View pointcloud generated, 99661 points.
-93054 visible points found.
- 16%|█▌        | 270/1710 [4:09:27<18:31:54, 46.33s/it]Rendering timestamp 1403715537412143104...
-View pointcloud generated, 99416 points.
-92806 visible points found.
- 16%|█▌        | 271/1710 [4:10:16<18:49:57, 47.11s/it]Rendering timestamp 1403715537462142976...
-View pointcloud generated, 100141 points.
-93319 visible points found.
- 16%|█▌        | 272/1710 [4:11:04<18:55:36, 47.38s/it]Rendering timestamp 1403715537512143104...
-View pointcloud generated, 101152 points.
-94620 visible points found.
- 16%|█▌        | 273/1710 [4:11:51<18:45:35, 47.00s/it]Rendering timestamp 1403715537562142976...
-View pointcloud generated, 102908 points.
-96527 visible points found.
- 16%|█▌        | 274/1710 [4:12:34<18:21:11, 46.01s/it]Rendering timestamp 1403715537612143104...
-View pointcloud generated, 105205 points.
-98559 visible points found.
- 16%|█▌        | 275/1710 [4:13:17<17:54:52, 44.94s/it]Rendering timestamp 1403715537662142976...
-View pointcloud generated, 107964 points.
-100484 visible points found.
- 16%|█▌        | 276/1710 [4:13:58<17:30:14, 43.94s/it]Rendering timestamp 1403715537712143104...
-View pointcloud generated, 110702 points.
-101721 visible points found.
- 16%|█▌        | 277/1710 [4:14:39<17:08:43, 43.07s/it]Rendering timestamp 1403715537762142976...
-View pointcloud generated, 113397 points.
-102924 visible points found.
- 16%|█▋        | 278/1710 [4:15:20<16:53:15, 42.45s/it]Rendering timestamp 1403715537812143104...
-View pointcloud generated, 116252 points.
-104303 visible points found.
- 16%|█▋        | 279/1710 [4:16:01<16:39:15, 41.90s/it]Rendering timestamp 1403715537862142976...
-View pointcloud generated, 119122 points.
-105993 visible points found.
- 16%|█▋        | 280/1710 [4:16:41<16:21:58, 41.20s/it]Rendering timestamp 1403715537912143104...
-View pointcloud generated, 122249 points.
-108876 visible points found.
- 16%|█▋        | 281/1710 [4:17:18<15:57:40, 40.21s/it]Rendering timestamp 1403715537962142976...
-View pointcloud generated, 125775 points.
-112002 visible points found.
- 16%|█▋        | 282/1710 [4:17:54<15:23:09, 38.79s/it]Rendering timestamp 1403715538012143104...
-View pointcloud generated, 129660 points.
-115668 visible points found.
- 17%|█▋        | 283/1710 [4:18:27<14:41:49, 37.08s/it]Rendering timestamp 1403715538062142976...
-View pointcloud generated, 133713 points.
-119430 visible points found.
- 17%|█▋        | 284/1710 [4:18:57<13:52:34, 35.03s/it]Rendering timestamp 1403715538112143104...
-View pointcloud generated, 137924 points.
-123240 visible points found.
- 17%|█▋        | 285/1710 [4:19:25<13:02:29, 32.95s/it]Rendering timestamp 1403715538162142976...
-View pointcloud generated, 142189 points.
-127222 visible points found.
- 17%|█▋        | 286/1710 [4:19:45<11:24:29, 28.84s/it]Rendering timestamp 1403715538212143104...
-View pointcloud generated, 146517 points.
-130874 visible points found.
- 17%|█▋        | 287/1710 [4:20:03<10:07:23, 25.61s/it]Rendering timestamp 1403715538262142976...
-View pointcloud generated, 150995 points.
-134828 visible points found.
- 17%|█▋        | 288/1710 [4:20:19<9:03:11, 22.92s/it] Rendering timestamp 1403715538312143104...
-View pointcloud generated, 155455 points.
-138615 visible points found.
- 17%|█▋        | 289/1710 [4:20:36<8:16:59, 20.99s/it]Rendering timestamp 1403715538362142976...
-View pointcloud generated, 159841 points.
-142290 visible points found.
- 17%|█▋        | 290/1710 [4:20:51<7:37:10, 19.32s/it]Rendering timestamp 1403715538412143104...
-View pointcloud generated, 164023 points.
-145748 visible points found.
- 17%|█▋        | 291/1710 [4:21:06<7:04:43, 17.96s/it]Rendering timestamp 1403715538462142976...
-View pointcloud generated, 168600 points.
-149684 visible points found.
- 17%|█▋        | 292/1710 [4:21:25<7:09:09, 18.16s/it]Rendering timestamp 1403715538512143104...
-View pointcloud generated, 173652 points.
-154020 visible points found.
- 17%|█▋        | 293/1710 [4:21:42<7:03:35, 17.94s/it]Rendering timestamp 1403715538562142976...
-View pointcloud generated, 179105 points.
-158716 visible points found.
- 17%|█▋        | 294/1710 [4:21:58<6:48:08, 17.29s/it]Rendering timestamp 1403715538612143104...
-View pointcloud generated, 184982 points.
-163957 visible points found.
- 17%|█▋        | 295/1710 [4:22:10<6:13:54, 15.86s/it]Rendering timestamp 1403715538662142976...
-View pointcloud generated, 191208 points.
-169476 visible points found.
- 17%|█▋        | 296/1710 [4:22:22<5:41:53, 14.51s/it]Rendering timestamp 1403715538712143104...
-View pointcloud generated, 197754 points.
-175248 visible points found.
- 17%|█▋        | 297/1710 [4:22:31<5:07:05, 13.04s/it]Rendering timestamp 1403715538762142976...
-View pointcloud generated, 204603 points.
-181384 visible points found.
- 17%|█▋        | 298/1710 [4:22:40<4:37:11, 11.78s/it]Rendering timestamp 1403715538812143104...
-View pointcloud generated, 211310 points.
-187430 visible points found.
- 17%|█▋        | 299/1710 [4:22:48<4:12:52, 10.75s/it]Rendering timestamp 1403715538862142976...
-View pointcloud generated, 218483 points.
-194235 visible points found.
- 18%|█▊        | 300/1710 [4:22:56<3:52:53,  9.91s/it]Rendering timestamp 1403715538912143104...
-View pointcloud generated, 225974 points.
-201376 visible points found.
- 18%|█▊        | 301/1710 [4:23:04<3:37:52,  9.28s/it]Rendering timestamp 1403715538962142976...
-View pointcloud generated, 234338 points.
-209453 visible points found.
- 18%|█▊        | 302/1710 [4:23:12<3:24:25,  8.71s/it]Rendering timestamp 1403715539012143104...
-View pointcloud generated, 245525 points.
-220353 visible points found.
- 18%|█▊        | 303/1710 [4:23:19<3:13:59,  8.27s/it]Rendering timestamp 1403715539062142976...
-View pointcloud generated, 255430 points.
-229789 visible points found.
- 18%|█▊        | 304/1710 [4:23:26<3:05:42,  7.93s/it]Rendering timestamp 1403715539112143104...
-View pointcloud generated, 266189 points.
-239309 visible points found.
- 18%|█▊        | 305/1710 [4:23:33<2:56:56,  7.56s/it]Rendering timestamp 1403715539162142976...
-View pointcloud generated, 277705 points.
-249210 visible points found.
- 18%|█▊        | 306/1710 [4:23:39<2:50:52,  7.30s/it]Rendering timestamp 1403715539212143104...
-View pointcloud generated, 286986 points.
-257355 visible points found.
- 18%|█▊        | 307/1710 [4:23:46<2:46:42,  7.13s/it]Rendering timestamp 1403715539262142976...
-View pointcloud generated, 294061 points.
-263419 visible points found.
- 18%|█▊        | 308/1710 [4:23:53<2:45:32,  7.08s/it]Rendering timestamp 1403715539312143104...
-View pointcloud generated, 300251 points.
-266358 visible points found.
- 18%|█▊        | 309/1710 [4:24:00<2:46:23,  7.13s/it]Rendering timestamp 1403715539362142976...
-View pointcloud generated, 304336 points.
-266427 visible points found.
- 18%|█▊        | 310/1710 [4:24:08<2:50:15,  7.30s/it]Rendering timestamp 1403715539412143104...
-View pointcloud generated, 308246 points.
-265429 visible points found.
- 18%|█▊        | 311/1710 [4:24:16<2:54:51,  7.50s/it]Rendering timestamp 1403715539462142976...
-View pointcloud generated, 313280 points.
-264315 visible points found.
- 18%|█▊        | 312/1710 [4:24:26<3:11:32,  8.22s/it]Rendering timestamp 1403715539512143104...
-View pointcloud generated, 317400 points.
-261775 visible points found.
- 18%|█▊        | 313/1710 [4:24:37<3:33:16,  9.16s/it]Rendering timestamp 1403715539562142976...
-View pointcloud generated, 320533 points.
-260066 visible points found.
- 18%|█▊        | 314/1710 [4:24:48<3:47:01,  9.76s/it]Rendering timestamp 1403715539612143104...
-View pointcloud generated, 324028 points.
-260437 visible points found.
- 18%|█▊        | 315/1710 [4:25:02<4:12:46, 10.87s/it]Rendering timestamp 1403715539662142976...
-View pointcloud generated, 328062 points.
-261829 visible points found.
- 18%|█▊        | 316/1710 [4:25:16<4:33:11, 11.76s/it]Rendering timestamp 1403715539712143104...
-View pointcloud generated, 332871 points.
-264100 visible points found.
- 19%|█▊        | 317/1710 [4:25:30<4:49:54, 12.49s/it]Rendering timestamp 1403715539762142976...
-View pointcloud generated, 337171 points.
-266056 visible points found.
- 19%|█▊        | 318/1710 [4:25:44<5:03:40, 13.09s/it]Rendering timestamp 1403715539812143104...
-View pointcloud generated, 341736 points.
-268702 visible points found.
- 19%|█▊        | 319/1710 [4:25:59<5:14:23, 13.56s/it]Rendering timestamp 1403715539862142976...
-View pointcloud generated, 345055 points.
-270118 visible points found.
- 19%|█▊        | 320/1710 [4:26:14<5:24:39, 14.01s/it]Rendering timestamp 1403715539912143104...
-View pointcloud generated, 346776 points.
-271424 visible points found.
- 19%|█▉        | 321/1710 [4:26:31<5:42:36, 14.80s/it]Rendering timestamp 1403715539962142976...
-View pointcloud generated, 348928 points.
-273117 visible points found.
- 19%|█▉        | 322/1710 [4:26:48<5:56:03, 15.39s/it]Rendering timestamp 1403715540012143104...
-View pointcloud generated, 349830 points.
-273990 visible points found.
- 19%|█▉        | 323/1710 [4:27:02<5:52:43, 15.26s/it]Rendering timestamp 1403715540062142976...
-View pointcloud generated, 350621 points.
-275736 visible points found.
- 19%|█▉        | 324/1710 [4:27:18<5:51:21, 15.21s/it]Rendering timestamp 1403715540112143104...
-View pointcloud generated, 350596 points.
-276261 visible points found.
- 19%|█▉        | 325/1710 [4:27:35<6:07:20, 15.91s/it]Rendering timestamp 1403715540162142976...
-View pointcloud generated, 352751 points.
-278091 visible points found.
- 19%|█▉        | 326/1710 [4:27:50<5:59:05, 15.57s/it]Rendering timestamp 1403715540212143104...
-View pointcloud generated, 354884 points.
-280682 visible points found.
- 19%|█▉        | 327/1710 [4:28:03<5:39:37, 14.73s/it]Rendering timestamp 1403715540262142976...
-View pointcloud generated, 358982 points.
-284332 visible points found.
- 19%|█▉        | 328/1710 [4:28:15<5:25:46, 14.14s/it]Rendering timestamp 1403715540312143104...
-View pointcloud generated, 362503 points.
-287812 visible points found.
- 19%|█▉        | 329/1710 [4:28:28<5:13:11, 13.61s/it]Rendering timestamp 1403715540362142976...
-View pointcloud generated, 365051 points.
-290626 visible points found.
- 19%|█▉        | 330/1710 [4:28:40<5:04:46, 13.25s/it]Rendering timestamp 1403715540412143104...
-View pointcloud generated, 366423 points.
-292758 visible points found.
- 19%|█▉        | 331/1710 [4:28:52<4:56:08, 12.89s/it]Rendering timestamp 1403715540462142976...
-View pointcloud generated, 367023 points.
-293509 visible points found.
- 19%|█▉        | 332/1710 [4:29:04<4:51:23, 12.69s/it]Rendering timestamp 1403715540512143104...
-View pointcloud generated, 364532 points.
-292351 visible points found.
- 19%|█▉        | 333/1710 [4:29:17<4:47:12, 12.51s/it]Rendering timestamp 1403715540562142976...
-View pointcloud generated, 361517 points.
-289559 visible points found.
- 20%|█▉        | 334/1710 [4:29:29<4:45:28, 12.45s/it]Rendering timestamp 1403715540612143104...
-View pointcloud generated, 357979 points.
-286180 visible points found.
- 20%|█▉        | 335/1710 [4:29:41<4:46:28, 12.50s/it]Rendering timestamp 1403715540662142976...
-View pointcloud generated, 354902 points.
-284032 visible points found.
- 20%|█▉        | 336/1710 [4:29:54<4:47:52, 12.57s/it]Rendering timestamp 1403715540712143104...
-View pointcloud generated, 353021 points.
-282525 visible points found.
- 20%|█▉        | 337/1710 [4:30:07<4:50:26, 12.69s/it]Rendering timestamp 1403715540762142976...
-View pointcloud generated, 351371 points.
-281222 visible points found.
- 20%|█▉        | 338/1710 [4:30:20<4:51:50, 12.76s/it]Rendering timestamp 1403715540812143104...
-View pointcloud generated, 351397 points.
-281310 visible points found.
- 20%|█▉        | 339/1710 [4:30:33<4:53:35, 12.85s/it]Rendering timestamp 1403715540862142976...
-View pointcloud generated, 351155 points.
-280854 visible points found.
- 20%|█▉        | 340/1710 [4:30:46<4:53:36, 12.86s/it]Rendering timestamp 1403715540912143104...
-View pointcloud generated, 350712 points.
-279342 visible points found.
- 20%|█▉        | 341/1710 [4:30:59<4:52:58, 12.84s/it]Rendering timestamp 1403715540962142976...
-View pointcloud generated, 349697 points.
-slurmstepd-deedee: error: *** JOB 5632 ON deedee CANCELLED AT 2021-07-06T14:32:16 ***
