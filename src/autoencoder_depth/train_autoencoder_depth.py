@@ -82,7 +82,7 @@ def validate(model, dataloader, viz=False, epoch=1000):
     l_cost, l_depth, l_grad, l_psnr = [], [], [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
-            depthmap = x.to(device).unsqueeze(1)
+            depthmap = x['depth'].to(device)
             out = model(depthmap)
             costs = get_loss(depthmap, out)
             psnr = 10 * torch.log10(4 * ZMAX / costs[1])
