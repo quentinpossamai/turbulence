@@ -69,7 +69,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/training/
     # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    name = f"{now}_{model.__class__.__name__}_bs{batch_size}_bs{batch_size}_epch{epochs}_lr{lr}_h{horizon}_p{past}_us{unit_size}"
+    name = f"{now}_{model.__class__.__name__}_bs{batch_size}_epch{epochs}_lr{lr}_h{horizon}_p{past}_us{unit_size}"
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
     writer = SummaryWriter(training_path)
