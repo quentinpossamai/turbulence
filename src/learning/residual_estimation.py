@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.drone_models.residual.mlp import MLPResidual
+from src.drone_models.residual.gru import GRUResidual
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
@@ -21,8 +22,8 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 
 def loss(residual_gt, residual_hat):
     mse_loss = nn.MSELoss()
-    fa_loss = mse_loss(residual_gt[:, 0, :3], residual_hat[:, :3])
-    tau_a_loss = mse_loss(residual_gt[:, 0, 3:], residual_hat[:, 3:])
+    fa_loss = mse_loss(residual_gt[:, :, :3], residual_hat[:, :, :3])
+    tau_a_loss = mse_loss(residual_gt[:, :, 3:], residual_hat[:, :, 3:])
     return fa_loss + tau_a_loss
 
 
@@ -36,7 +37,7 @@ def validate(model, dataloader, horizon, past, epoch):
             motor = batch["motor"].to(device)
             t = batch["t"].to(device)
             dt = t[:, 1:] - t[:, :-1]
-            residual_gt = batch["residual"][:, -1:].to(device)
+            residual_gt = batch["residual"][:, 1:].to(device)
 
             # Horizon forward
             past_states = state[:, :past]
@@ -50,9 +51,6 @@ def validate(model, dataloader, horizon, past, epoch):
 
 
 def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
-    """
-    :param horizon: Here horizon is useless
-    """
     # Reproducibility
     seed = 0
     torch.manual_seed(seed)
@@ -62,7 +60,8 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # Training parameters
     memory = 100000
 
-    model = MLPResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
+    # model = MLPResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
+    model = GRUResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Tensorboard
@@ -90,7 +89,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
             motor = batch["motor"].to(device)
             t = batch["t"].to(device)
             dt = t[:, 1:] - t[:, :-1]
-            residual_gt = batch["residual"][:, -1:].to(device)
+            residual_gt = batch["residual"][:, 1:].to(device)
 
             # Horizon forward
             past_states = state[:, :past]
@@ -120,7 +119,7 @@ def main():
     parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
-    parser.add_argument('--unit_size', default=16, type=int, help="Number of unit for the hidden layers")
+    parser.add_argument('--unit_size', default=256, type=int, help="Number of unit for the hidden layers")
     args = parser.parse_args()
     fit_residual(args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
 

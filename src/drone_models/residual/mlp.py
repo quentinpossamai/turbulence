@@ -23,9 +23,9 @@ class MLPResidual(nn.Module):
     def forward(self, state, motor, dt):
         """
         Estimate the residual = GT - model
-        :param state: (batch * step * values=13)
-        :param motor: (batch * step * values=6)
-        :param dt: (batch * step * value=1)
+        :param state: (batch, step, values=13)
+        :param motor: (batch, step, values=6)
+        :param dt: (batch, step, values=1)
         :return: (batch, value=6)
         """
         batch_size = state.shape[0]
