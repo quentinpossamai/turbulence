@@ -4,6 +4,9 @@ import OpenEXR
 import Imath
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+
+ZMAX = 20
 
 
 def load_exr(filename):
@@ -30,4 +33,31 @@ def load_exr(filename):
         hdr = np.squeeze(hdr)
     return hdr
 
+
 if __name__ == '__main__':
+    DIR = "/home/sjanny/IRS/"
+    maxz, minz = 0, 100000
+    disparity_ex, normal_ex = [], []
+    for scene in os.listdir(DIR):
+        for detail in os.listdir(DIR + "/" + scene):
+            dataloc = DIR + "/" + scene + "/" + detail
+            for file in os.listdir(dataloc):
+                if "exr" in file:
+                    if "d" in file:
+                        disparity_ex.append(dataloc + "/" + file)
+                    elif "n" in file:
+                        normal_ex.append(dataloc + "/" + file)
+
+    for ex in tqdm(disparity_ex):
+        disp = load_exr(ex)
+        disp[disp == 0] = 0.001
+        z = 48 / disp
+        assert z.min() >= 0
+        z = np.clip(z, 0, ZMAX)
+        z = z / ZMAX
+        plt.imsave(ex.replace('exr', 'png'), np.stack([z, z, z], axis=-1))
+
+    for ex in tqdm(normal_ex):
+        n = load_exr(ex)
+        assert n.min() >= 0 and n.max() <= 1
+        plt.imsave(ex.replace('exr', 'png'), n)

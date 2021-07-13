@@ -1,9 +1,9 @@
 import torch
 import argparse
-from src.autoencoder_depth.Dataloaders.EurocMAVLoader import EurocMavLoader
-from src.autoencoder_depth.Dataloaders.IRSLoader import IRSLoader
+from Dataloaders.EurocMAVLoader import EurocMavLoader
+from Dataloaders.IRSLoader import IRSLoader
 import torch.nn as nn
-from src.autoencoder_depth.model import Autoencoder
+from model import Autoencoder
 import random
 import numpy as np
 from torch.utils.data import DataLoader
@@ -82,10 +82,10 @@ def validate(model, dataloader, viz=False, epoch=1000):
     l_cost, l_depth, l_grad, l_psnr = [], [], [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
-            depthmap = x.to(device).unsqueeze(1)
+            depthmap = x['depth'].to(device)
             out = model(depthmap)
             costs = get_loss(depthmap, out)
-            psnr = 10 * torch.log10(4 * ZMAX / costs[1])
+            psnr = 10 * torch.log10(4 / costs[1])
 
             l_cost.append(costs[0].detach().cpu().numpy())
             l_depth.append(costs[1].detach().cpu().numpy())
@@ -123,15 +123,14 @@ def main():
     random.seed(0)
     np.random.seed(0)
 
-    train_dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,
+    train_dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=16,
                                   shuffle=True,
-                                  num_workers=0,
+                                  num_workers=1,
                                   pin_memory=True)
 
-    ######################
-    val_dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,  #############@
+    val_dataloader = DataLoader(datasets[args.dataset](split='val'), batch_size=16,
                                 shuffle=False,
-                                num_workers=0,
+                                num_workers=1,
                                 pin_memory=True)
 
     model = Autoencoder(feature_size=args.feature_size, in_channel=1).to(device)
