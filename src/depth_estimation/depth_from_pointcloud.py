@@ -261,6 +261,18 @@ def gen_img(pipe, transform, xyz):
     filled_z = (filled_z / ZMAX)
     filled_n = ((filled_n + 1) / 2)
 
+    fig, ax = plt.subplots(2, 2)
+    ax[0][0].imshow(z_image)
+    ax[0][1].imshow(filled_z)
+    ax[1][0].imshow(n_image)
+    ax[1][1].imshow(filled_n)
+
+    ax[0][0].axis("off")
+    ax[0][1].axis("off")
+    ax[1][0].axis("off")
+    ax[1][1].axis("off")
+    plt.show()
+
     # plt.imsave("depth_estimation.png", np.stack([filled_z, filled_z, filled_z], axis=-1))
     # p = plt.imread("depth_estimation.png").astype(np.float64)[:, :, 0]
     #
