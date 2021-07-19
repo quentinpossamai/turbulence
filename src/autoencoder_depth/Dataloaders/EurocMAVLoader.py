@@ -18,7 +18,7 @@ class EurocMavLoader(Dataset):
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
         except FileNotFoundError:
-            file = f"../splits/eurocmav_{split}.txt"
+            file = f"/home/sjanny/codes/turbulence/src/autoencoder_depth/splits/eurocmav_{split}.txt"
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
 
