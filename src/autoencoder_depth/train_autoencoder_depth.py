@@ -11,12 +11,12 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', default=10, type=int)
+parser.add_argument('--epoch', default=0, type=int)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--dataset', default="irs", type=str)
-parser.add_argument('--feature_size', default=1024, type=int)
+parser.add_argument('--feature_size', default=512, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
-parser.add_argument('--name', default='autoencoder_depth', type=str)
+parser.add_argument('--name', default='autoencoder_depth_irs_512_irs', type=str)
 
 args = parser.parse_args()
 
@@ -31,7 +31,8 @@ datasets = {'eurocmav': EurocMavLoader, 'irs': IRSLoader}
 
 
 def evaluate():
-    dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,
+    print(args)
+    dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=16,
                             shuffle=False,
                             num_workers=0,
                             pin_memory=True)
@@ -39,16 +40,16 @@ def evaluate():
     model = Autoencoder(feature_size=args.feature_size).to(device)
     try:
         state_dict = torch.load(
-            f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn",
+            f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn",
             map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
-            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn",
+            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn",
             map_location=device)
 
     model.load_state_dict(state_dict)
 
-    validate(model, dataloader, viz=True)
+    validate(model, dataloader, viz=False)
 
 
 def vizualize(gt, pred):
@@ -157,10 +158,10 @@ def main():
             memory = error
             try:
                 torch.save(model.state_dict(),
-                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn")
+                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn")
             except FileNotFoundError:
                 torch.save(model.state_dict(),
-                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn")
+                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn")
             print("Saved!")
 
     evaluate()
