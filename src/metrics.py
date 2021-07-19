@@ -182,7 +182,7 @@ def mse_error_past(f, horizon, dataset, mode="test"):
         states = torch.FloatTensor(flights[k]["state"])
         motor = torch.FloatTensor(flights[k]["motor"])
         time = torch.FloatTensor(flights[k]['t'])
-        error_per_flight[k] = _compute_error_past(states, motor, time, horizon, f.n_past, f)
+        error_per_flight[k] = _compute_error_past(states, motor, time, horizon, f.time_size, f)
 
     # Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()

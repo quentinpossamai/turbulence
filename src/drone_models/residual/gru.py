@@ -9,7 +9,7 @@ class GRUResidual(nn.Module):
         self.motor_size = motor_size
         self.n_past = n_past
         self.unit_size = unit_size
-        self.num_layers = 4
+        self.num_layers = 2
 
         self.batch_norm_gru0 = nn.BatchNorm1d(self.n_past)
         self.gru0 = nn.GRU(input_size=1 + 13 + self.motor_size,
@@ -21,10 +21,10 @@ class GRUResidual(nn.Module):
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
         self.linear2 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
-        self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
-        self.linear3 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
-        self.batch_norm3 = nn.BatchNorm1d(self.unit_size)
-        self.linear4 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
+        # self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
+        # self.linear3 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
+        # self.batch_norm3 = nn.BatchNorm1d(self.unit_size)
+        # self.linear4 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
     def forward(self, state, motor, dt):
         """
@@ -48,10 +48,9 @@ class GRUResidual(nn.Module):
         out = self.batch_norm0(out)
         out = relu(self.linear1(out))
         out = self.batch_norm1(out)
-        out = relu(self.linear2(out))
-        out = self.batch_norm2(out)
-        out = relu(self.linear3(out))
-        out = self.batch_norm3(out)
-        # out = self.batch_norm3(out.view((batch_size, 1, self.unit_size))).view((batch_size, self.unit_size))
-        out = self.linear4(out)
+        out = self.linear2(out)
+        # out = self.batch_norm2(out)
+        # out = relu(self.linear3(out))
+        # out = self.batch_norm3(out)
+        # out = self.linear4(out)
         return out.view(batch_size, self.n_past, 6)  # residual

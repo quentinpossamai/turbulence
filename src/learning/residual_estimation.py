@@ -81,6 +81,8 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # num_workers=1, pin_memory=True
 
     global_iteration = 0
+    validation_loss = validate(model, validation_data, horizon, past, epoch=0)
+    writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
     for epoch in range(epochs):
         model.train()
         for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch}")):
