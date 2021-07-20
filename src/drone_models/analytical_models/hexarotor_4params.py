@@ -57,8 +57,7 @@ class DynamicalModel(nn.Module):
         # Linear PFD
         g = torch.FloatTensor([0, 0, 9.81]).view(1, 3)
         thrust = torch.cat([torch.zeros(batch_size, 1), torch.zeros(batch_size, 1), motor_torsor[:, 3:]], dim=1)
-        next_lin_vel = lin_vel + dt * (self.theta[0] * quaternion.qrot(quat, thrust) - g
-                                       + quaternion.qrot(quat, kfa))
+        next_lin_vel = lin_vel + dt * (quaternion.qrot(quat, self.theta[0] * thrust + kfa) - g)
 
         # Position
         next_pos = pos + dt * next_lin_vel
@@ -83,7 +82,7 @@ class DynamicalModel(nn.Module):
         motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
                                           [-b, -b, +0, +b, +b, +0],
                                           [-1, +1, -1, +1, -1, +1],
-                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
+                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6).double()
 
         motor = command[:, self.permutation]
         omega_squared = motor ** 2
@@ -100,6 +99,7 @@ class DynamicalModel(nn.Module):
         quat_bar = quat * torch.tensor([-1, -1, -1, 1]).view(1, 4)
         batch_size = len(quat)
         g = torch.tensor([0, 0, 9.81]).view(1, 3)
+
         thrust = torch.cat([torch.zeros((batch_size, 2)), self.theta[0] * motor_torsor[:, 3].view(-1, 1)], dim=1)
         kfa = quaternion.qrot(quat_bar, lin_acc + g) - thrust
 
@@ -107,6 +107,19 @@ class DynamicalModel(nn.Module):
         t12_tensor = torch.tensor([self.theta[1], self.theta[1], self.theta[2]]).view(1, 3)
         ktaua = (ang_acc - torch.cross(t3_tensor * ang_vel, ang_vel)
                  - t12_tensor * motor_torsor[:, :3])
+
+        # discontinuities [2850, 2875]
+        start, stop = 2462, 2468
+        # plt.plot(kfa[start:  stop])  # Problem
+        # plt.show()
+        # plt.plot(dt[start:stop])  # no
+        # plt.plot(state[start:stop, 7:10][:, 0])  # lin_vel  no !!!
+        # plt.plot(quat_bar[start:stop])  # no
+        # plt.plot(ang_vel[start:stop])  # no !! DT ?
+        # plt.plot(lin_acc[start:stop, 0])  # y
+        # plt.plot(ang_acc[start:stop])
+        # plt.plot(motor_torsor[start:stop])  # no
+
         return torch.cat([kfa, ktaua], dim=1)
 
 
@@ -114,81 +127,31 @@ def main():
     model = DynamicalModel(paper=False)
     # Sanity check
     def sanity_check(data):
-        test = torch.zeros(len(data), 13)
-        test2 = torch.zeros(len(data), 13)
+        analysis1 = torch.zeros(len(data), 13)
+        analysis2 = torch.zeros(len(data), 13)
+        analysis3 = torch.zeros(len(data), 6)
         for i in range(len(data)):
             state = data[i]["state"][-2].view(1, -1)
             motor = data[i]["motor"][-2].view(1, -1)
-            residual = data[i]["residual"][-1].view(1, -1)
+            residual_gt = data[i]["residual"][-1].view(1, -1)
             next_state_gt = data[i]["state"][-1].view(1, -1)
             dt = data[i]["t"][-1].view(1, -1) - data[i]["t"][-2].view(1, -1)
-            next_state_hat = model(state, motor, dt, residual)
-            test[i, :] = (next_state_gt - next_state_hat) ** 2
-            if any(test[i] > 10):
-                print(i)
-                # plt.plot(data[i]["state"][:, :3])
 
-            test2[i, :] = next_state_hat
-        print()
-        plt.plot(torch.stack([e["state"][-2] for e in data])[:, :3])
-        plt.plot(test2[:, 3:7])
-        plt.plot(torch.stack([e["state"][-1] for e in data])[:, 3:7])  # next_state_gt
-        plt.ylim([-1, 1])
+            residual_hat = model.residual_dynamic(motor, state, next_state_gt, dt)
+            next_state_hat = model(state, motor, dt, residual_gt)
 
-        plt.plot(test, label="x")
-        plt.ylim([-1e1, 1e2])
-        plt.legend()
-
-        plt.plot(data[900]["state"][:, :])
+            analysis1[i, :] = (next_state_gt - next_state_hat) ** 2
+            # analysis2[i, :] = next_state_hat
+            analysis3[i, :] = (residual_hat - residual_gt) ** 2
+        print(torch.mean(analysis1, dim=0))
         # assert (torch.max(test, 0)[0] < 2.5e-7).all()
 
-    # data = euroc.EurocMAVDatasetHorizon("train", traj_len=11)
-    # sanity_check(data)
-    # data = euroc.EurocMAVDatasetHorizon("validation", traj_len=11)
-    # sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("test", traj_len=11)
+    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21)
     sanity_check(data)
-
-
-    # pos = state[:, :3]
-    # quat = state[:, 3:7]
-    # lin_vel = state[:, 7:10]
-    # ang_vel = state[:, 10:]
-    #
-    # lin_acc = (next_state_gt[:, 7:10] - state[:, 7:10]) / dt
-    # ang_acc = (next_state_gt[:, 10:] - state[:, 10:]) / dt
-    # motor_torsor = model.motor_dynamic(motor)
-    #
-    # quat_bar = quat * torch.tensor([-1, -1, -1, 1]).view(1, 4)
-    # batch_size = len(quat)
-    # g = torch.tensor([0, 0, 9.81]).view(1, 3)
-    # thrust = torch.cat([torch.zeros((batch_size, 2)), model.theta[0] * motor_torsor[:, 3].view(-1, 1)], dim=1)
-    # kfa = quaternion.qrot(quat_bar, lin_acc + g) - thrust
-    #
-    # t3_tensor = torch.tensor([1, 1, model.theta[3]]).view(1, 3)
-    # t12_tensor = torch.tensor([model.theta[1], model.theta[1], model.theta[2]]).view(1, 3)
-    # ktaua = (ang_acc - torch.cross(t3_tensor * ang_vel, ang_vel)
-    #          - t12_tensor * motor_torsor[:, :3])
-    #
-    # motor_torsor = model.motor_dynamic(motor)
-    #
-    # batch_size = state.shape[0]
-    # # Linear PFD
-    # g = torch.FloatTensor([0, 0, 9.81]).view(1, 3)
-    # thrust = torch.cat([torch.zeros(batch_size, 1), torch.zeros(batch_size, 1), motor_torsor[:, 3:]], dim=1)
-    # next_lin_vel = lin_vel + dt * (model.theta[0] * quaternion.qrot(quat, thrust) - g
-    #                                + quaternion.qrot(quat, kfa))
-    # # Position
-    # next_pos = pos + dt * next_lin_vel
-    #
-    # # Angular PFD
-    # t3_tensor = torch.tensor([1, 1, model.theta[3]]).view(1, 3)
-    # t12_tensor = torch.tensor([model.theta[1], model.theta[1], model.theta[2]]).view(1, 3)
-    # next_ang_vel = ang_vel + dt * (torch.cross(t3_tensor * ang_vel, ang_vel)
-    #                                + t12_tensor * motor_torsor[:, :3]
-    #                                + ktaua)
-    # assert torch.isclose(next_lin_vel, next_state_gt[:, 7:10], 0, 8e-6).all()
-    # assert torch.isclose(next_ang_vel, next_state_gt[:, 10:], 0, 8e-6).all()
+    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21)
+    sanity_check(data)
+    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21)
+    sanity_check(data)
 
 
 if __name__ == '__main__':

@@ -243,37 +243,43 @@ def qrot_np(q, v):
 #
 #     return result.reshape(original_shape)
 
-# def _test():
-#     random.seed(0)
-#     np.random.seed(0)
-#     torch.manual_seed(0)
-#
-#     n = 1000
-#     tmp = torch.randn(n, 4, dtype=float)
-#     quat_a = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
-#     tmp = torch.randn(n, 4, dtype=float)
-#     quat_b = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
-#
-#     vect = torch.randn(n, 3, dtype=float)
-#
-#     quat_origin_a = torch.clone(quat_a[:, [3, 0, 1, 2]])
-#     quat_origin_b = torch.clone(quat_b[:, [3, 0, 1, 2]])
-#
-#     assert (quat_a == quat_origin_a[:, [1, 2, 3, 0]]).all()
-#
-#     res = qmul(quat_a, quat_b)
-#     res_origin = qmul_old_convention(quat_origin_a, quat_origin_b)
-#     assert torch.isclose(res, res_origin[:, [1, 2, 3, 0]]).all()
-#
-#     res1 = qrot(quat_a, vect)
-#     res1_origin = qrot_origin(quat_origin_a, vect)
-#     assert torch.isclose(res1, res1_origin).all()
-#
-#     rot_a = torch.from_numpy(Rotation.from_quat(quat_a).as_matrix())
-#     roted_vect = (rot_a @ vect.unsqueeze(-1)).squeeze()
-#     assert torch.isclose(res1, roted_vect).all()
+def _test():
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+
+    n = 1000
+    tmp = torch.randn(n, 4, dtype=float)
+    quat_a = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
+    tmp = torch.randn(n, 4, dtype=float)
+    quat_b = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
+
+    vect = torch.randn(n, 3, dtype=float)
+
+    quat_origin_a = torch.clone(quat_a[:, [3, 0, 1, 2]])
+    quat_origin_b = torch.clone(quat_b[:, [3, 0, 1, 2]])
+
+    assert (quat_a == quat_origin_a[:, [1, 2, 3, 0]]).all()
+
+    # res = qmul(quat_a, quat_b)
+    # res_origin = qmul_old_convention(quat_origin_a, quat_origin_b)
+    # assert torch.isclose(res, res_origin[:, [1, 2, 3, 0]]).all()
+    #
+    # res1 = qrot(quat_a, vect)
+    # res1_origin = qrot_origin(quat_origin_a, vect)
+    # assert torch.isclose(res1, res1_origin).all()
+    #
+    # rot_a = torch.from_numpy(Rotation.from_quat(quat_a).as_matrix())
+    # roted_vect = (rot_a @ vect.unsqueeze(-1)).squeeze()
+    # assert torch.isclose(res1, roted_vect).all()
+
+    # Inverse Rotation
+    vect1 = vect * 1e5 + 4
+    quat_a_bar = torch.tensor([-1., -1., -1., 1.]).view(-1, 4) * quat_a
+    vect_hat = qrot(quat_a_bar, qrot(quat_a, vect1))
+    torch.abs(vect1 - vect_hat).mean(dim=0)
 
 
 if __name__ == '__main__':
     pass
-    # _test()
+    _test()

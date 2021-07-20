@@ -23,6 +23,6 @@ class GroundTruth(nn.Module):
         state = state[:, -1]
         motor = motor[:, -1]
         dt = dt[:, -1]
-        next_state = next_state.squeeze()
+        next_state = next_state.squeeze(1)
         out = self.model.residual_dynamic(motor, state, next_state, dt)
         return out  # residual

@@ -102,10 +102,14 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # DENOISING with Fourier
     fc_rot = 5  # Hz
     fourier_quat = fft(quat, axis=0)
-    fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
+    # fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
     # fourier_d2quat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dquat
+    # dt = pose_dict["t"][1:] - pose_dict["t"][:-1]
+    dt = period
     den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_rot), axis=0))
-    den_dquat = np.real(ifft(low_pass_filter(fourier_dquat, frequencies, fc_rot), axis=0))
+    den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))
+    den_dquat = (den_quat[1:] - den_quat[:-1]) / dt.reshape((-1, 1))
+    den_dquat = np.concatenate([np.zeros((1, 4)), den_dquat], axis=0)
     # den_d2quat = np.real(ifft(low_pass_filter(fourier_d2quat, frequencies, fc_rot), axis=0))
 
     # Compute angular velocity
@@ -122,7 +126,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
     # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
     den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
-    den_dtrans = np.real(ifft(low_pass_filter(fourier_dtrans, frequencies, fc_trans), axis=0))
+    den_dtrans = (den_trans[1:] - den_trans[:-1]) / dt
+    den_dtrans = np.concatenate([np.zeros((1, 3)), den_dtrans], axis=0)
     # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
 
     # Denoising motor speed
@@ -267,7 +272,6 @@ class EurocMAVDatasetHorizon(Dataset):
         stop = local_idx + self.traj_len
         data = self.data[start:stop]
         assert len(data) == self.traj_len
-        plt.plot(self.data[start:stop][:, 1:4])
         # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
         res = {"t": torch.from_numpy(data[:, :1]).float(),
                "state": torch.from_numpy(data[:, 1:14]).float(),
@@ -285,15 +289,15 @@ def load_flight(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    #     raw_flight_path = RAW_DATASET_PATH + flight
-    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-    #     print("Loading", flight)
-    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
-    # splitting()
-    data = EurocMAVDatasetHorizon("test", traj_len=10)
-    print(len(data))
-    state = torch.stack([e["state"][-2] for e in data], dim=0)
+    for flight in FLIGHT_LIST:
+        raw_flight_path = RAW_DATASET_PATH + flight
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+        print("Loading", flight)
+        _load_clean_data(raw_flight_path, intermediate_flight_path)
+    splitting()
+    # data = EurocMAVDatasetHorizon("test", traj_len=10)
+    # print(len(data))
+    # state = torch.stack([e["state"][-2] for e in data], dim=0)
 
 
 if __name__ == '__main__':

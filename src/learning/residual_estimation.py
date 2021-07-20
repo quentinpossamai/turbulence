@@ -24,7 +24,7 @@ def loss(residual_gt, residual_hat):
     mse_loss = nn.MSELoss()
     fa_loss = mse_loss(residual_gt[:, :3], residual_hat[:, :3])
     tau_a_loss = mse_loss(residual_gt[:, 3:], residual_hat[:, 3:])
-    return fa_loss + tau_a_loss
+    return torch.mean((residual_gt - residual_hat) ** 2, dim=1).view(-1, 1)
 
 
 def validate(model, dataloader, horizon, past, epoch):
@@ -42,13 +42,12 @@ def validate(model, dataloader, horizon, past, epoch):
             # Horizon forward
             past_states = state[:, :past]
             past_motor = motor[:, :past]
-            past_dt = dt[:, :past]
             next_state = state[:, past:]
-            residual_hat = model(past_states, past_motor, past_dt, next_state)
+            residual_hat = model(past_states, past_motor, dt, next_state)
 
             validation_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
             loss_log.append(validation_loss)
-    return torch.mean(torch.tensor(loss_log).float())
+    return torch.mean(torch.cat(loss_log)).item()
 
 
 def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
@@ -76,15 +75,16 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=horizon + past - 1),
+    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=past + horizon),
                             batch_size=batch_size, shuffle=True)
-    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=horizon + past - 1),
+    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=past + horizon),
                                  batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 
     global_iteration = 0
     validation_loss = validate(model, validation_data, horizon, past, epoch=0)
-    writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
+    writer.add_scalars("Loss", {"Validation loss": validation_loss}, global_step=global_iteration)
+    training_log = []
     for epoch in range(epochs):
         model.train()
         for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch}")):
@@ -98,20 +98,22 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
             # Horizon forward
             past_states = state[:, :past]
             past_motor = motor[:, :past]
-            past_dt = dt[:, :past]
             next_state = state[:, past:]
-            residual_hat = model(past_states, past_motor, past_dt, next_state)
+            residual_hat = model(past_states, past_motor, dt, next_state)
 
             training_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
-            writer.add_scalars("Loss", {"Training loss": training_loss.item()}, global_step=global_iteration)
-
+            writer.add_scalars("Loss", {"Training loss": training_loss.mean().item()}, global_step=global_iteration)
+            training_log.append(training_loss)
             # optimizer.zero_grad()
             # training_loss.backward()
             # optimizer.step()
             global_iteration = global_iteration + 1
+        writer.add_scalars("Epoch loss", {"Training loss": torch.cat(training_log).mean().item()},
+                           global_step=global_iteration)
 
         validation_loss = validate(model, validation_data, horizon, past, epoch)
-        writer.add_scalars("Loss", {"Validation loss": validation_loss.item()}, global_step=global_iteration)
+        writer.add_scalars("Loss", {"Validation loss": validation_loss}, global_step=global_iteration)
+        writer.add_scalars("Epoch loss", {"Validation loss": validation_loss}, global_step=global_iteration)
         if validation_loss < memory:
             memory = validation_loss
             torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
