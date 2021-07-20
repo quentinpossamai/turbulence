@@ -215,7 +215,7 @@ class EurocMAVDatasetHorizon(Dataset):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
-        :param traj_len: number of next state to load
+        :param traj_len: length of the trajectory to give each index
         """
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -230,12 +230,12 @@ class EurocMAVDatasetHorizon(Dataset):
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
 
         assert isinstance(traj_len, int)
-        assert (traj_len + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 2}"
+        assert traj_len < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 1}"
         self.traj_len = traj_len
 
-        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.traj_len - 1
+        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list])
         self.cum_flight_idx = np.concatenate([np.array([0]), self.cum_flight_idx])
-        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.traj_len for name in self.flight_list]) - 1
+        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.traj_len for name in self.flight_list])
         self.cum_dataset_idx = np.concatenate([np.array([0]), self.cum_dataset_idx])
 
         # Loading data
@@ -254,19 +254,20 @@ class EurocMAVDatasetHorizon(Dataset):
         #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
     def __len__(self):
-        return self.cum_dataset_idx[-1] + 1
+        return self.cum_dataset_idx[-1]
 
     def __getitem__(self, idx):
         """
         One sample is time:1, state:13, motor:6, residual:6, not implemented (imu_ang_acc:6)
 
         """
-        flight_idx = np.where(idx <= self.cum_dataset_idx[1:])[0][0]  # [0,4507,6665,9545]
-        local_idx = idx - self.cum_dataset_idx[flight_idx] + self.cum_flight_idx[flight_idx]  # [0,4507,7665,11545]
+        flight_idx = np.where(idx <= self.cum_dataset_idx[1:])[0][0]
+        local_idx = idx - self.cum_dataset_idx[flight_idx] + self.cum_flight_idx[flight_idx]
         start = local_idx
-        stop = local_idx + self.traj_len + 1
+        stop = local_idx + self.traj_len
         data = self.data[start:stop]
-        assert len(data) == self.traj_len + 1
+        assert len(data) == self.traj_len
+        plt.plot(self.data[start:stop][:, 1:4])
         # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
         res = {"t": torch.from_numpy(data[:, :1]).float(),
                "state": torch.from_numpy(data[:, 1:14]).float(),
@@ -290,7 +291,7 @@ def main():
     #     print("Loading", flight)
     #     _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
-    data = EurocMAVDatasetHorizon("test", traj_len=1000)
+    data = EurocMAVDatasetHorizon("test", traj_len=10)
     print(len(data))
     state = torch.stack([e["state"][-2] for e in data], dim=0)
 

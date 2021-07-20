@@ -124,20 +124,29 @@ def main():
             dt = data[i]["t"][-1].view(1, -1) - data[i]["t"][-2].view(1, -1)
             next_state_hat = model(state, motor, dt, residual)
             test[i, :] = (next_state_gt - next_state_hat) ** 2
+            if any(test[i] > 10):
+                print(i)
+                # plt.plot(data[i]["state"][:, :3])
+
             test2[i, :] = next_state_hat
         print()
-        # TODO why stairs with data = "test"?
         plt.plot(torch.stack([e["state"][-2] for e in data])[:, :3])
-        plt.plot(test2[:, :3])
+        plt.plot(test2[:, 3:7])
+        plt.plot(torch.stack([e["state"][-1] for e in data])[:, 3:7])  # next_state_gt
+        plt.ylim([-1, 1])
+
+        plt.plot(test, label="x")
+        plt.ylim([-1e1, 1e2])
+        plt.legend()
 
         plt.plot(data[900]["state"][:, :])
         # assert (torch.max(test, 0)[0] < 2.5e-7).all()
 
-    # data = euroc.EurocMAVDatasetHorizon("train", traj_len=10)
+    # data = euroc.EurocMAVDatasetHorizon("train", traj_len=11)
     # sanity_check(data)
-    # data = euroc.EurocMAVDatasetHorizon("validation", traj_len=10)
+    # data = euroc.EurocMAVDatasetHorizon("validation", traj_len=11)
     # sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("test", traj_len=10)
+    data = euroc.EurocMAVDatasetHorizon("test", traj_len=11)
     sanity_check(data)
 
 
