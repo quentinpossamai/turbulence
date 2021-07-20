@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
@@ -222,25 +223,25 @@ class EurocMAVDatasetHorizon(Dataset):
         split = {e[0]: (int(e[1]), int(e[2]), int(e[3])) for e in split}
         self.flight_list = list(split.keys())
 
-        loading = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight + train_validation_test + ".pkl",
-                                            "rb")) for flight in self.flight_list}
-        self.flight_length = {flight: len(loading[flight]["t"]) for flight in self.flight_list}
+        loaded_data = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight + train_validation_test + ".pkl",
+                                                "rb")) for flight in self.flight_list}
+        self.flight_length = {flight: len(loaded_data[flight]["t"]) for flight in self.flight_list}
         minimum_length = np.min([[split[flight][0], split[flight][1] - split[flight][0],
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
 
         assert isinstance(traj_len, int)
         assert (traj_len + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 2}"
-        self.h = traj_len
+        self.traj_len = traj_len
 
-        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
-        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
+        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.traj_len - 1
+        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.traj_len for name in self.flight_list]) - 1
 
         # Loading data
-        for key, val in loading.items():
-            loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
-                                          axis=1)
+        for key, val in loaded_data.items():
+            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
+                                              axis=1)
 
-        self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
+        self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
 
         # print(np.min(self.data[:, 20:], axis=0))
         # print(np.max(self.data[:, 20:], axis=0))
@@ -259,14 +260,13 @@ class EurocMAVDatasetHorizon(Dataset):
 
         """
         flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
-        data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.h + 1, :]
+        data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.traj_len + 1, :]
         # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
         res = {"t": torch.from_numpy(data[:, :1]).float(),
                "state": torch.from_numpy(data[:, 1:14]).float(),
                "motor": torch.from_numpy(data[:, 14:20]).float(),
                # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
                "residual": torch.from_numpy(data[:, 20:]).float()}
-
         return res
 
 
@@ -284,7 +284,8 @@ def main():
     #     print("Loading", flight)
     #     _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
-    data = EurocMAVDatasetHorizon("train", traj_len=1)
+    data = EurocMAVDatasetHorizon("test", traj_len=1000)
+    data[1023]
 
 
 if __name__ == '__main__':

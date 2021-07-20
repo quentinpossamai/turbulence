@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
@@ -112,17 +113,33 @@ class DynamicalModel(nn.Module):
 def main():
     model = DynamicalModel(paper=False)
     # Sanity check
-    data = euroc.EurocMAVDatasetHorizon("train", traj_len=1)
-    test = torch.zeros(len(data), 13)
-    for i in range(len(data)):
-        state = data[i]["state"][:-1]
-        motor = data[i]["motor"][:-1]
-        residual = data[i]["residual"][1:]
-        next_state_gt = data[i]["state"][1:]
-        dt = data[i]["t"][1:] - data[i]["t"][:-1]
-        next_state_hat = model(state, motor, dt, residual)
-        test[i, :] = (next_state_gt - next_state_hat).abs()
-    assert (torch.max(test, 0)[0] < 5e-4).all()
+    def sanity_check(data):
+        test = torch.zeros(len(data), 13)
+        test2 = torch.zeros(len(data), 13)
+        for i in range(len(data)):
+            state = data[i]["state"][-2].view(1, -1)
+            motor = data[i]["motor"][-2].view(1, -1)
+            residual = data[i]["residual"][-1].view(1, -1)
+            next_state_gt = data[i]["state"][-1].view(1, -1)
+            dt = data[i]["t"][-1].view(1, -1) - data[i]["t"][-2].view(1, -1)
+            next_state_hat = model(state, motor, dt, residual)
+            test[i, :] = (next_state_gt - next_state_hat) ** 2
+            test2[i, :] = next_state_hat
+        print()
+        # TODO why stairs with data = "test"?
+        plt.plot(torch.stack([e["state"][-2] for e in data])[:, :3])
+        plt.plot(test2[:, :3])
+
+        plt.plot(data[900]["state"][:, :])
+        # assert (torch.max(test, 0)[0] < 2.5e-7).all()
+
+    # data = euroc.EurocMAVDatasetHorizon("train", traj_len=10)
+    # sanity_check(data)
+    # data = euroc.EurocMAVDatasetHorizon("validation", traj_len=10)
+    # sanity_check(data)
+    data = euroc.EurocMAVDatasetHorizon("test", traj_len=10)
+    sanity_check(data)
+
 
     # pos = state[:, :3]
     # quat = state[:, 3:7]
