@@ -234,7 +234,9 @@ class EurocMAVDatasetHorizon(Dataset):
         self.traj_len = traj_len
 
         self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.traj_len - 1
+        self.cum_flight_idx = np.concatenate([np.array([0]), self.cum_flight_idx])
         self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.traj_len for name in self.flight_list]) - 1
+        self.cum_dataset_idx = np.concatenate([np.array([0]), self.cum_dataset_idx])
 
         # Loading data
         for key, val in loaded_data.items():
@@ -259,8 +261,12 @@ class EurocMAVDatasetHorizon(Dataset):
         One sample is time:1, state:13, motor:6, residual:6, not implemented (imu_ang_acc:6)
 
         """
-        flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
-        data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.traj_len + 1, :]
+        flight_idx = np.where(idx <= self.cum_dataset_idx[1:])[0][0]  # [0,4507,6665,9545]
+        local_idx = idx - self.cum_dataset_idx[flight_idx] + self.cum_flight_idx[flight_idx]  # [0,4507,7665,11545]
+        start = local_idx
+        stop = local_idx + self.traj_len + 1
+        data = self.data[start:stop]
+        assert len(data) == self.traj_len + 1
         # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
         res = {"t": torch.from_numpy(data[:, :1]).float(),
                "state": torch.from_numpy(data[:, 1:14]).float(),
@@ -285,7 +291,8 @@ def main():
     #     _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
     data = EurocMAVDatasetHorizon("test", traj_len=1000)
-    data[1023]
+    print(len(data))
+    state = torch.stack([e["state"][-2] for e in data], dim=0)
 
 
 if __name__ == '__main__':
