@@ -32,7 +32,7 @@ datasets = {'eurocmav': EurocMavLoader, 'irs': IRSLoader}
 
 def evaluate():
     print(args)
-    dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=16,
+    dataloader = DataLoader(datasets[args.dataset](split='test'), batch_size=16,
                             shuffle=False,
                             num_workers=0,
                             pin_memory=True)
