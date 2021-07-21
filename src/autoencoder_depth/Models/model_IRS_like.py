@@ -141,7 +141,10 @@ class NormNetS(nn.Module):
         iconv0 = self.iconv0(upconv0)
         pr0 = self.pred_flow0(iconv0)
 
-        normal = pr0 / (torch.norm(pr0, 2, dim=1, keepdim=True) + 1e-8)
+        if pr0.shape[1] == 3:
+            normal = pr0 / (torch.norm(pr0, 2, dim=1, keepdim=True) + 1e-8)
+        else:
+            normal = torch.tanh(pr0)
         return {'feature': z, "output": normal}
 
     def weight_parameters(self):
