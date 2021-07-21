@@ -76,12 +76,16 @@ class Decoder(nn.Module):
     def forward(self, x):
         x = self.linear(x)
         x = x.view(x.shape[0], 4, 60, 94)
-        return torch.tanh(self.net(x))
+        x = self.net(x)
+        if x.shape[1] == 3:
+            return x / (torch.norm(x, 2, dim=1, keepdim=True) + 1e-8)
+        else:
+            return torch.tanh(x)
 
 
 if __name__ == '__main__':
     depthmap = torch.randn(16, 1, 240, 376)
-    model = Autoencoder()
+model = Autoencoder()
 
-    y = model(depthmap)
-    print(y["feature"].shape, y["output"].shape)
+y = model(depthmap)
+print(y["feature"].shape, y["output"].shape)
