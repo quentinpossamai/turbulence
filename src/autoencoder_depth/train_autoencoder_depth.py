@@ -3,7 +3,8 @@ import argparse
 from Dataloaders.EurocMAVLoader import EurocMavLoader
 from Dataloaders.IRSLoader import IRSLoader
 import torch.nn as nn
-from model import Autoencoder
+from Models.model_CoPhy_like import Autoencoder
+from Models.model_IRS_like import NormNetS
 import random
 import numpy as np
 from torch.utils.data import DataLoader
@@ -11,12 +12,13 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', default=0, type=int)
+parser.add_argument('--epoch', default=10, type=int)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--dataset', default="irs", type=str)
-parser.add_argument('--feature_size', default=512, type=int)
+parser.add_argument('--model', default="IRS_Like", type=str)
+parser.add_argument('--feature_size', default=32, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
-parser.add_argument('--name', default='autoencoder_depth_irs_512_irs', type=str)
+parser.add_argument('--name', default='autoencoder_depth_irs_32_irs', type=str)
 
 args = parser.parse_args()
 
@@ -28,28 +30,29 @@ MSE = nn.MSELoss()
 ZMAX = 7.48
 
 datasets = {'eurocmav': EurocMavLoader, 'irs': IRSLoader}
+models = {'CoPhy_Like': Autoencoder, 'IRS_Like': NormNetS}
 
 
 def evaluate():
     print(args)
-    dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=16,
+    dataloader = DataLoader(datasets[args.dataset](split='test'), batch_size=16,
                             shuffle=False,
                             num_workers=0,
                             pin_memory=True)
 
-    model = Autoencoder(feature_size=args.feature_size).to(device)
+    model = models[args.model](feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
     try:
         state_dict = torch.load(
-            f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn",
+            f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn",
             map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
-            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn",
+            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn",
             map_location=device)
 
     model.load_state_dict(state_dict)
 
-    validate(model, dataloader, viz=False)
+    validate(model, dataloader, viz=True)
 
 
 def vizualize(gt, pred):
@@ -84,6 +87,8 @@ def validate(model, dataloader, viz=False, epoch=1000):
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
             depthmap = x['depth'].to(device)
+            print(depthmap.shape)
+            input()
             out = model(depthmap)
             costs = get_loss(depthmap, out)
             psnr = 10 * torch.log10(4 / costs[1])
@@ -113,8 +118,9 @@ def compute_grad(rgb):
 
 
 def get_loss(gt, prediction):
-    mse_normal = MSE(gt, prediction["output"])
-    mse_grad = MSE(compute_grad(gt), compute_grad(prediction["output"]))
+    pred = prediction["output"][:, :, :gt.shape[-2], :gt.shape[-1]]
+    mse_normal = MSE(gt, pred)
+    mse_grad = MSE(compute_grad(gt), compute_grad(pred))
     return 1000 * mse_normal + args.weight_grad * mse_grad, mse_normal, mse_grad
 
 
@@ -134,7 +140,7 @@ def main():
                                 num_workers=1,
                                 pin_memory=True)
 
-    model = Autoencoder(feature_size=args.feature_size, in_channel=1).to(device)
+    model = models[args.model](feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -158,10 +164,10 @@ def main():
             memory = error
             try:
                 torch.save(model.state_dict(),
-                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn")
+                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn")
             except FileNotFoundError:
                 torch.save(model.state_dict(),
-                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}.nn")
+                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn")
             print("Saved!")
 
     evaluate()

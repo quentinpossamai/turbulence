@@ -5,4 +5,5 @@ python3 -u ../src/autoencoder_depth/train_autoencoder_depth.py \
 --lr 0.0001 \
 --dataset 'irs' \
 --feature_size 256 \
+--model "IRS_Like" \
 --name "autoencoder_depth_irs_256"
