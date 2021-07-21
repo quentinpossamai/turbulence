@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
@@ -26,12 +27,13 @@ FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 
 
 def _load_clean_data(raw_flight_path, intermediate_flight_path):
+    # 1-LOADING DATA
     # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
     # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
     # '/imu0__sensor_msgs/Imu'])
     raw = pickle.load(open(raw_flight_path + "data.pkl", "rb"), encoding="latin1")
 
-    # IMU Loading
+    # 1.1-IMU Loading
     # dict_keys(['orientation_covariance', 'orientation', 'angular_velocity_covariance', 'nsecs',
     # 'linear_acceleration_covariance', 'frame_id', 'secs', 'linear_acceleration', 'angular_velocity'])
     imu_key = "/fcu/imu__sensor_msgs/Imu"  # '/imu0__sensor_msgs/Imu' also exist
@@ -47,19 +49,18 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     frame_id = np.array([raw[imu_key][i]["frame_id"] for i in range(len(raw[imu_key]))])
     assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
     time = np.array([raw[imu_key][i]["secs"] + raw[imu_key][i]["nsecs"] * 1e-9 for i in range(len(raw[imu_key]))])
-    # plt.plot(time - time[0])
     imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1)}
 
-    # MOTOR SPEED Loading
+    # 1.2-MOTOR SPEED Loading
     # dict_keys(['frame_id', 'secs', 'motor_speed', 'nsecs'])
     ms_key = '/fcu/motor_speed__asctec_hl_comm/MotorSpeed'
     frame_id = np.array([raw[ms_key][i]["frame_id"] for i in range(len(raw[ms_key]))])
     assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
     time = np.array([raw[ms_key][i]["secs"] + raw[ms_key][i]["nsecs"] * 1e-9 for i in range(len(raw[ms_key]))])
     ms = np.array([raw[ms_key][i]["motor_speed"] for i in range(len(raw[ms_key]))], dtype=float)  # Assumed in rad/s
-    motor_dict = {"t": time, "ms": ms}
+    motor_dict = {"t": time, "motor": ms}
 
-    # STATE Loading
+    # 1.3-STATE Loading
     # dict_keys(['child_frame_id', 'nsecs', 'frame_id', 'secs', 'translation', 'rotation'])
     state_key = "/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped"
     child_frame_id = np.array([raw[state_key][i]["child_frame_id"] for i in range(len(raw[state_key]))])
@@ -70,101 +71,72 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     assert np.sum("/world" == frame_id) == len(frame_id)  # All the time "/world"
     trans = np.array([raw[state_key][i]["translation"] for i in range(len(raw[state_key]))])
     quat = np.array([raw[state_key][i]["rotation"] for i in range(len(raw[state_key]))])  # x, y, z, w
-    pose_dict = {"t": time}
+    pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
 
-    # Body and World reference frame are in FLU! Nice!
-    # Fix quaternion discontinuity
-    quat = Rotation.from_quat(quat).as_quat()
-    quat = quaternion.qfix(quat)
-
-    # Centering position
-    trans = trans - np.mean(trans, axis=0)
-
-    # trajectory.trace_trajectory3d(trans, quat)  # Check data by tracing drone trajectory
-
-    # FOURIER noise reduction
-    def low_pass_filter(fft_coef, fourier_freq, freq_cut):
+    # 2-DENOISING
+    def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
         output = fft_coef.copy()
         output[np.abs(fourier_freq) > freq_cut] = 0
         return output
 
-    # trajectory.timestamp_analysis(pose_dict["t"])  # Check timestamps for each timeseries
-    # trajectory.timestamp_analysis(imu_dict["t"])
-    # trajectory.timestamp_analysis(motor_dict["t"])
-    # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
-
-    # Computing a denoised state.
-    period = np.mean(pose_dict["t"][1:] - pose_dict["t"][:-1])
-    n = len(pose_dict["t"])
-    frequencies = fftfreq(n, d=period)
-
-    # DENOISING with Fourier
-    fc_rot = 5  # Hz
-    fourier_quat = fft(quat, axis=0)
-    fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
-    # fourier_d2quat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dquat
-    den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_rot), axis=0))
-    den_dquat = np.real(ifft(low_pass_filter(fourier_dquat, frequencies, fc_rot), axis=0))
-    # den_d2quat = np.real(ifft(low_pass_filter(fourier_d2quat, frequencies, fc_rot), axis=0))
-
-    # Compute angular velocity
-    dq_dt_convention = den_dquat[:, [3, 0, 1, 2]]
-    q0, q1, q2, q3 = den_quat[:, 3], den_quat[:, 0], den_quat[:, 1], den_quat[:, 2]
-    g_matrix = np.array([[-q1, q0, q3, -q2],
-                         [-q2, -q3, q0, q1],
-                         [-q3, q2, -q1, q0]]).transpose((2, 0, 1))
-    den_ang_vel = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
-
-    # Compute linear speed
-    fc_trans = 5  # Hz
-    fourier_trans = fft(trans, axis=0)
-    fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
-    # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
-    den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
-    den_dtrans = np.real(ifft(low_pass_filter(fourier_dtrans, frequencies, fc_trans), axis=0))
-    # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
-
-    # Denoising motor speed
+    # 2.1-Denoising motor speed's timestamp and motor speed
+    den_motor_dict = {}
     period = np.mean(motor_dict["t"][1:] - motor_dict["t"][:-1])
+    den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
+    # Denoising motor speed with low pass filter on Fourier's coefficients
     n = len(motor_dict["t"])
     frequencies = fftfreq(n, d=period)
-    den_motor_dict = {}
     for key, val in motor_dict.items():
         den_motor_dict[key] = val.copy()
     for i in range(6):
         fc_motor = 5  # Hz
-        fourier_motor = fft(motor_dict["ms"][:, i])
-        # den_motor.append(np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))))
-        den_motor_dict["ms"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # time = motor_dict["t"] - motor_dict["t"][0]
-    # # [ax.plot(time, motor_dict["ms"][:, i], label="raw") for i in range(6)]
-    # # [ax.plot(time, den_motor_dict["ms"][:, i], label="denoised") for i in range(6)]
-    # ax.plot(time, motor_dict["ms"][:, 0], label="raw")
-    # ax.plot(time, den_motor_dict["ms"][:, 0], label="denoised")
-    # ax.grid()
-    # ax.set_title(raw_flight_path.split("/")[-1])
-    # ax.set_ylabel("[rad/s]")
-    # ax.set_xlabel("Time [s]")
-    # ax.legend()
-    state = np.concatenate([den_trans, den_quat, den_dtrans, den_ang_vel], axis=1)
-    pose_dict["state"] = state
+        fourier_motor = fft(motor_dict["motor"][:, i])
+        den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
 
-    # Synchronisation
-    imu_sync = np.stack([interpolate.interp1d(imu_dict["t"], imu_dict["ang_acc"][:, i], bounds_error=False,
-                                              fill_value=(imu_dict["ang_acc"][0, i], imu_dict["ang_acc"][-1, i]))(
-        den_motor_dict["t"]) for i in range(6)], axis=1)
-    state_sync = np.stack([interpolate.interp1d(pose_dict["t"], pose_dict["state"][:, i], bounds_error=False,
-                                                fill_value=(pose_dict["state"][0, i], pose_dict["state"][-1, i]))(
-        den_motor_dict["t"]) for i in range(13)], axis=1)
+    # 2.2-Denoising IMU timestamp
+    den_imu_dict = {}
+    period = np.mean(imu_dict["t"][1:] - imu_dict["t"][:-1])
+    den_imu_dict["t"] = (period * np.array(range(len(imu_dict["t"]))) + imu_dict["t"][0])  # Denoising IMU timestamp
+    den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
 
-    synchronisation = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["ms"],
-                       "state": state_sync}
+    # 2.3-Computing a denoised translation and quaternion.
+    # Body and World reference frame are in FLU! Nice!
+    den_pose_dict = {}
+    quat = pose_dict["pose"][:, 3:7]
+    trans = pose_dict["pose"][:, :3]
+    time = pose_dict["t"]
+    n = len(time)
 
-    # Take data only when drone is flying
+    quat = quat / np.linalg.norm(quat, axis=1).reshape((-1, 1))  # Normalize quaternion
+    quat = quaternion.qfix(quat)  # Fix quaternion swap in continuity
+
+    # Centering position
+    trans = trans - np.mean(trans, axis=0)
+
+    # Denoising timestamp
+    period = np.mean(time[1:] - time[:-1])
+    den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
+
+    # Denoising quaternion
+    frequencies = fftfreq(n, d=period)
+    fc_rot = 5  # Hz
+    fourier_quat = fft(quat, axis=0)
+    # fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
+    den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_rot), axis=0))
+    den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
+
+    # Denoising translation
+    fc_trans = 5  # Hz
+    fourier_trans = fft(trans, axis=0)
+    # fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
+    # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
+    den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
+    den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
+
+    # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0
     has_started = False
-    for i, ms in enumerate(synchronisation["motor"]):
+    for i, ms in enumerate(den_motor_dict["motor"]):
         if (ms > 120).any() and not has_started:
             start = i
             has_started = True
@@ -172,20 +144,59 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
             stop = i
             break
     assert start != stop
+    print(f"""start: {start} | stop: {stop} | total: {len(den_motor_dict["t"])}""")
+    for key in motor_dict:
+        den_motor_dict[key] = den_motor_dict[key][start:stop]
 
-    print(f"start: {start} | stop: {stop} | total: {len(synchronisation['t'])}")
+    # 4-SYNCHRONISATION    
+    # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
+    imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
+                                              fill_value=(den_imu_dict["ang_acc"][0, i],
+                                                          den_imu_dict["ang_acc"][-1, i]))(
+        den_motor_dict["t"]) for i in range(6)], axis=1)
+    pose_sync = np.stack([interpolate.interp1d(den_pose_dict["t"], den_pose_dict["pose"][:, i], bounds_error=False,
+                                               fill_value=(den_pose_dict["pose"][0, i],
+                                                           den_pose_dict["pose"][-1, i]))(
+        den_motor_dict["t"]) for i in range(7)], axis=1)
+    syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
+           "pose": pose_sync}
 
-    # return start, stop
-    cut_data = {}
-    for key in synchronisation:
-        cut_data[key] = synchronisation[key][start:stop]
+    # Setting initial parameters and normalizing quaternion
+    syn["t"] = syn["t"] - syn["t"][0]
+    syn["pose"][:, 3:7] = syn["pose"][:, 3:7] / np.linalg.norm(syn["pose"][:, 3:7], axis=1).reshape((-1, 1))
 
-    # Setting initial parameters
-    cut_data["t"] = cut_data["t"] - cut_data["t"][0]
+    # 5-COMPUTE DERIVATIVE
+    dt = np.mean(syn["t"][1:] - syn["t"][:-1])
+    quat = syn["pose"][:, 3:7]
+    trans = syn["pose"][:, :3]
+
+    # Derivative of the quaternion
+    dquat = (quat[1:] - quat[:-1]) / dt  # Euler derivative
+    dquat = np.concatenate([np.zeros((1, 4)), dquat], axis=0)
+
+    # Compute angular velocity
+    dq_dt_convention = dquat[:, [3, 0, 1, 2]]
+    q0, q1, q2, q3 = (quat[:, 3], quat[:, 0], quat[:, 1], quat[:, 2])
+    g_matrix = np.array([[-q1, q0, q3, -q2],
+                         [-q2, -q3, q0, q1],
+                         [-q3, q2, -q1, q0]]).transpose((2, 0, 1))
+    ang_vel = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
+
+    # Compute linear speed
+    dtrans = (trans[1:] - trans[:-1]) / dt  # Euler derivative
+    dtrans = np.concatenate([np.zeros((1, 3)), dtrans], axis=0)
+    # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
+
+    syn["state"] = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
+    del syn["pose"]
+
+    # state = cut_data["state"]
+    # dt = np.array([1/200]).reshape((1, 1))
+    # speed_error = abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10])
 
     save_path = intermediate_flight_path + "data.pkl"
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
-    pickle.dump(cut_data, open(save_path, "wb"))
+    pickle.dump(syn, open(save_path, "wb"))
 
 
 def splitting():
@@ -214,7 +225,7 @@ class EurocMAVDatasetHorizon(Dataset):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
-        :param traj_len: number of next state to load
+        :param traj_len: length of the trajectory to give each index
         """
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -222,25 +233,27 @@ class EurocMAVDatasetHorizon(Dataset):
         split = {e[0]: (int(e[1]), int(e[2]), int(e[3])) for e in split}
         self.flight_list = list(split.keys())
 
-        loading = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight + train_validation_test + ".pkl",
-                                            "rb")) for flight in self.flight_list}
-        self.flight_length = {flight: len(loading[flight]["t"]) for flight in self.flight_list}
+        loaded_data = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight + train_validation_test + ".pkl",
+                                                "rb")) for flight in self.flight_list}
+        self.flight_length = {flight: len(loaded_data[flight]["t"]) for flight in self.flight_list}
         minimum_length = np.min([[split[flight][0], split[flight][1] - split[flight][0],
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
 
         assert isinstance(traj_len, int)
-        assert (traj_len + 1) < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 2}"
-        self.h = traj_len
+        assert traj_len < minimum_length, f"horizon too big, maximum possible horizon is {minimum_length - 1}"
+        self.traj_len = traj_len
 
-        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list]) - self.h - 1
-        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.h for name in self.flight_list]) - 1
+        self.cum_flight_idx = np.cumsum([self.flight_length[name] for name in self.flight_list])
+        self.cum_flight_idx = np.concatenate([np.array([0]), self.cum_flight_idx])
+        self.cum_dataset_idx = np.cumsum([self.flight_length[name] - self.traj_len for name in self.flight_list])
+        self.cum_dataset_idx = np.concatenate([np.array([0]), self.cum_dataset_idx])
 
         # Loading data
-        for key, val in loading.items():
-            loading[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
-                                          axis=1)
+        for key, val in loaded_data.items():
+            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
+                                              axis=1)
 
-        self.data = np.concatenate([loading[flight] for flight in self.flight_list], axis=0)
+        self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
 
         # print(np.min(self.data[:, 20:], axis=0))
         # print(np.max(self.data[:, 20:], axis=0))
@@ -251,22 +264,25 @@ class EurocMAVDatasetHorizon(Dataset):
         #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
     def __len__(self):
-        return self.cum_dataset_idx[-1] + 1
+        return self.cum_dataset_idx[-1]
 
     def __getitem__(self, idx):
         """
         One sample is time:1, state:13, motor:6, residual:6, not implemented (imu_ang_acc:6)
 
         """
-        flight_idx = np.where(idx <= self.cum_dataset_idx)[0][0]
-        data = self.data[self.cum_flight_idx[flight_idx]:self.cum_flight_idx[flight_idx] + self.h + 1, :]
+        flight_idx = np.where(idx <= self.cum_dataset_idx[1:])[0][0]
+        local_idx = idx - self.cum_dataset_idx[flight_idx] + self.cum_flight_idx[flight_idx]
+        start = local_idx
+        stop = local_idx + self.traj_len
+        data = self.data[start:stop]
+        assert len(data) == self.traj_len
         # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
         res = {"t": torch.from_numpy(data[:, :1]).float(),
                "state": torch.from_numpy(data[:, 1:14]).float(),
                "motor": torch.from_numpy(data[:, 14:20]).float(),
                # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
                "residual": torch.from_numpy(data[:, 20:]).float()}
-
         return res
 
 
@@ -278,13 +294,15 @@ def load_flight(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    #     raw_flight_path = RAW_DATASET_PATH + flight
-    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-    #     print("Loading", flight)
-    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
-    # splitting()
-    data = EurocMAVDatasetHorizon("train", traj_len=1)
+    for flight in FLIGHT_LIST:
+        raw_flight_path = RAW_DATASET_PATH + flight
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+        print("Loading", flight)
+        _load_clean_data(raw_flight_path, intermediate_flight_path)
+    splitting()
+    # data = EurocMAVDatasetHorizon("test", traj_len=10)
+    # print(len(data))
+    # state = torch.stack([e["state"][-2] for e in data], dim=0)
 
 
 if __name__ == '__main__':
