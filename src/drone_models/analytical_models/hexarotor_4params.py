@@ -13,7 +13,7 @@ class DynamicalModel(nn.Module):
         """
         super(DynamicalModel, self).__init__()
         # Point: 6
-        self.permutation = [4, 5, 0, 1, 2, 3]
+        self.permutation = [5, 0, 1, 2, 3, 4]
         if paper:
             # # Paper parameters from
             # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
@@ -33,10 +33,10 @@ class DynamicalModel(nn.Module):
                                        [1.5881e-05],
                                        [8.0943e-01]], dtype=float)
         else:
-            self.theta = torch.tensor([[1.1559688e-04],
-                                       [1.4442127e-03],
-                                       [-6.8990281e-05],
-                                       [1.8237591e+01]], dtype=float)  # MSE
+            self.theta = torch.tensor([[1.1566750e-04],
+                                       [6.9880742e-04],
+                                       [-5.1250136e-05],
+                                       [2.6935432e+00]], dtype=float)  # MSE
 
     def forward(self, state, command, dt, residual=None):
         assert command.shape[-1] == 6, "Motor len is not 6"

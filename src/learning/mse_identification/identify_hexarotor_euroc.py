@@ -19,7 +19,7 @@ DT = 1 / 360
 def identify_model():
     """Solve the Ax = y problem where x is the parameters of the model"""
 
-    flights = euroc.EurocMAVDatasetHorizon("train", traj_len=1)
+    flights = euroc.EurocMAVDatasetHorizon("train", traj_len=2)
 
     # Load flights in a big vector column
     states, future_states, command = [], [], []
@@ -112,8 +112,8 @@ def identify_model():
         print(f"Permutation: {list(e[0])}")
         print(f"Theta: {e[1].numpy()}")
         print(f"Error: {e[2].item():0.4e}")
-
-    print_point(9)
+    for i in range(10):
+        print_point(i)
     pickle.dump(save_identifications, open(euroc.ANALYSIS_SECTION_PATH + "identifications.pkl", "wb"))
 
     print()
