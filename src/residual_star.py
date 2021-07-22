@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 import torch
+from torch.utils.data import DataLoader
 
 import src.data.euroc_mav.loading as euroc
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
@@ -63,10 +64,10 @@ def euroc_mav_residual():
         assert abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10]).sum() == 0
 
         # Computing residual
-        residual_torsor = model.residual_dynamic(motor, state, next_state, dt)
+        residual_torsor = model.residual_dynamic(motor, state, dt, next_state)
         data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
 
-        # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
+        plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
 
         # Saving
         intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
@@ -74,20 +75,20 @@ def euroc_mav_residual():
     euroc.splitting()
 
 
-def test_euroc():
-    model = DynamicalModel(paper=False).double()
+def _test_euroc():
+    model = DynamicalModel(paper=False)
     for flight in euroc.FLIGHT_LIST:
         # Importing data
         data = euroc.load_flight(flight)
-        time = torch.from_numpy(data["t"][:-1])
-        motor = torch.from_numpy(data["motor"][:-1])
+        time = torch.from_numpy(data["t"][:-1]).float()
+        motor = torch.from_numpy(data["motor"][:-1]).float()
         # dt = torch.from_numpy(data["t"][1:] - data["t"][:-1]).view(-1, 1)
-        dt = torch.tensor([1 / 200], dtype=torch.float64).view((1, 1))
-        state = torch.from_numpy(data["state"][:-1])
-        next_state = torch.from_numpy(data["state"][1:])
-        residual_torsor = torch.from_numpy(data["residual"][1:])
+        dt = torch.FloatTensor([[1/200]])
+        state = torch.from_numpy(data["state"][:-1]).float()
+        next_state = torch.from_numpy(data["state"][1:]).float()
+        residual_torsor = torch.from_numpy(data["residual"][1:]).float()
 
-        next_state_hat = model(state, motor, dt, residual_torsor)
+        next_state_hat = model(motor, state, dt, residual_torsor)
         print(torch.abs(next_state - next_state_hat).mean(dim=0))
         print(next_state.allclose(next_state_hat))
 
@@ -97,11 +98,79 @@ def test_euroc():
             traj.append(model(traj[-1], motor[i].reshape((1, -1)),
                               dt, residual_torsor[i].reshape((1, -1))).reshape((1, -1)))
         traj = np.concatenate(traj, axis=0)
-        plt.plot(state[:horizon, 3:7])
-        plt.plot(traj[:, 3:7])
-        abs(state[:horizon, 3:7] - traj[:, 3:7]).mean()
+        # plt.plot(state[:horizon, 3:7])
+        # plt.plot(traj[:, 3:7])
+        print(abs(state[:horizon, 3:7] - traj[:, 3:7]).mean())
+
+        # tensor([1.6281e-08, 3.0245e-08, 4.2788e-09, 6.6299e-10, 6.4368e-10, 1.7825e-08,
+        #         2.9932e-08, 4.7618e-09, 6.2739e-09, 4.1462e-09, 5.8048e-09, 4.8914e-09,
+        #         4.8063e-09])
+        # False
+        # tensor(1.4273e-06)
+        # tensor([2.0686e-08, 2.3317e-08, 5.0654e-09, 1.9938e-09, 2.3139e-09, 2.2066e-08,
+        #         2.7499e-08, 1.0400e-08, 1.4242e-08, 5.5348e-09, 7.0967e-09, 6.4880e-09,
+        #         8.8543e-09])
+        # False
+        # tensor(4.8385e-06)
+        # tensor([1.8088e-08, 1.9594e-08, 6.1421e-09, 3.7639e-09, 3.9524e-09, 2.1350e-08,
+        #         2.8061e-08, 8.4490e-09, 1.0455e-08, 6.2868e-09, 6.6865e-09, 1.0682e-08,
+        #         6.6712e-09])
+        # False
+        # tensor(6.8227e-06)
+
+
+def _test_euroc_torch_dataset():
+    for name in ["train", "validation", "test"]:
+        dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21), batch_size=32,
+                             shuffle=True)
+        model = DynamicalModel(paper=False)
+        dt = torch.FloatTensor([[1 / 200]])
+        next_state_hat, next_state_gt = [], []
+        residual_hat, residual_gt = [], []
+        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21))
+        print("len: ", n)
+        print()
+        for e in dataset:
+            # next_state_hat = model(state, motor, dt, residual_torsor)
+            next_state_hat.append(model(e["motor"][:, -2], e["state"][:, -2], dt, e["residual"][:, -1]))
+            next_state_gt.append(e["state"][:, -1])
+
+            residual_hat.append(model.residual_dynamic(e["motor"][:, -2], e["state"][:, -2], dt, e["state"][:, -1]))
+            residual_gt.append(e["residual"][:, -1])
+
+        next_state_hat = torch.cat(next_state_hat, dim=0)
+        next_state_gt = torch.cat(next_state_gt, dim=0)
+        residual_hat = torch.cat(residual_hat, dim=0)
+        residual_gt = torch.cat(residual_gt, dim=0)
+        assert len(residual_hat) == n
+
+        # print("mean: ", abs(next_state_hat - next_state_gt).mean())
+        # print("std: ", abs(next_state_hat - next_state_gt).std())
+        # print()
+
+        # mean:  tensor(1.1272e-08)
+        # std:  tensor(2.7786e-08)
+        # mean:  tensor(1.1240e-08)
+        # std:  tensor(2.6749e-08)
+        # mean:  tensor(9.9072e-09)
+        # std:  tensor(2.3456e-08)
+
+        print("mean: ", abs(residual_hat - residual_gt).mean())
+        print("std: ", abs(residual_hat - residual_gt).std())
+        print()
+
+        # For torch.float32 :
+        # mean:  tensor(1.7927e-06)
+        # std:  tensor(2.3017e-06)
+        # mean:  tensor(1.9369e-06)
+        # std:  tensor(2.5113e-06)
+        # mean:  tensor(1.6900e-06)
+        # std:  tensor(2.2114e-06)
+
+        # For torch.float64 0 for each !
 
 
 if __name__ == '__main__':
-    euroc_mav_residual()
-    test_euroc()
+    # euroc_mav_residual()
+    # _test_euroc()
+    _test_euroc_torch_dataset()

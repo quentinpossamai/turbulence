@@ -11,7 +11,7 @@ class MLPResidual(nn.Module):
         self.unit_size = unit_size
 
         self.batch_norm0 = nn.BatchNorm2d(1)
-        self.linear1 = nn.Linear(in_features=self.n_past * (1 + 13 + self.motor_size), out_features=self.unit_size,
+        self.linear1 = nn.Linear(in_features=self.n_past * (13 + self.motor_size), out_features=self.unit_size,
                                  bias=True)
         self.batch_norm1 = nn.BatchNorm2d(1)
         self.linear2 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
@@ -20,17 +20,16 @@ class MLPResidual(nn.Module):
         self.batch_norm3 = nn.BatchNorm2d(1)
         self.linear4 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
-    def forward(self, state, motor, dt):
+    def forward(self, motor, state, dt):
         """
         Estimate the residual = GT - model
-        :param state: (batch, step, values=13)
         :param motor: (batch, step, values=6)
+        :param state: (batch, step, values=13)
         :param dt: (batch, step, values=1)
         :return: (batch, value=6)
         """
         batch_size = state.shape[0]
-        state_motor = torch.cat([state.view((batch_size, -1)), motor.view((batch_size, -1)),
-                                 dt.view((batch_size, -1))], dim=1)
+        state_motor = torch.cat([state.view((batch_size, -1)), motor.view((batch_size, -1))], dim=1)
         input_size = state_motor.shape[1]
 
         out = state_motor

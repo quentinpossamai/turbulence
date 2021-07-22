@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.drone_models.residual.groundthruth import GroundTruth
+from src.drone_models.residual.mlp import MLPResidual
 from src.drone_models.residual.gru import GRUResidual
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
@@ -21,33 +22,32 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 
 
 def loss(residual_gt, residual_hat):
-    mse_loss = nn.MSELoss()
-    fa_loss = mse_loss(residual_gt[:, :3], residual_hat[:, :3])
-    tau_a_loss = mse_loss(residual_gt[:, 3:], residual_hat[:, 3:])
-    return torch.mean((residual_gt - residual_hat) ** 2, dim=1).view(-1, 1)
+    # mse_loss = nn.MSELoss()
+    # fa_loss = mse_loss(residual_gt[:, :3], residual_hat[:, :3])
+    # tau_a_loss = mse_loss(residual_gt[:, 3:], residual_hat[:, 3:])
+    # torch.mean((residual_gt - residual_hat) ** 2, dim=1).view(-1, 1)
+    return (residual_gt - residual_hat) ** 2
 
 
 def validate(model, dataloader, horizon, past, epoch):
     model.eval()
     loss_log = []
+    dt = torch.FloatTensor([[1/200]])
     with torch.no_grad():
         for batch in tqdm(dataloader, desc=f"Validation: {epoch}"):
-            # Look in past states
             state = batch["state"].to(device)
             motor = batch["motor"].to(device)
-            t = batch["t"].to(device)
-            dt = t[:, 1:] - t[:, :-1]
             residual_gt = batch["residual"][:, -1].to(device)
 
             # Horizon forward
-            past_states = state[:, :past]
-            past_motor = motor[:, :past]
-            next_state = state[:, past:]
-            residual_hat = model(past_states, past_motor, dt, next_state)
+            past_states = state[:, -1 - past:-1]
+            past_motor = motor[:, -1 - past:-1]
+            next_state = state[:, -1:]
+            residual_hat = model(past_motor, past_states, dt)
 
             validation_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
             loss_log.append(validation_loss)
-    return torch.mean(torch.cat(loss_log)).item()
+    return torch.cat(loss_log).mean().item()
 
 
 def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
@@ -60,9 +60,9 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # Training parameters
     memory = 100000
 
-    # model = MLPResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
+    model = MLPResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
     # model = GRUResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
-    model = GroundTruth().to(device)
+    # model = GroundTruth().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Tensorboard
@@ -84,29 +84,30 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     global_iteration = 0
     validation_loss = validate(model, validation_data, horizon, past, epoch=0)
     writer.add_scalars("Loss", {"Validation loss": validation_loss}, global_step=global_iteration)
+    writer.add_scalars("Epoch loss", {"Validation loss": validation_loss}, global_step=global_iteration)
     training_log = []
+    dt = torch.FloatTensor([[1/200]])
     for epoch in range(epochs):
-        model.train()
         for i, batch in enumerate(tqdm(train_data, desc=f"Epoch: {epoch}")):
+            model.train()
             # Look in past states
             state = batch["state"].to(device)
             motor = batch["motor"].to(device)
-            t = batch["t"].to(device)
-            dt = t[:, 1:] - t[:, :-1]
             residual_gt = batch["residual"][:, -1].to(device)
 
             # Horizon forward
-            past_states = state[:, :past]
-            past_motor = motor[:, :past]
-            next_state = state[:, past:]
-            residual_hat = model(past_states, past_motor, dt, next_state)
+            past_states = state[:, -1 - past:-1]
+            past_motor = motor[:, -1 - past:-1]
+            next_state = state[:, -1:]
+            residual_hat = model(past_motor, past_states, dt)
 
             training_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
-            writer.add_scalars("Loss", {"Training loss": training_loss.mean().item()}, global_step=global_iteration)
+            reduced_training_loss = training_loss.mean()
+            writer.add_scalars("Loss", {"Training loss": reduced_training_loss.item()}, global_step=global_iteration)
             training_log.append(training_loss)
-            # optimizer.zero_grad()
-            # training_loss.backward()
-            # optimizer.step()
+            optimizer.zero_grad()
+            reduced_training_loss.backward()
+            optimizer.step()
             global_iteration = global_iteration + 1
         writer.add_scalars("Epoch loss", {"Training loss": torch.cat(training_log).mean().item()},
                            global_step=global_iteration)
