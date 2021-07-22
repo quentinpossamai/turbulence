@@ -47,19 +47,18 @@ def euroc_mav_residual():
 
     for flight in euroc.FLIGHT_LIST:
         data = euroc.load_flight(flight)
-        time = torch.from_numpy(data["t"][:-1])
         motor = torch.from_numpy(data["motor"][:-1])
-        # dt = torch.from_numpy(data["t"][1:] - data["t"][:-1]).view(-1, 1)
-        dt = torch.tensor([1 / 200]).view((1, 1))
+        dt = torch.tensor([1 / 200], dtype=torch.float64).view((1, 1))
         state = torch.from_numpy(data["state"][:-1])
         next_state = torch.from_numpy(data["state"][1:])
-
-        speed = (state[1:, :3] - state[:-1, :3]) / dt
-        speed = state[1:, 7:10]
+        state[:, 3:7] = state[:, 3:7] / torch.norm(state[:, 3:7], dim=1).view(-1, 1)
+        next_state[:, 3:7] = next_state[:, 3:7] / torch.norm(next_state[:, 3:7], dim=1).view(-1, 1)
 
         residual_torsor = model.residual_dynamic(motor, state, next_state, dt)
 
-        plot_residual_torsor(time, residual_torsor, flight, xlim=(50, 60))
+        # plot_residual_torsor(time, residual_torsor, flight, xlim=(50, 60))
+
+        abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10])
 
         data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
 
@@ -86,10 +85,14 @@ def test_euroc():
         next_state = torch.from_numpy(data["state"][1:])
         # next_state[:, 3:7] = next_state[:, 3:7] / torch.norm(next_state[:, 3:7], dim=1).view(-1, 1)
 
+        state[:, 3:7] = state[:, 3:7] / torch.norm(state[:, 3:7], dim=1).view(-1, 1)
+        next_state[:, 3:7] = next_state[:, 3:7] / torch.norm(next_state[:, 3:7], dim=1).view(-1, 1)
+
         residual_torsor = torch.from_numpy(data["residual"][1:])
 
         next_state_hat = model(state, motor, dt, residual_torsor)
         print(torch.abs(next_state - next_state_hat).mean(dim=0))
+        print(next_state.allclose(next_state_hat))
         # norm = torch.norm(quat, dim=1)
         # print(norm.min())
         # print(norm.max())

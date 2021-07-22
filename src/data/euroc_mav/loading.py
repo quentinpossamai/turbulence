@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
-from scipy import interpolate
+from scipy import interpolate, signal
 from scipy.fft import fft, fftfreq, ifft
 from scipy.spatial.transform import Rotation
 import torch
@@ -74,24 +74,28 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
 
     # 2-DENOISING
-    def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
-        output = fft_coef.copy()
-        output[np.abs(fourier_freq) > freq_cut] = 0
-        return output
+    # def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
+    #     output = fft_coef.copy()
+    #     output[np.abs(fourier_freq) > freq_cut] = 0
+    #     return output
 
     # 2.1-Denoising motor speed's timestamp and motor speed
     den_motor_dict = {}
-    period = np.mean(motor_dict["t"][1:] - motor_dict["t"][:-1])
-    den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
-    # Denoising motor speed with low pass filter on Fourier's coefficients
-    n = len(motor_dict["t"])
-    frequencies = fftfreq(n, d=period)
     for key, val in motor_dict.items():
         den_motor_dict[key] = val.copy()
+    # Denoising motor speed with low pass filter on Fourier's coefficients
+    # period = np.mean(motor_dict["t"][1:] - motor_dict["t"][:-1])
+    period = 1 / 200
+    # n = len(motor_dict["t"])
+    # frequencies = fftfreq(n, d=period)
+    den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
+
     for i in range(6):
         fc_motor = 5  # Hz
-        fourier_motor = fft(motor_dict["motor"][:, i])
-        den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+        # fourier_motor = fft(motor_dict["motor"][:, i])
+        # den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+        sos = signal.butter(1, fc_motor, 'lowpass', fs=200, output='sos')
+        den_motor_dict["motor"][:, i] = signal.sosfilt(sos, motor_dict["motor"][:, i])
 
     # 2.2-Denoising IMU timestamp
     den_imu_dict = {}
@@ -118,19 +122,27 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
     # Denoising quaternion
-    frequencies = fftfreq(n, d=period)
-    fc_rot = 5  # Hz
-    fourier_quat = fft(quat, axis=0)
+    # frequencies = fftfreq(n, d=period)
+    den_quat = np.zeros_like(quat)
+    fc_quat = 5  # Hz
+    # fourier_quat = fft(quat, axis=0)
     # fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
-    den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_rot), axis=0))
+    # den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0))
+    sos = signal.butter(1, 5, 'lowpass', fs=1 / period, output='sos')
+    for i in range(4):
+        den_quat[:, i] = signal.sosfilt(sos, quat[:, i])
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
 
     # Denoising translation
     fc_trans = 5  # Hz
-    fourier_trans = fft(trans, axis=0)
+    den_trans = np.zeros_like(trans)
+    # fourier_trans = fft(trans, axis=0)
     # fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
     # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
-    den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
+    # den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
+    sos = signal.butter(1, fc_trans, 'lowpass', fs=1 / period, output='sos')
+    for i in range(3):
+        den_trans[:, i] = signal.sosfilt(sos, trans[:, i])
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
 
     # 3-CUT: Cut data and keep only when the drone is flying
@@ -150,14 +162,25 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
-    imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
-                                              fill_value=(den_imu_dict["ang_acc"][0, i],
-                                                          den_imu_dict["ang_acc"][-1, i]))(
-        den_motor_dict["t"]) for i in range(6)], axis=1)
-    pose_sync = np.stack([interpolate.interp1d(den_pose_dict["t"], den_pose_dict["pose"][:, i], bounds_error=False,
-                                               fill_value=(den_pose_dict["pose"][0, i],
-                                                           den_pose_dict["pose"][-1, i]))(
-        den_motor_dict["t"]) for i in range(7)], axis=1)
+    # Spline interpolation
+    # TODO Interpolation spline
+    imu_sync = np.zeros((len(den_motor_dict["t"]), 6))
+    for i in range(6):
+        rep = interpolate.splrep(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], k=5)
+        imu_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+    pose_sync = np.zeros((len(den_motor_dict["t"]), 7))
+    for i in range(7):
+        rep = interpolate.splrep(den_pose_dict["t"], den_pose_dict["pose"][:, i], k=5)
+        pose_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+    # # Linear interpolation
+    # imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
+    #                                           fill_value=(den_imu_dict["ang_acc"][0, i],
+    #                                                       den_imu_dict["ang_acc"][-1, i]))(
+    #     den_motor_dict["t"]) for i in range(6)], axis=1)
+    # pose_sync = np.stack([interpolate.interp1d(den_pose_dict["t"], den_pose_dict["pose"][:, i], bounds_error=False,
+    #                                            fill_value=(den_pose_dict["pose"][0, i],
+    #                                                        den_pose_dict["pose"][-1, i]))(
+    #     den_motor_dict["t"]) for i in range(7)], axis=1)
     syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
            "pose": pose_sync}
 
@@ -166,7 +189,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     syn["pose"][:, 3:7] = syn["pose"][:, 3:7] / np.linalg.norm(syn["pose"][:, 3:7], axis=1).reshape((-1, 1))
 
     # 5-COMPUTE DERIVATIVE
-    dt = np.mean(syn["t"][1:] - syn["t"][:-1])
+    dt = 1 / 200
     quat = syn["pose"][:, 3:7]
     trans = syn["pose"][:, :3]
 
@@ -185,14 +208,11 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # Compute linear speed
     dtrans = (trans[1:] - trans[:-1]) / dt  # Euler derivative
     dtrans = np.concatenate([np.zeros((1, 3)), dtrans], axis=0)
-    # den_d2trans = np.real(ifft(low_pass_filter(fourier_d2trans, frequencies, fc_trans), axis=0))
 
     syn["state"] = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
     del syn["pose"]
 
-    # state = cut_data["state"]
-    # dt = np.array([1/200]).reshape((1, 1))
-    # speed_error = abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10])
+    syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
 
     save_path = intermediate_flight_path + "data.pkl"
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)

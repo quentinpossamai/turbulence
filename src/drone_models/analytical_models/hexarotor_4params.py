@@ -109,16 +109,17 @@ class DynamicalModel(nn.Module):
                  - t12_tensor * motor_torsor[:, :3])
 
         # discontinuities [2850, 2875]
-        start, stop = 2462, 2468
+        # start, stop = 0, len(quat)
         # plt.plot(kfa[start:  stop])  # Problem
         # plt.show()
-        # plt.plot(dt[start:stop])  # no
-        # plt.plot(state[start:stop, 7:10][:, 0])  # lin_vel  no !!!
-        # plt.plot(quat_bar[start:stop])  # no
-        # plt.plot(ang_vel[start:stop])  # no !! DT ?
-        # plt.plot(lin_acc[start:stop, 0])  # y
+        # plt.plot(dt[start:stop])  #
+        # plt.plot(quat_bar[start:stop])  #
+        # plt.plot(state[start:stop, 7:10])  #
+        # plt.plot(ang_vel[start:stop])  #
+        # plt.plot(lin_acc[start:stop, 0])  #
         # plt.plot(ang_acc[start:stop])
-        # plt.plot(motor_torsor[start:stop])  # no
+        # plt.plot(motor_torsor[start:stop])  #
+        # plt.plot((next_state[:, 7:10] - state[:, 7:10]) / dt)
 
         return torch.cat([kfa, ktaua], dim=1)
 
