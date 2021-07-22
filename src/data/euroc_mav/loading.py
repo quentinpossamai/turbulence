@@ -162,8 +162,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
-    # Spline interpolation
-    # TODO Interpolation spline
+    # 4.1.1-Spline interpolation
     imu_sync = np.zeros((len(den_motor_dict["t"]), 6))
     for i in range(6):
         rep = interpolate.splrep(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], k=5)
@@ -172,7 +171,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     for i in range(7):
         rep = interpolate.splrep(den_pose_dict["t"], den_pose_dict["pose"][:, i], k=5)
         pose_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
-    # # Linear interpolation
+
+    # 4.1.2-Linear interpolation
     # imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
     #                                           fill_value=(den_imu_dict["ang_acc"][0, i],
     #                                                       den_imu_dict["ang_acc"][-1, i]))(
@@ -184,7 +184,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
            "pose": pose_sync}
 
-    # Setting initial parameters and normalizing quaternion
+    # 4.2-Setting initial parameters and normalizing quaternion
     syn["t"] = syn["t"] - syn["t"][0]
     syn["pose"][:, 3:7] = syn["pose"][:, 3:7] / np.linalg.norm(syn["pose"][:, 3:7], axis=1).reshape((-1, 1))
 
@@ -193,17 +193,36 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = syn["pose"][:, 3:7]
     trans = syn["pose"][:, :3]
 
+    # 5.1 Compute angular velocity
     # Derivative of the quaternion
     dquat = (quat[1:] - quat[:-1]) / dt  # Euler derivative
     dquat = np.concatenate([np.zeros((1, 4)), dquat], axis=0)
 
-    # Compute angular velocity
-    dq_dt_convention = dquat[:, [3, 0, 1, 2]]
-    q0, q1, q2, q3 = (quat[:, 3], quat[:, 0], quat[:, 1], quat[:, 2])
-    g_matrix = np.array([[-q1, q0, q3, -q2],
-                         [-q2, -q3, q0, q1],
-                         [-q3, q2, -q1, q0]]).transpose((2, 0, 1))
-    ang_vel = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
+    # 5.1.1 Quaternion multiplication method
+    ang_vel = 2. * quaternion.qmul_np(quat * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
+
+    # 5.1.2 Matrix method
+    # dq_dt_convention = dquat[:, [3, 0, 1, 2]]
+    # q0, q1, q2, q3 = (quat[:, 3], quat[:, 0], quat[:, 1], quat[:, 2])
+    # g_matrix = np.array([[-q1, q0, q3, -q2],
+    #                      [-q2, -q3, q0, q1],
+    #                      [-q3, q2, -q1, q0]]).transpose((2, 0, 1))
+    # ang_vel2 = (2 * g_matrix @ dq_dt_convention.reshape((-1, 4, 1))).squeeze()
+    #
+    # print("mean: ", abs(ang_vel2 - ang_vel).mean())  # < 1e-17 with qmul product method from ref
+    # print("std: ", abs(ang_vel2 - ang_vel).std())
+
+    # 5.1.3 With Lie exponential
+    # https://math.stackexchange.com/questions/2282938/converting-from-quaternion-to-angular-velocity-then-back-to-quaternion
+    # ang_vel3 = 2. * (quaternion.qmul_np(quat[:-1] * np.array([[-1, -1, -1, 1]]), quat[1:]))[:, :3] / dt
+    # ang_vel3 = np.concatenate([np.zeros((1, 3)), ang_vel3], axis=0)
+    # def exp_so3(w):
+    #     norm = np.linalg.norm(w, axis=1).reshape((-1, 1))
+    #     return np.concatenate([np.cos(1/2 * norm), w / norm * np.sin(1/2*norm)], axis=1)
+    # next_quat = quaternion.qmul_np(quat[:-1], exp_so3(ang_vel * dt))
+    #
+    # print("mean: ", abs(ang_vel3 - ang_vel).mean())  # < 3e-15 with qmul product method from ref
+    # print("std: ", abs(ang_vel3 - ang_vel).std())
 
     # Compute linear speed
     dtrans = (trans[1:] - trans[:-1]) / dt  # Euler derivative

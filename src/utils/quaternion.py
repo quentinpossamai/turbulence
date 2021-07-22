@@ -280,6 +280,33 @@ def _test():
     torch.abs(vect1 - vect_hat).mean(dim=0)
 
 
+def _test_qmul():
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+
+    n = 1000
+    tmp = torch.randn(n, 4, dtype=float)
+    quat_a = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
+    tmp = torch.randn(n, 4, dtype=float)
+    quat_b = (tmp / torch.linalg.norm(tmp, axis=1).unsqueeze(1)).clone().detach()
+    vect = torch.randn(n, 3, dtype=float)
+
+    norm_error = abs(qmul(quat_a, quat_a * torch.DoubleTensor([[-1, -1, -1, 1]]))[:, 3] - 1)
+    assert norm_error.mean() < 1e-16
+    assert norm_error.std() < 1e-15
+
+    vect_prime = qmul(qmul(torch.DoubleTensor([[-1, -1, -1, 1]]) * quat_a, torch.cat([vect, torch.zeros(len(vect), 1)], dim=1)), quat_a)[:, :3]
+    vect_hat = qmul(qmul(quat_a, torch.cat([vect_prime, torch.zeros(len(vect_prime), 1)], dim=1)), torch.DoubleTensor([[-1, -1, -1, 1]]) * quat_a)[:, :3]
+    assert abs(vect - vect_hat).mean() < 1e-15
+    assert abs(vect - vect_hat).std() < 1e-15
+
+    ang_vel = 2. * qmul(quat_a * torch.DoubleTensor([[-1., -1., -1., 1.]]), quat_b)[:, :3]
+    quat_b_hat = 0.5 * qmul(quat_a, torch.cat([ang_vel, torch.zeros((len(quat_b), 1))], dim=1))
+    assert abs(quat_b_hat - quat_b).mean() < 1e-15
+    assert abs(quat_b_hat - quat_b).std() < 1e-15
+
 if __name__ == '__main__':
     pass
-    _test()
+    # _test()
+    _test_qmul()
