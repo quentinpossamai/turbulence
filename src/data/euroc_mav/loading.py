@@ -91,20 +91,14 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
 
     for i in range(6):
+        # den_motor_dict["motor"][:, i] = motor_dict["motor"][:, i]  # no denoising
         fc_motor = 5  # Hz
+        # Ideal denoising
         fourier_motor = fft(motor_dict["motor"][:, i])
-        # den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
-        sos = signal.butter(1, fc_motor, 'lowpass', fs=200, output='sos')
-        den_motor_dict["motor"][:, i] = signal.sosfilt(sos, motor_dict["motor"][:, i])
-        
-        # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-        # ax.plot(motor_dict["t"] - motor_dict["t"][0], motor_dict["motor"][:, i], label="Raw")
-        # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
-        # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], den_motor_dict["motor"][:, i], label="Butterworth")
-        # ax.legend()
-        # ax.grid()
-        # ax.set_xlabel("Time [s]")
-        # ax.set_ylabel("Motor speed")
+        den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
+        # Butterworth
+        # sos = signal.butter(1, fc_motor, 'lowpass', fs=200, output='sos')
+        # den_motor_dict["motor"][:, i] = signal.sosfilt(sos, motor_dict["motor"][:, i])
 
     # 2.2-Denoising IMU timestamp
     den_imu_dict = {}
@@ -131,28 +125,62 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
     # Denoising quaternion
-    # frequencies = fftfreq(n, d=period)
-    den_quat = np.zeros_like(quat)
+    # den_quat = quat  # no denoising
+    # Ideal denoising
+    frequencies = fftfreq(n, d=period)
     fc_quat = 5  # Hz
-    # fourier_quat = fft(quat, axis=0)
+    fourier_quat = fft(quat, axis=0)
+    den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0))
     # fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
-    # den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0))
-    sos = signal.butter(1, 5, 'lowpass', fs=1 / period, output='sos')
-    for i in range(4):
-        den_quat[:, i] = signal.sosfilt(sos, quat[:, i])
+    # Butterworth
+    # den_quat = np.zeros_like(quat)
+    # sos = signal.butter(1, fc_quat, 'lowpass', fs=1 / period, output='sos')
+    # for i in range(4):
+    #     den_quat[:, i] = signal.sosfilt(sos, quat[:, i])
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
 
     # Denoising translation
+    # den_trans = trans  # no denoising
+    # Ideal denoising
     fc_trans = 5  # Hz
-    den_trans = np.zeros_like(trans)
-    # fourier_trans = fft(trans, axis=0)
+    fourier_trans = fft(trans, axis=0)
+    den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
     # fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
     # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
-    # den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
-    sos = signal.butter(1, fc_trans, 'lowpass', fs=1 / period, output='sos')
-    for i in range(3):
-        den_trans[:, i] = signal.sosfilt(sos, trans[:, i])
+    # Butterworth
+    # den_trans = np.zeros_like(trans)
+    # sos = signal.butter(1, fc_trans, 'lowpass', fs=1 / period, output='sos')
+    # for i in range(3):
+    #     den_trans[:, i] = signal.sosfilt(sos, trans[:, i])
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
+
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # ax.plot(motor_dict["t"] - motor_dict["t"][0], motor_dict["motor"][:, i], label="Raw")
+    # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
+    # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], den_motor_dict["motor"][:, i], label="Butterworth")
+    # ax.legend()
+    # ax.grid()
+    # ax.set_xlabel("Time [s]")
+    # ax.set_ylabel("Motor speed")
+
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # i = 0
+    # ax.plot(pose_dict["t"] - pose_dict["t"][0], quat, label="Raw")
+    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0)), label="Ideal low pass")
+    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], den_quat, label="Butterworth")
+    # ax.legend()
+    # ax.grid()
+    # ax.set_xlabel("Time [s]")
+    # ax.set_ylabel("Quaternion")
+    #
+    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+    # ax.plot(pose_dict["t"] - pose_dict["t"][0], trans, label="Raw")
+    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0)), label="Ideal low pass")
+    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], den_trans, label="Butterworth")
+    # ax.legend()
+    # ax.grid()
+    # ax.set_xlabel("Time [s]")
+    # ax.set_ylabel("Translations [m]")
 
     # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0

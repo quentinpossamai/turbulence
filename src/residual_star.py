@@ -43,13 +43,14 @@ def plot_residual_torsor(time, residual_torsor, title, xlim: tuple):
 
 
 def euroc_mav_residual():
-    model = DynamicalModel(paper=False, dtype=torch.float64)
+    dtype = torch.float64
+    model = DynamicalModel(paper=False, dtype=dtype)
     for flight in euroc.FLIGHT_LIST:
         # Importing data
         data = euroc.load_flight(flight)
         time = torch.from_numpy(data["t"][:-1])
         motor = torch.from_numpy(data["motor"][:-1])
-        dt = torch.tensor([1 / 200], dtype=torch.float64).view((1, 1))
+        dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
         state = torch.from_numpy(data["state"][:-1])
         next_state = torch.from_numpy(data["state"][1:])
 
@@ -70,15 +71,15 @@ def euroc_mav_residual():
         # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
 
         # Saving
-        # intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
-        # pickle.dump(data, open(intermediate_flight_path, "wb"))
-        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-butterworth.pkl"
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-ideal.pkl"
         pickle.dump({"butterworth": data["residual"]}, open(intermediate_flight_path, "wb"))
     euroc.splitting()
 
 
 def _test_euroc():
-    dtype = torch.float32
+    dtype = torch.float64
     model = DynamicalModel(paper=False, dtype=dtype)
     for flight in euroc.FLIGHT_LIST:
         # Importing data
@@ -86,7 +87,7 @@ def _test_euroc():
         time = torch.from_numpy(data["t"][:-1]).type(dtype)
         motor = torch.from_numpy(data["motor"][:-1]).type(dtype)
         # dt = torch.from_numpy(data["t"][1:] - data["t"][:-1]).view(-1, 1)
-        dt = torch.tensor([[1/200]], dtype=dtype)
+        dt = torch.tensor([[1 / 200]], dtype=dtype)
         state = torch.from_numpy(data["state"][:-1]).type(dtype)
         next_state = torch.from_numpy(data["state"][1:]).type(dtype)
         residual_torsor = torch.from_numpy(data["residual"][1:]).type(dtype)
@@ -124,7 +125,7 @@ def _test_euroc():
 
 def _test_euroc_torch_dataset():
     for name in ["train", "validation", "test"]:
-        dtype = torch.float32
+        dtype = torch.float64
         dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype),
                              batch_size=32, shuffle=True)
         model = DynamicalModel(paper=False, dtype=dtype)
@@ -174,7 +175,31 @@ def _test_euroc_torch_dataset():
         # For torch.float64 0 for each !
 
 
+def compare_denoising():
+    for flight in euroc.FLIGHT_LIST:
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        current = pickle.load(open(intermediate_flight_path, "rb"))["residual"]
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-raw.pkl"
+        raw = pickle.load(open(intermediate_flight_path, "rb"))["butterworth"]
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-ideal.pkl"
+        ideal = pickle.load(open(intermediate_flight_path, "rb"))["butterworth"]
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-butterworth.pkl"
+        butterworth = pickle.load(open(intermediate_flight_path, "rb"))["butterworth"]
+
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        i = 3
+        ax.plot(current[:, i], label="Current")
+        ax.plot(raw[:, i], label="Raw")
+        ax.plot(ideal[:, i], label="Ideal")
+        ax.plot(butterworth[:, i], label="Butterworth")
+        ax.legend()
+        ax.grid()
+        ax.set_xlabel("Time [s]")
+        ax.set_ylabel("Fa [m/s2]")
+
+
 if __name__ == '__main__':
     # euroc_mav_residual()
-    _test_euroc()
-    _test_euroc_torch_dataset()
+    # _test_euroc()
+    # _test_euroc_torch_dataset()
+    compare_denoising()
