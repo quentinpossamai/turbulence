@@ -7,11 +7,14 @@ import src.utils.quaternion as quaternion
 
 
 class DynamicalModel(nn.Module):
-    def __init__(self, paper):
+    def __init__(self, paper, dtype):
         """
         :param paper: True, load paper parameters. False, load mse parameters
+        :param dtype: Datatype of the model.
         """
         super(DynamicalModel, self).__init__()
+        assert dtype in [torch.float32, torch.float64]
+        self.dtype = dtype
         # Point: 6
         self.permutation = [5, 0, 1, 2, 3, 4]
         if paper:
@@ -28,15 +31,15 @@ class DynamicalModel(nn.Module):
             # km = 1.2864e-7  # [N.m2.rad-1]
             # l = 0.215  # [m]
             # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
-            self.theta = torch.FloatTensor([[1.0228e-05],
-                                             [1.4064e-04],
-                                             [1.5881e-05],
-                                             [8.0943e-01]])
+            self.theta = torch.tensor([[1.0228e-05],
+                                       [1.4064e-04],
+                                       [1.5881e-05],
+                                       [8.0943e-01]], dtype=self.dtype)
         else:
-            self.theta = torch.FloatTensor([[1.1566750e-04],
-                                             [6.9880742e-04],
-                                             [-5.1250136e-05],
-                                             [2.6935432e+00]])  # MSE
+            self.theta = torch.tensor([[1.1566750e-04],
+                                       [6.9880742e-04],
+                                       [-5.1250136e-05],
+                                       [2.6935432e+00]], dtype=self.dtype)  # MSE
 
     def forward(self, motor, state, dt, residual=None):
         assert motor.shape[-1] == 6, "Motor len is not 6"
@@ -55,7 +58,7 @@ class DynamicalModel(nn.Module):
 
         batch_size = state.shape[0]
         # Linear PFD
-        g = torch.FloatTensor([0, 0, 9.81]).view(1, 3)
+        g = torch.tensor([0, 0, 9.81], dtype=self.dtype).view(1, 3)
         thrust = torch.cat([torch.zeros(batch_size, 1), torch.zeros(batch_size, 1), motor_torsor[:, 3:]], dim=1)
         next_lin_vel = lin_vel + dt * (quaternion.qrot(quat, self.theta[0] * thrust + kfa) - g)
 
@@ -63,8 +66,8 @@ class DynamicalModel(nn.Module):
         next_pos = pos + dt * next_lin_vel
 
         # Angular PFD
-        t3_tensor = torch.FloatTensor([1, 1, self.theta[3]]).view(1, 3)
-        t12_tensor = torch.FloatTensor([self.theta[1], self.theta[1], self.theta[2]]).view(1, 3)
+        t3_tensor = torch.tensor([1, 1, self.theta[3]], dtype=self.dtype).view(1, 3)
+        t12_tensor = torch.tensor([self.theta[1], self.theta[1], self.theta[2]], dtype=self.dtype).view(1, 3)
         next_ang_vel = ang_vel + dt * (torch.cross(t3_tensor * ang_vel, ang_vel)
                                        + t12_tensor * motor_torsor[:, :3]
                                        + ktaua)
@@ -80,10 +83,10 @@ class DynamicalModel(nn.Module):
     def motor_dynamic(self, command):
         a = 0.5
         b = 3 ** 0.5 / 2
-        motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
-                                           [-b, -b, +0, +b, +b, +0],
-                                           [-1, +1, -1, +1, -1, +1],
-                                           [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
+        motor_matrix = torch.tensor([[-a, +a, +1, +a, -a, -1],
+                                     [-b, -b, +0, +b, +b, +0],
+                                     [-1, +1, -1, +1, -1, +1],
+                                     [+1, +1, +1, +1, +1, +1]], dtype=self.dtype).view(1, 4, 6)
 
         motor = command[:, self.permutation]
         omega_squared = motor ** 2
@@ -97,15 +100,15 @@ class DynamicalModel(nn.Module):
         ang_acc = (next_state[:, 10:] - state[:, 10:]) / dt
         motor_torsor = self.motor_dynamic(motor)
 
-        quat_bar = quat * torch.FloatTensor([-1, -1, -1, 1]).view(1, 4)
+        quat_bar = quat * torch.tensor([-1, -1, -1, 1], dtype=self.dtype).view(1, 4)
         batch_size = len(quat)
-        g = torch.FloatTensor([0, 0, 9.81]).view(1, 3)
+        g = torch.tensor([0, 0, 9.81], dtype=self.dtype).view(1, 3)
 
         thrust = torch.cat([torch.zeros((batch_size, 2)), self.theta[0] * motor_torsor[:, 3].view(-1, 1)], dim=1)
         kfa = quaternion.qrot(quat_bar, lin_acc + g) - thrust
 
-        t3_tensor = torch.FloatTensor([1, 1, self.theta[3]]).view(1, 3)
-        t12_tensor = torch.FloatTensor([self.theta[1], self.theta[1], self.theta[2]]).view(1, 3)
+        t3_tensor = torch.tensor([1, 1, self.theta[3]], dtype=self.dtype).view(1, 3)
+        t12_tensor = torch.tensor([self.theta[1], self.theta[1], self.theta[2]], dtype=self.dtype).view(1, 3)
         ktaua = (ang_acc - torch.cross(t3_tensor * ang_vel, ang_vel, dim=-1)
                  - t12_tensor * motor_torsor[:, :3])
 
@@ -126,7 +129,7 @@ class DynamicalModel(nn.Module):
 
 
 def main():
-    model = DynamicalModel(paper=False)
+    model = DynamicalModel(paper=False, dtype=torch.float32)
 
     # Sanity check
     def sanity_check(data):

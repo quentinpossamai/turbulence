@@ -97,13 +97,14 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
         sos = signal.butter(1, fc_motor, 'lowpass', fs=200, output='sos')
         den_motor_dict["motor"][:, i] = signal.sosfilt(sos, motor_dict["motor"][:, i])
         
-        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-        ax.plot(motor_dict["t"], motor_dict["motor"][:, i], label="Raw")
-        ax.plot(den_motor_dict["t"], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
-        ax.plot(den_motor_dict["t"], den_motor_dict["motor"][:, i], label="Butterworth")
-        ax.legend()
-        ax.grid()
-        ax.set_label("")
+        # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        # ax.plot(motor_dict["t"] - motor_dict["t"][0], motor_dict["motor"][:, i], label="Raw")
+        # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
+        # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], den_motor_dict["motor"][:, i], label="Butterworth")
+        # ax.legend()
+        # ax.grid()
+        # ax.set_xlabel("Time [s]")
+        # ax.set_ylabel("Motor speed")
 
     # 2.2-Denoising IMU timestamp
     den_imu_dict = {}
@@ -268,12 +269,15 @@ def splitting():
 
 
 class EurocMAVDatasetHorizon(Dataset):
-    def __init__(self, train_validation_test: str, traj_len: int):
+    def __init__(self, train_validation_test: str, traj_len: int, dtype):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
         :param traj_len: length of the trajectory to give each index
+        :param dtype: Datatype of the model.
         """
+        assert dtype in [torch.float32, torch.float64]
+        self.dtype = dtype
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
         split = [e.split(",") for e in open(INTERMEDIATE_DATASET_PATH + f"split.txt", "r")]
@@ -301,6 +305,7 @@ class EurocMAVDatasetHorizon(Dataset):
                                               axis=1)
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
+        self.data = torch.from_numpy(self.data).type(self.dtype)
 
         # print(np.min(self.data[:, 20:], axis=0))
         # print(np.max(self.data[:, 20:], axis=0))
@@ -324,12 +329,11 @@ class EurocMAVDatasetHorizon(Dataset):
         stop = local_idx + self.traj_len
         data = self.data[start:stop]
         assert len(data) == self.traj_len
-        # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
-        res = {"t": torch.from_numpy(data[:, :1]).float(),
-               "state": torch.from_numpy(data[:, 1:14]).float(),
-               "motor": torch.from_numpy(data[:, 14:20]).float(),
-               # "residual": (torch.from_numpy(data[:, 20:]).float() - self.min_res) / (self.max_res - self.min_res)}
-               "residual": torch.from_numpy(data[:, 20:]).float()}
+        res = {"t": data[:, :1],
+               "state": data[:, 1:14],
+               "motor": data[:, 14:20],
+               # "residual": (data[:, 20:] - self.min_res) / (self.max_res - self.min_res)}
+               "residual": data[:, 20:]}
         return res
 
 

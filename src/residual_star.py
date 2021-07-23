@@ -43,7 +43,7 @@ def plot_residual_torsor(time, residual_torsor, title, xlim: tuple):
 
 
 def euroc_mav_residual():
-    model = DynamicalModel(paper=False)
+    model = DynamicalModel(paper=False, dtype=torch.float64)
     for flight in euroc.FLIGHT_LIST:
         # Importing data
         data = euroc.load_flight(flight)
@@ -67,26 +67,29 @@ def euroc_mav_residual():
         residual_torsor = model.residual_dynamic(motor, state, dt, next_state)
         data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
 
-        plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
+        # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
 
         # Saving
-        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
-        pickle.dump(data, open(intermediate_flight_path, "wb"))
+        # intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        # pickle.dump(data, open(intermediate_flight_path, "wb"))
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-butterworth.pkl"
+        pickle.dump({"butterworth": data["residual"]}, open(intermediate_flight_path, "wb"))
     euroc.splitting()
 
 
 def _test_euroc():
-    model = DynamicalModel(paper=False)
+    dtype = torch.float32
+    model = DynamicalModel(paper=False, dtype=dtype)
     for flight in euroc.FLIGHT_LIST:
         # Importing data
         data = euroc.load_flight(flight)
-        time = torch.from_numpy(data["t"][:-1]).float()
-        motor = torch.from_numpy(data["motor"][:-1]).float()
+        time = torch.from_numpy(data["t"][:-1]).type(dtype)
+        motor = torch.from_numpy(data["motor"][:-1]).type(dtype)
         # dt = torch.from_numpy(data["t"][1:] - data["t"][:-1]).view(-1, 1)
-        dt = torch.FloatTensor([[1/200]])
-        state = torch.from_numpy(data["state"][:-1]).float()
-        next_state = torch.from_numpy(data["state"][1:]).float()
-        residual_torsor = torch.from_numpy(data["residual"][1:]).float()
+        dt = torch.tensor([[1/200]], dtype=dtype)
+        state = torch.from_numpy(data["state"][:-1]).type(dtype)
+        next_state = torch.from_numpy(data["state"][1:]).type(dtype)
+        residual_torsor = torch.from_numpy(data["residual"][1:]).type(dtype)
 
         next_state_hat = model(motor, state, dt, residual_torsor)
         print(torch.abs(next_state - next_state_hat).mean(dim=0))
@@ -95,7 +98,7 @@ def _test_euroc():
         traj = [state[0].reshape((1, -1))]
         horizon = 10000
         for i in range(horizon - 1):
-            traj.append(model(traj[-1], motor[i].reshape((1, -1)),
+            traj.append(model(motor[i].reshape((1, -1)), traj[-1],
                               dt, residual_torsor[i].reshape((1, -1))).reshape((1, -1)))
         traj = np.concatenate(traj, axis=0)
         # plt.plot(state[:horizon, 3:7])
@@ -121,13 +124,14 @@ def _test_euroc():
 
 def _test_euroc_torch_dataset():
     for name in ["train", "validation", "test"]:
-        dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21), batch_size=32,
-                             shuffle=True)
-        model = DynamicalModel(paper=False)
-        dt = torch.FloatTensor([[1 / 200]])
+        dtype = torch.float32
+        dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype),
+                             batch_size=32, shuffle=True)
+        model = DynamicalModel(paper=False, dtype=dtype)
+        dt = torch.tensor([[1 / 200]], dtype=dtype)
         next_state_hat, next_state_gt = [], []
         residual_hat, residual_gt = [], []
-        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21))
+        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype))
         print("len: ", n)
         print()
         for e in dataset:
@@ -172,5 +176,5 @@ def _test_euroc_torch_dataset():
 
 if __name__ == '__main__':
     # euroc_mav_residual()
-    # _test_euroc()
+    _test_euroc()
     _test_euroc_torch_dataset()
