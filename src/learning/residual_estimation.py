@@ -84,7 +84,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # num_workers=1, pin_memory=True
 
     global_iteration = 0
-    validation_loss = validate(model, validation_data, horizon, past, epoch=0)
+    validation_loss = validate(model, validation_data, horizon, past, epoch=-1)
     writer.add_scalars("Loss", {"Validation loss": validation_loss}, global_step=global_iteration)
     writer.add_scalars("Epoch loss", {"Validation loss": validation_loss}, global_step=-1)
     training_log = []
@@ -105,7 +105,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
             training_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
             reduced_training_loss = training_loss.mean()
             writer.add_scalars("Loss", {"Training loss": reduced_training_loss.item()}, global_step=global_iteration)
-            training_log.append(training_loss)
+            training_log.append(training_loss.detach())
 
             optimizer.zero_grad()
             reduced_training_loss.backward()

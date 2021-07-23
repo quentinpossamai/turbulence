@@ -74,10 +74,10 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
 
     # 2-DENOISING
-    # def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
-    #     output = fft_coef.copy()
-    #     output[np.abs(fourier_freq) > freq_cut] = 0
-    #     return output
+    def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
+        output = fft_coef.copy()
+        output[np.abs(fourier_freq) > freq_cut] = 0
+        return output
 
     # 2.1-Denoising motor speed's timestamp and motor speed
     den_motor_dict = {}
@@ -86,16 +86,24 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # Denoising motor speed with low pass filter on Fourier's coefficients
     # period = np.mean(motor_dict["t"][1:] - motor_dict["t"][:-1])
     period = 1 / 200
-    # n = len(motor_dict["t"])
-    # frequencies = fftfreq(n, d=period)
+    n = len(motor_dict["t"])
+    frequencies = fftfreq(n, d=period)
     den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
 
     for i in range(6):
         fc_motor = 5  # Hz
-        # fourier_motor = fft(motor_dict["motor"][:, i])
+        fourier_motor = fft(motor_dict["motor"][:, i])
         # den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
         sos = signal.butter(1, fc_motor, 'lowpass', fs=200, output='sos')
         den_motor_dict["motor"][:, i] = signal.sosfilt(sos, motor_dict["motor"][:, i])
+        
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        ax.plot(motor_dict["t"], motor_dict["motor"][:, i], label="Raw")
+        ax.plot(den_motor_dict["t"], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
+        ax.plot(den_motor_dict["t"], den_motor_dict["motor"][:, i], label="Butterworth")
+        ax.legend()
+        ax.grid()
+        ax.set_label("")
 
     # 2.2-Denoising IMU timestamp
     den_imu_dict = {}
