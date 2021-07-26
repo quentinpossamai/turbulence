@@ -106,10 +106,12 @@ def test_euroc_mav_mlp_metrics(model_name):
     test_model(model, "euroc_mav", "test", "normal")
 
 
-def test_model(model, dataset, train_test_validation, mode):
+def test_model(model, residual_model, past, dataset, train_test_validation, mode):
     """
     Print the error on 0.025s, 0.5s and 1s of one model on one dataset split.
     :param model: The model to evaluate.
+    :param residual_model: Model to compute residual of the first one.
+    :param past: Number of samples to give to the model
     :param dataset: The dataset to use for evaluation. "blackbird" or "euroc_mav".
     :param train_test_validation: The split to evaluate on. "train", "validation" or "test".
     :param mode: The split to evaluate on. "normal", "residual" or "past".
@@ -128,7 +130,8 @@ def test_model(model, dataset, train_test_validation, mode):
 
     if dataset == "euroc_mav":
         for i, e_i in enumerate([5, 100, 200]):
-            res[i] = (metric_func(model, e_i, 'euroc_mav', train_test_validation).item())
+            res[i] = (metric_func(model=model, residual_model=residual_model, horizon=e_i, past=past,
+                                  dataset="euroc_mav", split=train_test_validation).item())
     else:  # dataset == "blackbird"
         for i, e_i in enumerate([9, 180, 360]):
             res[i] = (metric_func(model, e_i, 'blackbird', train_test_validation).item())
@@ -178,10 +181,13 @@ def main():
 
     cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/1470_weights.pt"
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}")
-    model = drone_models.residual.CNNResidual(motor_size=6, n_past=20, unit_size=50)
-    model.load_state_dict(weights)
-    model.eval()
-    test_model(model, "euroc_mav", "test", "past")
+    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    past = 20
+    residual_model = drone_models.residual.CNNResidual(motor_size=6, past=past, unit_size=50)
+    residual_model.load_state_dict(weights)
+    residual_model.eval()
+    test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test",
+               mode="normal")
     pass
 
 

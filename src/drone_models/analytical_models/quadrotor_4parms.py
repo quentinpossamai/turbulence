@@ -33,8 +33,8 @@ class DynamicalModel(nn.Module):
         self.permutation = [1, 0, 3, 2]
         self.dt = 1 / 360
 
-    def forward(self, state, command, dt=None):
-        assert command.shape[-1] == 4, "Motor len is not 4"
+    def forward(self, motor, state, dt=None):
+        assert motor.shape[-1] == 4, "Motor len is not 4"
         pos = state[:, :3]
         quat = state[:, 3:7]
         vel = state[:, 7:10]
@@ -48,7 +48,7 @@ class DynamicalModel(nn.Module):
                                                                                                 1,
                                                                                                 1]).view(1, 4, 1)
 
-        motor = command[:, self.permutation]
+        motor = motor[:, self.permutation]
         omega_squared = motor ** 2
         motor_torsor = motor_matrix @ omega_squared.unsqueeze(-1)  # [tx, ty, tz, T]
         batch_size = state.shape[0]

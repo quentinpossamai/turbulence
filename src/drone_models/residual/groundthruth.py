@@ -8,7 +8,7 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 class GroundTruth(nn.Module):
     def __init__(self):
         super(GroundTruth, self).__init__()
-        self.model = DynamicalModel(paper=False)
+        self.model = DynamicalModel(paper=False, dtype=torch.float32)
         self.prms = nn.Parameter(torch.zeros(1))
 
     def forward(self, motor, state, dt, next_state):

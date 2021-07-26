@@ -62,7 +62,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # Training parameters
     memory = 100000
 
-    model = CNNResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
+    model = CNNResidual(motor_size=6, past=past, unit_size=unit_size).to(device)
     # model = GRUResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
     # model = GroundTruth().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)

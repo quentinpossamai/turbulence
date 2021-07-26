@@ -20,7 +20,7 @@ class MLP(nn.Module):
         self.batch_norm3 = nn.BatchNorm2d(1)
         self.linear4 = nn.Linear(in_features=256, out_features=6, bias=True)
 
-    def forward(self, state, motor, dt):
+    def forward(self, motor, state, dt):
         """
         Estimate the residual = GT - model
         :param state: (batch * step * values=13)

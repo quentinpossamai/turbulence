@@ -14,7 +14,7 @@ class MLP(nn.Module):
         self.linear3 = nn.Linear(in_features=256, out_features=256, bias=True)
         self.linear4 = nn.Linear(in_features=256, out_features=6, bias=True)
 
-    def forward(self, state, motor, dt):
+    def forward(self, motor, state, dt):
         position = state[:, :3]
         quat = state[:, 3:7]
         v = state[:, 7:10]

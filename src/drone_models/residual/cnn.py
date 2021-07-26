@@ -4,12 +4,12 @@ from torch.nn.functional import relu
 
 
 class CNNResidual(nn.Module):
-    def __init__(self, motor_size: int, n_past: int, unit_size: int):
+    def __init__(self, motor_size: int, past: int, unit_size: int):
         super(CNNResidual, self).__init__()
         self.motor_size = motor_size
         self.unit_size = unit_size
 
-        self.time_size = n_past
+        self.time_size = past
         self.feature_size = 19
 
         # In shape (batch, channel=1, self.time_size, self.feature_size)
@@ -20,11 +20,11 @@ class CNNResidual(nn.Module):
                                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         # Out shape (batch, channel=6, 1, 1)
 
-    def forward(self, state, motor, dt):
+    def forward(self, motor, state, dt):
         """
         Estimate the residual = GT - model
-        :param state: (batch, step, values=13)
         :param motor: (batch, step, values=6)
+        :param state: (batch, step, values=13)
         :param dt: (batch, step, values=1)
         :return: (batch, value=6)
         """

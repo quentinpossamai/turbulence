@@ -26,11 +26,11 @@ class GRUResidual(nn.Module):
         # self.batch_norm3 = nn.BatchNorm1d(self.unit_size)
         # self.linear4 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
-    def forward(self, state, motor, dt):
+    def forward(self, motor, state, dt):
         """
         Estimate the residual = GT - model
-        :param state: (batch, step, values=13)
         :param motor: (batch, step, values=6)
+        :param state: (batch, step, values=13)
         :param dt: (batch, step, values=1)
         :return: (batch, value=6)
         """
