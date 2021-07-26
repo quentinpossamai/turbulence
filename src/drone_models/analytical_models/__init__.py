@@ -1,2 +1,2 @@
-import hexarotor_4params
-import quadrotor_4parmsu
+import src.drone_models.analytical_models.hexarotor_4params
+import src.drone_models.analytical_models.quadrotor_4parms

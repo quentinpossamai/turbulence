@@ -226,9 +226,9 @@ def _compute_error(model, residual_model, horizon, past, states, motor, time):
 
             if residual_model is not None:
                 residual = residual_model(state=past_states, motor=past_motor, dt=dt)
-                next_state = model(motor=past_motor, state=past_states, dt=dt, residual=residual)
+                next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
             else:
-                next_state = model(past_states, past_motor, dt)
+                next_state = model(motor=past_motor, state=past_states, dt=dt)
             prediction.append(next_state)
 
     prediction = torch.stack(prediction, dim=1)

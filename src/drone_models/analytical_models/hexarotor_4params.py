@@ -59,7 +59,7 @@ class DynamicalModel(nn.Module):
         batch_size = state.shape[0]
         # Linear PFD
         g = torch.tensor([0, 0, 9.81], dtype=self.dtype).view(1, 3)
-        thrust = torch.cat([torch.zeros(batch_size, 1), torch.zeros(batch_size, 1), motor_torsor[:, 3:]], dim=1)
+        thrust = torch.cat([torch.zeros(batch_size, 2), motor_torsor[:, 3:]], dim=1)
         next_lin_vel = lin_vel + dt * (quaternion.qrot(quat, self.theta[0] * thrust + kfa) - g)
 
         # Position

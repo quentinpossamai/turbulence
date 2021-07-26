@@ -173,11 +173,12 @@ def main():
 
     # mlp_symplectic_past = "20210709_093134_MLP_bs_32/82320_weights.pt"
     # weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
-    # n_past = 20
-    # model = drone_models.mlp.iii_mlp_past.MLP(motor_size=6, n_past=n_past)
+    # past = 10
+    # model = drone_models.mlp.iii_mlp_past.MLP(motor_size=6, n_past=past)
     # model.load_state_dict(weights)
     # model.eval()
-    # test_model(model, "euroc_mav", "test", "past")
+    # test_model(model=model, residual_model=None, past=past, dataset="euroc_mav", train_test_validation="test",
+    #            mode="normal")
 
     cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/1470_weights.pt"
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}")
