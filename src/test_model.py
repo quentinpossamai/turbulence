@@ -6,16 +6,15 @@ import src.data.blackbird.loading as blackbird
 import src.data.euroc_mav.loading as euroc
 
 # Models
-from src.drone_models.analytical_models import quadrotor_4parms, hexarotor_4params
-from src.drone_models.mlp import iii_mlp_past
-from src.drone_models.mlp.ii_mlp import MLP
-from src.drone_models.mlp.i_old_mlp_quadrotor import OldMLPQuadrotor
+import src.drone_models as drone_models
 import src.utils.trajectory
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 from src import metrics
+from src.learning import residual_estimation
 
 BLACKBIRD_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
 EUROC_MAV_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_learned_hexarotor_training/"
+EUROC_MAV_RESIDUAL = residual_estimation.ANALYSIS_PATH
 mkdir_if_not_exist([BLACKBIRD_ANALYSIS_PATH])
 
 
@@ -169,14 +168,20 @@ def main():
     # model.eval()
     # test_model(model, "euroc_mav", "test", "past")
 
-    mlp_symplectic_past = "20210709_093134_MLP_bs_32/82320_weights.pt"
-    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
-    n_past = 10
-    model = iii_mlp_past.MLP(6, n_past)
+    # mlp_symplectic_past = "20210709_093134_MLP_bs_32/82320_weights.pt"
+    # weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
+    # n_past = 20
+    # model = drone_models.mlp.iii_mlp_past.MLP(motor_size=6, n_past=n_past)
+    # model.load_state_dict(weights)
+    # model.eval()
+    # test_model(model, "euroc_mav", "test", "past")
+
+    cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/1470_weights.pt"
+    weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}")
+    model = drone_models.residual.CNNResidual(motor_size=6, n_past=20, unit_size=50)
     model.load_state_dict(weights)
     model.eval()
     test_model(model, "euroc_mav", "test", "past")
-
     pass
 
 
