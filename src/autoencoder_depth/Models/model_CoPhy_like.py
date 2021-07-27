@@ -85,7 +85,7 @@ class Decoder(nn.Module):
 
 if __name__ == '__main__':
     depthmap = torch.randn(16, 1, 240, 376)
-model = Autoencoder()
+    model = Autoencoder()
 
-y = model(depthmap)
-print(y["feature"].shape, y["output"].shape)
+    y = model(depthmap)
+    print(y["feature"].shape, y["output"].shape)
