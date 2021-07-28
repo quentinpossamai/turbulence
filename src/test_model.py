@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
@@ -18,95 +19,7 @@ EUROC_MAV_RESIDUAL = residual_estimation.ANALYSIS_PATH
 mkdir_if_not_exist([BLACKBIRD_ANALYSIS_PATH])
 
 
-def test_blackbird_mlp(horizon, train_validation_test, model_name):
-    assert train_validation_test in ["train", "validation", "test"]
-
-    weights = torch.load(BLACKBIRD_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLP(motor_size=4)
-    model.load_state_dict(weights)
-    model.eval()
-
-    flight = list(e[:-2] for e in open(blackbird.DATASET_PATH + f"{train_validation_test}.txt", "r"))[0]
-    print(f"Testing on {train_validation_test}")
-    flight_name, flight_yaw, flight_speed = flight.split("/")
-    data = blackbird.load_flight(flight_name, flight_yaw, flight_speed)
-
-    state = torch.from_numpy(data["state"][:-1]).float()
-    motor = torch.from_numpy(data["motor"][:-1]).float()
-    time = torch.from_numpy(data["t"][:-1]).float()
-    next_time = torch.from_numpy(data["t"][1:]).float()
-    next_state = torch.from_numpy(data["state"][1:]).float()
-    dt = (next_time - time).float()
-
-    next_state_hat = src.utils.trajectory.gen_traj(model, state, motor, dt, horizon=horizon)
-
-    start = 0
-    if horizon == 1:
-        length = 100
-    else:
-        length = horizon
-    src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + length,
-                                      train_validation_test,
-                                      EUROC_MAV_ANALYSIS_PATH + f"training/{model_name.split('/')[0]}/"
-                                                                f"traj_{train_validation_test}_horizon{horizon}.svg")
-    # visualise_metrics(model, 500, "test", plot_range=[15000, 15500])
-
-
-def test_euroc_mav_mlp(horizon, train_validation_test, model_name):
-    assert train_validation_test in ["train", "validation", "test"]
-    assert horizon < 3156, "horizon too big, maximum possible horizon is 3156"
-    train_flight = euroc.EurocMAVDatasetHorizon("train", traj_len=3155)[0]
-    validation_flight = euroc.EurocMAVDatasetHorizon("validation", traj_len=3155)[0]
-    test_flight = euroc.EurocMAVDatasetHorizon("test", traj_len=3155)[0]
-
-    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLP(motor_size=6)
-    model.load_state_dict(weights)
-    model.eval()
-
-    if train_validation_test == "train":
-        data = train_flight
-    elif train_validation_test == "validation":
-        data = validation_flight
-    else:
-        data = test_flight
-    state = data["state"][:-1]
-    motor = data["motor"][:-1]
-    time = data["t"][:-1]
-    next_state = data["state"][1:]
-    next_time = data["t"][1:]
-    dt = next_time - time
-
-    next_state_hat = src.utils.trajectory.gen_traj(model, state, motor, dt, horizon=horizon)
-
-    start = 0
-    if horizon == 1:
-        length = 100
-    else:
-        length = horizon
-    src.utils.trajectory.compare_traj(next_state, next_state_hat, next_time, start, start + length,
-                                      train_validation_test,
-                                      EUROC_MAV_ANALYSIS_PATH + f"training/{model_name.split('/')[0]}/"
-                                                                f"traj_{train_validation_test}_horizon{horizon}.svg")
-
-
-def test_blackbird_mlp_metrics(model_name):
-    weights = torch.load(BLACKBIRD_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLP(motor_size=4)
-    model.load_state_dict(weights)
-    model.eval()
-    test_model(model, "blackbird", "test", "normal")
-
-
-def test_euroc_mav_mlp_metrics(model_name):
-    weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{model_name}")
-    model = MLP(motor_size=6)
-    model.load_state_dict(weights)
-    model.eval()
-    test_model(model, "euroc_mav", "test", "normal")
-
-
-def test_model(model, residual_model, past, dataset, train_test_validation, mode):
+def test_model(model, residual_model, past, dataset, train_test_validation):
     """
     Print the error on 0.025s, 0.5s and 1s of one model on one dataset split.
     :param model: The model to evaluate.
@@ -114,29 +27,53 @@ def test_model(model, residual_model, past, dataset, train_test_validation, mode
     :param past: Number of samples to give to the model
     :param dataset: The dataset to use for evaluation. "blackbird" or "euroc_mav".
     :param train_test_validation: The split to evaluate on. "train", "validation" or "test".
-    :param mode: The split to evaluate on. "normal", "residual" or "past".
     """
     assert train_test_validation in ["train", "validation", "test"]
     assert dataset in ["blackbird", "euroc_mav"]
-    assert mode in ["normal", "residual", "past"]
-    # Test metric
-    res = np.zeros(3)
-    if mode == "normal":
-        metric_func = metrics.mse_error
-    elif mode == "residual":
-        metric_func = metrics.mse_error_residual
-    else:  # mode == "past"
-        metric_func = metrics.mse_error_past
 
+    res = np.zeros(3)
     if dataset == "euroc_mav":
         for i, e_i in enumerate([5, 100, 200]):
-            res[i] = (metric_func(model=model, residual_model=residual_model, horizon=e_i, past=past,
-                                  dataset="euroc_mav", split=train_test_validation).item())
+            res[i] = (metrics.mse_error(model=model, residual_model=residual_model, horizon=e_i, past=past,
+                                        dataset="euroc_mav", split=train_test_validation).item())
     else:  # dataset == "blackbird"
         for i, e_i in enumerate([9, 180, 360]):
-            res[i] = (metric_func(model, e_i, 'blackbird', train_test_validation).item())
+            res[i] = (metrics.mse_error(model=model, residual_model=residual_model, horizon=e_i, past=past,
+                                        dataset="blackbird", split=train_test_validation).item())
     print(f"Model {model.__class__.__name__} on {train_test_validation} "
           f"E(0.025s): {res[0]:0.4e}, E(0.5s): {res[1]:0.4e}, E(1s): {res[2]:0.4e}")
+
+
+def plot_residual(model, residual_model, past, dataset, train_test_validation):
+    residual_model.eval()
+    if dataset == "euroc_mav":
+        traj_len = past + 1
+        data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
+                                            traj_len=traj_len, dtype=torch.float32)
+        time = data[0]["t"]
+        state = data[0]["state"].unsqueeze(0)
+        dt = torch.FloatTensor([[1 / 200]]).unsqueeze(0)
+        motor = data[0]["motor"].unsqueeze(0)
+        residual_gt = data[0]["residual"][past:]
+
+        with torch.no_grad():
+            residual_hat = []
+            for i in range(past, traj_len):
+                residual_hat.append(residual_model(motor=motor[:, i-past:i], state=state[:, i-past:i], dt=dt))
+            residual_hat = torch.stack(residual_hat, dim=0)
+        ((residual_hat - residual_gt) ** 2).mean()
+
+        i = 3
+        name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        ax.plot(time[past:], residual_gt[:, i], label=f"{name[i]} GT")
+        ax.plot(time[past:], residual_hat[:, i], label=f"{name[i]} hat")
+        ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
+        ax.set_xlabel("Time [s]")
+        ax.grid()
+        ax.legend()
+    else:
+        raise NotImplementedError
 
 
 def main():
@@ -180,15 +117,17 @@ def main():
     # test_model(model=model, residual_model=None, past=past, dataset="euroc_mav", train_test_validation="test",
     #            mode="normal")
 
-    cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/1470_weights.pt"
-    weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}")
-    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/636216_weights.pt"
     past = 20
-    residual_model = drone_models.residual.CNNResidual(motor_size=6, past=past, unit_size=50)
+    weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}")
+    residual_model = drone_models.residual.cnn.CNNResidual(motor_size=6, past=past, unit_size=50)
     residual_model.load_state_dict(weights)
     residual_model.eval()
-    test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test",
-               mode="normal")
+    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+    #            train_test_validation="test")
+    plot_residual(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+                  train_test_validation="train")
     pass
 
 

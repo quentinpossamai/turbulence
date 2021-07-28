@@ -200,7 +200,6 @@ def mse_error(model, residual_model, horizon, past, dataset, split):
     return total_error
 
 
-# TODO adapt with a model that compute residual
 def _compute_error(model, residual_model, horizon, past, states, motor, time):
     crop_idx = (time.shape[0] - 1) // (past + horizon)  # remove last time step of states to fit N*(H+1) points
 

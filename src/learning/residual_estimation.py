@@ -45,7 +45,7 @@ def validate(model, dataloader, horizon, past, epoch):
             past_states = state[:, -1 - past:-1]
             past_motor = motor[:, -1 - past:-1]
             # next_state = state[:, -1:]
-            residual_hat = model(past_motor, past_states, DT)
+            residual_hat = model(motor=past_motor, state=past_states, dt=DT)
 
             validation_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
             loss_log.append(validation_loss)
@@ -65,6 +65,10 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     model = CNNResidual(motor_size=6, past=past, unit_size=unit_size).to(device)
     # model = GRUResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
     # model = GroundTruth().to(device)
+    cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/636216_weights.pt"
+    weights = torch.load(ANALYSIS_PATH + f"training/{cnn_residual}")
+    model.load_state_dict(weights)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     # Tensorboard
@@ -100,7 +104,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
             past_states = state[:, -1 - past:-1]
             past_motor = motor[:, -1 - past:-1]
             # next_state = state[:, -1:]
-            residual_hat = model(past_motor, past_states, DT)
+            residual_hat = model(motor=past_motor, state=past_states, dt=DT)
 
             training_loss = loss(residual_gt=residual_gt, residual_hat=residual_hat)
             reduced_training_loss = training_loss.mean()
@@ -124,11 +128,11 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
 def main():
     parser = argparse.ArgumentParser(description="Identify model on data.")
     parser.add_argument('--batch_size', default=32, type=int, help="Size of a batch")
-    parser.add_argument('--epochs', default=100, type=int, help="Number of epochs")
-    parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
+    parser.add_argument('--epochs', default=10000, type=int, help="Number of epochs")
+    parser.add_argument('--lr', default=1e-3, type=float, help="Learning rate")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
-    parser.add_argument('--unit_size', default=256, type=int, help="Number of unit for the hidden layers")
+    parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
     args = parser.parse_args()
     fit_residual(args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
 

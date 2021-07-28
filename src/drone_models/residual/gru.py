@@ -20,7 +20,7 @@ class GRUResidual(nn.Module):
         self.batch_norm0 = nn.BatchNorm1d(self.unit_size)
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
-        self.linear2 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
+        self.linear2 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
         # self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
         # self.linear3 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         # self.batch_norm3 = nn.BatchNorm1d(self.unit_size)
