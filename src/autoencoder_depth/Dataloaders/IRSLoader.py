@@ -3,9 +3,19 @@ import os
 import cv2
 import numpy as np
 from torch.utils.data import Dataset
-from Dataloaders.utils import *
+import torchvision.transforms as transforms
 
 ZMAX = 20
+
+
+def default_transform(scale_size=None):
+    rgb_list = [
+        transforms.ToTensor(),
+    ]
+    if scale_size is not None:
+        rgb_list.append(transforms.Resize(scale_size))
+
+    return transforms.Compose(rgb_list)
 
 
 class IRSLoader(Dataset):
@@ -22,7 +32,7 @@ class IRSLoader(Dataset):
             self.dataloc = "/home/sjanny/IRS/"
 
         try:
-            file = f"splits/irs_{split}.txt"
+            file = f"../splits/irs_{split}.txt"
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
         except FileNotFoundError:
@@ -80,6 +90,8 @@ class IRSLoader(Dataset):
         depthmap = resize_transform(load_depth(gt_disp_name))  # * ZMAX
         normalmap = resize_transform(load_norm(gt_norm_name))
 
+        normalmap = normalmap / np.sqrt((normalmap ** 2).sum(0, keepdims=True))
+
         sample = {'img_names': img_names, 'depth': depthmap.float(),
                   'normal': normalmap.float()}
 
@@ -96,11 +108,8 @@ class IRSLoader(Dataset):
 
 if __name__ == '__main__':
     d = IRSLoader(scale_size=(240, 376), with_stereo=True)
-    x = d[0]
-    # import matplotlib.pyplot as plt
-    #
-    # plt.figure()
-    # plt.imshow(x['depth'].numpy().transpose(1, 2, 0))
-    # plt.figure()
-    # plt.imshow(x['normal'].numpy().transpose(1, 2, 0))
-    # plt.show()
+    x = d[0]['normal']
+
+    print((x ** 2).sum(0))
+    print(x.min(), x.max())
+    print(x.shape)

@@ -77,10 +77,10 @@ class Decoder(nn.Module):
         x = self.linear(x)
         x = x.view(x.shape[0], 4, 60, 94)
         x = self.net(x)
+        x = torch.tanh(x)
         if x.shape[1] == 3:
-            return x / (torch.norm(x, 2, dim=1, keepdim=True) + 1e-8)
-        else:
-            return torch.tanh(x)
+            x = x / (torch.norm(x, 2, dim=1, keepdim=True) + 1e-8)
+        return x
 
 
 if __name__ == '__main__':
