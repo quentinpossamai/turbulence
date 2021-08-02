@@ -65,9 +65,9 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     model = CNNResidual(motor_size=6, past=past, unit_size=unit_size).to(device)
     # model = GRUResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
     # model = GroundTruth().to(device)
-    cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/636216_weights.pt"
-    weights = torch.load(ANALYSIS_PATH + f"training/{cnn_residual}")
-    model.load_state_dict(weights)
+    # cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/636216_weights.pt"
+    # weights = torch.load(ANALYSIS_PATH + f"training/{cnn_residual}")
+    # model.load_state_dict(weights)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
