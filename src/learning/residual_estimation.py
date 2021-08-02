@@ -127,7 +127,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
 
 def main():
     parser = argparse.ArgumentParser(description="Identify model on data.")
-    parser.add_argument('--batch_size', default=32, type=int, help="Size of a batch")
+    parser.add_argument('--batch_size', default=256, type=int, help="Size of a batch")
     parser.add_argument('--epochs', default=10000, type=int, help="Number of epochs")
     parser.add_argument('--lr', default=1e-3, type=float, help="Learning rate")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
