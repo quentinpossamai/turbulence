@@ -3,7 +3,8 @@ import argparse
 from Dataloaders.EurocMAVLoader import EurocMavLoader
 from Dataloaders.IRSLoader import IRSLoader
 import torch.nn as nn
-from model import Autoencoder
+from Models.model_CoPhy_like import Autoencoder
+from Models.model_IRS_like import NormNetS
 import random
 import numpy as np
 from torch.utils.data import DataLoader
@@ -12,10 +13,11 @@ import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', default=10, type=int)
-parser.add_argument('--lr', default=1e-4, type=float)
+parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--dataset', default="irs", type=str)
-parser.add_argument('--feature_size', default=1024, type=int)
-parser.add_argument('--weight_grad', default=10, type=int)
+parser.add_argument('--model', default="CoPhy_Like", type=str)
+parser.add_argument('--feature_size', default=32, type=int)
+parser.add_argument('--weight_grad', default=1, type=int)
 parser.add_argument('--name', default='autoencoder_normal', type=str)
 
 args = parser.parse_args()
@@ -26,20 +28,23 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 MSE = nn.MSELoss()
 
 datasets = {'eurocmav': EurocMavLoader, 'irs': IRSLoader}
+models = {'CoPhy_Like': Autoencoder, 'IRS_Like': NormNetS}
+
 
 def evaluate():
-    dataloader = DataLoader(datasets[args.dataset](split='train'), batch_size=2,
+    dataloader = DataLoader(datasets[args.dataset](split='test'), batch_size=2,
                             shuffle=False,
                             num_workers=0,
                             pin_memory=True)
 
-    model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=3).to(device)
+    model = models[args.model](feature_size=args.feature_size, in_channel=1, out_channel=3).to(device)
     try:
-        state_dict = torch.load(f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn",
-                                map_location=device)
+        state_dict = torch.load(
+            f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn",
+            map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
-            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn",
+            f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn",
             map_location=device)
 
     model.load_state_dict(state_dict)
