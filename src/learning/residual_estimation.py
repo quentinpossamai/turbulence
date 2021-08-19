@@ -122,7 +122,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
         writer.add_scalars("Epoch loss", {"Validation loss": validation_loss}, global_step=epoch)
         if validation_loss < memory:
             memory = validation_loss
-            torch.save(model.state_dict(), training_path + f"{global_iteration}_weights.pt")
+            torch.save(model.state_dict(), training_path + f"{epoch}_weights.pt")
 
 
 def main():
