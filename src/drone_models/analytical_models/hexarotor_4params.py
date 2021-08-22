@@ -152,11 +152,12 @@ def main():
         print(torch.mean(analysis1, dim=0))
         # assert (torch.max(test, 0)[0] < 2.5e-7).all()
 
-    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21)
+    # Could adapt code with for_loader=False
+    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21, dtype=torch.float32, for_loader=True)
     sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21)
+    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21, dtype=torch.float32, for_loader=True)
     sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21)
+    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21, dtype=torch.float32, for_loader=True)
     sanity_check(data)
 
 

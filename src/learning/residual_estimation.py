@@ -81,9 +81,11 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=past + horizon, dtype=torch.float32),
+    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=past + horizon, dtype=torch.float32,
+                                                   for_loader=True),
                             batch_size=batch_size, shuffle=True)
-    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=past + horizon, dtype=torch.float32),
+    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=past + horizon, dtype=torch.float32,
+                                                        for_loader=True),
                                  batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 

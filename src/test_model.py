@@ -49,12 +49,12 @@ def plot_residual(model, residual_model, horizon, past, dataset, train_test_vali
     if dataset == "euroc_mav":
         traj_len = 3000
         data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
-                                            traj_len=traj_len, dtype=torch.float32)
-        time = data[0]["t"]
-        state = data[0]["state"].unsqueeze(0)
+                                            traj_len=traj_len, dtype=torch.float32, for_loader=False)
+        time = data[0]["t"].squeeze()
+        state = data[0]["state"]
         dt = torch.FloatTensor([[1 / 200]]).unsqueeze(0)
-        motor = data[0]["motor"].unsqueeze(0)
-        residual_gt = data[0]["residual"][past:]
+        motor = data[0]["motor"]
+        residual_gt = data[0]["residual"][past:].squeeze()
 
         # Horizon 1
         # with torch.no_grad():

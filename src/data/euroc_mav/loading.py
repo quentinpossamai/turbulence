@@ -297,14 +297,16 @@ def splitting():
 
 
 class EurocMAVDatasetHorizon(Dataset):
-    def __init__(self, train_validation_test: str, traj_len: int, dtype):
+    def __init__(self, train_validation_test: str, traj_len: int, dtype, for_loader: bool):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
         :param traj_len: length of the trajectory to give each index
         :param dtype: Datatype of the model.
+        :param for_loader: If the Dataset will be used with a Dataloader or not.
         """
         assert dtype in [torch.float32, torch.float64]
+        self.for_loader = for_loader
         self.dtype = dtype
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -343,6 +345,17 @@ class EurocMAVDatasetHorizon(Dataset):
         # self.max_res = torch.tensor([4.07108498, 2.69354105, 2.62223434,
         #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
+        if self.for_loader:
+            self.get_func = lambda x: {"t": x[:, :1],
+                                       "state": x[:, 1:14],
+                                       "motor": x[:, 14:20],
+                                       "residual": x[:, 20:]}
+        else:
+            self.get_func = lambda x: {"t": x[:, :1].view((1, -1, 1)),
+                                       "state": x[:, 1:14].view((1, -1, 13)),
+                                       "motor": x[:, 14:20].view((1, -1, 6)),
+                                       "residual": x[:, 20:].view((1, -1, 6))}
+
     def __len__(self):
         return self.cum_dataset_idx[-1]
 
@@ -357,12 +370,7 @@ class EurocMAVDatasetHorizon(Dataset):
         stop = local_idx + self.traj_len
         data = self.data[start:stop]
         assert len(data) == self.traj_len
-        res = {"t": data[:, :1],
-               "state": data[:, 1:14],
-               "motor": data[:, 14:20],
-               # "residual": (data[:, 20:] - self.min_res) / (self.max_res - self.min_res)}
-               "residual": data[:, 20:]}
-        return res
+        return self.get_func(data)
 
 
 def load_flight(flight):
@@ -373,18 +381,21 @@ def load_flight(flight):
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        raw_flight_path = RAW_DATASET_PATH + flight
-        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-        print("Loading", flight)
-        _load_clean_data(raw_flight_path, intermediate_flight_path)
-    splitting()
-    # data = EurocMAVDatasetHorizon("test", traj_len=10)
-    # print(len(data))
-    # state = torch.stack([e["state"][-2] for e in data], dim=0)
+    # for flight in FLIGHT_LIST:
+    #     raw_flight_path = RAW_DATASET_PATH + flight
+    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    #     print("Loading", flight)
+    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
+    # splitting()
+
+    data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
+    # dict_keys(['t', 'state', 'motor', 'residual'])
+    test = data[0]
+
+    data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=True)
+    dataloader = torch.utils.data.DataLoader(data, batch_size=32, shuffle=False)
+    batch = next(iter(dataloader))
 
 
 if __name__ == '__main__':
     main()
-    # _madiha_laurent_csv()
-    # _test_plot_final_data()
