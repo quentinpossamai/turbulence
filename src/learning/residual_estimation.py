@@ -4,6 +4,7 @@ import numpy as np
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as f
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -52,7 +53,7 @@ def validate(model, dataloader, horizon, past, epoch):
     return torch.cat(loss_log).mean().item()
 
 
-def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
+def fit_residual(model, batch_size, epochs, lr, horizon, past, unit_size):
     # Reproducibility
     seed = 0
     torch.manual_seed(seed)
@@ -62,7 +63,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
     # Training parameters
     memory = 100000
 
-    model = CNNResidual(motor_size=6, past=past, unit_size=unit_size).to(device)
+    model = model.to(device)
     # model = GRUResidual(motor_size=6, n_past=past, unit_size=unit_size).to(device)
     # model = GroundTruth().to(device)
     # cnn_residual = "20210723_180758_CNNResidual_bs256_epch10000_lr0.001_h1_p20_us50/636216_weights.pt"
@@ -104,7 +105,7 @@ def fit_residual(batch_size, epochs, lr, horizon, past, unit_size):
 
             # Horizon forward
             past_states = state[:, -1 - past:-1]
-            past_motor = motor[:, -1 - past:-1]
+            past_motor = motor[:, -past:]
             # next_state = state[:, -1:]
             residual_hat = model(motor=past_motor, state=past_states, dt=DT)
 
@@ -136,7 +137,9 @@ def main():
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
     parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
     args = parser.parse_args()
-    fit_residual(args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
+
+    model = CNNResidual(motor_size=6, past=args.past, unit_size=args.unit_size, activation=f.tanh)
+    fit_residual(model, args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
 
 
 if __name__ == "__main__":

@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
-from torch.nn.functional import relu
+import torch.nn.functional as f
+from typing import Callable
 
 
 class CNNResidual(nn.Module):
-    def __init__(self, motor_size: int, past: int, unit_size: int):
+    def __init__(self, motor_size: int, past: int, unit_size: int, activation: Callable):
         super(CNNResidual, self).__init__()
         self.motor_size = motor_size
         self.unit_size = unit_size
+        self.a = activation
 
         self.time_size = past
         self.feature_size = 19
@@ -30,6 +32,6 @@ class CNNResidual(nn.Module):
         """
         batch_size = state.shape[0]
         state_motor = torch.cat([state, motor], dim=2).view(batch_size, 1, self.time_size, self.feature_size)
-        out = relu(self.conv2d0(state_motor))
+        out = self.a(self.conv2d0(state_motor))
         out = self.conv2d1(out).squeeze()
         return out  # residual
