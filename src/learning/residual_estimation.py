@@ -138,7 +138,7 @@ def main():
     parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
     args = parser.parse_args()
 
-    model = CNNResidual(motor_size=6, past=args.past, unit_size=args.unit_size, activation=f.tanh)
+    model = CNNResidual(motor_size=6, past=args.past, unit_size=args.unit_size, activation=f.relu)
     fit_residual(model, args.batch_size, args.epochs, args.lr, args.horizon, args.past, args.unit_size)
 
 
