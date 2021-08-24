@@ -98,13 +98,14 @@ def _compute_error(model, residual_model, horizon, past, states, motor, time):
             past_states = torch.cat([cropped_states[:, i:past - 1],
                                      torch.stack(prediction, dim=1)[:, -past:]],
                                     dim=1)
-            past_motor = cropped_command[:, i:past + i]
             # past_dt = cropped_dt[:, i:past + i]
 
             if residual_model is not None:
+                past_motor = cropped_command[:, i+1:past + i+1]
                 residual = residual_model(state=past_states, motor=past_motor, dt=dt)
                 next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
             else:
+                past_motor = cropped_command[:, i:past + i]
                 next_state = model(motor=past_motor, state=past_states, dt=dt)
             prediction.append(next_state)
 

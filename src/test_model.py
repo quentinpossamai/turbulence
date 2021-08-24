@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
+import torch.nn.functional as f
 # Data
 import src.data.blackbird.loading as blackbird
 import src.data.euroc_mav.loading as euroc
@@ -152,7 +152,7 @@ def main():
     cnn_residual = "20210803_115051_CNNResidual_bs32_epch10000_lr0.001_h1_p20_us50/567525_weights.pt"
     past = 20
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
-    residual_model = drone_models.residual.cnn.CNNResidual(motor_size=6, past=past, unit_size=50)
+    residual_model = drone_models.residual.cnn.CNNResidual(motor_size=6, past=past, unit_size=50, activation=f.relu)
     residual_model.load_state_dict(weights)
     residual_model.eval()
     model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
