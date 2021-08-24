@@ -36,8 +36,8 @@ class MLP(nn.Module):
         last_dt = dt[:, -1]
 
         batch_size = state.shape[0]
-        state_motor = torch.cat([state.view((batch_size, -1)), motor.view((batch_size, -1)),
-                                 dt.view((batch_size, -1))], dim=1)
+        past = state.shape[1]
+        state_motor = torch.cat([state.view((batch_size, -1)), motor.view((batch_size, -1)), dt.expand((batch_size, past))], dim=1)
         input_size = state_motor.shape[1]
 
         out = state_motor

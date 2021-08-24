@@ -59,7 +59,7 @@ class DynamicalModel(nn.Module):
         batch_size = state.shape[0]
         # Linear PFD
         g = torch.tensor([0, 0, 9.81], dtype=self.dtype).view(1, 3)
-        thrust = torch.cat([torch.zeros(batch_size, 1), torch.zeros(batch_size, 1), motor_torsor[:, 3:]], dim=1)
+        thrust = torch.cat([torch.zeros(batch_size, 2), motor_torsor[:, 3:]], dim=1)
         next_lin_vel = lin_vel + dt * (quaternion.qrot(quat, self.theta[0] * thrust + kfa) - g)
 
         # Position
@@ -152,11 +152,12 @@ def main():
         print(torch.mean(analysis1, dim=0))
         # assert (torch.max(test, 0)[0] < 2.5e-7).all()
 
-    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21)
+    # Could adapt code with for_loader=False
+    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21, dtype=torch.float32, for_loader=True)
     sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21)
+    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21, dtype=torch.float32, for_loader=True)
     sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21)
+    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21, dtype=torch.float32, for_loader=True)
     sanity_check(data)
 
 

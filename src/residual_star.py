@@ -126,13 +126,14 @@ def _test_euroc():
 def _test_euroc_torch_dataset():
     for name in ["train", "validation", "test"]:
         dtype = torch.float64
-        dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype),
+        dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype,
+                                                          for_loader=True),
                              batch_size=32, shuffle=True)
         model = DynamicalModel(paper=False, dtype=dtype)
         dt = torch.tensor([[1 / 200]], dtype=dtype)
         next_state_hat, next_state_gt = [], []
         residual_hat, residual_gt = [], []
-        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype))
+        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype, for_loader=True))
         print("len: ", n)
         print()
         for e in dataset:

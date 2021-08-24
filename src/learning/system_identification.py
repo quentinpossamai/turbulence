@@ -100,9 +100,11 @@ def system_identification(batch_size, epochs, lr, horizon, past):
     writer = SummaryWriter(training_path)
 
     # Datasets
-    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=horizon + past - 1),
+    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=horizon + past - 1,
+                                                   dtype=torch.float32, for_loader=True),
                             batch_size=batch_size, shuffle=True)
-    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=horizon + past - 1),
+    validation_data = DataLoader(EurocMAVDatasetHorizon("validation", traj_len=horizon + past - 1,
+                                                        dtype=torch.float32, for_loader=True),
                                  batch_size=batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 

@@ -19,7 +19,7 @@ DT = 1 / 360
 def identify_model():
     """Solve the Ax = y problem where x is the parameters of the model"""
 
-    flights = euroc.EurocMAVDatasetHorizon("train", traj_len=2)
+    flights = euroc.EurocMAVDatasetHorizon("train", traj_len=2, dtype=torch.float32, for_loader=True)
 
     # Load flights in a big vector column
     states, future_states, command = [], [], []
