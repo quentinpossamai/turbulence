@@ -12,6 +12,7 @@ import src.utils.trajectory
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 from src import metrics
 from src.learning import residual_estimation
+from src.log import Logger
 
 BLACKBIRD_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
 EUROC_MAV_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_learned_hexarotor_training/"
@@ -149,17 +150,30 @@ def main():
     # test_model(model=model, residual_model=None, past=past, dataset="euroc_mav", train_test_validation="test",
     #            mode="normal")
 
-    cnn_residual = "20210803_115051_CNNResidual_bs32_epch10000_lr0.001_h1_p20_us50/567525_weights.pt"
-    past = 20
-    weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
-    residual_model = drone_models.residual.cnn.CNNResidual(motor_size=6, past=past, unit_size=50, activation=f.relu)
-    residual_model.load_state_dict(weights)
-    residual_model.eval()
-    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
-    test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
-               train_test_validation="test")
+    # cnn_residual = "20210803_115051_CNNResidual_bs32_epch10000_lr0.001_h1_p20_us50/567525_weights.pt"
+    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # past = 20
+    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
+    #                                                        device="cpu")
+    # residual_model.load_state_dict(weights)
+    # residual_model.eval()
+    # test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+    #            train_test_validation="test")
     # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
     #               train_test_validation="validation")
+
+    cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
+    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    past = 10
+    weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
+                                                           device="cpu")
+    residual_model.load_state_dict(weights)
+    residual_model.eval()
+    test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+               train_test_validation="test")
+
     pass
 
 

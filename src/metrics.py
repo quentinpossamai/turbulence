@@ -91,26 +91,32 @@ def _compute_error(model, residual_model, horizon, past, states, motor, time):
     dt = torch.FloatTensor([[1 / 200]])
 
     ground_truth = cropped_states[:, -horizon - 1:]
-    with torch.no_grad():
-        # Prediction rollout
-        prediction = [cropped_states[:, past - 1]]
-        for i in range(horizon):
-            past_states = torch.cat([cropped_states[:, i:past - 1],
-                                     torch.stack(prediction, dim=1)[:, -past:]],
-                                    dim=1)
-            # past_dt = cropped_dt[:, i:past + i]
+    if residual_model is None:
+        with torch.no_grad():
+            # Prediction rollout
+            prediction = [cropped_states[:, past - 1]]
+            for i in range(horizon):
+                past_states = torch.cat([cropped_states[:, i:past - 1],
+                                         torch.stack(prediction, dim=1)[:, -past:]],
+                                        dim=1)
+                # past_dt = cropped_dt[:, i:past + i]
 
-            if residual_model is not None:
-                past_motor = cropped_command[:, i+1:past + i+1]
-                residual = residual_model(state=past_states, motor=past_motor, dt=dt)
-                next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
-            else:
+                # if residual_model is not None:
+                # past_motor = cropped_command[:, i+1:past + i+1]
+                # residual = residual_model(state=past_states, motor=past_motor, dt=dt)
+                # next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
+                # else:
                 past_motor = cropped_command[:, i:past + i]
                 next_state = model(motor=past_motor, state=past_states, dt=dt)
-            prediction.append(next_state)
+                prediction.append(next_state)
 
-    prediction = torch.stack(prediction, dim=1)
-    error = ((prediction - ground_truth) ** 2).mean()
+            prediction = torch.stack(prediction, dim=1)
+            error = ((prediction - ground_truth) ** 2).mean()
+    else:
+        error, prediction = residual_model.rollout(motor=cropped_command,
+                                                   state=cropped_states,
+                                                   state_gt=ground_truth,
+                                                   horizon=horizon)
     return error
 
 
