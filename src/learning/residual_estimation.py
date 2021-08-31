@@ -31,9 +31,9 @@ MEMORY = 100000
 def main():
     # Args are hyper parameters to optimize
     parser = argparse.ArgumentParser(description="Identify model on data.")
-    parser.add_argument('--batch_size', default=256, type=int, help="Size of a batch")
+    parser.add_argument('--batch_size', default=128, type=int, help="Size of a batch")
     parser.add_argument('--epochs', default=10000, type=int, help="Number of epochs")
-    parser.add_argument('--lr', default=1e-3, type=float, help="Learning rate")
+    parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
     parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
@@ -48,7 +48,7 @@ def main():
     # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = (f"{now}_"
-            f"{CNNResidual.__class__.__name__}_"
+            f"{CNNResidual.__name__}_"
             f"bs{args.batch_size}_"
             f"epch{args.epochs}_"
             f"lr{args.lr}_"
@@ -64,10 +64,10 @@ def main():
     random.seed(seed)
     np.random.seed(seed)
 
-    log = Logger(writer_name=name, saving_path=training_path)
-    model = DynamicalModel(paper=False, dtype=torch.float32)
+    log = Logger(run_name=name, saving_path=training_path)
+    analytic_model = DynamicalModel(paper=False, dtype=torch.float32)
     run = CNNResidual(log=log,
-                      model=model,
+                      model=analytic_model,
                       past=args.past,
                       unit_size=args.unit_size,
                       activation=activation,
@@ -91,7 +91,7 @@ def main():
     for run.log.epoch in range(args.epochs):
         validate(run, validation_data)
         for run.log.tb_idx, batch in enumerate(tqdm(train_data, desc=f"Epoch: {run.log.epoch}")):
-            training_loss = model.training_step(train_batch=batch)
+            training_loss = run.training_step(train_batch=batch)
             reduced_training_loss = training_loss.mean()
             run.log.train_batch_loss_log.append(training_loss.detach())
 
@@ -99,15 +99,16 @@ def main():
             reduced_training_loss.backward()
             optimizer.step()
 
-            # Update logger
             run.log.g_idx = run.log.g_idx + 1
-            run.log.train_loss_log.append(run.log.valid_batch_loss_log)
-            run.log.train_batch_loss_log = []
+        # Update logger
         run.log.sw.add_scalars("Epoch loss", {"Training loss": torch.cat(run.log.train_batch_loss_log).mean().item()},
                                global_step=run.log.epoch)
+        run.log.train_loss_log.append(run.log.valid_batch_loss_log)
+        run.log.train_batch_loss_log = []
 
 
 def validate(run, dataloader):
+    global MEMORY
     run.eval()
     run.log.valid_batch_loss_log = []
     with torch.no_grad():

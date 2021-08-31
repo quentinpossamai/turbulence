@@ -80,7 +80,7 @@ class CNNResidual(nn.Module, Run):
     def training_step(self, train_batch):
         self.train()
         training_loss = self._step(train_batch)
-        self.log.training_log.append(training_loss.detach())
+        self.log.train_batch_loss_log.append(training_loss.detach())
         return training_loss
 
     def validation_step(self, val_batch):

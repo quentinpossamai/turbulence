@@ -2,7 +2,9 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 class Logger:
-    def __init__(self, writer_name, saving_path):
+    def __init__(self, run_name, saving_path):
+        self.run_name = run_name
+
         # Loss save
         self.valid_loss_log = []  # All loss
         self.valid_batch_loss_log = []
@@ -17,8 +19,8 @@ class Logger:
         self.vb_idx = None  # Validation current batch index
 
         # Tensorboard
-        print("Tensorboard logdir: ", writer_name)
-        self.sw = SummaryWriter(writer_name)  # tensorboard writer
+        print("Tensorboard logdir: ", saving_path)
+        self.sw = SummaryWriter(saving_path)  # tensorboard writer
 
         # Saving path
-        self.saving_path = None
+        self.saving_path = saving_path
