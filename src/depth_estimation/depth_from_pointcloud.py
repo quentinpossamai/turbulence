@@ -152,6 +152,8 @@ class GroundTruthInterpolator(object):
         Args:
           filename: A string, filepath of the state_groundtruth_estimate0.csv file.
         """
+
+        #### TO DO MODIFIED
         with open(filename) as f:
             lines = f.readlines()
         lines = lines[1:]  # skip the first line
@@ -160,7 +162,9 @@ class GroundTruthInterpolator(object):
         for line in lines:
             tokens = line.split(',')
             gt.append([float(t) for t in tokens[:8]])
-        self.gt = np.array(gt)
+        ####
+
+        self.gt = np.array(gt)  # Should be an array Tx7 : [x, y, z, qw, qx, qy, qz]
 
     def get_transform(self, k):
         """Interpolates the MAV's transform matrix at a timestamp."""
