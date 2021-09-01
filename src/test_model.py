@@ -163,9 +163,10 @@ def main():
     # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
     #               train_test_validation="validation")
 
-    cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
+    cnn_residual = "20210831_120906_CNNResidual_bs128_epch10000_lr0.0001_h1_p20_us50_relu/1241_weights.pt"
+    # cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
     model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
-    past = 10
+    past = 20
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
     residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
                                                            device="cpu")
@@ -173,6 +174,8 @@ def main():
     residual_model.eval()
     test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
                train_test_validation="test")
+    # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
+    #               train_test_validation="validation")
 
     pass
 

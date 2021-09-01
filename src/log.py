@@ -7,7 +7,7 @@ class Logger:
 
         # Loss save
         self.valid_loss_log = []  # All loss
-        self.valid_batch_loss_log = []
+        self.valid_epoch_loss_log = []
 
         self.train_loss_log = []  # All loss
         self.train_epoch_loss_log = []

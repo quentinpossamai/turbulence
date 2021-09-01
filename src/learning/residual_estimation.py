@@ -80,6 +80,7 @@ def main():
                                                    dtype=torch.float32,
                                                    for_loader=True),
                             batch_size=args.batch_size, shuffle=True)
+
     validation_data = DataLoader(EurocMAVDatasetHorizon("validation",
                                                         traj_len=args.past + args.horizon,
                                                         dtype=torch.float32,
@@ -93,7 +94,6 @@ def main():
         for run.log.tb_idx, batch in enumerate(tqdm(train_data, desc=f"Epoch: {run.log.epoch}")):
             training_loss = run.training_step(train_batch=batch)
             reduced_training_loss = training_loss.mean()
-            run.log.train_epoch_loss_log.append(training_loss.detach())
 
             optimizer.zero_grad()
             reduced_training_loss.backward()
@@ -101,8 +101,6 @@ def main():
 
             run.log.g_idx = run.log.g_idx + 1
         # Update logger
-        run.log.sw.add_scalars("Epoch loss", {"Training loss": torch.cat(run.log.train_epoch_loss_log).mean().item()},
-                               global_step=run.log.epoch)
         run.log.train_loss_log.append(run.log.train_epoch_loss_log)
         run.log.train_epoch_loss_log = []
 
@@ -113,8 +111,7 @@ def validate(run, dataloader):
     run.log.valid_epoch_loss_log = []
     with torch.no_grad():
         for run.log.vb_idx, batch in enumerate(tqdm(dataloader, desc=f"Validation: {run.log.epoch}")):
-            batch_loss = run.validation_step(val_batch=batch)
-            run.log.valid_epoch_loss_log.append(batch_loss)
+            run.validation_step(val_batch=batch)
     epoch_loss = torch.cat(run.log.valid_epoch_loss_log).mean().item()
 
     run.log.sw.add_scalars("Epoch loss", {"Valid loss": epoch_loss}, global_step=run.log.epoch)

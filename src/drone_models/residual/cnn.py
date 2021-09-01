@@ -87,7 +87,7 @@ class CNNResidual(nn.Module, Run):
         self.eval()
         with torch.no_grad():
             val_loss = self._step(val_batch)
-            self.log.valid_batch_loss_log.append(val_loss)
+            self.log.valid_epoch_loss_log.append(val_loss)
         return val_loss
 
     def rollout(self, motor, state, state_gt, horizon):
