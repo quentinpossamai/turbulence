@@ -12,13 +12,13 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', default=10, type=int)
+parser.add_argument('--epoch', default=0, type=int)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--dataset', default="irs", type=str)
 parser.add_argument('--model', default="CoPhy_Like", type=str)
-parser.add_argument('--feature_size', default=32, type=int)
+parser.add_argument('--feature_size', default=512, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
-parser.add_argument('--name', default='autoencoder_depth_irs_32_irs', type=str)
+parser.add_argument('--name', default='autoencoder_depth_irs_512', type=str)
 
 args = parser.parse_args()
 
@@ -52,7 +52,7 @@ def evaluate():
 
     model.load_state_dict(state_dict)
 
-    validate(model, dataloader, viz=False)
+    validate(model, dataloader, viz=True)
 
 
 def vizualize(gt, pred):

@@ -12,13 +12,13 @@ from tqdm import tqdm
 import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', default=10, type=int)
+parser.add_argument('--epoch', default=0, type=int)
 parser.add_argument('--lr', default=1e-3, type=float)
-parser.add_argument('--dataset', default="irs", type=str)
+parser.add_argument('--dataset', default="eurocmav", type=str)
 parser.add_argument('--model', default="CoPhy_Like", type=str)
-parser.add_argument('--feature_size', default=32, type=int)
+parser.add_argument('--feature_size', default=256, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
-parser.add_argument('--name', default='autoencoder_normal', type=str)
+parser.add_argument('--name', default='autoencoder_normal_irs_256', type=str)
 
 args = parser.parse_args()
 
@@ -96,7 +96,7 @@ def validate(model, dataloader, viz=False, epoch=1000):
             l_psnr.append(psnr.detach().cpu().numpy())
 
             if viz == True:
-                vizualize(depthmap, out)
+                vizualize(normal, out)
     print(
         f"!*  loss : {np.mean(l_cost):.4f},  MSE : {np.mean(l_normal):.4f}, Grad : {np.mean(l_grad):.4f}, PSNR : {np.mean(l_psnr):.2f} dB")
     loss = np.mean(l_cost)
@@ -161,10 +161,10 @@ def main():
             memory = error
             try:
                 torch.save(model.state_dict(),
-                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn")
+                           f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn")
             except FileNotFoundError:
                 torch.save(model.state_dict(),
-                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.name}_{args.dataset}.nn")
+                           f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn")
             print("Saved!")
 
     evaluate()
