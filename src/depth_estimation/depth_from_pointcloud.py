@@ -21,21 +21,18 @@ import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--room_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy', type=str)
-parser.add_argument('--output_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/', type=str)
+parser.add_argument('--output_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/',
+                    help="Output location, where the depth/normal will be registerd", type=str)
 args = parser.parse_args()
 
-# A 4D transform that connects the Cam0 to the body of the MAV. This is taken
-# from the sensor.yaml file. To project the point cloud on Cam1, please replace
-# with the respective extrinsic matrix. This is constant across all the rooms in
-# the dataset.
+# 4D Camera transformation
 CAM0_TO_BODY = np.array(
     [[0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975],
      [0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768],
      [-0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949],
      [0.0, 0.0, 0.0, 1.0]])
 
-# Intrinsics of Cam0. This is taken from cam0/sensor.yaml and is the same for
-# all rooms.
+# Intrinsic parameters of camera
 FX = 458.654
 FY = 457.296
 X0 = 367.215
@@ -45,7 +42,11 @@ K2 = 0.07395907
 H = 480
 W = 752
 
+# Normalization factor for Depth
 ZMAX = 7.48
+
+# Number of parallel process
+NUM_PROCESS = 8
 
 
 def get_camera_view_pointcloud(transform, xyz):
@@ -178,18 +179,13 @@ class GroundTruthInterpolator(object):
         # Creates a matrix
         transform = np.array([[
             1 - 2 * qy * qy - 2 * qz * qz, 2 * qx * qy - 2 * qz * qw,
-            2 * qx * qz + 2 * qy * qw, x
-        ],  # pylint: disable=bad-continuation
-            [
-                2 * qx * qy + 2 * qz * qw,
-                1 - 2 * qx * qx - 2 * qz * qz,
-                2 * qy * qz - 2 * qx * qw, y
-            ],
-            [
-                2 * qx * qz - 2 * qy * qw,
-                2 * qy * qz + 2 * qx * qw,
-                1 - 2 * qx * qx - 2 * qy * qy, z
-            ], [0.0, 0.0, 0.0, 1.0]])
+            2 * qx * qz + 2 * qy * qw, x],
+            [2 * qx * qy + 2 * qz * qw,
+             1 - 2 * qx * qx - 2 * qz * qz,
+             2 * qy * qz - 2 * qx * qw, y],
+            [2 * qx * qz - 2 * qy * qw,
+             2 * qy * qz + 2 * qx * qw,
+             1 - 2 * qx * qx - 2 * qy * qy, z], [0.0, 0.0, 0.0, 1.0]])
 
         return self.gt[k, 0], transform
 
@@ -225,28 +221,34 @@ def filter_out_ot_frame_points(xyz):
 
 
 def gen_img(pipe, transform, xyz):
+    """Generate depth and normals from the position/orientation :
+    input : - pipe : pipe object for multiprocessing
+            - transform : 3x4 transformation matrix from frame to camera
+            - xyz : pointcloud with 1 on the last line"""
+
+    # Move the point cloud to fit the camera position
     xyz_view = get_camera_view_pointcloud(transform, xyz)
-
+    # Remove occluded points (point behind a wall)
     visible_indices = get_occluded_points(xyz_view, 0.02, 0.08)
-
     xyz_view = xyz_view[visible_indices, :]
 
+    # Remove out of screen points
     visible_indices = filter_out_ot_frame_points(xyz_view)
-
     xyz_view = xyz_view[visible_indices, :]
 
+    # Estimate normals using pcd lib
     pcd = o3d.geometry.PointCloud()
     pcd.points = o3d.utility.Vector3dVector(xyz_view)
     pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=1, max_nn=1000),
                          fast_normal_computation=True)
     pcd.orient_normals_towards_camera_location(camera_location=transform[:-1, -1])
     pcd.normalize_normals()
-    # o3d.visualization.draw_geometries([pcd])
-
     visible_normal = np.asarray(pcd.normals)
 
+    # Compute depth + fancy stuff on the normal
     z_image, n_image = render_z_and_normal(xyz_view, visible_normal)
 
+    # Fill hole in images with linear interp
     valid_mask = (1 - np.isnan(z_image)).astype(bool)
     coords = np.array(np.nonzero(valid_mask)).T
 
@@ -258,20 +260,21 @@ def gen_img(pipe, transform, xyz):
     it = interpolate.LinearNDInterpolator(coords, values_n)
     filled_n = it(list(np.ndindex(z_image.shape))).reshape(n_image.shape)
 
+    # Normalization
     filled_z = (filled_z / ZMAX)
     filled_n = ((filled_n + 1) / 2)
 
-    fig, ax = plt.subplots(2, 2)
-    ax[0][0].imshow(z_image)
-    ax[0][1].imshow(filled_z)
-    ax[1][0].imshow(n_image)
-    ax[1][1].imshow(filled_n)
-
-    ax[0][0].axis("off")
-    ax[0][1].axis("off")
-    ax[1][0].axis("off")
-    ax[1][1].axis("off")
-    plt.show()
+    # fig, ax = plt.subplots(2, 2)
+    # ax[0][0].imshow(z_image)
+    # ax[0][1].imshow(filled_z)
+    # ax[1][0].imshow(n_image)
+    # ax[1][1].imshow(filled_n)
+    #
+    # ax[0][0].axis("off")
+    # ax[0][1].axis("off")
+    # ax[1][0].axis("off")
+    # ax[1][1].axis("off")
+    # plt.show()
 
     # plt.imsave("depth_estimation.png", np.stack([filled_z, filled_z, filled_z], axis=-1))
     # p = plt.imread("depth_estimation.png").astype(np.float64)[:, :, 0]
@@ -288,44 +291,50 @@ def gen_img(pipe, transform, xyz):
 
 
 def main():
+    # GT position/orientation interpolator
     gti = GroundTruthInterpolator(
         os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
-    print('Groundtruth loaded.')
-    # xyz = read_ply(os.path.join(args.room_path, 'pointcloud0/data.ply'))
+
+    # 3D point cloud (as npy, faster loading)
     xyz = np.load("pointcloud.npy")
-    print('PLY loaded.')
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
+    # Create the output directories
     os.makedirs(args.output_path + "depth_estimation", exist_ok=True)
     os.makedirs(args.output_path + "normal", exist_ok=True)
+
+    # For each timestamp
     for k in tqdm(range(0, gti.gt.shape[0], 8)):
         timestamps, transforms = [], []
-        gen_img(0, gti.get_transform(k)[1], xyz_homogeneous)
-        for i in range(8):
+        # Extract NUM_PROCESS position/orientation for computation
+        for i in range(NUM_PROCESS):
             if k + i < gti.gt.shape[0]:
                 time, trans = gti.get_transform(k + i)
                 timestamps.append(time)
                 transforms.append(trans)
+
         childPipes, parentPipes = [], []
         processes = []
         imgs_z, imgs_n = [], []
-        for pr in range(8):  # Create pipes to get the simulation
+
+        for pr in range(NUM_PROCESS):  # Create pipes for multiprocessing
             parentPipe, childPipe = mp.Pipe()
             parentPipes.append(parentPipe)
             childPipes.append(childPipe)
 
-        for rank in range(len(transforms)):  # Run the processes
+        for rank in range(len(transforms)):  # Run the processes, ie compute normals and depths
             p = mp.Process(target=gen_img,
                            args=(childPipes[rank], transforms[rank], xyz_homogeneous))
             p.start()
             processes.append(p)
 
-        for rank, p in enumerate(processes):  # Get the simulation
+        for rank, p in enumerate(processes):  # Get the imgs from pipes
             z, n = parentPipes[rank].recv()
             imgs_z.append(z)
             imgs_n.append(n)
             p.join()
 
+        # Save images, use png for time/space saving
         for i in range(len(imgs_z)):
             plt.imsave(args.output_path + "depth_estimation/%d.png" % int(timestamps[i]),
                        np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))

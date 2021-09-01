@@ -32,7 +32,7 @@ class IRSLoader(Dataset):
             self.dataloc = "/home/sjanny/IRS/"
 
         try:
-            file = f"../splits/irs_{split}.txt"
+            file = f"splits/irs_{split}.txt"
             with open(file, "r") as file:
                 self.index = file.read().split('\n')
         except FileNotFoundError:
