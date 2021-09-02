@@ -18,7 +18,7 @@ parser.add_argument('--dataset', default="eurocmav", type=str)
 parser.add_argument('--model', default="CoPhy_Like", type=str)
 parser.add_argument('--feature_size', default=256, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
-parser.add_argument('--name', default='autoencoder_normal_irs_256', type=str)
+parser.add_argument('--name', default='autoencoder_normal_irs_512_irs', type=str)
 
 args = parser.parse_args()
 
@@ -80,7 +80,7 @@ def vizualize(gt, pred):
 
 def validate(model, dataloader, viz=False, epoch=1000):
     model.eval()
-    l_cost, l_normal, l_grad, l_psnr = [], [], [], []
+    l_cost, l_normal, l_grad, l_psnr, l_cross = [], [], [], [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
             depthmap = x["depth"].to(device)
@@ -94,11 +94,12 @@ def validate(model, dataloader, viz=False, epoch=1000):
             l_normal.append(costs[1].detach().cpu().numpy())
             l_grad.append(costs[2].detach().cpu().numpy())
             l_psnr.append(psnr.detach().cpu().numpy())
+            l_cross.append(costs[-1].detach().cpu().numpy())
 
             if viz == True:
                 vizualize(normal, out)
     print(
-        f"!*  loss : {np.mean(l_cost):.4f},  MSE : {np.mean(l_normal):.4f}, Grad : {np.mean(l_grad):.4f}, PSNR : {np.mean(l_psnr):.2f} dB")
+        f"!*  loss : {np.mean(l_cost):.4f},  MSE : {np.mean(l_normal):.4f}, Grad : {np.mean(l_grad):.4f}, PSNR : {np.mean(l_psnr):.2f} dB, CrossProduct : {np.mean(l_cross)}")
     loss = np.mean(l_cost)
     return loss
 
@@ -117,7 +118,10 @@ def compute_grad(rgb):
 def get_loss(gt, prediction):
     mse_normal = MSE(gt, prediction["output"])
     mse_grad = MSE(compute_grad(gt), compute_grad(prediction["output"]))
-    return 10000 * mse_normal + args.weight_grad * mse_grad, mse_normal, mse_grad
+    gt_transpose = gt.permute(0, 2, 3, 1).reshape(-1, 3)
+    prediction_transpose = prediction["output"].permute(0, 2, 3, 1).reshape(-1, 3)
+    cross_product_loss = torch.sqrt((torch.cross(gt_transpose, prediction_transpose, dim=-1) ** 2).sum(-1)).mean()
+    return 10000 * mse_normal + args.weight_grad * mse_grad, mse_normal, mse_grad, cross_product_loss
 
 
 def main():
