@@ -7,10 +7,10 @@ class Logger:
 
         # Loss save
         self.valid_loss_log = []  # All loss
-        self.valid_batch_loss_log = []
+        self.valid_epoch_loss_log = []
 
         self.train_loss_log = []  # All loss
-        self.train_batch_loss_log = []
+        self.train_epoch_loss_log = []
 
         # Indexes
         self.g_idx = 0  # Global index (Number of back propagation).

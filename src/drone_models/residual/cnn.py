@@ -8,8 +8,8 @@ from src.log import Logger
 
 
 class CNNResidual(nn.Module, Run):
-    def __init__(self, log: Logger, model, past: int, unit_size: int, activation: Callable,
-                 device):
+    def __init__(self, model, past: int, unit_size: int, activation: Callable,
+                 device, log: Logger = None):
         """
         Run with a CNN.
         :param log: The logger to log training and validation error.
@@ -80,42 +80,35 @@ class CNNResidual(nn.Module, Run):
     def training_step(self, train_batch):
         self.train()
         training_loss = self._step(train_batch)
-        self.log.train_batch_loss_log.append(training_loss.detach())
+        self.log.train_epoch_loss_log.append(training_loss.detach())
         return training_loss
 
     def validation_step(self, val_batch):
         self.eval()
         with torch.no_grad():
             val_loss = self._step(val_batch)
-            self.log.valid_batch_loss_log.append(val_loss)
+            self.log.valid_epoch_loss_log.append(val_loss)
         return val_loss
 
-    def rollout(self, batch, batch_idx):
-        motor, state, dt, residual = (batch["motor"].to(self.device),
-                                      batch["state"].to(self.device),
-                                      torch.FloatTensor([[[1 / 200]]]),
-                                      batch["residual"].to(self.device))
-        # Look in past states
-        residual_gt = residual[:, -1].to(self.device)
-
-        # Horizon forward
-        past_states = state[:, -1 - self.past:-1]
-        past_motor = motor[:, -self.past:]
-        residual_hat = self.forward(motor=past_motor, state=past_states, dt=dt)
+    def rollout(self, motor, state, state_gt, horizon):
+        dt = torch.FloatTensor([[1 / 200]])
+        # state_gt = state[:, -horizon - 1:]
+        
+        assert len(state_gt.shape) == 3  # (batch=1, horizon, value=6)
+        assert state_gt.shape[1] == horizon + 1
+        
         with torch.no_grad():
             # Prediction rollout
-            prediction = [cropped_states[:, past - 1]]
+            prediction = [state[:, self.past - 1]]
             for i in range(horizon):
-                past_states = torch.cat([cropped_states[:, i:past - 1],
-                                         torch.stack(prediction, dim=1)[:, -past:]],
+                past_states = torch.cat([state[:, i:self.past - 1],
+                                         torch.stack(prediction, dim=1)[:, -self.past:]],
                                         dim=1)
-                # past_dt = cropped_dt[:, i:past + i]
-
-                past_motor = cropped_command[:, i + 1:past + i + 1]
-                residual = residual_model(state=past_states, motor=past_motor, dt=dt)
-                next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
+                past_motor = motor[:, i + 1:self.past + i + 1]
+                residual = self.forward(state=past_states, motor=past_motor, dt=dt)
+                next_state = self.model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
                 prediction.append(next_state)
 
         prediction = torch.stack(prediction, dim=1)
-        error = ((prediction - ground_truth) ** 2).mean()
-        pass  # states, losses
+        error = ((prediction - state_gt) ** 2).mean()
+        return error, prediction
