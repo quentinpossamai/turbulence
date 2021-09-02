@@ -156,7 +156,12 @@ class GroundTruthInterpolator(object):
         """
 
         if type(filename) == int:
+            mean = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
+                    "V1_02_medium/": np.array([0.00806092, 1.18968812, 1.60374988]),
+                    "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
+
             data = load_flight(FLIGHT_LIST[filename])
+            data["state"][:, :3] = data["state"][:, :3] + mean[FLIGHT_LIST[filename]].reshape((1, 3))
             self.gt = np.concatenate([data["t"].reshape((-1, 1)), data["state"][:, :7][:, [0, 1, 2, 6, 3, 4, 5]]],
                                      axis=1)
         else:
@@ -302,7 +307,7 @@ def gen_img(pipe, transform, xyz):
 def main():
     if args.integrated:
         gti = GroundTruthInterpolator(int(args.room_path))
-        xyz = np.load(WD_PATH+"src/depth_estimation/pointcloud.npy")
+        xyz = np.load(WD_PATH + "src/depth_estimation/pointcloud.npy")
     else:
         # GT position/orientation interpolator
         gti = GroundTruthInterpolator(os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))

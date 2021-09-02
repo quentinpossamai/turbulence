@@ -117,8 +117,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = quat / np.linalg.norm(quat, axis=1).reshape((-1, 1))  # Normalize quaternion
     quat = quaternion.qfix(quat)  # Fix quaternion swap in continuity
 
-    # Centering position
-    trans = trans - np.mean(trans, axis=0)
+    # Centering position  # TODO
+    # trans = trans - np.mean(trans, axis=0)
 
     # Denoising timestamp
     period = np.mean(time[1:] - time[:-1])
@@ -261,7 +261,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # print("mean: ", abs(ang_vel3 - ang_vel).mean())  # < 3e-15 with qmul product method from ref
     # print("std: ", abs(ang_vel3 - ang_vel).std())
 
-    # Compute linear speed
+    # 5.2 Compute linear speed
     dtrans = (trans[1:] - trans[:-1]) / dt  # Euler derivative
     dtrans = np.concatenate([np.zeros((1, 3)), dtrans], axis=0)
 
@@ -270,7 +270,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
 
-    save_path = intermediate_flight_path + "data.pkl"
+    save_path = intermediate_flight_path + "depth_data.pkl"
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(syn, open(save_path, "wb"))
 
@@ -381,20 +381,21 @@ def load_flight(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    #     raw_flight_path = RAW_DATASET_PATH + flight
-    #     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-    #     print("Loading", flight)
-    #     _load_clean_data(raw_flight_path, intermediate_flight_path)
+    for flight in FLIGHT_LIST:
+        # flight = FLIGHT_LIST[2]
+        raw_flight_path = RAW_DATASET_PATH + flight
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+        print("Loading", flight)
+        _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
 
-    data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
-    # dict_keys(['t', 'state', 'motor', 'residual'])
-    test = data[0]
-
-    data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=True)
-    dataloader = torch.utils.data.DataLoader(data, batch_size=32, shuffle=False)
-    batch = next(iter(dataloader))
+    # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
+    # # dict_keys(['t', 'state', 'motor', 'residual'])
+    # test = data[0]
+    #
+    # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=True)
+    # dataloader = torch.utils.data.DataLoader(data, batch_size=32, shuffle=False)
+    # batch = next(iter(dataloader))
 
 
 if __name__ == '__main__':
