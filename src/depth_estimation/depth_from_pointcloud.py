@@ -18,7 +18,7 @@ from scipy import interpolate
 from tqdm import tqdm
 
 from src.utils.paths import WD_PATH
-from src.data.euroc_mav.loading import load_flight, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH
+from src.data.euroc_mav.loading import load_flight_for_depth, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--room_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy', type=str)
@@ -156,12 +156,12 @@ class GroundTruthInterpolator(object):
         """
 
         if type(filename) == int:
-            mean = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
-                    "V1_02_medium/": np.array([0.00806092, 1.18968812, 1.60374988]),
-                    "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
+            # mean = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
+            #         "V1_02_medium/": np.array([0.00806092, 1.18968812, 1.60374988]),
+            #         "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
 
-            data = load_flight(FLIGHT_LIST[filename])
-            data["state"][:, :3] = data["state"][:, :3] + mean[FLIGHT_LIST[filename]].reshape((1, 3))
+            data = load_flight_for_depth(FLIGHT_LIST[filename])
+            # data["state"][:, :3] = data["state"][:, :3] + mean[FLIGHT_LIST[filename]].reshape((1, 3))
             self.gt = np.concatenate([data["t"].reshape((-1, 1)), data["state"][:, :7][:, [0, 1, 2, 6, 3, 4, 5]]],
                                      axis=1)
         else:
@@ -352,9 +352,9 @@ def main():
 
         # Save images, use png for time/space saving
         for i in range(len(imgs_z)):
-            plt.imsave(args.output_path + "depth_estimation/%d.png" % str(float(timestamps[i])).replace('.', '_'),
+            plt.imsave(args.output_path + f"depth_estimation/{str(float(timestamps[i])).replace('.', '_')}.png",
                        np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))
-            plt.imsave(args.output_path + "normal/%d.png" % str(float(timestamps[i])).replace('.', '_'), imgs_n[i])
+            plt.imsave(args.output_path + f"normal/{str(float(timestamps[i])).replace('.', '_')}.png", imgs_n[i])
 
 
 def _split(matrix):

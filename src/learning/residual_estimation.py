@@ -40,7 +40,7 @@ def main():
     args = parser.parse_args()
 
     # Training parameters
-    activation = f.relu  # f.tanh
+    activation = f.tanh  # f.tanh
     seed = 0
 
     # Tensorboard

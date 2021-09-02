@@ -379,6 +379,12 @@ def load_flight(flight):
     data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
 
+def load_flight_for_depth(flight):
+    #     data = {"t", "imu_ang_acc", "motor", "state"}
+    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/depth_data.pkl"
+    data = pickle.load(open(intermediate_flight_path, "rb"))
+    return data
+
 
 def main():
     for flight in FLIGHT_LIST:
