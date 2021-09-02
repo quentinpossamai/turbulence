@@ -9,6 +9,7 @@ TO GET THE DEPTH MAP AND NORMAL MAP BACK :
 
 import argparse
 import collections
+import csv
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 import numpy as np
@@ -18,7 +19,10 @@ from scipy import interpolate
 from tqdm import tqdm
 
 from src.utils.paths import WD_PATH
-from src.data.euroc_mav.loading import load_flight_for_depth, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH
+from src.data.euroc_mav.loading import load_flight_for_depth, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH
+from src.utils.trajectory import trace_trajectory3d
+import src.utils.quaternion as quaternion
+from src.utils.transform import Transform
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--room_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy', type=str)
@@ -28,11 +32,14 @@ parser.add_argument('--integrated', default=False, type=bool)
 args = parser.parse_args()
 
 # 4D Camera transformation
-CAM0_TO_BODY = np.array(
-    [[0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975],
-     [0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768],
-     [-0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949],
-     [0.0, 0.0, 0.0, 1.0]])
+TF_BODY_CAM0 = np.array([[0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975],
+                         [0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768],
+                         [-0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949],
+                         [0.0, 0.0, 0.0, 1.0]])
+TF_BODY_VICON0 = np.array([[0.33638, -0.01749, 0.94156, 0.06901],
+                           [-0.02078, -0.99972, -0.01114, -0.02781],
+                           [0.94150, -0.01582, -0.33665, -0.12395],
+                           [0.0, 0.0, 0.0, 1.0]])
 
 # Intrinsic parameters of camera
 FX = 458.654
@@ -65,7 +72,7 @@ def get_camera_view_pointcloud(transform, xyz):
       the camera are kept.
     """
 
-    overall_transform = np.linalg.inv(CAM0_TO_BODY).dot(np.linalg.inv(transform))
+    overall_transform = np.linalg.inv(TF_BODY_CAM0).dot(np.linalg.inv(transform))
     transformed_xyz = xyz.dot(overall_transform.transpose())
     x, y, z, _ = _split(transformed_xyz)
     u, v = _project_and_distort(x, y, z)
@@ -161,9 +168,39 @@ class GroundTruthInterpolator(object):
             #         "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
 
             data = load_flight_for_depth(FLIGHT_LIST[filename])
+
             # data["state"][:, :3] = data["state"][:, :3] + mean[FLIGHT_LIST[filename]].reshape((1, 3))
-            self.gt = np.concatenate([data["t"].reshape((-1, 1)), data["state"][:, :7][:, [0, 1, 2, 6, 3, 4, 5]]],
-                                     axis=1)
+            trans, quat = data["state"][:, :3], data["state"][:, 3:7]
+            state_body = TF_BODY_VICON0 @ Transform.from_quat_trans(quat, trans).as_matrix()
+            quat, trans = Transform.from_matrix(state_body).as_quat_trans()
+            quat = quaternion.qfix(quat)
+            quat = quat / np.linalg.norm(quat, axis=1).reshape((-1, 1))
+            self.gt = np.concatenate([data["t"].reshape((-1, 1)), trans, quat[:, [3, 0, 1, 2]]], axis=1)
+
+            # Check csv
+            filename = (WD_PATH + "data/euroc_mav/raw/" + FLIGHT_LIST[int(args.room_path)] +
+                        "state_groundtruth_estimate0/data.csv")
+            with open(filename) as f:
+                lines = f.readlines()
+            lines = lines[1:]  # skip the first line
+
+            gt2 = []
+            for line in lines:
+                tokens = line.split(',')
+                gt2.append([float(t) for t in tokens[:8]])
+            gt2 = np.array(gt2)
+            gt2[:, 4:8] = quaternion.qfix(gt2[:, 4:8])
+            gt2[:, 4:8] = gt2[:, 4:8] / np.linalg.norm(gt2[:, 4:8], axis=1).reshape((-1, 1))
+
+            # for i in range(4, 8):
+            #     plt.plot(self.gt[:, i], label=f"Quentin {i}")
+            #     plt.plot(gt2[:, i], label=f"Steeven {i}")
+            # plt.legend()
+            # plt.show()
+
+            # print()
+            # trace_trajectory3d(self.gt[:, 1:4], self.gt[:, 4:8])
+
         else:
             with open(filename) as f:
                 lines = f.readlines()

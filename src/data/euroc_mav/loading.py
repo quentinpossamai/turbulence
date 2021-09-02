@@ -8,6 +8,7 @@ from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
 
+from  src.utils.paths import WD_PATH
 from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion
@@ -72,6 +73,29 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     trans = np.array([raw[state_key][i]["translation"] for i in range(len(raw[state_key]))])
     quat = np.array([raw[state_key][i]["rotation"] for i in range(len(raw[state_key]))])  # x, y, z, w
     pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
+
+    # Check csv
+    filename = (WD_PATH + "data/euroc_mav/raw/" + FLIGHT_LIST[int(0)] +
+                "state_groundtruth_estimate0/data.csv")
+    with open(filename) as f:
+        lines = f.readlines()
+    lines = lines[1:]  # skip the first line
+
+    gt2 = []
+    for line in lines:
+        tokens = line.split(',')
+        gt2.append([float(t) for t in tokens[:8]])
+    gt2 = np.array(gt2)
+    # gt2 = quaternion.qfix(gt2[:, 4:8])
+
+
+    plt.plot(pose_dict["pose"][:, 3:7], label="rosbag")
+    plt.plot(gt2[:, 4:8], label="csv")
+    plt.legend()
+
+    1 / ((gt2[1:, 0] - gt2[:-1, 0]) * 10**-9).mean()
+
+
 
     # 2-DENOISING
     def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
@@ -270,9 +294,9 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
 
-    save_path = intermediate_flight_path + "depth_data.pkl"
-    pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
-    pickle.dump(syn, open(save_path, "wb"))
+    # save_path = intermediate_flight_path + "depth_data.pkl"
+    # pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
+    # pickle.dump(syn, open(save_path, "wb"))
 
 
 def splitting():
@@ -379,6 +403,7 @@ def load_flight(flight):
     data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
 
+
 def load_flight_for_depth(flight):
     #     data = {"t", "imu_ang_acc", "motor", "state"}
     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/depth_data.pkl"
@@ -387,12 +412,12 @@ def load_flight_for_depth(flight):
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        # flight = FLIGHT_LIST[2]
-        raw_flight_path = RAW_DATASET_PATH + flight
-        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-        print("Loading", flight)
-        _load_clean_data(raw_flight_path, intermediate_flight_path)
+    # for flight in FLIGHT_LIST:
+    flight = FLIGHT_LIST[0]
+    raw_flight_path = RAW_DATASET_PATH + flight
+    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    print("Loading", flight)
+    _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
 
     # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)

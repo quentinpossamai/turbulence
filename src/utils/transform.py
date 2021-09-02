@@ -249,7 +249,7 @@ class Transform(object):
 
         trans, quat = tf.get_pose().
 
-        :return: quat(x, y, z, w), trans (x, y,z ) concatenated array.
+        :return: quat(x, y, z, w) and trans (x, y, z).
 
         Note: only work for 3D points_name, P_A = (x_A, y_A, z_A) while applying '@' operator.
 
@@ -261,9 +261,9 @@ class Transform(object):
         """
         quat = Rotation.from_matrix(self.as_rot_mat()).as_quat()
         if self._is_single:
-            return np.hstack((quat[0], self.as_trans()))
+            return quat[0], self.as_trans()
         else:
-            return np.hstack((quat, self.as_trans()))
+            return quat, self.as_trans()
 
     def as_rot_quat(self) -> np.ndarray:
         """quat = x, y, z, w with scipy Rotation."""
