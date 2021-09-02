@@ -7,22 +7,24 @@ TO GET THE DEPTH MAP AND NORMAL MAP BACK :
 - DEPTH MAP : Read with plt.imread(), then multiple by ZMAX
 - NORMAL MAP : Read with plt.imread(), then n*2 -1"""
 
-import collections
-import os
-
 import argparse
-
+import collections
+import matplotlib.pyplot as plt
+import multiprocessing as mp
+import numpy as np
+import open3d as o3d
+import os
 from scipy import interpolate
 from tqdm import tqdm
-import numpy as np
-import multiprocessing as mp
-import open3d as o3d
-import matplotlib.pyplot as plt
+
+from src.utils.paths import WD_PATH
+from src.data.euroc_mav.loading import load_flight, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--room_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy', type=str)
 parser.add_argument('--output_path', default='/Volumes/Samsung_T5/BlackBird/eurocmav/raw/V1_01_easy/',
                     help="Output location, where the depth/normal will be registerd", type=str)
+parser.add_argument('--integrated', default=False, type=bool)
 args = parser.parse_args()
 
 # 4D Camera transformation
@@ -150,21 +152,24 @@ class GroundTruthInterpolator(object):
     def __init__(self, filename):
         """Creates an instance.
         Args:
-          filename: A string, filepath of the state_groundtruth_estimate0.csv file.
+          filename: A string, filepath of the state_groundtruth_estimate0.csv file. Can also be the room number.
         """
 
-        #### TO DO MODIFIED
-        with open(filename) as f:
-            lines = f.readlines()
-        lines = lines[1:]  # skip the first line
+        if type(filename) == int:
+            data = load_flight(FLIGHT_LIST[filename])
+            self.gt = np.concatenate([data["t"].reshape((-1, 1)), data["state"][:, :7][:, [0, 1, 2, 6, 3, 4, 5]]],
+                                     axis=1)
+        else:
+            with open(filename) as f:
+                lines = f.readlines()
+            lines = lines[1:]  # skip the first line
 
-        gt = []
-        for line in lines:
-            tokens = line.split(',')
-            gt.append([float(t) for t in tokens[:8]])
-        ####
+            gt = []
+            for line in lines:
+                tokens = line.split(',')
+                gt.append([float(t) for t in tokens[:8]])
 
-        self.gt = np.array(gt)  # Should be an array Tx7 : [x, y, z, qw, qx, qy, qz]
+            self.gt = np.array(gt)  # Should be an array Tx7 : [x, y, z, qw, qx, qy, qz]
 
     def get_transform(self, k):
         """Interpolates the MAV's transform matrix at a timestamp."""
@@ -295,12 +300,14 @@ def gen_img(pipe, transform, xyz):
 
 
 def main():
-    # GT position/orientation interpolator
-    gti = GroundTruthInterpolator(
-        os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
-
-    # 3D point cloud (as npy, faster loading)
-    xyz = np.load("pointcloud.npy")
+    if args.integrated:
+        gti = GroundTruthInterpolator(int(args.room_path))
+        xyz = np.load(WD_PATH+"src/depth_estimation/pointcloud.npy")
+    else:
+        # GT position/orientation interpolator
+        gti = GroundTruthInterpolator(os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
+        # 3D point cloud (as npy, faster loading)
+        xyz = np.load("pointcloud.npy")
     xyz_homogeneous = np.concatenate([xyz, np.ones((xyz.shape[0], 1))], axis=1)
 
     # Create the output directories
@@ -375,4 +382,6 @@ def _project_and_distort(x, y, z):
 
 
 if __name__ == '__main__':
+    if args.integrated:
+        args.output_path = INTERMEDIATE_DATASET_PATH + FLIGHT_LIST[int(args.room_path)]
     main()
