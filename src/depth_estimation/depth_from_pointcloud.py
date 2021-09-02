@@ -302,7 +302,7 @@ def gen_img(pipe, transform, xyz):
 def main():
     if args.integrated:
         gti = GroundTruthInterpolator(int(args.room_path))
-        xyz = np.load(WD_PATH+"src/depth_estimation/pointcloud.npy")
+        xyz = np.load(WD_PATH + "src/depth_estimation/pointcloud.npy")
     else:
         # GT position/orientation interpolator
         gti = GroundTruthInterpolator(os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
@@ -315,7 +315,7 @@ def main():
     os.makedirs(args.output_path + "normal", exist_ok=True)
 
     # For each timestamp
-    for k in tqdm(range(0, gti.gt.shape[0], 8)):
+    for k in tqdm(range(0, gti.gt.shape[0], NUM_PROCESS)):
         timestamps, transforms = [], []
         # Extract NUM_PROCESS position/orientation for computation
         for i in range(NUM_PROCESS):
@@ -347,9 +347,9 @@ def main():
 
         # Save images, use png for time/space saving
         for i in range(len(imgs_z)):
-            plt.imsave(args.output_path + "depth_estimation/%d.png" % int(timestamps[i]),
+            plt.imsave(args.output_path + "depth_estimation/%d.png" % str(float(timestamps[i])).replace('.', '_'),
                        np.stack([imgs_z[i], imgs_z[i], imgs_z[i]], axis=-1))
-            plt.imsave(args.output_path + "normal/%d.png" % int(timestamps[i]), imgs_n[i])
+            plt.imsave(args.output_path + "normal/%d.png" % str(float(timestamps[i])).replace('.', '_'), imgs_n[i])
 
 
 def _split(matrix):

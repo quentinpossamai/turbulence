@@ -63,6 +63,7 @@ def get_img(z, dataset):
             map_location=device)
 
     model.load_state_dict(state_dict)
+    model.eval()
     with torch.no_grad():
         depthmap = dataloader[0]['depth'].to(device).unsqueeze(0)
         out = model(depthmap)
@@ -74,13 +75,13 @@ def draw_irs(fig):
     for z in depth_irs_irs.keys():
         img_irs.append(get_img(z, IRSLoader).numpy().transpose(1, 2, 0))
 
-    axs = [fig.add_subplot(6, 3, 6 + i) for i in range(1, 7)]
+    axs = [fig.add_subplot(3, 6, 6 + i) for i in range(1, 7)]
 
     titles = ("Ground Truth", "Z=32", "Z=64", "Z=128", "Z=256", "Z=512")
     for i, img in enumerate(img_irs):
         axs[i].imshow(img, cmap=plt.get_cmap("viridis"))
         axs[i].axis("off")
-        axs[i].set_title(titles[i], fontsize=8, pad=0)
+        axs[i].set_title(titles[i], fontsize=12, pad=0)
 
 
 def draw_euroc(fig):
@@ -88,7 +89,7 @@ def draw_euroc(fig):
     for z in depth_irs_irs.keys():
         img_irs.append(get_img(z, EurocMavLoader).numpy().transpose(1, 2, 0))
 
-    axs = [fig.add_subplot(6, 3, 12 + i) for i in range(1, 7)]
+    axs = [fig.add_subplot(3, 6, 12 + i) for i in range(1, 7)]
 
     titles = ("Ground Truth", "Z=32", "Z=64", "Z=128", "Z=256", "Z=512")
     for i, img in enumerate(img_irs):
