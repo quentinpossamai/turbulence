@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', default=0, type=int)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--dataset', default="eurocmav", type=str)
-parser.add_argument('--model', default="CoPhy_Like", type=str)
+parser.add_argument('--model', default="IRS_Like", type=str)
 parser.add_argument('--feature_size', default=256, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
 parser.add_argument('--name', default='autoencoder_normal_irs_256', type=str)
@@ -49,7 +49,7 @@ def evaluate():
 
     model.load_state_dict(state_dict)
 
-    validate(model, dataloader, viz=True)
+    validate(model, dataloader, viz=False)
 
 
 def vizualize(gt, pred):
