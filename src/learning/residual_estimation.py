@@ -40,7 +40,7 @@ def main():
     args = parser.parse_args()
 
     # Training parameters
-    activation = f.tanh  # f.tanh
+    activation = torch.tanh  # torch.tanh or f.relu
     seed = 0
 
     # Tensorboard
@@ -55,7 +55,8 @@ def main():
             f"h{args.horizon}_"
             f"p{args.past}_"
             f"us{args.unit_size}_"
-            f"{activation.__name__}")
+            f"{activation.__name__}"
+            f"l{3}")
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
 
@@ -71,6 +72,7 @@ def main():
                       past=args.past,
                       unit_size=args.unit_size,
                       activation=activation,
+                      one_more_layer=True,
                       device=device)
     optimizer = run.configure_optimizers(lambda x: torch.optim.Adam(x, lr=args.lr))
     run = run.to(device)

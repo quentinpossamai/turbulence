@@ -8,35 +8,48 @@ from src.log import Logger
 
 
 class CNNResidual(nn.Module, Run):
-    def __init__(self, model, past: int, unit_size: int, activation: Callable,
-                 device, log: Logger = None):
+    def __init__(self, model,
+                 past: int,
+                 unit_size: int,
+                 activation: Callable,
+                 one_more_layer: bool,
+                 device,
+                 log: Logger = None):
         """
         Run with a CNN.
-        :param log: The logger to log training and validation error.
         :param model: The model to use the residual model with for the rollout.
         :param past: The number of past state and motor measures to use.
         :param unit_size: The size of one layer.
         :param activation: The activation function to use.
+        :param one_more_layer: One more layer with kernel 1x1 for more non linearity.
         :param device: Cuda device to use.
+        :param log: The logger to log training and validation error.
         """
         super().__init__()
-        self.log = log
-        self.optimizer = None
+        self.model = model
         self.past = past
         self.unit_size = unit_size
         self.a = activation
+        self.one_more_layer = one_more_layer
         self.device = device
-        self.model = model
+        self.log = log
 
+        self.optimizer = None
         self.motor_size = 6
         self.feature_size = 19
 
         # In shape (batch, channel=1, self.time_size, self.feature_size)
         self.conv2d0 = nn.Conv2d(in_channels=1, out_channels=unit_size, kernel_size=(1, self.feature_size),
                                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
-        # In/Out shape (batch, channel=50, self.time_size, 1)
-        self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=6, kernel_size=(self.past, 1),
-                                 stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
+        if not self.one_more_layer:
+            # In/Out shape (batch, channel=50, self.time_size, 1)
+            self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=6, kernel_size=(self.past, 1),
+                                     stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
+        else:
+            self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=unit_size, kernel_size=(self.past, 1),
+                                     stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
+            self.conv2d2 = nn.Conv2d(in_channels=unit_size, out_channels=6, kernel_size=(1, 1),
+                                     stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         # Out shape (batch, channel=6, 1, 1)
 
     def configure_optimizers(self, optimizer):
@@ -53,8 +66,10 @@ class CNNResidual(nn.Module, Run):
         batch_size = state.shape[0]
         state_motor = torch.cat([state, motor], dim=2).view(batch_size, 1, self.past, self.feature_size)
         out = self.a(self.conv2d0(state_motor))
-        out = self.conv2d1(out).squeeze()
-        return out  # residual
+        out = self.conv2d1(out)
+        if self.one_more_layer:
+            out = self.conv2d2(out)
+        return out.squeeze()  # residual
 
     def _step(self, batch):
         """
@@ -93,10 +108,10 @@ class CNNResidual(nn.Module, Run):
     def rollout(self, motor, state, state_gt, horizon):
         dt = torch.FloatTensor([[1 / 200]])
         # state_gt = state[:, -horizon - 1:]
-        
+
         assert len(state_gt.shape) == 3  # (batch=1, horizon, value=6)
         assert state_gt.shape[1] == horizon + 1
-        
+
         with torch.no_grad():
             # Prediction rollout
             prediction = [state[:, self.past - 1]]
