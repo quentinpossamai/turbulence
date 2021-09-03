@@ -59,7 +59,7 @@ W = 752
 ZMAX = 7.48
 
 # Number of parallel process
-NUM_PROCESS = 8
+NUM_PROCESS = 16
 
 
 def get_camera_view_pointcloud(transform, xyz):
