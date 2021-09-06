@@ -32,9 +32,9 @@ ZMAX = 7.48
 class EurocMavLoader(Dataset):
     def __init__(self, split="V1_01"):
         super(EurocMavLoader, self).__init__()
-        self.dataloc = f"/storage/Dataset/BlackBird/euroc_mav/intermediate/{split}/"
+        self.dataloc = f"/Volumes/Samsung_T5/BlackBird/euroc_mav/intermediate/{split}/"
         if not os.path.isdir(self.dataloc):
-            self.dataloc = f"/Volumes/Samsung_T5/BlackBird/euroc_mav/intermediate/{split}/"
+            self.dataloc = f"/storage/Dataset/BlackBird/euroc_mav/intermediate/{split}/"
 
         self.index = os.listdir(self.dataloc + "depth_estimation")
 
