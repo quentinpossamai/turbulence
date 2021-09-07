@@ -41,15 +41,12 @@ class CNNResidual(nn.Module, Run):
         # In shape (batch, channel=1, self.time_size, self.feature_size)
         self.conv2d0 = nn.Conv2d(in_channels=1, out_channels=unit_size, kernel_size=(1, self.feature_size),
                                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
-        if not self.one_more_layer:
-            # In/Out shape (batch, channel=50, self.time_size, 1)
-            self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=6, kernel_size=(self.past, 1),
+        if self.one_more_layer:
+            self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=unit_size, kernel_size=(1, 1),
                                      stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
-        else:
-            self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=unit_size, kernel_size=(self.past, 1),
-                                     stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
-            self.conv2d2 = nn.Conv2d(in_channels=unit_size, out_channels=6, kernel_size=(1, 1),
-                                     stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
+        # In/Out shape (batch, channel=50, self.time_size, 1)
+        self.conv2d_end = nn.Conv2d(in_channels=unit_size, out_channels=6, kernel_size=(self.past, 1),
+                                    stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         # Out shape (batch, channel=6, 1, 1)
 
     def configure_optimizers(self, optimizer):
@@ -66,9 +63,9 @@ class CNNResidual(nn.Module, Run):
         batch_size = state.shape[0]
         state_motor = torch.cat([state, motor], dim=2).view(batch_size, 1, self.past, self.feature_size)
         out = self.a(self.conv2d0(state_motor))
-        out = self.conv2d1(out)
         if self.one_more_layer:
             out = self.conv2d2(out)
+        out = self.conv2d_end(out)
         return out.squeeze()  # residual
 
     def _step(self, batch):
