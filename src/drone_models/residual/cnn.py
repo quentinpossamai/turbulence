@@ -64,7 +64,7 @@ class CNNResidual(nn.Module, Run):
         state_motor = torch.cat([state, motor], dim=2).view(batch_size, 1, self.past, self.feature_size)
         out = self.a(self.conv2d0(state_motor))
         if self.one_more_layer:
-            out = self.conv2d2(out)
+            out = self.conv2d1(out)
         out = self.conv2d_end(out)
         return out.squeeze()  # residual
 
