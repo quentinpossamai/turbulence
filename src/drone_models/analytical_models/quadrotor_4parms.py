@@ -75,7 +75,7 @@ class DynamicalModel(nn.Module):
         return torch.cat([next_pos, next_quat.squeeze(-1), next_lin_vel, next_ang_vel], dim=-1)
 
     def motor_dynamic(self, command):
-        a = 1 / torch.sqrt(2)
+        a = 1 / 2 ** 0.5
         motor_matrix = torch.tensor([[-a, +a, +a, -a],
                                      [-a, -a, +a, +a],
                                      [-1, +1, -1, +1],
