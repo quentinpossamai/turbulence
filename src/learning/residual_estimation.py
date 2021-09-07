@@ -55,7 +55,7 @@ def main():
             f"h{args.horizon}_"
             f"p{args.past}_"
             f"us{args.unit_size}_"
-            f"{activation.__name__}"
+            f"{activation.__name__}_"
             f"l{3}")
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
