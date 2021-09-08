@@ -74,28 +74,22 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = np.array([raw[state_key][i]["rotation"] for i in range(len(raw[state_key]))])  # x, y, z, w
     pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
 
-    # Check csv
-    filename = (WD_PATH + "data/euroc_mav/raw/" + FLIGHT_LIST[int(0)] +
-                "state_groundtruth_estimate0/data.csv")
-    with open(filename) as f:
-        lines = f.readlines()
-    lines = lines[1:]  # skip the first line
-
-    gt2 = []
-    for line in lines:
-        tokens = line.split(',')
-        gt2.append([float(t) for t in tokens[:8]])
-    gt2 = np.array(gt2)
-    # gt2 = quaternion.qfix(gt2[:, 4:8])
-
-
-    plt.plot(pose_dict["pose"][:, 3:7], label="rosbag")
-    plt.plot(gt2[:, 4:8], label="csv")
-    plt.legend()
-
-    1 / ((gt2[1:, 0] - gt2[:-1, 0]) * 10**-9).mean()
-
-
+    # 1.4-Cam0 image name loading
+    # dict_keys(['nsecs', 'image', 'step', 'height', 'width', 'secs', 'is_bigendian'])
+    cam0_key = '/cam0/image_raw__sensor_msgs/Image'
+    cam0_dict = {}
+    for i in range(len(raw[cam0_key])):
+        cam0_dict[raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9] = raw[cam0_key][i]["image"]
+    # time = np.array([raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9 for i in range(len(raw[cam0_key]))])
+    # image = np.array([raw[cam0_key][i]["image"] for i in range(len(raw[cam0_key]))])
+    step = np.array([raw[cam0_key][i]["step"] for i in range(len(raw[cam0_key]))])
+    assert (step == 752).all()  # step not use
+    height = np.array([raw[cam0_key][i]["height"] for i in range(len(raw[cam0_key]))])
+    assert (height == 480).all()  # height not use
+    width = np.array([raw[cam0_key][i]["width"] for i in range(len(raw[cam0_key]))])
+    assert (width == 752).all()  # width not use
+    is_bigendian = np.array([raw[cam0_key][i]["is_bigendian"] for i in range(len(raw[cam0_key]))])
+    assert is_bigendian.sum() == 0  # is_bigendian not use
 
     # 2-DENOISING
     def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
@@ -130,7 +124,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     den_imu_dict["t"] = (period * np.array(range(len(imu_dict["t"]))) + imu_dict["t"][0])  # Denoising IMU timestamp
     den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
 
-    # 2.3-Computing a denoised translation and quaternion.
+    # 2.3-Computing a denoised motion capture's translation and quaternion.
+    # 2.3.1-Initialization, normalization and centering
     # Body and World reference frame are in FLU! Nice!
     den_pose_dict = {}
     quat = pose_dict["pose"][:, 3:7]
@@ -141,14 +136,14 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = quat / np.linalg.norm(quat, axis=1).reshape((-1, 1))  # Normalize quaternion
     quat = quaternion.qfix(quat)  # Fix quaternion swap in continuity
 
-    # Centering position  # TODO
-    # trans = trans - np.mean(trans, axis=0)
+    # Centering position
+    trans = trans - np.mean(trans, axis=0)
 
-    # Denoising timestamp
+    # 2.3.2 Denoising timestamp
     period = np.mean(time[1:] - time[:-1])
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
-    # Denoising quaternion
+    # 2.3.3-Denoising quaternion
     # den_quat = quat  # no denoising
     # Ideal denoising
     frequencies = fftfreq(n, d=period)
@@ -163,7 +158,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     #     den_quat[:, i] = signal.sosfilt(sos, quat[:, i])
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
 
-    # Denoising translation
+    # 2.3.4-Denoising translation
     # den_trans = trans  # no denoising
     # Ideal denoising
     fc_trans = 5  # Hz
@@ -177,34 +172,6 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # for i in range(3):
     #     den_trans[:, i] = signal.sosfilt(sos, trans[:, i])
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
-
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # ax.plot(motor_dict["t"] - motor_dict["t"][0], motor_dict["motor"][:, i], label="Raw")
-    # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
-    # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], den_motor_dict["motor"][:, i], label="Butterworth")
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Motor speed")
-
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # i = 0
-    # ax.plot(pose_dict["t"] - pose_dict["t"][0], quat, label="Raw")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0)), label="Ideal low pass")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], den_quat, label="Butterworth")
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Quaternion")
-    #
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # ax.plot(pose_dict["t"] - pose_dict["t"][0], trans, label="Raw")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0)), label="Ideal low pass")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], den_trans, label="Butterworth")
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Translations [m]")
 
     # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0
@@ -223,17 +190,24 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
-    # 4.1.1-Spline interpolation
+    # 4.1.1-Spline interpolation method
+    # Imu
     imu_sync = np.zeros((len(den_motor_dict["t"]), 6))
     for i in range(6):
         rep = interpolate.splrep(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], k=5)
         imu_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+    # Motion capture
     pose_sync = np.zeros((len(den_motor_dict["t"]), 7))
     for i in range(7):
         rep = interpolate.splrep(den_pose_dict["t"], den_pose_dict["pose"][:, i], k=5)
         pose_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+    # Cam0
+    image_sync = np.zeros(len(den_motor_dict["t"]))  # The timestamp of the image
+    cam0_time = np.array(list(cam0_dict.keys()))
+    for i, time in enumerate(den_motor_dict["t"]):
+        image_sync[i] = np.abs(time - cam0_time).argmin()
 
-    # 4.1.2-Linear interpolation
+    # 4.1.2-Linear interpolation method
     # imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
     #                                           fill_value=(den_imu_dict["ang_acc"][0, i],
     #                                                       den_imu_dict["ang_acc"][-1, i]))(
@@ -243,7 +217,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     #                                                        den_pose_dict["pose"][-1, i]))(
     #     den_motor_dict["t"]) for i in range(7)], axis=1)
     syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
-           "pose": pose_sync}
+           "pose": pose_sync, "img": image_sync}
 
     # 4.2-Setting initial parameters and normalizing quaternion
     syn["t"] = syn["t"] - syn["t"][0]
@@ -254,15 +228,16 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = syn["pose"][:, 3:7]
     trans = syn["pose"][:, :3]
 
-    # 5.1 Compute angular velocity
-    # Derivative of the quaternion
+    # 5.1-Compute angular velocity
+    # 5.1.1-Derivative of the quaternion
     dquat = (quat[1:] - quat[:-1]) / dt  # Euler derivative
     dquat = np.concatenate([np.zeros((1, 4)), dquat], axis=0)
 
-    # 5.1.1 Quaternion multiplication method
+    # 5.1.2-Quaternion to angular velocity
+    # 5.1.2.1-Quaternion multiplication method
     ang_vel = 2. * quaternion.qmul_np(quat * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
 
-    # 5.1.2 Matrix method
+    # 5.1.2.2-Matrix method
     # dq_dt_convention = dquat[:, [3, 0, 1, 2]]
     # q0, q1, q2, q3 = (quat[:, 3], quat[:, 0], quat[:, 1], quat[:, 2])
     # g_matrix = np.array([[-q1, q0, q3, -q2],
@@ -273,7 +248,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # print("mean: ", abs(ang_vel2 - ang_vel).mean())  # < 1e-17 with qmul product method from ref
     # print("std: ", abs(ang_vel2 - ang_vel).std())
 
-    # 5.1.3 With Lie exponential
+    # 5.1.2.3-With Lie exponential
     # https://math.stackexchange.com/questions/2282938/converting-from-quaternion-to-angular-velocity-then-back-to-quaternion
     # ang_vel3 = 2. * (quaternion.qmul_np(quat[:-1] * np.array([[-1, -1, -1, 1]]), quat[1:]))[:, :3] / dt
     # ang_vel3 = np.concatenate([np.zeros((1, 3)), ang_vel3], axis=0)
@@ -289,15 +264,15 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     dtrans = (trans[1:] - trans[:-1]) / dt  # Euler derivative
     dtrans = np.concatenate([np.zeros((1, 3)), dtrans], axis=0)
 
+    # 5.3 Merge and normalize
     syn["state"] = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
     del syn["pose"]
-
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
 
-    # save_path = intermediate_flight_path + "depth_data.pkl"
-    # pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
-    # pickle.dump(syn, open(save_path, "wb"))
-
+    # 6. Save dict as with pickle
+    pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
+    pickle.dump(syn, open(intermediate_flight_path + "data.pkl", "wb"))
+    pickle.dump(cam0_dict, open(intermediate_flight_path + "img.pkl", "wb"))
 
 def splitting():
     with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
@@ -412,12 +387,11 @@ def load_flight_for_depth(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    flight = FLIGHT_LIST[0]
-    raw_flight_path = RAW_DATASET_PATH + flight
-    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-    print("Loading", flight)
-    _load_clean_data(raw_flight_path, intermediate_flight_path)
+    for flight in FLIGHT_LIST:
+        raw_flight_path = RAW_DATASET_PATH + flight
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+        print("Loading", flight)
+        _load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
 
     # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)

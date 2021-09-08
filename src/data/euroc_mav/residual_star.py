@@ -73,8 +73,6 @@ def euroc_mav_residual():
         # Saving
         intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
         pickle.dump(data, open(intermediate_flight_path, "wb"))
-        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-ideal.pkl"
-        pickle.dump({"butterworth": data["residual"]}, open(intermediate_flight_path, "wb"))
     euroc.splitting()
 
 
@@ -200,7 +198,7 @@ def compare_denoising():
 
 
 if __name__ == '__main__':
-    # euroc_mav_residual()
+    euroc_mav_residual()
     # _test_euroc()
     # _test_euroc_torch_dataset()
-    compare_denoising()
+    # compare_denoising()
