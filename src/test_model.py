@@ -163,20 +163,31 @@ def main():
     # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
     #               train_test_validation="validation")
 
-    cnn_residual = "20210831_120906_CNNResidual_bs128_epch10000_lr0.0001_h1_p20_us50_relu/1241_weights.pt"
-    # cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
+    # cnn_residual = "20210831_120906_CNNResidual_bs128_epch10000_lr0.0001_h1_p20_us50_relu/1241_weights.pt"
+    # # cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
+    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # past = 20
+    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
+    #                                                        device="cpu")
+    # residual_model.load_state_dict(weights)
+    # residual_model.eval()
+    # test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+    #            train_test_validation="test")
+    # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
+    #               train_test_validation="validation")
+
+    cnn_residual = "20210903_114943_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanhl3/9890_weights.pt"
+    cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
     model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
-    past = 20
+    past = 60
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
-    residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
-                                                           device="cpu")
+    residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=torch.tanh,
+                                                           one_more_layer=False, device="cpu")
     residual_model.load_state_dict(weights)
     residual_model.eval()
     test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
                train_test_validation="test")
-    # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
-    #               train_test_validation="validation")
-
     pass
 
 
