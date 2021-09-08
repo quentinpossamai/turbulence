@@ -3,6 +3,26 @@ from scipy.spatial.transform import Rotation
 from typing import Tuple
 
 
+def qfix(q):
+    """
+    Enforce quaternion continuity across the time dimension by selecting
+    the representation (q or -q) with minimal distance (or, equivalently, maximal dot product)
+    between two consecutive frames.
+
+    Expects a tensor of shape (L, 4), where L is the sequence length.
+    Returns a tensor of the same shape.
+    """
+    assert len(q.shape) == 2
+    assert q.shape[-1] == 4
+
+    result = q.copy()
+    dot_products = np.sum(q[1:] * q[:-1], axis=-1)
+    mask = dot_products < 0
+    mask = (np.cumsum(mask, axis=0) % 2).astype(bool)
+    result[1:][mask] *= -1
+    return result
+
+
 class Transform(object):
     def __init__(self, matrix: np.ndarray):
         self._matrix: np.ndarray = matrix  # shape = (n, 4, 4)
@@ -260,6 +280,7 @@ class Transform(object):
         C_T_D = C_T_A @ A_T_B @ B_T_D.                T_C_D = C_T_D
         """
         quat = Rotation.from_matrix(self.as_rot_mat()).as_quat()
+        quat = qfix(quat)
         if self._is_single:
             return quat[0], self.as_trans()
         else:
@@ -267,7 +288,7 @@ class Transform(object):
 
     def as_rot_quat(self) -> np.ndarray:
         """quat = x, y, z, w with scipy Rotation."""
-        return Rotation.from_matrix(self.as_rot_mat()).as_quat()
+        return qfix(Rotation.from_matrix(self.as_rot_mat()).as_quat())
 
     def as_rot_mat(self) -> np.ndarray:
         if self._is_single:
