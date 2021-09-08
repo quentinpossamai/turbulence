@@ -197,8 +197,17 @@ def compare_denoising():
         ax.set_ylabel("Fa [m/s2]")
 
 
-if __name__ == '__main__':
+def main():
+    for flight in euroc.FLIGHT_LIST:
+        raw_flight_path = euroc.RAW_DATASET_PATH + flight
+        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + flight
+        print("Loading", flight)
+        euroc.load_clean_data(raw_flight_path, intermediate_flight_path)
     euroc_mav_residual()
     # _test_euroc()
     # _test_euroc_torch_dataset()
     # compare_denoising()
+
+
+if __name__ == '__main__':
+    main()

@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
 
-from  src.utils.paths import WD_PATH
+from src.utils.paths import WD_PATH
 from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion
@@ -23,11 +23,13 @@ src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_DAT
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 
-
 # FLIGHT_LIST = ["V2_01_easy/", "V2_02_medium/", "V2_03_difficult/"]
+TRANS_MEAN = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
+              "V1_02_medium/": np.array([0.00806092, 1.18968812, 1.60374988]),
+              "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
 
 
-def _load_clean_data(raw_flight_path, intermediate_flight_path):
+def load_clean_data(raw_flight_path, intermediate_flight_path):
     # 1-LOADING DATA
     # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
     # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
@@ -78,8 +80,12 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # dict_keys(['nsecs', 'image', 'step', 'height', 'width', 'secs', 'is_bigendian'])
     cam0_key = '/cam0/image_raw__sensor_msgs/Image'
     cam0_dict = {}
+    shape = raw[cam0_key][0]["image"].shape
     for i in range(len(raw[cam0_key])):
-        cam0_dict[raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9] = raw[cam0_key][i]["image"]
+        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
+        for j in range(3):
+            color_frame[:, :, j] = raw[cam0_key][i]["image"]
+        cam0_dict[raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9] = color_frame
     # time = np.array([raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9 for i in range(len(raw[cam0_key]))])
     # image = np.array([raw[cam0_key][i]["image"] for i in range(len(raw[cam0_key]))])
     step = np.array([raw[cam0_key][i]["step"] for i in range(len(raw[cam0_key]))])
@@ -205,7 +211,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     image_sync = np.zeros(len(den_motor_dict["t"]))  # The timestamp of the image
     cam0_time = np.array(list(cam0_dict.keys()))
     for i, time in enumerate(den_motor_dict["t"]):
-        image_sync[i] = np.abs(time - cam0_time).argmin()
+        image_sync[i] = cam0_time[np.abs(time - cam0_time).argmin()]
 
     # 4.1.2-Linear interpolation method
     # imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
@@ -272,7 +278,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # 6. Save dict as with pickle
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(syn, open(intermediate_flight_path + "data.pkl", "wb"))
-    pickle.dump(cam0_dict, open(intermediate_flight_path + "img.pkl", "wb"))
+    pickle.dump(cam0_dict, open(intermediate_flight_path + "cam0.pkl", "wb"))
+
 
 def splitting():
     with open(INTERMEDIATE_DATASET_PATH + "split.txt", "w") as file:
@@ -391,7 +398,7 @@ def main():
         raw_flight_path = RAW_DATASET_PATH + flight
         intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
         print("Loading", flight)
-        _load_clean_data(raw_flight_path, intermediate_flight_path)
+        load_clean_data(raw_flight_path, intermediate_flight_path)
     # splitting()
 
     # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
