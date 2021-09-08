@@ -26,7 +26,12 @@ def load_flight(flight_name):
     return data
 
 
-def integrate(position, quaternion, imu, dt):
+def integrate(state, imu, dt):
+    position = state[:3]
+    quaternion = state[3:7]
+    speed = state[7:10]
+    rpy = state[10:]
+
     sensor_rpy = imu[:3]
     sensor_acc = imu[3:]
 
@@ -34,13 +39,19 @@ def integrate(position, quaternion, imu, dt):
     G = np.array([[qw, qz, -qy, -qx],
                   [-qz, qw, qx, -qy],
                   [qy, -qx, qw, -qz]]).transpose()
-    dot_q = -(0.5 * G @ sensor_rpy.reshape((3, 1))).reshape((4))
+    dot_q = (0.5 * G @ sensor_rpy.reshape((3, 1))).reshape((4))
 
     next_quaternion = quaternion + dt * dot_q
     next_quaternion = next_quaternion / np.linalg.norm(next_quaternion)
-    r = Rotation.from_quat(next_quaternion).inv()
-    # sensor_acc_frame = r.apply(sensor_acc)
-    return next_quaternion
+
+    r = Rotation.from_quat(next_quaternion)
+    sensor_acc = r.apply(sensor_acc) + np.array([0, 0, -9.81])
+
+    next_speed = speed + dt * sensor_acc
+    next_position = position + dt * next_speed
+
+    next_state = np.concatenate([next_position, next_quaternion, next_speed, sensor_rpy])
+    return next_state
 
 
 def orientation_check(quaternion_gt, pred):
@@ -79,24 +90,62 @@ def orientation_check(quaternion_gt, pred):
 
 
 if __name__ == '__main__':
-    data = load_flight(FLIGHT_LIST[2])
 
-    time = data["t"]
-    dt = (time[1:] - time[:-1]).mean()
-    state = data["state"]
-    imu = data["imu_ang_acc"]
+    for k in range(4, len(FLIGHT_LIST)):
+        data = load_flight(FLIGHT_LIST[k])
 
-    integration = [state[0, 3:7]]
-    for k in range(time.shape[0]):
-        integration.append(integrate(None, integration[-1], imu[k], dt))
+        START = 10_000
+        LENGTH = 10_000
+        time = data["t"][START:START + LENGTH]
+        dt = (time[1:] - time[:-1]).mean()
+        state = data["state"][START:START + LENGTH]
+        imu = data["imu_ang_acc"][START:START + LENGTH]
 
-    integration = np.array(integration)
-    # orientation_check(state[:, 3:7], integration)
-    fig, ax = plt.subplots(4, 1)
-    for k in range(4):
-        ax[k].plot(state[:, 3 + k], label='mocap')
-        ax[k].plot(integration[:, k], label='IMU')
-        ax[k].set_title("Q_" + str(k))
-    fig.tight_layout()
-    # plt.plot(integration)
-    plt.show()
+        pi_rotation = Rotation.from_euler("zyx", np.array([np.pi/2, 0, np.pi]), degrees=False)
+        imu_rpy = pi_rotation.apply(imu[:, :3])
+        # imu_rpy = imu_rpy[:, [1, 0, 2]] * np.array([1, -1, 1])
+        imu_acc = pi_rotation.apply(imu[:, 3:])
+        # imu_acc = imu_acc[:, [1, 0, 2]] * np.array([1, -1, 1])
+        imu = np.concatenate([imu_rpy, imu_acc], axis=-1)
+
+        integration = [state[0]]
+        for k in range(time.shape[0] - 1):
+            integration.append(integrate(integration[-1], imu[k], dt))
+
+        integration = np.array(integration)
+        # orientation_check(state[:, 3:7], integration)
+
+        fig, ax = plt.subplots(3, 1)
+        for k in range(3):
+            ax[k].plot(time, state[:, k], label='mocap')
+            ax[k].plot(time, integration[:, k], label='IMU')
+            ax[k].set_title("p_" + str(k))
+            ax[k].legend(frameon=True)
+        fig.tight_layout()
+
+        fig, ax = plt.subplots(4, 1)
+        for k in range(4):
+            ax[k].plot(time, state[:, 3 + k], label='mocap')
+            ax[k].plot(time, integration[:, 3 + k], label='IMU')
+            ax[k].set_title("Q_" + str(k))
+            ax[k].legend(frameon=True)
+        fig.tight_layout()
+
+        fig, ax = plt.subplots(3, 1)
+        for k in range(3):
+            ax[k].plot(time, state[:, 7 + k], label='mocap')
+            ax[k].plot(time, integration[:, 7 + k], label='IMU')
+            ax[k].set_title("V_" + str(k))
+            ax[k].legend(frameon=True)
+        fig.tight_layout()
+
+        fig, ax = plt.subplots(3, 1)
+        for k in range(3):
+            ax[k].plot(time, state[:, 10 + k], label='mocap')
+            ax[k].plot(time, integration[:, 10 + k], label='IMU')
+            ax[k].set_title("w_" + str(k))
+            ax[k].legend(frameon=True)
+        fig.tight_layout()
+
+        # plt.plot(integration)
+        plt.show()
