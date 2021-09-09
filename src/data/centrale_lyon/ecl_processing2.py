@@ -99,7 +99,7 @@ def error_estimation():
                                                          max_distance=5)
     estimator.p3_generator()
     saving_path = f.folders['results'][flight_number] + 'pose_camera_correspondence_video.mkv'
-    estimator.p32video(fps=camera_parameters['fps'], saving_path=saving_path)
+    estimator.p32video_get_frame(fps=camera_parameters['fps'], saving_path=saving_path)
 
 
 class tara_slider_plot:

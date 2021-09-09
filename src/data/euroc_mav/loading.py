@@ -230,8 +230,8 @@ def load_clean_data(flight):
     #                                            fill_value=(den_pose_dict["pose"][0, i],
     #                                                        den_pose_dict["pose"][-1, i]))(
     #     den_motor_dict["t"]) for i in range(7)], axis=1)
-    syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
-           "pose": pose_sync, "cam0": cam0_sync}
+    syn = {"t": den_motor_dict["t"], "timestamp": den_motor_dict["timestamp"], "imu_ang_acc": imu_sync,
+           "motor": den_motor_dict["motor"], "pose": pose_sync, "cam0": cam0_sync}
 
     # 4.2-Setting initial parameters and normalizing quaternion
     syn["t"] = syn["t"] - syn["t"][0]
