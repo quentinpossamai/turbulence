@@ -49,7 +49,7 @@ def evaluate():
 
     model.load_state_dict(state_dict)
 
-    validate(model, dataloader, viz=True)
+    validate(model, dataloader, viz=False)
 
 
 def vizualize(gt, pred):

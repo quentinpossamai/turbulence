@@ -34,7 +34,7 @@ class EurocMavLoader(Dataset):
         super(EurocMavLoader, self).__init__()
         self.dataloc = f"/Volumes/Samsung_T5/BlackBird/euroc_mav/intermediate/{split}/"
         if not os.path.isdir(self.dataloc):
-            self.dataloc = f"/storage/Dataset/BlackBird/euroc_mav/intermediate/{split}/"
+            self.dataloc = f"/storage/Datasets/BlackBird/euroc_mav/intermediate/{split}/"
 
         self.index = os.listdir(self.dataloc + "depth_estimation")
 
@@ -43,7 +43,11 @@ class EurocMavLoader(Dataset):
 
     def __getitem__(self, item):
         dir = self.dataloc + "depth_estimation/" + self.index[item]
-        depth_map = torch.FloatTensor(cv2.imread(dir)[:, :, 0]).unsqueeze(0)
+        try:
+            depth_map = torch.FloatTensor(cv2.imread(dir)[:, :, 0]).unsqueeze(0)
+        except TypeError:
+            print(self.index[item])
+            raise TypeError("DTC")
         depth_map = depth_map / 255 * 2 - 1
         depth_map = depth_map  # * ZMAX
 
@@ -95,8 +99,8 @@ def main():
         out = model(depthmap)
         costs = get_loss(normal, out)
         data.append(
-            {'timestamp': ex, 'embedding': out["feature"], "MSE": costs[1].detach().numpy(), "CrossProduct": costs[-1]})
-    pickle.dump(data, open(f"/storage/Dataset/BlackBird/{args.flight}.pkl"))
+            {'timestamp': ex, 'embedding': out["feature"][0].cpu().detach().numpy(), "MSE": costs[1].cpu().detach().numpy(), "CrossProduct": costs[-1].cpu().detach().numpy()})
+    pickle.dump(data, open(f"/storage/Datasets/BlackBird/{args.flight}.pkl", "wb"))
 
 
 if __name__ == '__main__':
