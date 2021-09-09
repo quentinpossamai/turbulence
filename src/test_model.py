@@ -183,7 +183,7 @@ def main():
     past = 60
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
     residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=torch.tanh,
-                                                           one_more_layer=False, device="cpu")
+                                                           layer=False, device="cpu")
     residual_model.load_state_dict(weights)
     residual_model.eval()
     test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",

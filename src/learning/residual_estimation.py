@@ -34,9 +34,12 @@ def main():
     parser.add_argument('--batch_size', default=128, type=int, help="Size of a batch")
     parser.add_argument('--epochs', default=10000, type=int, help="Number of epochs")
     parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
-    parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model")
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
+    parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
     parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
+    parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
+    parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
+    parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
     args = parser.parse_args()
 
     # Training parameters
@@ -56,7 +59,8 @@ def main():
             f"p{args.past}_"
             f"us{args.unit_size}_"
             f"{activation.__name__}_"
-            f"l{3}")
+            f"l{args.layer}_",
+            f"{args.embedding}")
     training_path = ANALYSIS_PATH + f"training/{name}/"
     print("Tensorboard logdir: ", training_path)
 
@@ -67,13 +71,14 @@ def main():
 
     log = Logger(run_name=name, saving_path=training_path)
     analytic_model = DynamicalModel(paper=False, dtype=torch.float32)
-    run = CNNResidual(log=log,
-                      model=analytic_model,
+    run = CNNResidual(model=analytic_model,
                       past=args.past,
                       unit_size=args.unit_size,
                       activation=activation,
-                      one_more_layer=True,
-                      device=device)
+                      layer=args.layer,
+                      embedding=args.embedding,
+                      device=device,
+                      log=log)
     optimizer = run.configure_optimizers(lambda x: torch.optim.Adam(x, lr=args.lr))
     run = run.to(device)
 
