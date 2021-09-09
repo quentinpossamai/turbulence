@@ -4,22 +4,23 @@ import pathlib
 import pickle
 from scipy import interpolate, signal
 from scipy.fft import fft, fftfreq, ifft
-from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
+import os
 
 from src.utils.paths import WD_PATH
-from src.utils.transform import Transform
 import src.utils.paths
 from src.utils import quaternion
 
 # Path
 ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "euroc_mav_processing_data/"
 DATASET_PATH = src.utils.paths.WD_PATH + "data/euroc_mav/"
-RAW_DATASET_PATH = DATASET_PATH + f"raw_python/"
+RAW_PYTHON_DATASET_PATH = DATASET_PATH + f"raw_python/"
+RAW_DATASET_PATH = DATASET_PATH + f"raw/"
 INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
-src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_DATASET_PATH, INTERMEDIATE_DATASET_PATH])
+src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_PYTHON_DATASET_PATH,
+                                    INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 
@@ -29,7 +30,10 @@ TRANS_MEAN = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
               "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
 
 
-def load_clean_data(raw_flight_path, intermediate_flight_path):
+def load_clean_data(flight):
+    raw_flight_path = RAW_PYTHON_DATASET_PATH + flight
+    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    print("Loading", flight)
     # 1-LOADING DATA
     # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
     # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
@@ -52,7 +56,10 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     frame_id = np.array([raw[imu_key][i]["frame_id"] for i in range(len(raw[imu_key]))])
     assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
     time = np.array([raw[imu_key][i]["secs"] + raw[imu_key][i]["nsecs"] * 1e-9 for i in range(len(raw[imu_key]))])
-    imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1)}
+    timestamp = np.array([raw[imu_key][i]["secs"] * int(1e9) +
+                          raw[imu_key][i]["nsecs"] for i in range(len(raw[imu_key]))])
+    assert (timestamp == sorted(timestamp)).all()
+    imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1), "timestamp": timestamp}
 
     # 1.2-MOTOR SPEED Loading
     # dict_keys(['frame_id', 'secs', 'motor_speed', 'nsecs'])
@@ -60,8 +67,10 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     frame_id = np.array([raw[ms_key][i]["frame_id"] for i in range(len(raw[ms_key]))])
     assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
     time = np.array([raw[ms_key][i]["secs"] + raw[ms_key][i]["nsecs"] * 1e-9 for i in range(len(raw[ms_key]))])
+    timestamp = np.array([raw[ms_key][i]["secs"] * int(1e9) + raw[ms_key][i]["nsecs"] for i in range(len(raw[ms_key]))])
+    assert (timestamp == sorted(timestamp)).all()
     ms = np.array([raw[ms_key][i]["motor_speed"] for i in range(len(raw[ms_key]))], dtype=float)  # Assumed in rad/s
-    motor_dict = {"t": time, "motor": ms}
+    motor_dict = {"t": time, "motor": ms, "timestamp": timestamp}
 
     # 1.3-STATE Loading
     # dict_keys(['child_frame_id', 'nsecs', 'frame_id', 'secs', 'translation', 'rotation'])
@@ -70,22 +79,20 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # Check if it is all the time 'vicon/firefly_sbx/firefly_sbx'
     assert np.sum("vicon/firefly_sbx/firefly_sbx" == child_frame_id) == len(child_frame_id)
     time = np.array([raw[state_key][i]["secs"] + raw[state_key][i]["nsecs"] * 1e-9 for i in range(len(raw[state_key]))])
+    timestamp = np.array([raw[state_key][i]["secs"] * int(1e9) +
+                          raw[state_key][i]["nsecs"] for i in range(len(raw[state_key]))])
+    assert (timestamp == sorted(timestamp)).all()
     frame_id = np.array([raw[state_key][i]["frame_id"] for i in range(len(raw[state_key]))])
     assert np.sum("/world" == frame_id) == len(frame_id)  # All the time "/world"
     trans = np.array([raw[state_key][i]["translation"] for i in range(len(raw[state_key]))])
     quat = np.array([raw[state_key][i]["rotation"] for i in range(len(raw[state_key]))])  # x, y, z, w
-    pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
+    pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1), "timestamp": timestamp}
 
-    # 1.4-Cam0 image name loading
+    # 1.4-CAM0 image name loading
     # dict_keys(['nsecs', 'image', 'step', 'height', 'width', 'secs', 'is_bigendian'])
     cam0_key = '/cam0/image_raw__sensor_msgs/Image'
-    cam0_dict = {}
-    shape = raw[cam0_key][0]["image"].shape
-    for i in range(len(raw[cam0_key])):
-        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
-        for j in range(3):
-            color_frame[:, :, j] = raw[cam0_key][i]["image"]
-        cam0_dict[raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9] = color_frame
+    timestamp = np.array(sorted([int(e.removesuffix(".png")) 
+                                 for e in os.listdir(f"{DATASET_PATH}raw/{flight}/cam0/data/")]))
     # time = np.array([raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9 for i in range(len(raw[cam0_key]))])
     # image = np.array([raw[cam0_key][i]["image"] for i in range(len(raw[cam0_key]))])
     step = np.array([raw[cam0_key][i]["step"] for i in range(len(raw[cam0_key]))])
@@ -96,6 +103,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     assert (width == 752).all()  # width not use
     is_bigendian = np.array([raw[cam0_key][i]["is_bigendian"] for i in range(len(raw[cam0_key]))])
     assert is_bigendian.sum() == 0  # is_bigendian not use
+    cam0_dict = {"t": time, "timestamp": timestamp}
 
     # 2-DENOISING
     def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
@@ -129,11 +137,12 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     period = np.mean(imu_dict["t"][1:] - imu_dict["t"][:-1])
     den_imu_dict["t"] = (period * np.array(range(len(imu_dict["t"]))) + imu_dict["t"][0])  # Denoising IMU timestamp
     den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
+    den_imu_dict["timestamp"] = imu_dict["timestamp"]
 
     # 2.3-Computing a denoised motion capture's translation and quaternion.
     # 2.3.1-Initialization, normalization and centering
     # Body and World reference frame are in FLU! Nice!
-    den_pose_dict = {}
+    den_pose_dict = {"timestamp": pose_dict["timestamp"]}
     quat = pose_dict["pose"][:, 3:7]
     trans = pose_dict["pose"][:, :3]
     time = pose_dict["t"]
@@ -198,20 +207,19 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
     # 4.1.1-Spline interpolation method
     # Imu
-    imu_sync = np.zeros((len(den_motor_dict["t"]), 6))
+    imu_sync = np.zeros((len(den_motor_dict["timestamp"]), 6))
     for i in range(6):
-        rep = interpolate.splrep(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], k=5)
-        imu_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+        rep = interpolate.splrep(den_imu_dict["timestamp"], den_imu_dict["ang_acc"][:, i], k=5)
+        imu_sync[:, i] = interpolate.splev(den_motor_dict["timestamp"], rep)
     # Motion capture
-    pose_sync = np.zeros((len(den_motor_dict["t"]), 7))
+    pose_sync = np.zeros((len(den_motor_dict["timestamp"]), 7))
     for i in range(7):
-        rep = interpolate.splrep(den_pose_dict["t"], den_pose_dict["pose"][:, i], k=5)
-        pose_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+        rep = interpolate.splrep(den_pose_dict["timestamp"], den_pose_dict["pose"][:, i], k=5)
+        pose_sync[:, i] = interpolate.splev(den_motor_dict["timestamp"], rep)
     # Cam0
-    image_sync = np.zeros(len(den_motor_dict["t"]))  # The timestamp of the image
-    cam0_time = np.array(list(cam0_dict.keys()))
-    for i, time in enumerate(den_motor_dict["t"]):
-        image_sync[i] = cam0_time[np.abs(time - cam0_time).argmin()]
+    cam0_sync = np.zeros(len(den_motor_dict["timestamp"]), dtype=int)  # The timestamp of the image
+    for i, timestamp in enumerate(den_motor_dict["timestamp"]):
+        cam0_sync[i] = cam0_dict["timestamp"][np.abs(timestamp - cam0_dict["timestamp"]).argmin()]
 
     # 4.1.2-Linear interpolation method
     # imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
@@ -223,7 +231,7 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
     #                                                        den_pose_dict["pose"][-1, i]))(
     #     den_motor_dict["t"]) for i in range(7)], axis=1)
     syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
-           "pose": pose_sync, "img": image_sync}
+           "pose": pose_sync, "cam0": cam0_sync}
 
     # 4.2-Setting initial parameters and normalizing quaternion
     syn["t"] = syn["t"] - syn["t"][0]
@@ -277,8 +285,8 @@ def load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # 6. Save dict as with pickle
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
+    plt.plot(syn["state"][:, :3])
     pickle.dump(syn, open(intermediate_flight_path + "data.pkl", "wb"))
-    pickle.dump(cam0_dict, open(intermediate_flight_path + "cam0.pkl", "wb"))
 
 
 def splitting():
@@ -395,10 +403,7 @@ def load_flight_for_depth(flight):
 
 def main():
     for flight in FLIGHT_LIST:
-        raw_flight_path = RAW_DATASET_PATH + flight
-        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-        print("Loading", flight)
-        load_clean_data(raw_flight_path, intermediate_flight_path)
+        load_clean_data(flight)
     # splitting()
 
     # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
