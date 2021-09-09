@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
-import src.data.euroc_mav.loading as euroc
 import src.utils.quaternion as quaternion
 
 
@@ -112,40 +111,3 @@ class DynamicalModel(nn.Module):
         ktaua = (ang_acc - torch.cross(t3_tensor * ang_vel, ang_vel, dim=-1)
                  - t12_tensor * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1)
-
-
-def main():
-    model = DynamicalModel(paper=False, dtype=torch.float32)
-
-    # Sanity check
-    def sanity_check(data):
-        analysis1 = torch.zeros(len(data), 13)
-        analysis2 = torch.zeros(len(data), 13)
-        analysis3 = torch.zeros(len(data), 6)
-        for i in range(len(data)):
-            state = data[i]["state"][-2].view(1, -1)
-            motor = data[i]["motor"][-2].view(1, -1)
-            residual_gt = data[i]["residual"][-1].view(1, -1)
-            next_state_gt = data[i]["state"][-1].view(1, -1)
-            dt = data[i]["t"][-1].view(1, -1) - data[i]["t"][-2].view(1, -1)
-
-            residual_hat = model.residual_dynamic(motor, state, dt, next_state_gt)
-            next_state_hat = model(state, motor, dt, residual_gt)
-
-            analysis1[i, :] = (next_state_gt - next_state_hat) ** 2
-            # analysis2[i, :] = next_state_hat
-            analysis3[i, :] = (residual_hat - residual_gt) ** 2
-        print(torch.mean(analysis1, dim=0))
-        # assert (torch.max(test, 0)[0] < 2.5e-7).all()
-
-    # Could adapt code with for_loader=False
-    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21, dtype=torch.float32, for_loader=True)
-    sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21, dtype=torch.float32, for_loader=True)
-    sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21, dtype=torch.float32, for_loader=True)
-    sanity_check(data)
-
-
-if __name__ == '__main__':
-    main()

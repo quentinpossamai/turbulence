@@ -8,6 +8,7 @@ import torch
 from torch.utils.data import Dataset
 import os
 
+from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.utils.paths import WD_PATH
 import src.utils.paths
 from src.utils import quaternion
@@ -91,7 +92,7 @@ def load_clean_data(flight):
     # 1.4-CAM0 image name loading
     # dict_keys(['nsecs', 'image', 'step', 'height', 'width', 'secs', 'is_bigendian'])
     cam0_key = '/cam0/image_raw__sensor_msgs/Image'
-    timestamp = np.array(sorted([int(e.removesuffix(".png")) 
+    timestamp = np.array(sorted([int(e.removesuffix(".png"))
                                  for e in os.listdir(f"{DATASET_PATH}raw/{flight}/cam0/data/")]))
     # time = np.array([raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9 for i in range(len(raw[cam0_key]))])
     # image = np.array([raw[cam0_key][i]["image"] for i in range(len(raw[cam0_key]))])
@@ -285,8 +286,65 @@ def load_clean_data(flight):
 
     # 6. Save dict as with pickle
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
-    plt.plot(syn["state"][:, :3])
     pickle.dump(syn, open(intermediate_flight_path + "data.pkl", "wb"))
+
+
+def euroc_mav_residual():
+    dtype = torch.float64
+    model = DynamicalModel(paper=False, dtype=dtype)
+    for flight in FLIGHT_LIST:
+        # Importing data
+        data = load_flight(flight)
+        time = torch.from_numpy(data["t"][:-1])
+        motor = torch.from_numpy(data["motor"][:-1])
+        dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
+        state = torch.from_numpy(data["state"][:-1])
+        next_state = torch.from_numpy(data["state"][1:])
+
+        # Test-1 Quaternion norm is 1 and standard deviation is 1e-18
+        # state[:, 3:7] = state[:, 3:7] / torch.norm(state[:, 3:7], dim=1).view(-1, 1)
+        # next_state[:, 3:7] = next_state[:, 3:7] / torch.norm(next_state[:, 3:7], dim=1).view(-1, 1)
+        norm = torch.norm(state[:, 3:7], dim=1)
+        print("Quaternion's norm mean: ", torch.mean(norm))
+        print("Quaternion's norm std: ", torch.std(norm))
+
+        # Test-2 integrating perfect derivative lead to perfect pose
+        assert abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10]).sum() == 0
+
+        # Computing residual
+        residual_torsor = model.residual_dynamic(motor, state, dt, next_state)
+        data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
+
+        # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
+
+        # Saving
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
+
+
+def merge_embeddings():
+    dtype = torch.float64
+    for flight in FLIGHT_LIST:
+        # Importing data
+        data = load_flight(flight)
+
+        # list[dict_keys(['timestamp', 'embedding', 'MSE', 'GradMSE'])]
+        depth_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}depth_embedding.pkl", "rb"))
+        assert (data["t"] == np.array(sorted([e["timestamp"] for e in depth_emb]))).all()
+        depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])
+        assert (data["t"] == np.array([e["timestamp"] for e in depth_emb])).all
+        data["depth_emb"] = np.array([e["embedding"].numpy().flatten() for e in depth_emb]).astype(float)
+
+        # list[dict_keys(['timestamp', 'embedding', 'MSE', 'CrossProduct'])]
+        norm_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}normal_embedding.pkl", "rb"))
+        assert (data["t"] == np.array(sorted([e["timestamp"] for e in norm_emb]))).all()
+        norm_emb = sorted(norm_emb, key=lambda x: x["timestamp"])
+        assert (data["t"] == np.array([e["timestamp"] for e in norm_emb])).all
+        data["norm_emb"] = np.array([e["embedding"].flatten() for e in norm_emb]).astype(float)
+
+        # Saving
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
 
 
 def splitting():
@@ -345,8 +403,13 @@ class EurocMAVDatasetHorizon(Dataset):
 
         # Loading data
         for key, val in loaded_data.items():
-            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
-                                              axis=1)
+            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)),  # len 1
+                                               val["state"],  # len 13
+                                               val["motor"],  # len 6
+                                               val["residual"],  # len6
+                                               val["depth_emb"],  # len 128
+                                               val["norm_emb"]  # len 128
+                                               ], axis=1)
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
         self.data = torch.from_numpy(self.data).type(self.dtype)
@@ -363,12 +426,17 @@ class EurocMAVDatasetHorizon(Dataset):
             self.get_func = lambda x: {"t": x[:, :1],
                                        "state": x[:, 1:14],
                                        "motor": x[:, 14:20],
-                                       "residual": x[:, 20:]}
+                                       "residual": x[:, 20:26],
+                                       "depth_emb": x[:, 26:154],
+                                       "norm_emb": x[:, 154:282],
+                                       }
         else:
             self.get_func = lambda x: {"t": x[:, :1].view((1, -1, 1)),
                                        "state": x[:, 1:14].view((1, -1, 13)),
                                        "motor": x[:, 14:20].view((1, -1, 6)),
-                                       "residual": x[:, 20:].view((1, -1, 6))}
+                                       "residual": x[:, 20:26].view((1, -1, 6)),
+                                       "depth_emb": x[:, 26:154].view((1, -1, 128)),
+                                       "norm_emb": x[:, 154:282].view((1, -1, 128))}
 
     def __len__(self):
         return self.cum_dataset_idx[-1]
@@ -394,17 +462,12 @@ def load_flight(flight):
     return data
 
 
-def load_flight_for_depth(flight):
-    #     data = {"t", "imu_ang_acc", "motor", "state"}
-    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/depth_data.pkl"
-    data = pickle.load(open(intermediate_flight_path, "rb"))
-    return data
-
-
 def main():
-    for flight in FLIGHT_LIST:
-        load_clean_data(flight)
-    # splitting()
+    # for flight in FLIGHT_LIST:
+    #     load_clean_data(flight)
+    # euroc_mav_residual()
+    merge_embeddings()
+    splitting()
 
     # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
     # # dict_keys(['t', 'state', 'motor', 'residual'])
