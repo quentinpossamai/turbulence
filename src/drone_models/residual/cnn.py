@@ -23,6 +23,7 @@ class CNNResidual(nn.Module, Run):
         :param unit_size: The size of one layer.
         :param activation: The activation function to use.
         :param layer: Number of layer for the neural network.
+        :param embedding: Type of embedding to use.
         :param device: Cuda device to use.
         :param log: The logger to log training and validation error.
         """
@@ -42,7 +43,7 @@ class CNNResidual(nn.Module, Run):
         self.motor_size = 6
         self.feature_size = 19
         if self.emb in ["depth", "norm"]:
-            self.feature_size =  self.feature_size + 128
+            self.feature_size = self.feature_size + 128
         elif self.emb in ["both"]:
             self.feature_size = self.feature_size + 2 * 128
 
@@ -72,7 +73,7 @@ class CNNResidual(nn.Module, Run):
         state_motor = torch.cat([state, motor], dim=2).view(batch_size, 1, self.past, self.feature_size)
         out = self.a(self.conv2d0(state_motor))
         if self.layer == 3:
-            out = self.conv2d1(out)
+            out = self.a(self.conv2d1(out))
         out = self.conv2d_end(out)
         return out.squeeze()  # residual
 
