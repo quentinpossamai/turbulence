@@ -296,7 +296,7 @@ def euroc_mav_residual():
         # Importing data
         data = load_flight(flight)
         # time = torch.from_numpy(data["t"][:-1])
-        motor = torch.from_numpy(data["motor"][:-1])
+        motor = torch.from_numpy(data["motor"][1:])
         dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
         state = torch.from_numpy(data["state"][:-1])
         next_state = torch.from_numpy(data["state"][1:])
@@ -312,7 +312,7 @@ def euroc_mav_residual():
         assert abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10]).sum() == 0
 
         # Computing residual
-        residual_torsor = model.residual_dynamic(motor, state, dt, next_state)
+        residual_torsor = model.residual_dynamic(motor=motor, state=state, dt=dt, next_state=next_state)
         data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
 
         # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))

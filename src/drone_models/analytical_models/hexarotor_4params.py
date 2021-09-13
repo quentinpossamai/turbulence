@@ -41,6 +41,13 @@ class DynamicalModel(nn.Module):
                                        [2.6935432e+00]], dtype=self.dtype)  # MSE
 
     def forward(self, motor, state, dt, residual=None):
+        """
+        :param motor: t+1
+        :param state: t
+        :param dt: = t+1 - t
+        :param residual: t+1
+        :return: state t+1 = next_state
+        """
         assert motor.shape[-1] == 6, "Motor len is not 6"
         pos = state[:, :3]
         quat = state[:, 3:7]
@@ -93,6 +100,13 @@ class DynamicalModel(nn.Module):
         return motor_torsor.squeeze(-1)
 
     def residual_dynamic(self, motor, state, dt, next_state):
+        """
+        :param motor: t+1
+        :param state: t
+        :param dt: = t+1 - t
+        :param next_state: state t+1 = next_state
+        :return: fa t+1
+        """
         quat = state[:, 3:7]
         ang_vel = state[:, 10:]
         lin_acc = (next_state[:, 7:10] - state[:, 7:10]) / dt
