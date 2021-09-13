@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 import torch
@@ -35,11 +36,11 @@ def main():
     parser.add_argument('--epochs', default=10000, type=int, help="Number of epochs")
     parser.add_argument('--lr', default=1e-4, type=float, help="Learning rate")
     parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
-    parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
+    parser.add_argument('--past', default=3000, type=int, help="Number of past information to take in the model")
     parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
     parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-    parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
-    parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
+    parser.add_argument('--layer', default=2, type=int, help="Number of layer in the neural network")
+    parser.add_argument('--embedding', default="None", type=str, help="Type of embedding to use")
     args = parser.parse_args()
 
     # Training parameters

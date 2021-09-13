@@ -88,7 +88,7 @@ def plot_residual(model, residual_model, horizon, past, dataset, train_test_vali
         name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
         ax.plot(time[past:], residual_gt[:, i], label=f"{name[i]} GT")
-        ax.plot(time[past:], residual_hat[:, i], label=f"{name[i]} hat")
+        ax.plot(time[past:], prediction[:, i], label=f"{name[i]} hat")  # TODO Check if prediction should be plotted
         ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
         ax.set_xlabel("Time [s]")
         ax.grid()

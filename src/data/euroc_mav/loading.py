@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
-from scipy import interpolate, signal
+from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
 import torch
 from torch.utils.data import Dataset
@@ -32,20 +32,20 @@ TRANS_MEAN = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
 
 
 def load_clean_data(flight):
-    raw_flight_path = RAW_PYTHON_DATASET_PATH + flight
+    raw_python_flight_path = RAW_PYTHON_DATASET_PATH + flight
     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
     print("Loading", flight)
     # 1-LOADING DATA
     # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
     # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
     # '/imu0__sensor_msgs/Imu'])
-    raw = pickle.load(open(raw_flight_path + "data.pkl", "rb"), encoding="latin1")
+    raw = pickle.load(open(raw_python_flight_path + "data.pkl", "rb"), encoding="latin1")
 
     # 1.1-IMU Loading
     # dict_keys(['orientation_covariance', 'orientation', 'angular_velocity_covariance', 'nsecs',
     # 'linear_acceleration_covariance', 'frame_id', 'secs', 'linear_acceleration', 'angular_velocity'])
     imu_key = "/fcu/imu__sensor_msgs/Imu"  # '/imu0__sensor_msgs/Imu' also exist
-    orientation = np.array([raw[imu_key][i]["orientation"] for i in range(len(raw[imu_key]))])
+    # orientation = np.array([raw[imu_key][i]["orientation"] for i in range(len(raw[imu_key]))])
     orientation_covariance = np.array([raw[imu_key][i]["orientation_covariance"] for i in range(len(raw[imu_key]))])
     assert np.linalg.norm(orientation_covariance) == 0  # not usable
     ang_vel = np.array([raw[imu_key][i]["angular_velocity"] for i in range(len(raw[imu_key]))])
@@ -93,7 +93,7 @@ def load_clean_data(flight):
     # dict_keys(['nsecs', 'image', 'step', 'height', 'width', 'secs', 'is_bigendian'])
     cam0_key = '/cam0/image_raw__sensor_msgs/Image'
     timestamp = np.array(sorted([int(e.removesuffix(".png"))
-                                 for e in os.listdir(f"{DATASET_PATH}raw/{flight}/cam0/data/")]))
+                                 for e in os.listdir(f"{RAW_DATASET_PATH}{flight}/cam0/data/")]))
     # time = np.array([raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9 for i in range(len(raw[cam0_key]))])
     # image = np.array([raw[cam0_key][i]["image"] for i in range(len(raw[cam0_key]))])
     step = np.array([raw[cam0_key][i]["step"] for i in range(len(raw[cam0_key]))])
@@ -208,15 +208,15 @@ def load_clean_data(flight):
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
     # 4.1.1-Spline interpolation method
     # Imu
-    imu_sync = np.zeros((len(den_motor_dict["timestamp"]), 6))
+    imu_sync = np.zeros((len(den_motor_dict["t"]), 6))
     for i in range(6):
-        rep = interpolate.splrep(den_imu_dict["timestamp"], den_imu_dict["ang_acc"][:, i], k=5)
-        imu_sync[:, i] = interpolate.splev(den_motor_dict["timestamp"], rep)
+        rep = interpolate.splrep(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], k=5)
+        imu_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
     # Motion capture
-    pose_sync = np.zeros((len(den_motor_dict["timestamp"]), 7))
+    pose_sync = np.zeros((len(den_motor_dict["t"]), 7))
     for i in range(7):
-        rep = interpolate.splrep(den_pose_dict["timestamp"], den_pose_dict["pose"][:, i], k=5)
-        pose_sync[:, i] = interpolate.splev(den_motor_dict["timestamp"], rep)
+        rep = interpolate.splrep(den_pose_dict["t"], den_pose_dict["pose"][:, i], k=5)
+        pose_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
     # Cam0
     cam0_sync = np.zeros(len(den_motor_dict["timestamp"]), dtype=int)  # The timestamp of the image
     for i, timestamp in enumerate(den_motor_dict["timestamp"]):
@@ -295,7 +295,7 @@ def euroc_mav_residual():
     for flight in FLIGHT_LIST:
         # Importing data
         data = load_flight(flight)
-        time = torch.from_numpy(data["t"][:-1])
+        # time = torch.from_numpy(data["t"][:-1])
         motor = torch.from_numpy(data["motor"][:-1])
         dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
         state = torch.from_numpy(data["state"][:-1])
@@ -323,7 +323,6 @@ def euroc_mav_residual():
 
 
 def merge_embeddings():
-    dtype = torch.float64
     for flight in FLIGHT_LIST:
         # Importing data
         data = load_flight(flight)
@@ -352,7 +351,9 @@ def splitting():
         for flight in FLIGHT_LIST:
             print("Splitting: ", flight)
             data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
-            assert all(np.array([len(data[key]) for key in data]) == len(data["t"]))  # All keys have the same length
+
+            assert all(np.array([len(data[key]) for key in data]) == len(data["t"])), f"All Data key must have same" \
+                                                                                      f" length"
             flight_len = len(data["t"])
             print(flight, flight_len)
 
@@ -456,6 +457,10 @@ class EurocMAVDatasetHorizon(Dataset):
 
 
 def load_flight(flight):
+    """
+    :param flight: The flight to from FLIGHT_LIST
+    :return: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
+    """
     #     data = {"t", "imu_ang_acc", "motor", "state"}
     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
     data = pickle.load(open(intermediate_flight_path, "rb"))
@@ -463,19 +468,11 @@ def load_flight(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    #     load_clean_data(flight)
-    # euroc_mav_residual()
+    for flight in FLIGHT_LIST:
+        load_clean_data(flight)
+    euroc_mav_residual()
     merge_embeddings()
     splitting()
-
-    # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
-    # # dict_keys(['t', 'state', 'motor', 'residual'])
-    # test = data[0]
-    #
-    # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=True)
-    # dataloader = torch.utils.data.DataLoader(data, batch_size=32, shuffle=False)
-    # batch = next(iter(dataloader))
 
 
 if __name__ == '__main__':
