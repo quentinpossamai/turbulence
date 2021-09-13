@@ -32,11 +32,17 @@ class CNNResidual(nn.Module, Run):
         self.past = past
         self.unit_size = unit_size
         self.a = activation
-        assert layer in [2, 3]
+
+        layer_test = [2, 3]
+        assert layer in layer_test, f"embedding parameter must be one of the following values {layer_test}"
         self.layer = layer
+
         self.device = device
-        assert embedding in [None, "depth", "norm", "both"]
+
+        emb_test = ["None", "depth", "norm", "both"]
+        assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
         self.emb = embedding
+
         self.log = log
 
         self.optimizer = None
