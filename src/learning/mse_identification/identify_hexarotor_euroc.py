@@ -13,7 +13,14 @@ from tqdm import tqdm
 import src.data.euroc_mav.loading as euroc
 from src.utils.quaternion import qrot
 
-DT = 1 / 360
+DT = 1 / 200
+
+a = 0.5
+b = 3 ** 0.5 / 2
+MOTOR_MATRIX = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
+                                  [-b, -b, +0, +b, +b, +0],
+                                  [-1, +1, -1, +1, -1, +1],
+                                  [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
 
 
 def identify_model():
@@ -28,7 +35,7 @@ def identify_model():
         motor = torch.FloatTensor(flights[i]["motor"])
         states.append(s[:-1])
         future_states.append(s[1:])
-        command.append(motor[:-1])
+        command.append(motor[:1:])
     states = torch.cat(states, dim=0)
     future_states = torch.cat(future_states, dim=0)
     command = torch.cat(command, dim=0)
@@ -41,20 +48,13 @@ def identify_model():
     save_identifications = []
     for p in tqdm(permutations):
         omega = command[:, p] ** 2
-
-        a = 0.5
-        b = 3 ** 0.5 / 2
-        motor_matrix = torch.FloatTensor([[-a, +a, +1, +a, -a, -1],
-                                          [-b, -b, +0, +b, +b, +0],
-                                          [-1, +1, -1, +1, -1, +1],
-                                          [+1, +1, +1, +1, +1, +1]]).view(1, 4, 6)
-        motor_forces = motor_matrix @ omega.unsqueeze(-1)  # [tx, ty, tz, T]
+        motor_forces = MOTOR_MATRIX @ omega.unsqueeze(-1)  # [tx, ty, tz, T]
 
         # Linear PFD
         gravity = torch.FloatTensor([0, 0, 9.81]).view(1, 3, 1)
-        thrust = DT * torch.cat([torch.zeros(batch_size, 1), torch.zeros(batch_size, 1), motor_forces[:, 3]], dim=1)
-        thrust_world_frame = qrot(states[:, 3:7], thrust).unsqueeze(-1)
-        a_speed = torch.cat([thrust_world_frame, torch.zeros(batch_size, 3, 3)], dim=-1)
+        thrust_body = torch.cat([torch.zeros(batch_size, 2), motor_forces[:, 3]], dim=1)
+        thrust_world = qrot(states[:, 3:7], thrust_body).view(batch_size, 3, 1)
+        a_speed = torch.cat([DT * thrust_world, torch.zeros(batch_size, 3, 3)], dim=-1)
         b_speed = states[:, 7:10].unsqueeze(-1) - gravity * DT
 
         # Angular PFD
@@ -115,6 +115,8 @@ def identify_model():
     for i in range(10):
         print_point(i)
     pickle.dump(save_identifications, open(euroc.ANALYSIS_SECTION_PATH + "identifications.pkl", "wb"))
+
+    # TODO ROLLOUT
 
     print()
     plt.show()
