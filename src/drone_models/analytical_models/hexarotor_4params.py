@@ -2,22 +2,24 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
-import src.data.euroc_mav.loading as euroc
 import src.utils.quaternion as quaternion
 
 
 class DynamicalModel(nn.Module):
-    def __init__(self, paper, dtype):
+    def __init__(self, param, dtype):
         """
-        :param paper: True, load paper parameters. False, load mse parameters
+        :param param: "paper", "identification", or dict["permutation", "theta"]
         :param dtype: Datatype of the model.
         """
         super(DynamicalModel, self).__init__()
         assert dtype in [torch.float32, torch.float64]
         self.dtype = dtype
+        msg = '''"paper", "identification", or dict["permutation", "theta"]'''
+        assert param in ["paper", "identification"] or list(param.keys()) == ["permutation", "theta"], msg
+
         # Point: 6
-        self.permutation = [5, 0, 1, 2, 3, 4]
-        if paper:
+        self.permutation = [0, 1, 2, 3, 4, 5]
+        if param == "paper":
             # # Paper parameters from
             # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
             # Redundancy’
@@ -35,13 +37,24 @@ class DynamicalModel(nn.Module):
                                        [1.4064e-04],
                                        [1.5881e-05],
                                        [8.0943e-01]], dtype=self.dtype)
+        elif param == "identification":
+            self.theta = torch.tensor([[1.14061868e-04],
+                                        [2.35845582e-04],
+                                        [2.90530320e-05],
+                                        [2.52134583e+00]], dtype=self.dtype)  # MSE
         else:
-            self.theta = torch.tensor([[1.1566750e-04],
-                                       [6.9880742e-04],
-                                       [-5.1250136e-05],
-                                       [2.6935432e+00]], dtype=self.dtype)  # MSE
+            self.theta = param["theta"]
+            self.permutation = param["permutation"]
 
     def forward(self, motor, state, dt, residual=None):
+        """
+        All have shape (time, values)
+        :param motor: t+1
+        :param state: t
+        :param dt: = t+1 - t
+        :param residual: t+1
+        :return: state t+1 = next_state
+        """
         assert motor.shape[-1] == 6, "Motor len is not 6"
         pos = state[:, :3]
         quat = state[:, 3:7]
@@ -94,6 +107,13 @@ class DynamicalModel(nn.Module):
         return motor_torsor.squeeze(-1)
 
     def residual_dynamic(self, motor, state, dt, next_state):
+        """
+        :param motor: t+1
+        :param state: t
+        :param dt: = t+1 - t
+        :param next_state: state t+1 = next_state
+        :return: fa t+1
+        """
         quat = state[:, 3:7]
         ang_vel = state[:, 10:]
         lin_acc = (next_state[:, 7:10] - state[:, 7:10]) / dt
@@ -113,39 +133,24 @@ class DynamicalModel(nn.Module):
                  - t12_tensor * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1)
 
+    def rollout(self, motor, state, horizon):
+        assert horizon + 1 == len(state)
+        assert horizon + 1 == len(motor)
+        assert len(state.shape) == 2  # (horizon, value=13)
+        state_gt = state[1:]
 
-def main():
-    model = DynamicalModel(paper=False, dtype=torch.float32)
+        dt = torch.FloatTensor([[1 / 200]])
 
-    # Sanity check
-    def sanity_check(data):
-        analysis1 = torch.zeros(len(data), 13)
-        analysis2 = torch.zeros(len(data), 13)
-        analysis3 = torch.zeros(len(data), 6)
-        for i in range(len(data)):
-            state = data[i]["state"][-2].view(1, -1)
-            motor = data[i]["motor"][-2].view(1, -1)
-            residual_gt = data[i]["residual"][-1].view(1, -1)
-            next_state_gt = data[i]["state"][-1].view(1, -1)
-            dt = data[i]["t"][-1].view(1, -1) - data[i]["t"][-2].view(1, -1)
+        with torch.no_grad():
+            # Prediction rollout
+            prediction = [state[0].unsqueeze(0)]
+            for i in range(horizon):
+                next_state = self.forward(motor=motor[i+1].unsqueeze(0),
+                                          state=prediction[-1], dt=dt)
+                prediction.append(next_state)
 
-            residual_hat = model.residual_dynamic(motor, state, dt, next_state_gt)
-            next_state_hat = model(state, motor, dt, residual_gt)
-
-            analysis1[i, :] = (next_state_gt - next_state_hat) ** 2
-            # analysis2[i, :] = next_state_hat
-            analysis3[i, :] = (residual_hat - residual_gt) ** 2
-        print(torch.mean(analysis1, dim=0))
-        # assert (torch.max(test, 0)[0] < 2.5e-7).all()
-
-    # Could adapt code with for_loader=False
-    data = euroc.EurocMAVDatasetHorizon("train", traj_len=21, dtype=torch.float32, for_loader=True)
-    sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("validation", traj_len=21, dtype=torch.float32, for_loader=True)
-    sanity_check(data)
-    data = euroc.EurocMAVDatasetHorizon("test", traj_len=21, dtype=torch.float32, for_loader=True)
-    sanity_check(data)
+        prediction = torch.cat(prediction, dim=0)[1:]  # First is not a prediction
+        error = ((prediction - state_gt) ** 2).mean(dim=1)
+        return error.mean(), error, prediction
 
 
-if __name__ == '__main__':
-    main()

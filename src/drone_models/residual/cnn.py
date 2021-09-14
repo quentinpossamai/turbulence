@@ -12,7 +12,8 @@ class CNNResidual(nn.Module, Run):
                  past: int,
                  unit_size: int,
                  activation: Callable,
-                 one_more_layer: bool,
+                 layer: int,
+                 embedding: str,
                  device,
                  log: Logger = None):
         """
@@ -21,7 +22,8 @@ class CNNResidual(nn.Module, Run):
         :param past: The number of past state and motor measures to use.
         :param unit_size: The size of one layer.
         :param activation: The activation function to use.
-        :param one_more_layer: One more layer with kernel 1x1 for more non linearity.
+        :param layer: Number of layer for the neural network.
+        :param embedding: Type of embedding to use.
         :param device: Cuda device to use.
         :param log: The logger to log training and validation error.
         """
@@ -30,18 +32,31 @@ class CNNResidual(nn.Module, Run):
         self.past = past
         self.unit_size = unit_size
         self.a = activation
-        self.one_more_layer = one_more_layer
+
+        layer_test = [2, 3]
+        assert layer in layer_test, f"embedding parameter must be one of the following values {layer_test}"
+        self.layer = layer
+
         self.device = device
+
+        emb_test = ["None", "depth", "norm", "both"]
+        assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
+        self.emb = embedding
+
         self.log = log
 
         self.optimizer = None
         self.motor_size = 6
         self.feature_size = 19
+        if self.emb in ["depth", "norm"]:
+            self.feature_size = self.feature_size + 128
+        elif self.emb in ["both"]:
+            self.feature_size = self.feature_size + 2 * 128
 
         # In shape (batch, channel=1, self.time_size, self.feature_size)
         self.conv2d0 = nn.Conv2d(in_channels=1, out_channels=unit_size, kernel_size=(1, self.feature_size),
                                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
-        if self.one_more_layer:
+        if self.layer == 3:
             self.conv2d1 = nn.Conv2d(in_channels=unit_size, out_channels=unit_size, kernel_size=(1, 1),
                                      stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         # In/Out shape (batch, channel=50, self.time_size, 1)
@@ -56,28 +71,34 @@ class CNNResidual(nn.Module, Run):
         """
         Estimate the residual = GT - model
         :param motor: (batch, step, values=6)
-        :param state: (batch, step, values=13)
+        :param state: (batch, step, values=13, 128+13 or 2*128+13)
         :param dt: (batch, step, values=1)
         :return: (batch, value=6)
         """
         batch_size = state.shape[0]
         state_motor = torch.cat([state, motor], dim=2).view(batch_size, 1, self.past, self.feature_size)
         out = self.a(self.conv2d0(state_motor))
-        if self.one_more_layer:
-            out = self.conv2d1(out)
+        if self.layer == 3:
+            out = self.a(self.conv2d1(out))
         out = self.conv2d_end(out)
         return out.squeeze()  # residual
 
     def _step(self, batch):
         """
         :param batch: {motor: (batch, time, 6), state: (batch, time, 13), residual: (batch, time, 6)}
-        :param batch_idx:
-        :return:
+        :return: Loss
         """
-        motor, state, dt, residual = (batch["motor"].to(self.device),
-                                      batch["state"].to(self.device),
-                                      torch.FloatTensor([[[1 / 200]]]),
-                                      batch["residual"].to(self.device))
+        motor = batch["motor"].to(self.device)
+        state = batch["state"].to(self.device)
+        dt = torch.FloatTensor([[[1 / 200]]])
+        residual = batch["residual"].to(self.device)
+        if self.emb in ["depth", "both"]:
+            depth_emb = batch["depth_emb"].to(self.device)
+            state = torch.cat([state, depth_emb], dim=-1)
+        if self.emb in ["norm", "both"]:
+            norm_emb = batch["norm_emb"].to(self.device)
+            state = torch.cat([state, norm_emb], dim=-1)
+
         # Look in past states
         residual_gt = residual[:, -1].to(self.device)
 
@@ -103,6 +124,7 @@ class CNNResidual(nn.Module, Run):
         return val_loss
 
     def rollout(self, motor, state, state_gt, horizon):
+        # TODO rework
         dt = torch.FloatTensor([[1 / 200]])
         # state_gt = state[:, -horizon - 1:]
 

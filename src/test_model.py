@@ -50,7 +50,7 @@ def plot_residual(model, residual_model, horizon, past, dataset, train_test_vali
     if dataset == "euroc_mav":
         traj_len = 3000
         data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
-                                            traj_len=traj_len, dtype=torch.float32, for_loader=False)
+                                            traj_len=traj_len, dtype=torch.float32, batch_dim=True)
         time = data[0]["t"].squeeze()
         state = data[0]["state"]
         dt = torch.FloatTensor([[1 / 200]]).unsqueeze(0)
@@ -88,7 +88,7 @@ def plot_residual(model, residual_model, horizon, past, dataset, train_test_vali
         name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
         ax.plot(time[past:], residual_gt[:, i], label=f"{name[i]} GT")
-        ax.plot(time[past:], residual_hat[:, i], label=f"{name[i]} hat")
+        ax.plot(time[past:], prediction[:, i], label=f"{name[i]} hat")  # TODO Check if prediction should be plotted
         ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
         ax.set_xlabel("Time [s]")
         ax.grid()
@@ -177,18 +177,38 @@ def main():
     # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
     #               train_test_validation="validation")
 
-    cnn_residual = "20210903_114943_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanhl3/9890_weights.pt"
-    cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
+    cnn_residual = "l3/"
+    # cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
     model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     past = 60
+    layer = 3
     weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    for old_key, new_key in [["conv2d1", "conv2d_end"]]:
+        weights[f"{new_key}.weight"] = weights.pop(f"{old_key}.weight")
+        weights[f"{new_key}.bias"] = weights.pop(f"{old_key}.bias")
     residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=torch.tanh,
-                                                           one_more_layer=False, device="cpu")
+                                                           layer=layer, embedding="None", device="cpu")
     residual_model.load_state_dict(weights)
     residual_model.eval()
     test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
                train_test_validation="test")
-    pass
+
+
+    # # Testing embeddings
+    # cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
+    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # past = 60
+    # layer = 2
+    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # for old_key, new_key in [["conv2d1", "conv2d_end"]]:
+    #     weights[f"{new_key}.weight"] = weights.pop(f"{old_key}.weight")
+    #     weights[f"{new_key}.bias"] = weights.pop(f"{old_key}.bias")
+    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=torch.tanh,
+    #                                                        layer=layer, embedding=None, device="cpu")
+    # residual_model.load_state_dict(weights)
+    # residual_model.eval()
+    # test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+    #            train_test_validation="test")
 
 
 if __name__ == '__main__':

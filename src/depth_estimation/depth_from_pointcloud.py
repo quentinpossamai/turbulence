@@ -18,7 +18,7 @@ from scipy import interpolate
 from tqdm import tqdm
 
 from src.utils.paths import WD_PATH
-from src.data.euroc_mav.loading import load_flight_for_depth, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH
+from src.data.euroc_mav.loading import load_flight, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH, TRANS_MEAN
 from src.utils.trajectory import trace_trajectory3d
 import src.utils.quaternion as quaternion
 from src.utils.transform import Transform
@@ -167,7 +167,9 @@ class GroundTruthInterpolator(object):
         """
 
         if type(filename) == int:
-            data = load_flight_for_depth(FLIGHT_LIST[filename])
+            flight = FLIGHT_LIST[filename]  # dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
+            data = load_flight(flight)
+            trans = data["state"][:, :3] + TRANS_MEAN[flight].reshape((1, 3))
             tf_vicon0_origin = Transform.from_quat_trans(data["state"][:, 3:7],
                                                          data["state"][:, :3]).inv().as_matrix()
             tf_origin_body = Transform.from_matrix(TF_BODY_VICON0 @ tf_vicon0_origin).inv().as_matrix()

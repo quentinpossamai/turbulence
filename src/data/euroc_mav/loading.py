@@ -2,43 +2,50 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
-from scipy import interpolate, signal
+from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
-from scipy.spatial.transform import Rotation
 import torch
 from torch.utils.data import Dataset
+import os
 
-from  src.utils.paths import WD_PATH
-from src.utils.transform import Transform
+from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+from src.utils.paths import WD_PATH
 import src.utils.paths
 from src.utils import quaternion
 
 # Path
 ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "euroc_mav_processing_data/"
 DATASET_PATH = src.utils.paths.WD_PATH + "data/euroc_mav/"
-RAW_DATASET_PATH = DATASET_PATH + f"raw_python/"
+RAW_PYTHON_DATASET_PATH = DATASET_PATH + f"raw_python/"
+RAW_DATASET_PATH = DATASET_PATH + f"raw/"
 INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
-src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_DATASET_PATH, INTERMEDIATE_DATASET_PATH])
+src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_PYTHON_DATASET_PATH,
+                                    INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 
-
 # FLIGHT_LIST = ["V2_01_easy/", "V2_02_medium/", "V2_03_difficult/"]
+TRANS_MEAN = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
+              "V1_02_medium/": np.array([0.00806092, 1.18968812, 1.60374988]),
+              "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
 
 
-def _load_clean_data(raw_flight_path, intermediate_flight_path):
+def load_clean_data(flight):
+    raw_python_flight_path = RAW_PYTHON_DATASET_PATH + flight
+    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
+    print("Loading", flight)
     # 1-LOADING DATA
     # dict_keys(['/cam1/image_raw__sensor_msgs/Image', '/vicon/firefly_sbx/firefly_sbx__geometry_msgs/TransformStamped',
     # '/fcu/motor_speed__asctec_hl_comm/MotorSpeed', '/cam0/image_raw__sensor_msgs/Image', '/fcu/imu__sensor_msgs/Imu',
     # '/imu0__sensor_msgs/Imu'])
-    raw = pickle.load(open(raw_flight_path + "data.pkl", "rb"), encoding="latin1")
+    raw = pickle.load(open(raw_python_flight_path + "data.pkl", "rb"), encoding="latin1")
 
     # 1.1-IMU Loading
     # dict_keys(['orientation_covariance', 'orientation', 'angular_velocity_covariance', 'nsecs',
     # 'linear_acceleration_covariance', 'frame_id', 'secs', 'linear_acceleration', 'angular_velocity'])
     imu_key = "/fcu/imu__sensor_msgs/Imu"  # '/imu0__sensor_msgs/Imu' also exist
-    orientation = np.array([raw[imu_key][i]["orientation"] for i in range(len(raw[imu_key]))])
+    # orientation = np.array([raw[imu_key][i]["orientation"] for i in range(len(raw[imu_key]))])
     orientation_covariance = np.array([raw[imu_key][i]["orientation_covariance"] for i in range(len(raw[imu_key]))])
     assert np.linalg.norm(orientation_covariance) == 0  # not usable
     ang_vel = np.array([raw[imu_key][i]["angular_velocity"] for i in range(len(raw[imu_key]))])
@@ -50,7 +57,10 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     frame_id = np.array([raw[imu_key][i]["frame_id"] for i in range(len(raw[imu_key]))])
     assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
     time = np.array([raw[imu_key][i]["secs"] + raw[imu_key][i]["nsecs"] * 1e-9 for i in range(len(raw[imu_key]))])
-    imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1)}
+    timestamp = np.array([raw[imu_key][i]["secs"] * int(1e9) +
+                          raw[imu_key][i]["nsecs"] for i in range(len(raw[imu_key]))])
+    assert (timestamp == sorted(timestamp)).all()
+    imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1), "timestamp": timestamp}
 
     # 1.2-MOTOR SPEED Loading
     # dict_keys(['frame_id', 'secs', 'motor_speed', 'nsecs'])
@@ -58,8 +68,10 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     frame_id = np.array([raw[ms_key][i]["frame_id"] for i in range(len(raw[ms_key]))])
     assert np.sum("fcu" == frame_id) == len(frame_id)  # All the time "fcu"
     time = np.array([raw[ms_key][i]["secs"] + raw[ms_key][i]["nsecs"] * 1e-9 for i in range(len(raw[ms_key]))])
+    timestamp = np.array([raw[ms_key][i]["secs"] * int(1e9) + raw[ms_key][i]["nsecs"] for i in range(len(raw[ms_key]))])
+    assert (timestamp == sorted(timestamp)).all()
     ms = np.array([raw[ms_key][i]["motor_speed"] for i in range(len(raw[ms_key]))], dtype=float)  # Assumed in rad/s
-    motor_dict = {"t": time, "motor": ms}
+    motor_dict = {"t": time, "motor": ms, "timestamp": timestamp}
 
     # 1.3-STATE Loading
     # dict_keys(['child_frame_id', 'nsecs', 'frame_id', 'secs', 'translation', 'rotation'])
@@ -68,34 +80,31 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # Check if it is all the time 'vicon/firefly_sbx/firefly_sbx'
     assert np.sum("vicon/firefly_sbx/firefly_sbx" == child_frame_id) == len(child_frame_id)
     time = np.array([raw[state_key][i]["secs"] + raw[state_key][i]["nsecs"] * 1e-9 for i in range(len(raw[state_key]))])
+    timestamp = np.array([raw[state_key][i]["secs"] * int(1e9) +
+                          raw[state_key][i]["nsecs"] for i in range(len(raw[state_key]))])
+    assert (timestamp == sorted(timestamp)).all()
     frame_id = np.array([raw[state_key][i]["frame_id"] for i in range(len(raw[state_key]))])
     assert np.sum("/world" == frame_id) == len(frame_id)  # All the time "/world"
     trans = np.array([raw[state_key][i]["translation"] for i in range(len(raw[state_key]))])
     quat = np.array([raw[state_key][i]["rotation"] for i in range(len(raw[state_key]))])  # x, y, z, w
-    pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1)}
+    pose_dict = {"t": time, "pose": np.concatenate([trans, quat], axis=1), "timestamp": timestamp}
 
-    # Check csv
-    filename = (WD_PATH + "data/euroc_mav/raw/" + FLIGHT_LIST[int(0)] +
-                "state_groundtruth_estimate0/data.csv")
-    with open(filename) as f:
-        lines = f.readlines()
-    lines = lines[1:]  # skip the first line
-
-    gt2 = []
-    for line in lines:
-        tokens = line.split(',')
-        gt2.append([float(t) for t in tokens[:8]])
-    gt2 = np.array(gt2)
-    # gt2 = quaternion.qfix(gt2[:, 4:8])
-
-
-    plt.plot(pose_dict["pose"][:, 3:7], label="rosbag")
-    plt.plot(gt2[:, 4:8], label="csv")
-    plt.legend()
-
-    1 / ((gt2[1:, 0] - gt2[:-1, 0]) * 10**-9).mean()
-
-
+    # 1.4-CAM0 image name loading
+    # dict_keys(['nsecs', 'image', 'step', 'height', 'width', 'secs', 'is_bigendian'])
+    cam0_key = '/cam0/image_raw__sensor_msgs/Image'
+    timestamp = np.array(sorted([int(e.removesuffix(".png"))
+                                 for e in os.listdir(f"{RAW_DATASET_PATH}{flight}/cam0/data/")]))
+    # time = np.array([raw[cam0_key][i]["secs"] + raw[cam0_key][i]["nsecs"] * 1e-9 for i in range(len(raw[cam0_key]))])
+    # image = np.array([raw[cam0_key][i]["image"] for i in range(len(raw[cam0_key]))])
+    step = np.array([raw[cam0_key][i]["step"] for i in range(len(raw[cam0_key]))])
+    assert (step == 752).all()  # step not use
+    height = np.array([raw[cam0_key][i]["height"] for i in range(len(raw[cam0_key]))])
+    assert (height == 480).all()  # height not use
+    width = np.array([raw[cam0_key][i]["width"] for i in range(len(raw[cam0_key]))])
+    assert (width == 752).all()  # width not use
+    is_bigendian = np.array([raw[cam0_key][i]["is_bigendian"] for i in range(len(raw[cam0_key]))])
+    assert is_bigendian.sum() == 0  # is_bigendian not use
+    cam0_dict = {"t": time, "timestamp": timestamp}
 
     # 2-DENOISING
     def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
@@ -129,10 +138,12 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     period = np.mean(imu_dict["t"][1:] - imu_dict["t"][:-1])
     den_imu_dict["t"] = (period * np.array(range(len(imu_dict["t"]))) + imu_dict["t"][0])  # Denoising IMU timestamp
     den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
+    den_imu_dict["timestamp"] = imu_dict["timestamp"]
 
-    # 2.3-Computing a denoised translation and quaternion.
+    # 2.3-Computing a denoised motion capture's translation and quaternion.
+    # 2.3.1-Initialization, normalization and centering
     # Body and World reference frame are in FLU! Nice!
-    den_pose_dict = {}
+    den_pose_dict = {"timestamp": pose_dict["timestamp"]}
     quat = pose_dict["pose"][:, 3:7]
     trans = pose_dict["pose"][:, :3]
     time = pose_dict["t"]
@@ -141,14 +152,14 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = quat / np.linalg.norm(quat, axis=1).reshape((-1, 1))  # Normalize quaternion
     quat = quaternion.qfix(quat)  # Fix quaternion swap in continuity
 
-    # Centering position  # TODO
-    # trans = trans - np.mean(trans, axis=0)
+    # Centering position
+    trans = trans - np.mean(trans, axis=0)
 
-    # Denoising timestamp
+    # 2.3.2 Denoising timestamp
     period = np.mean(time[1:] - time[:-1])
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
-    # Denoising quaternion
+    # 2.3.3-Denoising quaternion
     # den_quat = quat  # no denoising
     # Ideal denoising
     frequencies = fftfreq(n, d=period)
@@ -163,7 +174,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     #     den_quat[:, i] = signal.sosfilt(sos, quat[:, i])
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
 
-    # Denoising translation
+    # 2.3.4-Denoising translation
     # den_trans = trans  # no denoising
     # Ideal denoising
     fc_trans = 5  # Hz
@@ -177,34 +188,6 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # for i in range(3):
     #     den_trans[:, i] = signal.sosfilt(sos, trans[:, i])
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
-
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # ax.plot(motor_dict["t"] - motor_dict["t"][0], motor_dict["motor"][:, i], label="Raw")
-    # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor))), label="Ideal low pass")
-    # ax.plot(den_motor_dict["t"] - den_motor_dict["t"][0], den_motor_dict["motor"][:, i], label="Butterworth")
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Motor speed")
-
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # i = 0
-    # ax.plot(pose_dict["t"] - pose_dict["t"][0], quat, label="Raw")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0)), label="Ideal low pass")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], den_quat, label="Butterworth")
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Quaternion")
-    #
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # ax.plot(pose_dict["t"] - pose_dict["t"][0], trans, label="Raw")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0)), label="Ideal low pass")
-    # ax.plot(den_pose_dict["t"] - den_pose_dict["t"][0], den_trans, label="Butterworth")
-    # ax.legend()
-    # ax.grid()
-    # ax.set_xlabel("Time [s]")
-    # ax.set_ylabel("Translations [m]")
 
     # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0
@@ -223,17 +206,23 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
-    # 4.1.1-Spline interpolation
+    # 4.1.1-Spline interpolation method
+    # Imu
     imu_sync = np.zeros((len(den_motor_dict["t"]), 6))
     for i in range(6):
         rep = interpolate.splrep(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], k=5)
         imu_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+    # Motion capture
     pose_sync = np.zeros((len(den_motor_dict["t"]), 7))
     for i in range(7):
         rep = interpolate.splrep(den_pose_dict["t"], den_pose_dict["pose"][:, i], k=5)
         pose_sync[:, i] = interpolate.splev(den_motor_dict["t"], rep)
+    # Cam0
+    cam0_sync = np.zeros(len(den_motor_dict["timestamp"]), dtype=int)  # The timestamp of the image
+    for i, timestamp in enumerate(den_motor_dict["timestamp"]):
+        cam0_sync[i] = cam0_dict["timestamp"][np.abs(timestamp - cam0_dict["timestamp"]).argmin()]
 
-    # 4.1.2-Linear interpolation
+    # 4.1.2-Linear interpolation method
     # imu_sync = np.stack([interpolate.interp1d(den_imu_dict["t"], den_imu_dict["ang_acc"][:, i], bounds_error=False,
     #                                           fill_value=(den_imu_dict["ang_acc"][0, i],
     #                                                       den_imu_dict["ang_acc"][-1, i]))(
@@ -242,8 +231,8 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     #                                            fill_value=(den_pose_dict["pose"][0, i],
     #                                                        den_pose_dict["pose"][-1, i]))(
     #     den_motor_dict["t"]) for i in range(7)], axis=1)
-    syn = {"t": den_motor_dict["t"], "imu_ang_acc": imu_sync, "motor": den_motor_dict["motor"],
-           "pose": pose_sync}
+    syn = {"t": den_motor_dict["t"], "timestamp": den_motor_dict["timestamp"], "imu_ang_acc": imu_sync,
+           "motor": den_motor_dict["motor"], "pose": pose_sync, "cam0": cam0_sync}
 
     # 4.2-Setting initial parameters and normalizing quaternion
     syn["t"] = syn["t"] - syn["t"][0]
@@ -254,15 +243,16 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     quat = syn["pose"][:, 3:7]
     trans = syn["pose"][:, :3]
 
-    # 5.1 Compute angular velocity
-    # Derivative of the quaternion
+    # 5.1-Compute angular velocity
+    # 5.1.1-Derivative of the quaternion
     dquat = (quat[1:] - quat[:-1]) / dt  # Euler derivative
     dquat = np.concatenate([np.zeros((1, 4)), dquat], axis=0)
 
-    # 5.1.1 Quaternion multiplication method
+    # 5.1.2-Quaternion to angular velocity
+    # 5.1.2.1-Quaternion multiplication method
     ang_vel = 2. * quaternion.qmul_np(quat * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
 
-    # 5.1.2 Matrix method
+    # 5.1.2.2-Matrix method
     # dq_dt_convention = dquat[:, [3, 0, 1, 2]]
     # q0, q1, q2, q3 = (quat[:, 3], quat[:, 0], quat[:, 1], quat[:, 2])
     # g_matrix = np.array([[-q1, q0, q3, -q2],
@@ -273,7 +263,7 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     # print("mean: ", abs(ang_vel2 - ang_vel).mean())  # < 1e-17 with qmul product method from ref
     # print("std: ", abs(ang_vel2 - ang_vel).std())
 
-    # 5.1.3 With Lie exponential
+    # 5.1.2.3-With Lie exponential
     # https://math.stackexchange.com/questions/2282938/converting-from-quaternion-to-angular-velocity-then-back-to-quaternion
     # ang_vel3 = 2. * (quaternion.qmul_np(quat[:-1] * np.array([[-1, -1, -1, 1]]), quat[1:]))[:, :3] / dt
     # ang_vel3 = np.concatenate([np.zeros((1, 3)), ang_vel3], axis=0)
@@ -289,14 +279,71 @@ def _load_clean_data(raw_flight_path, intermediate_flight_path):
     dtrans = (trans[1:] - trans[:-1]) / dt  # Euler derivative
     dtrans = np.concatenate([np.zeros((1, 3)), dtrans], axis=0)
 
+    # 5.3 Merge and normalize
     syn["state"] = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
     del syn["pose"]
-
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
 
-    # save_path = intermediate_flight_path + "depth_data.pkl"
-    # pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
-    # pickle.dump(syn, open(save_path, "wb"))
+    # 6. Save dict as with pickle
+    pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
+    pickle.dump(syn, open(intermediate_flight_path + "data.pkl", "wb"))
+
+
+def euroc_mav_residual():
+    dtype = torch.float64
+    model = DynamicalModel(paper=False, dtype=dtype)
+    for flight in FLIGHT_LIST:
+        # Importing data
+        data = load_flight(flight)
+        # time = torch.from_numpy(data["t"][:-1])
+        motor = torch.from_numpy(data["motor"][1:])
+        dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
+        state = torch.from_numpy(data["state"][:-1])
+        next_state = torch.from_numpy(data["state"][1:])
+
+        # Test-1 Quaternion norm is 1 and standard deviation is 1e-18
+        # state[:, 3:7] = state[:, 3:7] / torch.norm(state[:, 3:7], dim=1).view(-1, 1)
+        # next_state[:, 3:7] = next_state[:, 3:7] / torch.norm(next_state[:, 3:7], dim=1).view(-1, 1)
+        norm = torch.norm(state[:, 3:7], dim=1)
+        print("Quaternion's norm mean: ", torch.mean(norm))
+        print("Quaternion's norm std: ", torch.std(norm))
+
+        # Test-2 integrating perfect derivative lead to perfect pose
+        assert abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10]).sum() == 0
+
+        # Computing residual
+        residual_torsor = model.residual_dynamic(motor=motor, state=state, dt=dt, next_state=next_state)
+        data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
+
+        # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
+
+        # Saving
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
+
+
+def merge_embeddings():
+    for flight in FLIGHT_LIST:
+        # Importing data
+        data = load_flight(flight)
+
+        # list[dict_keys(['timestamp', 'embedding', 'MSE', 'GradMSE'])]
+        depth_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}depth_embedding.pkl", "rb"))
+        assert (data["t"] == np.array(sorted([e["timestamp"] for e in depth_emb]))).all()
+        depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])
+        assert (data["t"] == np.array([e["timestamp"] for e in depth_emb])).all
+        data["depth_emb"] = np.array([e["embedding"].numpy().flatten() for e in depth_emb]).astype(float)
+
+        # list[dict_keys(['timestamp', 'embedding', 'MSE', 'CrossProduct'])]
+        norm_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}normal_embedding.pkl", "rb"))
+        assert (data["t"] == np.array(sorted([e["timestamp"] for e in norm_emb]))).all()
+        norm_emb = sorted(norm_emb, key=lambda x: x["timestamp"])
+        assert (data["t"] == np.array([e["timestamp"] for e in norm_emb])).all
+        data["norm_emb"] = np.array([e["embedding"].flatten() for e in norm_emb]).astype(float)
+
+        # Saving
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
 
 
 def splitting():
@@ -304,7 +351,9 @@ def splitting():
         for flight in FLIGHT_LIST:
             print("Splitting: ", flight)
             data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
-            assert all(np.array([len(data[key]) for key in data]) == len(data["t"]))  # All keys have the same length
+
+            assert all(np.array([len(data[key]) for key in data]) == len(data["t"])), f"All Data key must have same" \
+                                                                                      f" length"
             flight_len = len(data["t"])
             print(flight, flight_len)
 
@@ -321,16 +370,16 @@ def splitting():
 
 
 class EurocMAVDatasetHorizon(Dataset):
-    def __init__(self, train_validation_test: str, traj_len: int, dtype, for_loader: bool):
+    def __init__(self, train_validation_test: str, traj_len: int, dtype, batch_dim: bool):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
         :param traj_len: length of the trajectory to give each index
         :param dtype: Datatype of the model.
-        :param for_loader: If the Dataset will be used with a Dataloader or not.
+        :param batch_dim: If the Dataset will be used with a Dataloader or not.
         """
         assert dtype in [torch.float32, torch.float64]
-        self.for_loader = for_loader
+        self.batch_dim = batch_dim
         self.dtype = dtype
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -355,8 +404,13 @@ class EurocMAVDatasetHorizon(Dataset):
 
         # Loading data
         for key, val in loaded_data.items():
-            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)), val["state"], val["motor"], val["residual"]],
-                                              axis=1)
+            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)),  # len 1
+                                               val["state"],  # len 13
+                                               val["motor"],  # len 6
+                                               val["residual"],  # len6
+                                               val["depth_emb"],  # len 128
+                                               val["norm_emb"]  # len 128
+                                               ], axis=1)
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
         self.data = torch.from_numpy(self.data).type(self.dtype)
@@ -369,16 +423,22 @@ class EurocMAVDatasetHorizon(Dataset):
         # self.max_res = torch.tensor([4.07108498, 2.69354105, 2.62223434,
         #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
-        if self.for_loader:
-            self.get_func = lambda x: {"t": x[:, :1],
-                                       "state": x[:, 1:14],
-                                       "motor": x[:, 14:20],
-                                       "residual": x[:, 20:]}
-        else:
+        if self.batch_dim:
             self.get_func = lambda x: {"t": x[:, :1].view((1, -1, 1)),
                                        "state": x[:, 1:14].view((1, -1, 13)),
                                        "motor": x[:, 14:20].view((1, -1, 6)),
-                                       "residual": x[:, 20:].view((1, -1, 6))}
+                                       "residual": x[:, 20:26].view((1, -1, 6)),
+                                       "depth_emb": x[:, 26:154].view((1, -1, 128)),
+                                       "norm_emb": x[:, 154:282].view((1, -1, 128))}
+
+        else:
+            self.get_func = lambda x: {"t": x[:, :1],
+                                       "state": x[:, 1:14],
+                                       "motor": x[:, 14:20],
+                                       "residual": x[:, 20:26],
+                                       "depth_emb": x[:, 26:154],
+                                       "norm_emb": x[:, 154:282],
+                                       }
 
     def __len__(self):
         return self.cum_dataset_idx[-1]
@@ -398,35 +458,22 @@ class EurocMAVDatasetHorizon(Dataset):
 
 
 def load_flight(flight):
+    """
+    :param flight: The flight to from FLIGHT_LIST
+    :return: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
+    """
     #     data = {"t", "imu_ang_acc", "motor", "state"}
     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
     data = pickle.load(open(intermediate_flight_path, "rb"))
     return data
 
 
-def load_flight_for_depth(flight):
-    #     data = {"t", "imu_ang_acc", "motor", "state"}
-    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/depth_data.pkl"
-    data = pickle.load(open(intermediate_flight_path, "rb"))
-    return data
-
-
 def main():
-    # for flight in FLIGHT_LIST:
-    flight = FLIGHT_LIST[0]
-    raw_flight_path = RAW_DATASET_PATH + flight
-    intermediate_flight_path = INTERMEDIATE_DATASET_PATH + flight
-    print("Loading", flight)
-    _load_clean_data(raw_flight_path, intermediate_flight_path)
-    # splitting()
-
-    # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=False)
-    # # dict_keys(['t', 'state', 'motor', 'residual'])
-    # test = data[0]
-    #
-    # data = EurocMAVDatasetHorizon(train_validation_test="test", traj_len=10, dtype=torch.float32, for_loader=True)
-    # dataloader = torch.utils.data.DataLoader(data, batch_size=32, shuffle=False)
-    # batch = next(iter(dataloader))
+    for flight in FLIGHT_LIST:
+        load_clean_data(flight)
+    euroc_mav_residual()
+    merge_embeddings()
+    splitting()
 
 
 if __name__ == '__main__':

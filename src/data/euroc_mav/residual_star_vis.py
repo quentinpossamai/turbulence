@@ -42,42 +42,6 @@ def plot_residual_torsor(time, residual_torsor, title, xlim: tuple):
                                              'Avant Garde', 'sans-serif']})
 
 
-def euroc_mav_residual():
-    dtype = torch.float64
-    model = DynamicalModel(paper=False, dtype=dtype)
-    for flight in euroc.FLIGHT_LIST:
-        # Importing data
-        data = euroc.load_flight(flight)
-        time = torch.from_numpy(data["t"][:-1])
-        motor = torch.from_numpy(data["motor"][:-1])
-        dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
-        state = torch.from_numpy(data["state"][:-1])
-        next_state = torch.from_numpy(data["state"][1:])
-
-        # Test-1 Quaternion norm is 1 and standard deviation is 1e-18
-        # state[:, 3:7] = state[:, 3:7] / torch.norm(state[:, 3:7], dim=1).view(-1, 1)
-        # next_state[:, 3:7] = next_state[:, 3:7] / torch.norm(next_state[:, 3:7], dim=1).view(-1, 1)
-        norm = torch.norm(state[:, 3:7], dim=1)
-        print("Quaternion's norm mean: ", torch.mean(norm))
-        print("Quaternion's norm std: ", torch.std(norm))
-
-        # Test-2 integrating perfect derivative lead to perfect pose
-        assert abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10]).sum() == 0
-
-        # Computing residual
-        residual_torsor = model.residual_dynamic(motor, state, dt, next_state)
-        data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
-
-        # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
-
-        # Saving
-        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
-        pickle.dump(data, open(intermediate_flight_path, "wb"))
-        intermediate_flight_path = euroc.INTERMEDIATE_DATASET_PATH + f"{flight}/c-ideal.pkl"
-        pickle.dump({"butterworth": data["residual"]}, open(intermediate_flight_path, "wb"))
-    euroc.splitting()
-
-
 def _test_euroc():
     dtype = torch.float64
     model = DynamicalModel(paper=False, dtype=dtype)
@@ -85,7 +49,7 @@ def _test_euroc():
         # Importing data
         data = euroc.load_flight(flight)
         time = torch.from_numpy(data["t"][:-1]).type(dtype)
-        motor = torch.from_numpy(data["motor"][:-1]).type(dtype)
+        motor = torch.from_numpy(data["motor"][1:]).type(dtype)
         # dt = torch.from_numpy(data["t"][1:] - data["t"][:-1]).view(-1, 1)
         dt = torch.tensor([[1 / 200]], dtype=dtype)
         state = torch.from_numpy(data["state"][:-1]).type(dtype)
@@ -127,21 +91,21 @@ def _test_euroc_torch_dataset():
     for name in ["train", "validation", "test"]:
         dtype = torch.float64
         dataset = DataLoader(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype,
-                                                          for_loader=True),
+                                                          batch_dim=False),
                              batch_size=32, shuffle=True)
-        model = DynamicalModel(paper=False, dtype=dtype)
+        model = DynamicalModel(param="identification", dtype=dtype)
         dt = torch.tensor([[1 / 200]], dtype=dtype)
         next_state_hat, next_state_gt = [], []
         residual_hat, residual_gt = [], []
-        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype, for_loader=True))
+        n = len(euroc.EurocMAVDatasetHorizon(train_validation_test=name, traj_len=21, dtype=dtype, batch_dim=False))
         print("len: ", n)
         print()
         for e in dataset:
             # next_state_hat = model(state, motor, dt, residual_torsor)
-            next_state_hat.append(model(e["motor"][:, -2], e["state"][:, -2], dt, e["residual"][:, -1]))
+            next_state_hat.append(model(e["motor"][:, -1], e["state"][:, -2], dt, e["residual"][:, -1]))
             next_state_gt.append(e["state"][:, -1])
 
-            residual_hat.append(model.residual_dynamic(e["motor"][:, -2], e["state"][:, -2], dt, e["state"][:, -1]))
+            residual_hat.append(model.residual_dynamic(e["motor"][:, -1], e["state"][:, -2], dt, e["state"][:, -1]))
             residual_gt.append(e["residual"][:, -1])
 
         next_state_hat = torch.cat(next_state_hat, dim=0)
@@ -199,8 +163,10 @@ def compare_denoising():
         ax.set_ylabel("Fa [m/s2]")
 
 
+def main():
+    _test_euroc()
+    _test_euroc_torch_dataset()
+
+
 if __name__ == '__main__':
-    # euroc_mav_residual()
-    # _test_euroc()
-    # _test_euroc_torch_dataset()
-    compare_denoising()
+    main()

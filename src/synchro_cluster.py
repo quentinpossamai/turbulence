@@ -11,3 +11,6 @@ tensorboard_cmd = f"tensorboard --logdir /Users/quentin/phd/turbulence/analysis/
                   "training/ --load_fast=false --samples_per_plugin scalars=999999999"
 print(tensorboard_cmd)
 # os.system(tensorboard_cmd)
+
+# Synchronise data from mac to cluster
+# rsync -av ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/

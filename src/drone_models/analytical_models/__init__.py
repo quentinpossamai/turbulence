@@ -1,2 +1,0 @@
-import src.drone_models.analytical_models.hexarotor_4params
-import src.drone_models.analytical_models.quadrotor_4parms
