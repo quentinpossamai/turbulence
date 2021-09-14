@@ -50,7 +50,7 @@ def integrate(state, imu, dt):
     next_speed = speed + dt * sensor_acc
     next_position = position + dt * next_speed
 
-    next_state = np.concatenate([next_position, next_quaternion, next_speed, sensor_rpy])
+    next_state = np.concatenate([next_position, next_quaternion, next_speed, sensor_rpy, sensor_acc])
     return next_state
 
 
@@ -95,55 +95,65 @@ if __name__ == '__main__':
         data = load_flight(FLIGHT_LIST[k])
 
         START = 10_000
-        LENGTH = 10_000
+        LENGTH = 5_000
         time = data["t"][START:START + LENGTH]
         dt = (time[1:] - time[:-1]).mean()
         state = data["state"][START:START + LENGTH]
         imu = data["imu_ang_acc"][START:START + LENGTH]
 
-        pi_rotation = Rotation.from_euler("zyx", np.array([np.pi/2, 0, np.pi]), degrees=False)
+        pi_rotation = Rotation.from_euler("zyx", np.array([np.pi / 2, 0, np.pi]), degrees=False)
         imu_rpy = pi_rotation.apply(imu[:, :3])
         # imu_rpy = imu_rpy[:, [1, 0, 2]] * np.array([1, -1, 1])
         imu_acc = pi_rotation.apply(imu[:, 3:])
         # imu_acc = imu_acc[:, [1, 0, 2]] * np.array([1, -1, 1])
         imu = np.concatenate([imu_rpy, imu_acc], axis=-1)
 
+        acc = np.concatenate([np.zeros((1, 3)), (state[1:, 7:10] - state[:-1, 7:10]) / dt], axis=0)
+        state = np.concatenate([state, acc], axis=-1)
         integration = [state[0]]
         for k in range(time.shape[0] - 1):
             integration.append(integrate(integration[-1], imu[k], dt))
 
-        integration = np.array(integration)
+        integration = np.stack(integration, axis=0)
         # orientation_check(state[:, 3:7], integration)
 
         fig, ax = plt.subplots(3, 1)
         for k in range(3):
-            ax[k].plot(time, state[:, k], label='mocap')
             ax[k].plot(time, integration[:, k], label='IMU')
+            ax[k].plot(time, state[:, k], label='mocap')
             ax[k].set_title("p_" + str(k))
             ax[k].legend(frameon=True)
         fig.tight_layout()
 
         fig, ax = plt.subplots(4, 1)
         for k in range(4):
-            ax[k].plot(time, state[:, 3 + k], label='mocap')
             ax[k].plot(time, integration[:, 3 + k], label='IMU')
+            ax[k].plot(time, state[:, 3 + k], label='mocap')
             ax[k].set_title("Q_" + str(k))
             ax[k].legend(frameon=True)
         fig.tight_layout()
 
         fig, ax = plt.subplots(3, 1)
         for k in range(3):
-            ax[k].plot(time, state[:, 7 + k], label='mocap')
             ax[k].plot(time, integration[:, 7 + k], label='IMU')
+            ax[k].plot(time, state[:, 7 + k], label='mocap')
             ax[k].set_title("V_" + str(k))
             ax[k].legend(frameon=True)
         fig.tight_layout()
 
         fig, ax = plt.subplots(3, 1)
         for k in range(3):
-            ax[k].plot(time, state[:, 10 + k], label='mocap')
             ax[k].plot(time, integration[:, 10 + k], label='IMU')
+            ax[k].plot(time, state[:, 10 + k], label='mocap')
             ax[k].set_title("w_" + str(k))
+            ax[k].legend(frameon=True)
+        fig.tight_layout()
+
+        fig, ax = plt.subplots(3, 1)
+        for k in range(3):
+            ax[k].plot(time, integration[:, 13 + k], label='IMU')
+            ax[k].plot(time, acc[:, k], label='mocap')
+            ax[k].set_title("a_" + str(k))
             ax[k].legend(frameon=True)
         fig.tight_layout()
 
