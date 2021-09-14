@@ -370,16 +370,16 @@ def splitting():
 
 
 class EurocMAVDatasetHorizon(Dataset):
-    def __init__(self, train_validation_test: str, traj_len: int, dtype, for_loader: bool):
+    def __init__(self, train_validation_test: str, traj_len: int, dtype, batch_dim: bool):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
         :param traj_len: length of the trajectory to give each index
         :param dtype: Datatype of the model.
-        :param for_loader: If the Dataset will be used with a Dataloader or not.
+        :param batch_dim: If the Dataset will be used with a Dataloader or not.
         """
         assert dtype in [torch.float32, torch.float64]
-        self.for_loader = for_loader
+        self.batch_dim = batch_dim
         self.dtype = dtype
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
@@ -423,7 +423,15 @@ class EurocMAVDatasetHorizon(Dataset):
         # self.max_res = torch.tensor([4.07108498, 2.69354105, 2.62223434,
         #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
-        if self.for_loader:
+        if self.batch_dim:
+            self.get_func = lambda x: {"t": x[:, :1].view((1, -1, 1)),
+                                       "state": x[:, 1:14].view((1, -1, 13)),
+                                       "motor": x[:, 14:20].view((1, -1, 6)),
+                                       "residual": x[:, 20:26].view((1, -1, 6)),
+                                       "depth_emb": x[:, 26:154].view((1, -1, 128)),
+                                       "norm_emb": x[:, 154:282].view((1, -1, 128))}
+
+        else:
             self.get_func = lambda x: {"t": x[:, :1],
                                        "state": x[:, 1:14],
                                        "motor": x[:, 14:20],
@@ -431,13 +439,6 @@ class EurocMAVDatasetHorizon(Dataset):
                                        "depth_emb": x[:, 26:154],
                                        "norm_emb": x[:, 154:282],
                                        }
-        else:
-            self.get_func = lambda x: {"t": x[:, :1].view((1, -1, 1)),
-                                       "state": x[:, 1:14].view((1, -1, 13)),
-                                       "motor": x[:, 14:20].view((1, -1, 6)),
-                                       "residual": x[:, 20:26].view((1, -1, 6)),
-                                       "depth_emb": x[:, 26:154].view((1, -1, 128)),
-                                       "norm_emb": x[:, 154:282].view((1, -1, 128))}
 
     def __len__(self):
         return self.cum_dataset_idx[-1]

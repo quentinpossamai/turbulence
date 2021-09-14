@@ -6,17 +6,20 @@ import src.utils.quaternion as quaternion
 
 
 class DynamicalModel(nn.Module):
-    def __init__(self, paper, dtype):
+    def __init__(self, param, dtype):
         """
-        :param paper: True, load paper parameters. False, load mse parameters
+        :param param: "paper", "identification", or dict["permutation", "theta"]
         :param dtype: Datatype of the model.
         """
         super(DynamicalModel, self).__init__()
         assert dtype in [torch.float32, torch.float64]
         self.dtype = dtype
+        msg = '''"paper", "identification", or dict["permutation", "theta"]'''
+        assert param in ["paper", "identification"] or list(param.keys()) == ["permutation", "theta"], msg
+
         # Point: 6
         self.permutation = [5, 0, 1, 2, 3, 4]
-        if paper:
+        if param == "paper":
             # # Paper parameters from
             # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
             # Redundancy’
@@ -34,14 +37,18 @@ class DynamicalModel(nn.Module):
                                        [1.4064e-04],
                                        [1.5881e-05],
                                        [8.0943e-01]], dtype=self.dtype)
-        else:
+        elif param == "identification":
             self.theta = torch.tensor([[1.1566750e-04],
                                        [6.9880742e-04],
                                        [-5.1250136e-05],
                                        [2.6935432e+00]], dtype=self.dtype)  # MSE
+        else:
+            self.theta = param["theta"]
+            self.permutation = param["permutation"]
 
     def forward(self, motor, state, dt, residual=None):
         """
+        All have shape (time, values)
         :param motor: t+1
         :param state: t
         :param dt: = t+1 - t
@@ -125,3 +132,23 @@ class DynamicalModel(nn.Module):
         ktaua = (ang_acc - torch.cross(t3_tensor * ang_vel, ang_vel, dim=-1)
                  - t12_tensor * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1)
+
+    def rollout(self, motor, state, horizon):
+        assert horizon + 1 == len(state)
+        assert horizon + 1 == len(motor)
+        assert len(state.shape) == 2  # (horizon, value=13)
+        state_gt = state[:, 1:]
+
+        dt = torch.FloatTensor([[1 / 200]])
+
+        with torch.no_grad():
+            # Prediction rollout
+            prediction = [state[:, 0]]
+            for i in range(horizon):
+                next_state = self.forward(motor=motor[:, i+1], state=prediction[:, -1], dt=dt)
+                prediction.append(next_state)
+
+        prediction = torch.stack(prediction, dim=1)[:, 1:]  # First is not a prediction
+        error = ((prediction - state_gt) ** 2).mean()
+        return error, prediction
+

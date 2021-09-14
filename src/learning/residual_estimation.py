@@ -85,13 +85,13 @@ def main():
     # Datasets
     train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
-                                                   for_loader=True),
+                                                   batch_dim=False),
                             batch_size=args.batch_size, shuffle=True)
 
     validation_data = DataLoader(EurocMAVDatasetHorizon("validation",
                                                         traj_len=args.past + args.horizon,
                                                         dtype=torch.float32,
-                                                        for_loader=True),
+                                                        batch_dim=False),
                                  batch_size=args.batch_size, shuffle=True)
     # num_workers=1, pin_memory=True
 

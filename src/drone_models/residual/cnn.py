@@ -124,6 +124,7 @@ class CNNResidual(nn.Module, Run):
         return val_loss
 
     def rollout(self, motor, state, state_gt, horizon):
+        # TODO rework
         dt = torch.FloatTensor([[1 / 200]])
         # state_gt = state[:, -horizon - 1:]
 

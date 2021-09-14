@@ -50,7 +50,7 @@ def plot_residual(model, residual_model, horizon, past, dataset, train_test_vali
     if dataset == "euroc_mav":
         traj_len = 3000
         data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
-                                            traj_len=traj_len, dtype=torch.float32, for_loader=False)
+                                            traj_len=traj_len, dtype=torch.float32, batch_dim=True)
         time = data[0]["t"].squeeze()
         state = data[0]["state"]
         dt = torch.FloatTensor([[1 / 200]]).unsqueeze(0)
