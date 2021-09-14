@@ -117,45 +117,36 @@ if __name__ == '__main__':
         integration = np.stack(integration, axis=0)
         # orientation_check(state[:, 3:7], integration)
 
-        fig, ax = plt.subplots(3, 1)
+        fig, ax = plt.subplots(4, 4)
+        label = ["X", "Y", "Z"]
         for k in range(3):
-            ax[k].plot(time, integration[:, k], label='IMU')
-            ax[k].plot(time, state[:, k], label='mocap')
-            ax[k].set_title("p_" + str(k))
-            ax[k].legend(frameon=True)
-        fig.tight_layout()
+            ax[0][k].plot(time, state[:, k], label="gt")
+            ax[0][k].plot(time, integration[:, k], label="pred")
+            ax[0][k].set_title(label[k])
+            ax[0][k].legend()
 
-        fig, ax = plt.subplots(4, 1)
+        label = ["Qx", "Qy", "Qz", "Qw"]
         for k in range(4):
-            ax[k].plot(time, integration[:, 3 + k], label='IMU')
-            ax[k].plot(time, state[:, 3 + k], label='mocap')
-            ax[k].set_title("Q_" + str(k))
-            ax[k].legend(frameon=True)
-        fig.tight_layout()
+            ax[1][k].plot(time, state[:, 3 + k], label="gt")
+            ax[1][k].plot(time, integration[:, 3 + k], label="pred")
+            ax[1][k].set_title(label[k])
+            ax[1][k].legend()
 
-        fig, ax = plt.subplots(3, 1)
+        label = ["Vx", "Vy", "Vz"]
         for k in range(3):
-            ax[k].plot(time, integration[:, 7 + k], label='IMU')
-            ax[k].plot(time, state[:, 7 + k], label='mocap')
-            ax[k].set_title("V_" + str(k))
-            ax[k].legend(frameon=True)
-        fig.tight_layout()
+            ax[2][k].plot(time, state[:, k + 7], label="gt")
+            ax[2][k].plot(time, integration[:, k + 7], label="pred")
+            ax[2][k].set_title(label[k])
+            ax[2][k].legend()
 
-        fig, ax = plt.subplots(3, 1)
+        label = ["Wx", "Wy", "Wz"]
         for k in range(3):
-            ax[k].plot(time, integration[:, 10 + k], label='IMU')
-            ax[k].plot(time, state[:, 10 + k], label='mocap')
-            ax[k].set_title("w_" + str(k))
-            ax[k].legend(frameon=True)
+            ax[3][k].plot(time, state[:, k + 10], label="gt")
+            ax[3][k].plot(time, integration[:, k + 10], label="pred")
+            ax[3][k].set_title(label[k])
+            ax[3][k].legend()
         fig.tight_layout()
-
-        fig, ax = plt.subplots(3, 1)
-        for k in range(3):
-            ax[k].plot(time, integration[:, 13 + k], label='IMU')
-            ax[k].plot(time, acc[:, k], label='mocap')
-            ax[k].set_title("a_" + str(k))
-            ax[k].legend(frameon=True)
-        fig.tight_layout()
+        plt.show()
 
         # plt.plot(integration)
         plt.show()

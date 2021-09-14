@@ -175,7 +175,7 @@ class KalmanFiltering(nn.Module):
                                [-2.7257e-07, 8.9331e-08, 3.0950e-07, -4.8284e-08, -1.6453e-07,
                                 -7.7208e-08, 1.2967e-07, -5.0812e-05, 7.3901e-06, 1.1143e-04,
                                 -6.8889e-05, -2.8575e-04, -4.8981e-05, -1.8277e-02, 2.6573e-03,
-                                4.0088e-02]]) * 1e3
+                                4.0088e-02]])
         R = torch.FloatTensor([[8.6052e-03, -4.3617e-04, 3.9815e-05, 2.1549e-04, 7.8445e-06, -6.7628e-04],
                                [-4.3617e-04, 6.6174e-03, 1.4289e-04, -1.8307e-03, 6.2787e-04, 1.1476e-03],
                                [3.9815e-05, 1.4289e-04, 5.9638e-04, 5.8608e-04, 2.1002e-04, -3.1699e-04],
@@ -212,52 +212,45 @@ if __name__ == '__main__':
 
     flights = [load_flight(FLIGHT_LIST[k]) for k in range(len(FLIGHT_LIST))][4:]
 
-    f = DynamicalModel()
-    e = []
-    for k in range(4, len(FLIGHT_LIST)):
-        data = load_flight(FLIGHT_LIST[k])
-        state = torch.FloatTensor(data["state"])
-        time = torch.FloatTensor(data["t"])
-        dt = (time[1:] - time[:-1]).mean()
+    # f = DynamicalModel()
+    # e = []
+    # for k in range(4, len(FLIGHT_LIST)):
+    #     data = load_flight(FLIGHT_LIST[k])
+    #     state = torch.FloatTensor(data["state"])
+    #     time = torch.FloatTensor(data["t"])
+    #     dt = (time[1:] - time[:-1]).mean()
+    #
+    #     acc = torch.cat([torch.zeros(1, 3), (state[1:, 7:10] - state[:-1, 7:10]) / dt], dim=0)
+    #     state = torch.cat([state, acc], dim=-1)
+    #
+    #     motor = torch.FloatTensor(data["motor"])
+    #     imu = data["imu_ang_acc"]
+    #
+    #     pi_rotation = Rotation.from_euler("zyx", np.array([np.pi / 2, 0, np.pi]), degrees=False)
+    #     imu_rpy = pi_rotation.apply(imu[:, :3])
+    #     imu_acc = pi_rotation.apply(imu[:, 3:])
+    #     imu = torch.FloatTensor(np.concatenate([imu_rpy, imu_acc], axis=-1))
+    #
+    #     pred_next_state, ang_acc = f(state[:-1], motor[1:], dt)
+    #     # e.append(state)
+    #     fig, ax = plt.subplots(3, 1)
+    #     for i in range(3):
+    #         ax[i].plot(state[1001:1111, 13 + i], marker=".", label="Mocap")
+    #         ax[i].plot(pred_next_state[1001:1111, i + 13], marker=".", label="Model")
+    #         ax[i].legend()
+    #         ax[i].set_title("Acceleration " + str(i))
+    #
+    #     fig, ax = plt.subplots(3, 1)
+    #     s = torch.cat([torch.zeros(1, 3), (state[1:, 10:13] - state[:-1, 10:13]) / dt], dim=0)
+    #     for i in range(3):
+    #         ax[i].plot(s[1001:1111, i], marker=".", label="Mocap")
+    #         ax[i].plot(ang_acc[1001:1111, i], marker=".", label="Model")
+    #         ax[i].legend()
+    #         ax[i].set_title("Acc Angle " + str(i))
+    #     plt.show()
 
-        acc = torch.cat([torch.zeros(1, 3), (state[1:, 7:10] - state[:-1, 7:10]) / dt], dim=0)
-        state = torch.cat([state, acc], dim=-1)
+    # e.append((state[1:] - pred_next_state).detach().numpy())
 
-        motor = torch.FloatTensor(data["motor"])
-        imu = data["imu_ang_acc"]
-
-        pi_rotation = Rotation.from_euler("zyx", np.array([np.pi / 2, 0, np.pi]), degrees=False)
-        imu_rpy = pi_rotation.apply(imu[:, :3])
-        imu_acc = pi_rotation.apply(imu[:, 3:])
-        imu = torch.FloatTensor(np.concatenate([imu_rpy, imu_acc], axis=-1))
-
-        pred_next_state = f(state[:-1], motor[1:], dt)
-        # e.append(state)
-        fig, ax = plt.subplots(3, 1)
-        for i in range(3):
-            ax[i].plot(state[1001:1111, 13+i], marker=".", label="Mocap")
-            ax[i].plot(pred_next_state[1001:1111, i + 13], marker=".", label="Model")
-            ax[i].legend()
-            ax[i].set_title("Acceleration "+str(i))
-
-        fig, ax = plt.subplots(3, 1)
-        for i in range(3):
-            ax[i].plot(state[1001:1111, 10 + i], marker=".", label="Mocap")
-            ax[i].plot(pred_next_state[1001:1111, i + 10], marker=".", label="Model")
-            ax[i].legend()
-            ax[i].set_title("RPY " + str(i))
-        plt.show()
-
-        # e.append((state[1:] - pred_next_state).detach().numpy())
-
-    e = np.concatenate(e, axis=0)
-    print(torch.FloatTensor(e.std(axis=0)))
-    print(e.max(axis=0) - e.min(axis=0))
-    print(e.mean(axis=0))
-    Q = np.cov(e.transpose())
-    torch.set_printoptions(precision=4)
-    print(torch.FloatTensor(Q))
-    input()
     for k in range(4, len(FLIGHT_LIST)):
         data = load_flight(FLIGHT_LIST[k])
         START = 10_000
@@ -279,14 +272,33 @@ if __name__ == '__main__':
 
         pred = model(state[0], imu, motor, dt)
 
-        fig, ax = plt.subplots(7, 2)
-        for k in range(7):
-            ax[k][0].plot(time, state[:, k], label="gt")
-            ax[k][0].plot(time, pred[:, k], label="pred")
-            ax[k][0].legend()
-        for k in range(6):
-            ax[k][1].plot(time, state[:, 7 + k], label="gt")
-            ax[k][1].plot(time, pred[:, 7 + k], label="pred")
-            ax[k][1].legend()
+        fig, ax = plt.subplots(4, 4)
+        label = ["X", "Y", "Z"]
+        for k in range(3):
+            ax[0][k].plot(time, state[:, k], label="gt")
+            ax[0][k].plot(time, pred[:, k], label="pred")
+            ax[0][k].set_title(label[k])
+            ax[0][k].legend()
+
+        label = ["Qx", "Qy", "Qz", "Qw"]
+        for k in range(4):
+            ax[1][k].plot(time, state[:, 3 + k], label="gt")
+            ax[1][k].plot(time, pred[:, 3 + k], label="pred")
+            ax[1][k].set_title(label[k])
+            ax[1][k].legend()
+
+        label = ["Vx", "Vy", "Vz"]
+        for k in range(3):
+            ax[2][k].plot(time, state[:, k + 7], label="gt")
+            ax[2][k].plot(time, pred[:, k + 7], label="pred")
+            ax[2][k].set_title(label[k])
+            ax[2][k].legend()
+
+        label = ["Wx", "Wy", "Wz"]
+        for k in range(3):
+            ax[3][k].plot(time, state[:, k + 10], label="gt")
+            ax[3][k].plot(time, pred[:, k + 10], label="pred")
+            ax[3][k].set_title(label[k])
+            ax[3][k].legend()
         fig.tight_layout()
         plt.show()
