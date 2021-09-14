@@ -18,7 +18,7 @@ class DynamicalModel(nn.Module):
         assert param in ["paper", "identification"] or list(param.keys()) == ["permutation", "theta"], msg
 
         # Point: 6
-        self.permutation = [5, 0, 1, 2, 3, 4]
+        self.permutation = [0, 1, 2, 3, 4, 5]
         if param == "paper":
             # # Paper parameters from
             # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
@@ -38,10 +38,10 @@ class DynamicalModel(nn.Module):
                                        [1.5881e-05],
                                        [8.0943e-01]], dtype=self.dtype)
         elif param == "identification":
-            self.theta = torch.tensor([[1.1566750e-04],
-                                       [6.9880742e-04],
-                                       [-5.1250136e-05],
-                                       [2.6935432e+00]], dtype=self.dtype)  # MSE
+            self.theta = torch.tensor([[1.14061868e-04],
+                                        [2.35845582e-04],
+                                        [2.90530320e-05],
+                                        [2.52134583e+00]], dtype=self.dtype)  # MSE
         else:
             self.theta = param["theta"]
             self.permutation = param["permutation"]
@@ -137,18 +137,20 @@ class DynamicalModel(nn.Module):
         assert horizon + 1 == len(state)
         assert horizon + 1 == len(motor)
         assert len(state.shape) == 2  # (horizon, value=13)
-        state_gt = state[:, 1:]
+        state_gt = state[1:]
 
         dt = torch.FloatTensor([[1 / 200]])
 
         with torch.no_grad():
             # Prediction rollout
-            prediction = [state[:, 0]]
+            prediction = [state[0].unsqueeze(0)]
             for i in range(horizon):
-                next_state = self.forward(motor=motor[:, i+1], state=prediction[:, -1], dt=dt)
+                next_state = self.forward(motor=motor[i+1].unsqueeze(0),
+                                          state=prediction[-1], dt=dt)
                 prediction.append(next_state)
 
-        prediction = torch.stack(prediction, dim=1)[:, 1:]  # First is not a prediction
-        error = ((prediction - state_gt) ** 2).mean()
-        return error, prediction
+        prediction = torch.cat(prediction, dim=0)[1:]  # First is not a prediction
+        error = ((prediction - state_gt) ** 2).mean(dim=1)
+        return error.mean(), error, prediction
+
 
