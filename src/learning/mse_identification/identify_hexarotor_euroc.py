@@ -153,7 +153,7 @@ def plot_rollout():
     for i, param in enumerate(param_range):
         error_tab[i, :] = param["rollout_error"]
         rank_tab[i, :] = torch.tensor(param["rank"])
-
+    # TODO solve shape error
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=100)
     for i, is_at_some_point_top in enumerate((rank_tab < 1).any(dim=1)):
         if is_at_some_point_top:
