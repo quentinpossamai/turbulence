@@ -14,6 +14,3 @@ print(tensorboard_cmd)
 
 # Synchronise data from mac to cluster
 # rsync -av ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/
-
-#  sudo openconnect --user=<VPN username> --cafile=<.pem file from step 4.3> <your vpn hostname>
-# sudo openconnect --user=qpossamai@insa-lyon.fr --protocol=gp sslvpn.cisr.fr

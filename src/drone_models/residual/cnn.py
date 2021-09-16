@@ -34,12 +34,12 @@ class CNNResidual(nn.Module, Run):
         self.a = activation
 
         layer_test = [2, 3]
-        assert layer in layer_test, f"embedding parameter must be one of the following values {layer_test}"
+        assert layer in layer_test, f"layer parameter must be one of the following values {layer_test}"
         self.layer = layer
 
         self.device = device
 
-        emb_test = ["None", "depth", "norm", "both"]
+        emb_test = ["none", "depth", "norm", "both"]
         assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
         self.emb = embedding
 
