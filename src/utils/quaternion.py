@@ -6,7 +6,7 @@ Quaternion is in x, y, z, w shape.
 """
 import numpy as np
 import random
-from scipy.spatial.transform import Rotation
+# from scipy.spatial.transform import Rotation
 import torch
 
 
@@ -17,8 +17,8 @@ def qmul(q, r):
     Returns q*r as a tensor of shape (*, 4).
     Quaternion is in x, y, z, w convention.
     """
-    assert q.shape[-1] == 4
-    assert r.shape[-1] == 4
+    assert q.shape[-1] == 4 or (q.shape[-2] == 4 and q.shape[-1] == 1)
+    assert r.shape[-1] == 4 or (r.shape[-2] == 4 and r.shape[-1] == 1)
 
     original_shape = q.shape
 
@@ -39,13 +39,13 @@ def qrot(q, v):
     where * denotes any number of dimensions. q in x, y, z, w convention.
     Returns a tensor of shape (*, 3).
     """
-    assert q.shape[-1] == 4
-    assert v.shape[-1] == 3
-    assert q.shape[:-1] == v.shape[:-1]
+    assert q.shape[-1] == 4 or (q.shape[-2] == 4 and q.shape[-1] == 1)
+    assert v.shape[-1] == 3 or (v.shape[-2] == 3 and v.shape[-1] == 1)
 
     original_shape = list(v.shape)
     q = q.view(-1, 4)
     v = v.view(-1, 3)
+    assert q.shape[0] == v.shape[0]
 
     qvec = q[:, :-1]
     uv = torch.cross(qvec, v, dim=1)
@@ -296,8 +296,10 @@ def _test_qmul():
     assert norm_error.mean() < 1e-16
     assert norm_error.std() < 1e-15
 
-    vect_prime = qmul(qmul(torch.DoubleTensor([[-1, -1, -1, 1]]) * quat_a, torch.cat([vect, torch.zeros(len(vect), 1)], dim=1)), quat_a)[:, :3]
-    vect_hat = qmul(qmul(quat_a, torch.cat([vect_prime, torch.zeros(len(vect_prime), 1)], dim=1)), torch.DoubleTensor([[-1, -1, -1, 1]]) * quat_a)[:, :3]
+    vect_prime = qmul(qmul(torch.DoubleTensor([[-1, -1, -1, 1]]) *
+                           quat_a, torch.cat([vect, torch.zeros(len(vect), 1)], dim=1)), quat_a)[:, :3]
+    vect_hat = qmul(qmul(quat_a, torch.cat([vect_prime, torch.zeros(len(vect_prime), 1)], dim=1)),
+                    torch.DoubleTensor([[-1, -1, -1, 1]]) * quat_a)[:, :3]
     assert abs(vect - vect_hat).mean() < 1e-15
     assert abs(vect - vect_hat).std() < 1e-15
 
