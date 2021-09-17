@@ -18,8 +18,8 @@ from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 ANALYSIS_PATH = f"{GENERAL_ANALYSIS_PATH}euroc_identification/"
 mkdir_if_not_exist([ANALYSIS_PATH])
 
-DT = 1 / 200
 DTYPE = torch.float64
+DT = torch.tensor([[1 / 200]], dtype=DTYPE)
 
 coef1 = 0.5
 coef2 = 3 ** 0.5 / 2
@@ -100,7 +100,7 @@ def rollout():
     for i, param in enumerate(tqdm(param_range)):
         permutation, theta = param["permutation"], param["theta"]
         model = DynamicalModel(param={"permutation": permutation, "theta": theta}, dtype=torch.float64)
-        _, rollout_error, _ = model.rollout(motor=motor_roll, state=state_roll, horizon=max_horizon)
+        _, rollout_error, _ = model.rollout(motor=motor_roll, state=state_roll, horizon=max_horizon, dt=DT)
         param_range[i]["rollout_error"] = rollout_error
 
     for j, horizon in enumerate(tqdm(horizon_range)):

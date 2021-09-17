@@ -11,7 +11,7 @@ class DynamicalModel(nn.Module):
         :param param: "paper", "identification", or dict["permutation", "theta"]
         :param dtype: Datatype of the model.
         """
-        super(DynamicalModel, self).__init__()
+        super().__init__()
         assert dtype in [torch.float32, torch.float64]
         self.dtype = dtype
         msg = '''"paper", "identification", or dict["permutation", "theta"]'''
@@ -39,9 +39,9 @@ class DynamicalModel(nn.Module):
                                        [8.0943e-01]], dtype=self.dtype)
         elif param == "identification":
             self.theta = torch.tensor([[1.14061868e-04],
-                                        [2.35845582e-04],
-                                        [2.90530320e-05],
-                                        [2.52134583e+00]], dtype=self.dtype)  # MSE
+                                       [2.35845582e-04],
+                                       [2.90530320e-05],
+                                       [2.52134583e+00]], dtype=self.dtype)  # MSE
         else:
             self.theta = param["theta"]
             self.permutation = param["permutation"]
@@ -133,19 +133,17 @@ class DynamicalModel(nn.Module):
                  - t12_tensor * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1)
 
-    def rollout(self, motor, state, horizon):
+    def rollout(self, motor, state, horizon, dt):
         assert horizon + 1 == len(state)
         assert horizon + 1 == len(motor)
-        assert len(state.shape) == 2  # (horizon, value=13)
-        state_gt = state[1:]
-
-        dt = torch.FloatTensor([[1 / 200]])
+        assert len(state.shape) == 3  # (batch, horizon, value=13)
+        state_gt = state[:, 1:]
 
         with torch.no_grad():
             # Prediction rollout
             prediction = [state[0].unsqueeze(0)]
             for i in range(horizon):
-                next_state = self.forward(motor=motor[i+1].unsqueeze(0),
+                next_state = self.forward(motor=motor[i + 1].unsqueeze(0),
                                           state=prediction[-1], dt=dt)
                 prediction.append(next_state)
 
@@ -154,3 +152,20 @@ class DynamicalModel(nn.Module):
         return error.mean(), error, prediction
 
 
+def _test():
+    dtype = torch.float64
+    batch_size = 1000
+    past = 60
+    motor = torch.randn(batch_size, past, 6, dtype=dtype)
+    state = torch.randn(batch_size, past, 13, dtype=dtype)
+    dt = torch.tensor([[1 / 200]], dtype=dtype)
+
+    DynamicalModel(param="identification", )
+
+
+def main():
+    _test()
+
+
+if __name__ == '__main__':
+    main()

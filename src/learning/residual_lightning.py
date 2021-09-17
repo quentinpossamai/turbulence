@@ -66,7 +66,7 @@ def main():
     np.random.seed(seed)
 
     tb_logger = pl_loggers.TensorBoardLogger(training_path)
-    analytic_model = DynamicalModel(param="paper", dtype=torch.float32)
+    analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
     run = CNNResidual(model=analytic_model,
                       past=args.past,
                       unit_size=args.unit_size,

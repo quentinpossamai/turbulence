@@ -291,7 +291,7 @@ def load_clean_data(flight):
 
 def euroc_mav_residual():
     dtype = torch.float64
-    model = DynamicalModel(param="paper", dtype=dtype)
+    model = DynamicalModel(param="identification", dtype=dtype)
     for flight in FLIGHT_LIST:
         # Importing data
         data = load_flight(flight)

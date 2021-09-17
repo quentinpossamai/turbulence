@@ -44,7 +44,7 @@ def plot_residual_torsor(time, residual_torsor, title, xlim: tuple):
 
 def _test_euroc():
     dtype = torch.float64
-    model = DynamicalModel(paper=False, dtype=dtype)
+    model = DynamicalModel(param="identification", dtype=dtype)
     for flight in euroc.FLIGHT_LIST:
         # Importing data
         data = euroc.load_flight(flight)
