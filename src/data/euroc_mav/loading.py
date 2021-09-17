@@ -291,7 +291,7 @@ def load_clean_data(flight):
 
 def euroc_mav_residual():
     dtype = torch.float64
-    model = DynamicalModel(paper=False, dtype=dtype)
+    model = DynamicalModel(param="paper", dtype=dtype)
     for flight in FLIGHT_LIST:
         # Importing data
         data = load_flight(flight)
@@ -390,7 +390,8 @@ class EurocMAVDatasetHorizon(Dataset):
         loaded_data = {flight: pickle.load(open(INTERMEDIATE_DATASET_PATH + flight + train_validation_test + ".pkl",
                                                 "rb")) for flight in self.flight_list}
         self.flight_length = {flight: len(loaded_data[flight]["t"]) for flight in self.flight_list}
-        minimum_length = np.min([[split[flight][0], split[flight][1] - split[flight][0],
+        minimum_length = np.min([[split[flight][0],
+                                  split[flight][1] - split[flight][0],
                                   split[flight][2] - split[flight][1]] for flight in self.flight_list])
 
         assert isinstance(traj_len, int)
@@ -423,23 +424,6 @@ class EurocMAVDatasetHorizon(Dataset):
         # self.max_res = torch.tensor([4.07108498, 2.69354105, 2.62223434,
         #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
-        if self.batch_dim:
-            self.get_func = lambda x: {"t": x[:, :1].view((1, -1, 1)),
-                                       "state": x[:, 1:14].view((1, -1, 13)),
-                                       "motor": x[:, 14:20].view((1, -1, 6)),
-                                       "residual": x[:, 20:26].view((1, -1, 6)),
-                                       "depth_emb": x[:, 26:154].view((1, -1, 128)),
-                                       "norm_emb": x[:, 154:282].view((1, -1, 128))}
-
-        else:
-            self.get_func = lambda x: {"t": x[:, :1],
-                                       "state": x[:, 1:14],
-                                       "motor": x[:, 14:20],
-                                       "residual": x[:, 20:26],
-                                       "depth_emb": x[:, 26:154],
-                                       "norm_emb": x[:, 154:282],
-                                       }
-
     def __len__(self):
         return self.cum_dataset_idx[-1]
 
@@ -454,7 +438,21 @@ class EurocMAVDatasetHorizon(Dataset):
         stop = local_idx + self.traj_len
         data = self.data[start:stop]
         assert len(data) == self.traj_len
-        return self.get_func(data)
+        if self.batch_dim:
+            return {"t": data[:, :1].view((1, -1, 1)),
+                    "state": data[:, 1:14].view((1, -1, 13)),
+                    "motor": data[:, 14:20].view((1, -1, 6)),
+                    "residual": data[:, 20:26].view((1, -1, 6)),
+                    "depth_emb": data[:, 26:154].view((1, -1, 128)),
+                    "norm_emb": data[:, 154:282].view((1, -1, 128))}
+
+        else:
+            return {"t": data[:, :1],
+                    "state": data[:, 1:14],
+                    "motor": data[:, 14:20],
+                    "residual": data[:, 20:26],
+                    "depth_emb": data[:, 26:154],
+                    "norm_emb": data[:, 154:282]}
 
 
 def load_flight(flight):

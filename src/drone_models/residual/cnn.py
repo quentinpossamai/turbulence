@@ -6,14 +6,17 @@ from typing import Callable
 from src.learning.run import Run
 from src.log import Logger
 
+import pytorch_lightning as pl
 
-class CNNResidual(nn.Module, Run):
+
+class CNNResidual(pl.LightningModule, Run):
     def __init__(self, model,
                  past: int,
                  unit_size: int,
                  activation: Callable,
                  layer: int,
                  embedding: str,
+                 optimizer,
                  device,
                  log: Logger = None):
         """
@@ -24,6 +27,7 @@ class CNNResidual(nn.Module, Run):
         :param activation: The activation function to use.
         :param layer: Number of layer for the neural network.
         :param embedding: Type of embedding to use.
+        :param optimizer: lambda x: torch.optim.optimizer(x, params)
         :param device: Cuda device to use.
         :param log: The logger to log training and validation error.
         """
@@ -37,23 +41,23 @@ class CNNResidual(nn.Module, Run):
         assert layer in layer_test, f"layer parameter must be one of the following values {layer_test}"
         self.layer = layer
 
-        self.device = device
-
         emb_test = ["none", "depth", "norm", "both"]
         assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
         self.emb = embedding
 
-        self.log = log
+        self.log1 = log
 
         self.optimizer = None
-        self.motor_size = 6
-        self.feature_size = 19
+
+        self.feature_size = 6 + 13
         if self.emb in ["depth", "norm"]:
             self.feature_size = self.feature_size + 128
         elif self.emb in ["both"]:
             self.feature_size = self.feature_size + 2 * 128
 
         # In shape (batch, channel=1, self.time_size, self.feature_size)
+        self.conv2d0 = nn.Conv2d(in_channels=1, out_channels=unit_size, kernel_size=(1, self.feature_size),
+                                 stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         self.conv2d0 = nn.Conv2d(in_channels=1, out_channels=unit_size, kernel_size=(1, self.feature_size),
                                  stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         if self.layer == 3:
@@ -64,8 +68,8 @@ class CNNResidual(nn.Module, Run):
                                     stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
         # Out shape (batch, channel=6, 1, 1)
 
-    def configure_optimizers(self, optimizer):
-        return optimizer(self.parameters())
+    def configure_optimizers(self):
+        return self.optimizer(self.parameters())
 
     def forward(self, motor, state, dt):
         """
@@ -113,14 +117,14 @@ class CNNResidual(nn.Module, Run):
     def training_step(self, train_batch):
         self.train()
         training_loss = self._step(train_batch)
-        self.log.train_epoch_loss_log.append(training_loss.detach())
+        self.log1.train_epoch_loss_log.append(training_loss.detach())
         return training_loss
 
     def validation_step(self, val_batch):
         self.eval()
         with torch.no_grad():
             val_loss = self._step(val_batch)
-            self.log.valid_epoch_loss_log.append(val_loss)
+            self.log1.valid_epoch_loss_log.append(val_loss)
         return val_loss
 
     def rollout(self, motor, state, state_gt, horizon):

@@ -1,5 +1,4 @@
 from __future__ import print_function
-
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -7,6 +6,7 @@ import pandas as pd
 import pathlib
 import pickle
 import re
+import socket
 import sys
 import time
 from typing import Union, Tuple, List, Iterable
@@ -27,6 +27,10 @@ def mkdir_if_not_exist(paths: list):
 
 
 mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
+
+
+def is_cluster():
+    return socket.gethostname() in ["joey", "deedee", "marky", "bob", "dgx"]
 
 
 class Progress(object):
