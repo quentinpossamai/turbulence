@@ -1,6 +1,6 @@
 rsync -av --delete ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/
 ssh remsto /bin/bash << EOF
-  rsync -av --delete ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/
+  rsync -av ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/
   chmod -R 774 /storage/Datasets/BlackBird/euroc_mav/intermediate/
   cd ~/phd/turbulence/launchers/residual_estimation/
   git pull github main

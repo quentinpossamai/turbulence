@@ -18,10 +18,15 @@ from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist, is_cluste
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
 mkdir_if_not_exist([ANALYSIS_PATH])
+
 GPU_COUNT = int(is_cluster())
+use_cuda = True
+device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
+
+print(f"GPU_COUNT: {GPU_COUNT}")
 
 
-DT = torch.FloatTensor([[1 / 200]])
+DT = torch.FloatTensor([[1 / 200]]).to(device)
 MEMORY = 100000
 
 

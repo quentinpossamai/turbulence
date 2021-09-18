@@ -10,4 +10,4 @@ singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m 
  --unit_size 50\
  --activation tanh\
  --layer 3\
- --embedding None
+ --embedding none
