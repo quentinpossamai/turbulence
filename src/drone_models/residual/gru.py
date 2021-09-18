@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from torch.nn.functional import relu
+from typing import Callable
 
 from src.learning.run import Run
 

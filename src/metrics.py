@@ -88,35 +88,14 @@ def _compute_error(model, residual_model, horizon, past, states, motor, time):
     cropped_states = states[:crop_idx * (past + horizon)].view(-1, past + horizon, 13)
     cropped_command = motor[:crop_idx * (past + horizon)].view(-1, past + horizon, motor_size)
     # cropped_dt = (time[1:] - time[:-1])[:crop_idx * (past + horizon)].view(-1, past + horizon, 1)
-    dt = torch.FloatTensor([[1 / 200]])
-
-    ground_truth = cropped_states[:, -horizon - 1:]
+    sh = list(cropped_states.shape)
+    sh[-1] = 1
+    dt = torch.FloatTensor([[1 / 200]]).repeat(sh)
     if residual_model is None:
-        with torch.no_grad():
-            # Prediction rollout
-            prediction = [cropped_states[:, past - 1]]
-            for i in range(horizon):
-                past_states = torch.cat([cropped_states[:, i:past - 1],
-                                         torch.stack(prediction, dim=1)[:, -past:]],
-                                        dim=1)
-                # past_dt = cropped_dt[:, i:past + i]
-
-                # if residual_model is not None:
-                # past_motor = cropped_command[:, i+1:past + i+1]
-                # residual = residual_model(state=past_states, motor=past_motor, dt=dt)
-                # next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt, residual=residual)
-                # else:
-                past_motor = cropped_command[:, i:past + i]
-                next_state = model(motor=past_motor, state=past_states, dt=dt)
-                prediction.append(next_state)
-
-            prediction = torch.stack(prediction, dim=1)
-            error = ((prediction - ground_truth) ** 2).mean()
+        error, error_rollout, pred = model.rollout(motor=cropped_command, state=cropped_states, dt=dt, horizon=horizon)
     else:
-        error, prediction = residual_model.rollout(motor=cropped_command,
-                                                   state=cropped_states,
-                                                   state_gt=ground_truth,
-                                                   horizon=horizon)
+        # TODO change like hexarotor_4params.py
+        error, prediction = residual_model.rollout(motor=cropped_command, state=cropped_states, dt=dt, horizon=horizon)
     return error
 
 

@@ -193,7 +193,7 @@ class DynamicalModel(nn.Module):
                  - t12_tensor * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1).view(residual_shape)
 
-    def rollout(self, motor, state, horizon, dt):
+    def rollout(self, motor, state, dt, horizon):
         """
         :param motor: (*, horizon+1, motor_size). t+1
         :param state: (*, horizon+1, 13). t
@@ -256,7 +256,7 @@ def _test():
     res = model.residual_dynamic(motor=motor, state=state, dt=dt, next_state=next_state)
     assert res.shape == (batch_size, time_size, 6)
 
-    error, error_tab, res = model.rollout(motor=motor, state=state, horizon=59, dt=dt)
+    error, error_tab, res = model.rollout(motor=motor, state=state, dt=dt, horizon=59)
     assert res.shape == (batch_size, time_size - 1, 13)
 
 

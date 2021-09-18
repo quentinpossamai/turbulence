@@ -8,6 +8,7 @@ import src.data.euroc_mav.loading as euroc
 
 # Models
 import src.drone_models as drone_models
+import src
 import src.utils.trajectory
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 from src import metrics
@@ -65,7 +66,7 @@ def plot_residual(model, residual_model, horizon, past, dataset, train_test_vali
         #     residual_hat = torch.stack(residual_hat, dim=0)
         # print(f"{((residual_hat - residual_gt) ** 2).mean()=}")
         with torch.no_grad():
-            prediction = [state[:, past-1]]
+            prediction = [state[:, past - 1]]
             for i in range(traj_len - past):
                 past_states = torch.cat([state[:, i:past - 1],
                                          torch.stack(prediction, dim=1)[:, -past:]],
@@ -124,11 +125,13 @@ def main():
     # test_blackbird_mlp_metrics(mlp_symplectic)
 
     # EUROC MAV
-    # phi_paper_param = hexarotor_4params.DynamicalModel(paper=True)
-    # test_model(phi_paper_param, "euroc_mav", "test", "normal")
+    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(param="paper",
+                                                                            dtype=torch.float32)
+    test_model(model=model, residual_model=None, past=1, dataset="euroc_mav", train_test_validation="test")
 
-    # phi_mse_param = hexarotor_4params.DynamicalModel(paper=False)
-    # test_model(phi_mse_param, "euroc_mav", "test", "normal")
+    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(param="identification",
+                                                                            dtype=torch.float32)
+    test_model(model=model, residual_model=None, past=1, dataset="euroc_mav", train_test_validation="test")
 
     # mlp_symplectic = "20210630_144438_MLP_bs_32/9416_weights.pt"
     # test_euroc_mav_mlp_metrics(mlp_symplectic)
@@ -177,22 +180,21 @@ def main():
     # plot_residual(model=model, residual_model=residual_model, horizon=1, past=past, dataset="euroc_mav",
     #               train_test_validation="validation")
 
-    cnn_residual = "l3/"
-    # cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
-    model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
-    past = 60
-    layer = 3
-    weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
-    for old_key, new_key in [["conv2d1", "conv2d_end"]]:
-        weights[f"{new_key}.weight"] = weights.pop(f"{old_key}.weight")
-        weights[f"{new_key}.bias"] = weights.pop(f"{old_key}.bias")
-    residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=torch.tanh,
-                                                           layer=layer, embedding="None", device="cpu")
-    residual_model.load_state_dict(weights)
-    residual_model.eval()
-    test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
-               train_test_validation="test")
-
+    # cnn_residual = "l3/"
+    # # cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
+    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # past = 60
+    # layer = 3
+    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # for old_key, new_key in [["conv2d1", "conv2d_end"]]:
+    #     weights[f"{new_key}.weight"] = weights.pop(f"{old_key}.weight")
+    #     weights[f"{new_key}.bias"] = weights.pop(f"{old_key}.bias")
+    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=torch.tanh,
+    #                                                        layer=layer, embedding="None", device="cpu")
+    # residual_model.load_state_dict(weights)
+    # residual_model.eval()
+    # test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
+    #            train_test_validation="test")
 
     # # Testing embeddings
     # cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"

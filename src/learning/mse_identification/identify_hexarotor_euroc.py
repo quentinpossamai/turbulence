@@ -105,7 +105,7 @@ def rollout():
     for i, param in enumerate(tqdm(param_range)):
         permutation, theta = param["permutation"], param["theta"]
         model = DynamicalModel(param={"permutation": permutation, "theta": theta}, dtype=torch.float64)
-        _, rollout_error, _ = model.rollout(motor=motor_roll, state=state_roll, horizon=max_horizon, dt=dt)
+        _, rollout_error, _ = model.rollout(motor=motor_roll, state=state_roll, dt=dt, horizon=max_horizon)
         param_range[i]["rollout_error"] = rollout_error.mean(dim=(0, 2))
 
     for j, horizon in enumerate(tqdm(range(max_horizon))):
