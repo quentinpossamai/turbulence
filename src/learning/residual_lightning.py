@@ -23,7 +23,7 @@ GPU_COUNT = int(is_cluster())
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 
-print(f"GPU_COUNT: {GPU_COUNT}")
+print(f"GPU_COUNT: {GPU_COUNT} | device: {device}")
 
 
 DT = torch.FloatTensor([[1 / 200]]).to(device)

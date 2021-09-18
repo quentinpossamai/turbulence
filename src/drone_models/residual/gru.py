@@ -16,7 +16,8 @@ class GRUResidual(pl.LightningModule, Run):
                  activation: Callable,
                  layer: int,
                  embedding: str,
-                 optimizer):
+                 optimizer,
+                 device):
         """
         Run with a CNN.
         :param model: The model to use the residual model with for the rollout.
@@ -27,6 +28,7 @@ class GRUResidual(pl.LightningModule, Run):
         :param layer: Number of layer for the neural network.
         :param embedding: Type of embedding to use.
         :param optimizer: lambda x: torch.optim.optimizer(x, params)
+        :param device: The device to use cpu or cuda gpu.
         """
         super(GRUResidual, self).__init__()
         self.model = model
@@ -137,7 +139,7 @@ class GRUResidual(pl.LightningModule, Run):
 
         dt_shape = list(motor_shape)
         dt_shape[-1] = 1
-        dt = torch.tensor(1 / 200).repeat(dt_shape)
+        dt = torch.tensor(1 / 200).repeat(dt_shape).to(self.device)
 
         residual_gt = batch["residual"][:, self.past]
 
