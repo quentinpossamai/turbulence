@@ -20,7 +20,8 @@ class DynamicalModel(nn.Module):
         assert param in ["paper", "identification"] or list(param.keys()) == ["permutation", "theta"], msg
 
         # Point: 6
-        self.permutation = [0, 1, 2, 3, 4, 5]
+        # self.permutation = [0, 1, 2, 3, 4, 5]  # Old mse
+        self.permutation = [4, 1, 0, 3, 2, 5]
         if param == "paper":
             # # Paper parameters from
             # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
@@ -40,10 +41,15 @@ class DynamicalModel(nn.Module):
                                        [1.5881e-05],
                                        [8.0943e-01]], dtype=self.dtype)
         elif param == "identification":
-            self.theta = torch.tensor([[1.14061868e-04],
-                                       [2.35845582e-04],
-                                       [2.90530320e-05],
-                                       [2.52134583e+00]], dtype=self.dtype)  # MSE
+            # self.theta = torch.tensor([[1.14061868e-04],
+            #                            [2.35845582e-04],
+            #                            [2.90530320e-05],
+            #                            [2.52134583e+00]], dtype=self.dtype)  # old MSE
+            self.theta = torch.tensor([[1.1405473589348445761539052600852528485120274126529693603515625000e-04],
+                                       [9.9462137822501944968422993298418077756650745868682861328125000000e-04],
+                                       [2.9476520535868356394024192290714836417464539408683776855468750000e-05],
+                                       [2.4780844735227764985552312282379716634750366210937500000000000000e+00]],
+                                      dtype=self.dtype)  # old MSE
         else:
             self.theta = param["theta"]
             self.permutation = param["permutation"]
@@ -226,8 +232,8 @@ class DynamicalModel(nn.Module):
                 prediction.append(next_state)
 
         prediction = torch.cat(prediction, dim=1)[:, 1:]  # First is not a prediction
-        error = ((prediction - next_state_gt) ** 2).mean(dim=0)
-        return error.mean(), error, prediction.view(pred_shape)
+        error = ((prediction - next_state_gt) ** 2)
+        return error.mean(), error.view(pred_shape), prediction.view(pred_shape)
 
 
 def _test():
