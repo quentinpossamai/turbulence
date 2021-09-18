@@ -179,11 +179,42 @@ def plot_rollout():
     print(f"pair2 | Permutation {pair2['permutation']} | Theta {pair2['theta']}")
 
 
+def plot_acceleration():
+    model = DynamicalModel(param="identification", dtype=torch.float64)
+
+    max_horizon = 200
+    dataset = euroc.EurocMAVDatasetHorizon("validation", traj_len=max_horizon + 1, dtype=DTYPE, batch_dim=False)
+    long_traj = DataLoader(dataset, batch_size=len(dataset), shuffle=True)
+
+    batch = next(iter(long_traj))
+    motor = batch["motor"][:, 1:]
+    state = batch["state"][:, :-1]
+    next_state_gt = batch["state"][:, 1:]
+    dt_shape = list(state.shape)
+    dt_shape[-1] = 1
+    dt = torch.tensor(DT, dtype=DTYPE).repeat(dt_shape)
+
+    next_state_hat = model.forward(motor=motor, state=state, dt=dt)
+
+    dstate_gt = (next_state_gt - state) / dt
+    dstate_hat = (next_state_hat - state) / dt
+
+    fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=100)
+    ax.plot(dstate_gt[0, :, 7:10], label=f"gt")
+    ax.plot(dstate_hat[0, :, 7:10], label=f"hat")
+    ax.grid()
+    ax.set_xlabel("Sample number")
+    ax.set_ylabel("Linear acceleration")
+    ax.legend()
+    plt.show()
+
+
 def main():
     # identify_model()
-    plot_identification()
+    # plot_identification()
     # rollout()
     # plot_rollout()
+    plot_acceleration()
 
 
 if __name__ == '__main__':

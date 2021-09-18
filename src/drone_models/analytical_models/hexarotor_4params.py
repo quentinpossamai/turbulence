@@ -64,25 +64,25 @@ class DynamicalModel(nn.Module):
         """
         assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
-        motor = motor.view(-1, self.motor_size, 1)
+        motor = motor.reshape(-1, self.motor_size, 1)
 
         assert state.shape[-1] == 13, "state len is not 13"
         state_shape = state.shape
-        state = state.view(-1, 13, 1)
+        state = state.reshape(-1, 13, 1)
 
         assert dt.shape[-1] == 1,  "dt len is not 1"
         dt_shape = dt.shape
-        dt = dt.view(-1, 1, 1)
+        dt = dt.reshape(-1, 1, 1)
 
         if residual is None:
             residual_shape = list(state_shape)
             residual_shape[-1] = 6
             residual_shape = tuple(residual_shape)
-            residual = torch.zeros(residual_shape).view(-1, 6, 1)
+            residual = torch.zeros(residual_shape).reshape(-1, 6, 1)
         else:
             assert residual.shape[-1] == 6, "residual len is not 6"
             residual_shape = residual.shape
-            residual = residual.view(-1, 6, 1)
+            residual = residual.reshape(-1, 6, 1)
         kfa = residual[:, :3]
         ktaua = residual[:, 3:]
 
@@ -119,7 +119,7 @@ class DynamicalModel(nn.Module):
                                                                       dim=1))
         next_quat = next_quat / torch.norm(next_quat, dim=1, keepdim=True)
 
-        return torch.cat([next_pos, next_quat, next_lin_vel, next_ang_vel], dim=1).view(state_shape)
+        return torch.cat([next_pos, next_quat, next_lin_vel, next_ang_vel], dim=1).reshape(state_shape)
 
     def motor_dynamic(self, motor):
         """
@@ -128,7 +128,7 @@ class DynamicalModel(nn.Module):
         """
         assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
-        motor = motor.view(-1, self.motor_size, 1)
+        motor = motor.reshape(-1, self.motor_size, 1)
         motor_torsor_shape = list(motor_shape)
         motor_torsor_shape[-1] = 4
 
@@ -141,7 +141,7 @@ class DynamicalModel(nn.Module):
 
         motor = motor[:, self.permutation]
         motor_torsor = motor_matrix @ motor ** 2  # [tx, ty, tz, T]
-        return motor_torsor.view(motor_torsor_shape)
+        return motor_torsor.reshape(motor_torsor_shape)
 
     def residual_dynamic(self, motor, state, dt, next_state):
         """
@@ -153,19 +153,19 @@ class DynamicalModel(nn.Module):
         """
         assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
-        motor = motor.view(-1, self.motor_size, 1)
+        motor = motor.reshape(-1, self.motor_size, 1)
 
         assert state.shape[-1] == 13, "state len is not 13"
         state_shape = state.shape
-        state = state.view(-1, 13, 1)
+        state = state.reshape(-1, 13, 1)
 
         assert dt.shape[-1] == 1,  "dt len is not 1"
         dt_shape = dt.shape
-        dt = dt.view(-1, 1, 1)
+        dt = dt.reshape(-1, 1, 1)
 
         assert next_state.shape[-1] == 13, "next_state len is not 13"
         next_state_shape = next_state.shape
-        next_state = next_state.view(-1, 13, 1)
+        next_state = next_state.reshape(-1, 13, 1)
 
         size = len(motor)
         assert motor_shape[:-1] == state_shape[:-1]
@@ -191,7 +191,7 @@ class DynamicalModel(nn.Module):
         t12_tensor = torch.tensor([self.theta[1], self.theta[1], self.theta[2]], dtype=self.dtype).view(1, 3, 1)
         ktaua = (ang_acc - torch.cross(t3_tensor * ang_vel, ang_vel, dim=1)
                  - t12_tensor * motor_torsor[:, :3])
-        return torch.cat([kfa, ktaua], dim=1).view(residual_shape)
+        return torch.cat([kfa, ktaua], dim=1).reshape(residual_shape)
 
     def rollout(self, motor, state, dt, horizon):
         """
@@ -203,15 +203,15 @@ class DynamicalModel(nn.Module):
         """
         assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
-        motor = motor.view(-1, horizon + 1, self.motor_size)
+        motor = motor.reshape(-1, horizon + 1, self.motor_size)
 
         assert state.shape[-1] == 13, "state len is not 13"
         state_shape = state.shape
-        state = state.view(-1, horizon + 1, 13)
+        state = state.reshape(-1, horizon + 1, 13)
 
         assert dt.shape[-1] == 1,  "dt len is not 1"
         dt_shape = dt.shape
-        dt = dt.view(-1, horizon + 1, 1)
+        dt = dt.reshape(-1, horizon + 1, 1)
 
         pred_shape = list(state_shape)
         pred_shape[-2] = horizon
@@ -233,7 +233,7 @@ class DynamicalModel(nn.Module):
 
         prediction = torch.cat(prediction, dim=1)[:, 1:]  # First is not a prediction
         error = ((prediction - next_state_gt) ** 2)
-        return error.mean(), error.view(pred_shape), prediction.view(pred_shape)
+        return error.mean(), error.reshape(pred_shape), prediction.reshape(pred_shape)
 
 
 def _test():
