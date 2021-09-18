@@ -284,6 +284,9 @@ def load_clean_data(flight):
     del syn["pose"]
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
 
+    for e in syn:
+        syn[e] = syn[e][1:]  # Reject first speed
+
     # 6. Save dict as with pickle
     pathlib.Path(intermediate_flight_path).mkdir(parents=True, exist_ok=True)
     pickle.dump(syn, open(intermediate_flight_path + "data.pkl", "wb"))
@@ -297,7 +300,7 @@ def euroc_mav_residual():
         data = load_flight(flight)
         # time = torch.from_numpy(data["t"][:-1])
         motor = torch.from_numpy(data["motor"][1:])
-        dt = torch.tensor([1 / 200], dtype=dtype).view((1, 1))
+        dt = torch.tensor([1 / 200], dtype=dtype).repeat(len(motor), 1)
         state = torch.from_numpy(data["state"][:-1])
         next_state = torch.from_numpy(data["state"][1:])
 
@@ -309,7 +312,7 @@ def euroc_mav_residual():
         print("Quaternion's norm std: ", torch.std(norm))
 
         # Test-2 integrating perfect derivative lead to perfect pose
-        assert abs((state[1:, :3] - state[:-1, :3]) / dt - state[1:, 7:10]).sum() == 0
+        assert abs((state[1:, :3] - state[:-1, :3]) / dt[1:] - state[1:, 7:10]).sum() == 0
 
         # Computing residual
         residual_torsor = model.residual_dynamic(motor=motor, state=state, dt=dt, next_state=next_state)
@@ -329,15 +332,13 @@ def merge_embeddings():
 
         # list[dict_keys(['timestamp', 'embedding', 'MSE', 'GradMSE'])]
         depth_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}depth_embedding.pkl", "rb"))
-        assert (data["t"] == np.array(sorted([e["timestamp"] for e in depth_emb]))).all()
-        depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])
+        depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])[1:]
         assert (data["t"] == np.array([e["timestamp"] for e in depth_emb])).all
         data["depth_emb"] = np.array([e["embedding"].numpy().flatten() for e in depth_emb]).astype(float)
 
         # list[dict_keys(['timestamp', 'embedding', 'MSE', 'CrossProduct'])]
         norm_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}normal_embedding.pkl", "rb"))
-        assert (data["t"] == np.array(sorted([e["timestamp"] for e in norm_emb]))).all()
-        norm_emb = sorted(norm_emb, key=lambda x: x["timestamp"])
+        norm_emb = sorted(norm_emb, key=lambda x: x["timestamp"])[1:]
         assert (data["t"] == np.array([e["timestamp"] for e in norm_emb])).all
         data["norm_emb"] = np.array([e["embedding"].flatten() for e in norm_emb]).astype(float)
 
@@ -472,7 +473,7 @@ def main():
     euroc_mav_residual()
     merge_embeddings()
     splitting()
-
+    # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
 
 if __name__ == '__main__':
     main()
