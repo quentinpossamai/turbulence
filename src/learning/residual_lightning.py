@@ -12,8 +12,8 @@ from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 # from src.drone_models.residual.groundthruth import GroundTruth  # Sanity check
 # from src.drone_models.residual.mlp import MLPResidual
-from src.drone_models.residual.cnn_lightning import CNNResidual
-# from src.drone_models.residual.gru import GRUResidual
+# from src.drone_models.residual.cnn_lightning import CNNResidual
+from src.drone_models.residual.gru import GRUResidual
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist, is_cluster
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
@@ -48,7 +48,7 @@ def main():
     # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     name = (f"{now}_"
-            f"{CNNResidual.__name__}_"
+            f"{GRUResidual.__name__}_"
             f"bs{args.batch_size}_"
             f"epch{args.epochs}_"
             f"lr{args.lr}_"
@@ -67,9 +67,10 @@ def main():
 
     tb_logger = pl_loggers.TensorBoardLogger(training_path)
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
-    run = CNNResidual(model=analytic_model,
+    run = GRUResidual(model=analytic_model,
                       past=args.past,
                       unit_size=args.unit_size,
+                      motor_size=6,
                       activation=activation,
                       layer=args.layer,
                       embedding=args.embedding,

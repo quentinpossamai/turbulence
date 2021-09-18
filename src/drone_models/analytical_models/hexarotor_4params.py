@@ -226,7 +226,7 @@ class DynamicalModel(nn.Module):
         with torch.no_grad():
             self.eval()
             # Prediction rollout
-            prediction = [state[:, :1]]
+            prediction = [state[:, 0:1]]
             for i in range(horizon):
                 next_state = self.forward(motor=motor[:, i+1:i+2], state=prediction[-1], dt=dt[:, i+1:i+2])
                 prediction.append(next_state)

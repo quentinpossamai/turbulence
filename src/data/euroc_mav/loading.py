@@ -409,7 +409,8 @@ class EurocMAVDatasetHorizon(Dataset):
             loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)),  # len 1
                                                val["state"],  # len 13
                                                val["motor"],  # len 6
-                                               val["residual"],  # len6
+                                               val["residual"],  # len 6
+                                               val["imu_ang_acc"],  # len 6
                                                val["depth_emb"],  # len 128
                                                val["norm_emb"]  # len 128
                                                ], axis=1)
@@ -430,7 +431,7 @@ class EurocMAVDatasetHorizon(Dataset):
 
     def __getitem__(self, idx):
         """
-        One sample is time:1, state:13, motor:6, residual:6, not implemented (imu_ang_acc:6)
+        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128
 
         """
         flight_idx = np.where(idx <= self.cum_dataset_idx[1:])[0][0]
@@ -440,20 +441,22 @@ class EurocMAVDatasetHorizon(Dataset):
         data = self.data[start:stop]
         assert len(data) == self.traj_len
         if self.batch_dim:
-            return {"t": data[:, :1].view((1, -1, 1)),
+            return {"t": data[:, 0:1].view((1, -1, 1)),
                     "state": data[:, 1:14].view((1, -1, 13)),
                     "motor": data[:, 14:20].view((1, -1, 6)),
                     "residual": data[:, 20:26].view((1, -1, 6)),
-                    "depth_emb": data[:, 26:154].view((1, -1, 128)),
-                    "norm_emb": data[:, 154:282].view((1, -1, 128))}
+                    "imu_ang_acc": data[:, 26:32].view((1, -1, 6)),
+                    "depth_emb": data[:, 32:160].view((1, -1, 128)),
+                    "norm_emb": data[:, 160:288].view((1, -1, 128))}
 
         else:
             return {"t": data[:, :1],
                     "state": data[:, 1:14],
                     "motor": data[:, 14:20],
                     "residual": data[:, 20:26],
-                    "depth_emb": data[:, 26:154],
-                    "norm_emb": data[:, 154:282]}
+                    "imu_ang_acc": data[:, 26:32],
+                    "depth_emb": data[:, 32:160],
+                    "norm_emb": data[:, 160:288]}
 
 
 def load_flight(flight):
