@@ -1,7 +1,7 @@
 #!/bin/bash
 workspace=~/phd/turbulence/
 cd $workspace
-singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.residual_estimation\
+singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.residual_lightning\
  --batch_size 128\
  --epochs 10000\
  --lr 1e-4\
