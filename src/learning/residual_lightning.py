@@ -13,7 +13,7 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 # from src.drone_models.residual.groundthruth import GroundTruth  # Sanity check
 # from src.drone_models.residual.mlp import MLPResidual
 # from src.drone_models.residual.cnn_lightning import CNNResidual
-from src.drone_models.residual.gru import GRUResidual
+from src.drone_models.residual.gru_cnn import GRUCNNResidual
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist, is_cluster
 
 ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
@@ -37,7 +37,7 @@ def main():
     # parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
     # parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
     # parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
-    parser = GRUResidual.add_model_specific_args(parser)
+    parser = GRUCNNResidual.add_model_specific_args(parser)
     parser = pl.Trainer.add_argparse_args(parser)  # accelerator, max_epochs
     args = parser.parse_args()
 
@@ -53,7 +53,7 @@ def main():
     # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     version = (f"{now}_"
-               f"{GRUResidual.__name__}_"
+               f"{GRUCNNResidual.__name__}_"
                f"bs{args.batch_size}_"
                f"epch{args.max_epochs}_"
                f"lr{args.lr}_"
@@ -64,7 +64,7 @@ def main():
                f"l{args.layer}_"
                f"{args.embedding}"
                )
-    training_path = ANALYSIS_PATH + f"{GRUResidual.__name__}/"
+    training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}/"
 
     # Reproducibility
     seed = 0
@@ -74,7 +74,7 @@ def main():
 
     tb_logger = pl_loggers.TensorBoardLogger(training_path, version=version)
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
-    run = GRUResidual(
+    run = GRUCNNResidual(
         activation=activation,
         embedding=args.embedding,
         layer=args.layer,
