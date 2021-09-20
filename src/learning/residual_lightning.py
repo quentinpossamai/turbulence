@@ -64,7 +64,7 @@ def main():
                f"l{args.layer}_"
                f"{args.embedding}"
                )
-    training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}/"
+    training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}_{args.embedding}/"
 
     # Reproducibility
     seed = 0

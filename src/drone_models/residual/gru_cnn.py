@@ -126,6 +126,12 @@ class GRUCNNResidual(pl.LightningModule, Run):
 
         state_motor_dt = torch.cat([motor, state, dt], dim=2)
 
+        # 2.1-GRU state-motor-dt
+        out = state_motor_dt  # (batch, self.n_past, feature_size)
+        out = self.batch_norm_gru0(out)  # (batch, self.n_past, feature_size)
+        out, _ = self.gru0(out)  # gru output with shape: (step, batch, feature_size)
+        out = out[:, -1]  # last hidden states, (batch, feature_size)
+
         if self.emb_size != 0:
             assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
             embedding_shape = embedding.shape
@@ -133,20 +139,17 @@ class GRUCNNResidual(pl.LightningModule, Run):
             assert motor_shape[:-1] == embedding_shape[:-1]
             # Input any batch dim processing end
 
-            # 2.1-CNN embedding
+            # 2.2-CNN embedding
             out_emb = self.batch_norm_emb_0(embedding)
             out_emb = self.activation(self.conv2d_emb_0(out_emb))
             out_emb = self.batch_norm_emb_1(out_emb)
             out_emb = self.activation(self.conv2d_emb_1(out_emb))
 
-        # 2.2-GRU state-motor-dt
-        out = state_motor_dt  # (batch, self.n_past, feature_size)
-        out = self.batch_norm_gru0(out)  # (batch, self.n_past, feature_size)
-        out, _ = self.gru0(out)  # gru output with shape: (step, batch, feature_size)
-        out = out[:, -1]  # last hidden states, (batch, feature_size)
+            # 2.3-Fully connected merge
+            out = self.batch_norm0(torch.cat([out, out_emb.squeeze()], dim=1))
+        else:
+            out = self.batch_norm0(out)
 
-        # 2.3-Fully connected merge
-        out = self.batch_norm0(torch.cat([out, out_emb.squeeze()], dim=1))
         out = self.activation(self.linear0(out))
         out = self.batch_norm1(out)
         out = self.linear1(out)
