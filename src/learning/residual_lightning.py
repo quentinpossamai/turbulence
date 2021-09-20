@@ -94,7 +94,7 @@ def main():
                                  batch_size=args.batch_size, shuffle=False, num_workers=4)
     # num_workers=1, pin_memory=True
 
-    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger)
+    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.epochs)
     trainer.fit(run, train_data, validation_data)
 
 
