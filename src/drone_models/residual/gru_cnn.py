@@ -75,6 +75,13 @@ class GRUCNNResidual(pl.LightningModule, Run):
             "unit_size"
         )
 
+        self.batch_norm_gru0 = nn.BatchNorm1d(self.past)
+        self.gru0 = nn.GRU(input_size=self.feature_size,
+                           hidden_size=self.unit_size,
+                           num_layers=self.layer,
+                           bias=True,
+                           batch_first=True)
+
         if self.emb_size != 0:
             self.batch_norm_emb_0 = nn.BatchNorm2d(1)
             self.conv2d_emb_0 = nn.Conv2d(in_channels=1, out_channels=self.unit_size, kernel_size=(1, self.emb_size),
@@ -84,15 +91,11 @@ class GRUCNNResidual(pl.LightningModule, Run):
                                           kernel_size=(self.past, 1),
                                           stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
 
-        self.batch_norm_gru0 = nn.BatchNorm1d(self.past)
-        self.gru0 = nn.GRU(input_size=self.feature_size,
-                           hidden_size=self.unit_size,
-                           num_layers=self.layer,
-                           bias=True,
-                           batch_first=True)
-
-        self.batch_norm0 = nn.BatchNorm1d(2 * self.unit_size)
-        self.linear0 = nn.Linear(in_features=2 * self.unit_size, out_features=self.unit_size, bias=True)
+            self.batch_norm0 = nn.BatchNorm1d(2 * self.unit_size)
+            self.linear0 = nn.Linear(in_features=2 * self.unit_size, out_features=self.unit_size, bias=True)
+        else:
+            self.batch_norm0 = nn.BatchNorm1d(self.unit_size)
+            self.linear0 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
