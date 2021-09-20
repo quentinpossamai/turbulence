@@ -8,7 +8,7 @@ from src.learning.run import Run
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 
 
-class GRUResidual(pl.LightningModule, Run):
+class GRUCNNResidual(pl.LightningModule, Run):
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
@@ -42,7 +42,7 @@ class GRUResidual(pl.LightningModule, Run):
         :param past: The number of past state and motor measures to use.
         :param unit_size: The size of one layer.
         """
-        super(GRUResidual, self).__init__()
+        super(GRUCNNResidual, self).__init__()
         self.activation = activation
 
         emb_test = ["none", "depth", "norm", "both"]
@@ -268,15 +268,15 @@ def _test():
 
     batch = {"motor": motor, "state": state, "residual": residual, "depth_emb": depth, "norm_emb": normal}
 
-    model = GRUResidual(model=DynamicalModel(param="identification", dtype=torch.float32),
-                        past=60,
-                        unit_size=50,
-                        motor_size=6,
-                        activation=torch.tanh,
-                        layer=3,
-                        embedding="both",
-                        learning_rate=1e-3
-                        )
+    model = GRUCNNResidual(model=DynamicalModel(param="identification", dtype=torch.float32),
+                           past=60,
+                           unit_size=50,
+                           motor_size=6,
+                           activation=torch.tanh,
+                           layer=3,
+                           embedding="both",
+                           learning_rate=1e-3
+                           )
     model.configure_optimizers()
 
     res = model.forward(motor=motor[:, :past], state=state[:, :past],
