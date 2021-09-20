@@ -9,49 +9,80 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 
 
 class GRUResidual(pl.LightningModule, Run):
-    def __init__(self, model,
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = parent_parser.add_argument_group("GRUResidual")
+        parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
+        parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
+        parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
+        parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
+        parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
+        parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
+        parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
+        return parent_parser
+
+    def __init__(self,
+                 activation: Callable,
+                 embedding: str,
+                 layer: int,
+                 learning_rate: float,
+                 model,
+                 motor_size: int,
                  past: int,
                  unit_size: int,
-                 motor_size: int,
-                 activation: Callable,
-                 layer: int,
-                 embedding: str,
-                 optimizer):
+                 ):
         """
         Run with a CNN.
+        :param activation: The activation function to use.
+        :param embedding: Type of embedding to use.
+        :param layer: Number of layer for the neural network.
+        :param learning_rate: Learning rate for Adam optimizer.
         :param model: The model to use the residual model with for the rollout.
+        :param motor_size: The number of motors.
         :param past: The number of past state and motor measures to use.
         :param unit_size: The size of one layer.
-        :param motor_size: The number of motors.
-        :param activation: The activation function to use.
-        :param layer: Number of layer for the neural network.
-        :param embedding: Type of embedding to use.
-        :param optimizer: lambda x: torch.optim.optimizer(x, params)
         """
         super(GRUResidual, self).__init__()
-        self.model = model
-        self.past = past
-        self.unit_size = unit_size
-        self.motor_size = motor_size
-        self.a = activation
+        self.activation = activation
+
+        emb_test = ["none", "depth", "norm", "both"]
+        assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
+        self.embedding = embedding
+        self.emb_size = 0
+        if self.embedding in ["depth", "norm"]:
+            self.emb_size = 128
+        elif self.embedding in ["both"]:
+            self.emb_size = 2 * 128
 
         layer_test = [2, 3]
         assert layer in layer_test, f"layer parameter must be one of the following values {layer_test}"
         self.layer = layer
 
-        emb_test = ["none", "depth", "norm", "both"]
-        assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
-        self.emb = embedding
-
-        self.optimizer = optimizer
+        self.learning_rate = learning_rate
+        self.model = model
+        self.motor_size = motor_size
+        self.past = past
+        self.unit_size = unit_size
 
         self.feature_size = self.motor_size + 13 + 1
-        self.emb_size = 0
-        if self.emb in ["depth", "norm"]:
-            self.emb_size = 128
-        elif self.emb in ["both"]:
-            self.emb_size = 2 * 128
-        self.feature_size += self.emb_size
+
+        self.save_hyperparameters(
+            "activation",
+            "embedding",
+            "layer",
+            "learning_rate",
+            "past",
+            "unit_size"
+        )
+
+        if self.emb_size != 0:
+            self.batch_norm_emb_0 = nn.BatchNorm2d(1)
+            self.conv2d_emb_0 = nn.Conv2d(in_channels=1, out_channels=self.unit_size, kernel_size=(1, self.emb_size),
+                                          stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
+            self.batch_norm_emb_1 = nn.BatchNorm2d(self.unit_size)
+            self.conv2d_emb_1 = nn.Conv2d(in_channels=self.unit_size, out_channels=self.unit_size,
+                                          kernel_size=(self.past, 1),
+                                          stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
 
         self.batch_norm_gru0 = nn.BatchNorm1d(self.past)
         self.gru0 = nn.GRU(input_size=self.feature_size,
@@ -60,17 +91,13 @@ class GRUResidual(pl.LightningModule, Run):
                            bias=True,
                            batch_first=True)
 
-        self.batch_norm0 = nn.BatchNorm1d(self.unit_size)
-        self.linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
+        self.batch_norm0 = nn.BatchNorm1d(2 * self.unit_size)
+        self.linear0 = nn.Linear(in_features=2 * self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
-        self.linear2 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
-        # self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
-        # self.linear3 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
-        # self.batch_norm3 = nn.BatchNorm1d(self.unit_size)
-        # self.linear4 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
+        self.linear1 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
     def configure_optimizers(self):
-        return self.optimizer(self.parameters())
+        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, motor, state, embedding, dt):
         """
@@ -81,7 +108,7 @@ class GRUResidual(pl.LightningModule, Run):
         :param dt: (batch, step, values=1)
         :return: (batch, value=6)
         """
-        # Input any batch dim processing
+        # 1.-Input any batch dim processing
         assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
         motor = motor.reshape(-1, self.past, self.motor_size)
@@ -99,22 +126,30 @@ class GRUResidual(pl.LightningModule, Run):
 
         state_motor_dt = torch.cat([motor, state, dt], dim=2)
 
-        if embedding is not None:
+        if self.emb_size != 0:
             assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
             embedding_shape = embedding.shape
-            embedding = embedding.reshape(-1, self.past, self.emb_size)
+            embedding = embedding.reshape(-1, 1, self.past, self.emb_size)
             assert motor_shape[:-1] == embedding_shape[:-1]
-            state_motor_dt = torch.cat([state_motor_dt, embedding], dim=2)
-        # Input any batch dim processing end
+            # Input any batch dim processing end
 
+            # 2.1-CNN embedding
+            out_emb = self.batch_norm_emb_0(embedding)
+            out_emb = self.activation(self.conv2d_emb_0(out_emb))
+            out_emb = self.batch_norm_emb_1(out_emb)
+            out_emb = self.activation(self.conv2d_emb_1(out_emb))
+
+        # 2.2-GRU state-motor-dt
         out = state_motor_dt  # (batch, self.n_past, feature_size)
         out = self.batch_norm_gru0(out)  # (batch, self.n_past, feature_size)
         out, _ = self.gru0(out)  # gru output with shape: (step, batch, feature_size)
         out = out[:, -1]  # last hidden states, (batch, feature_size)
-        out = self.batch_norm0(out)
-        out = self.a(self.linear1(out))
+
+        # 2.3-Fully connected merge
+        out = self.batch_norm0(torch.cat([out, out_emb.squeeze()], dim=1))
+        out = self.activation(self.linear0(out))
         out = self.batch_norm1(out)
-        out = self.linear2(out)
+        out = self.linear1(out)
 
         residual_shape = list(state_shape)
         residual_shape[-1] = 6
@@ -137,16 +172,16 @@ class GRUResidual(pl.LightningModule, Run):
 
         dt_shape = list(motor_shape)
         dt_shape[-1] = 1
-        dt = torch.tensor(1 / 200).repeat(dt_shape).to(self.device)
+        dt = torch.tensor(1 / 200, device=self.device).repeat(dt_shape)
 
         residual_gt = batch["residual"][:, self.past]
 
         embedding = None
-        if self.emb in ["depth"]:
+        if self.embedding in ["depth"]:
             embedding = batch["depth_emb"][:, :self.past]
-        if self.emb in ["norm"]:
+        if self.embedding in ["norm"]:
             embedding = batch["norm_emb"][:, :self.past]
-        if self.emb in ["both"]:
+        if self.embedding in ["both"]:
             embedding = torch.cat([batch["depth_emb"][:, :self.past], batch["norm_emb"][:, :self.past]], dim=-1)
 
         residual_hat = self.forward(motor=motor, state=state, embedding=embedding, dt=dt)
@@ -199,16 +234,16 @@ class GRUResidual(pl.LightningModule, Run):
         with torch.no_grad():
             self.eval()
             # Prediction rollout
-            prediction = [state[:, self.past-1].view(-1, 1, 13)]
+            prediction = [state[:, self.past - 1].view(-1, 1, 13)]
             past_state = state[:, 0:self.past]
             for i in range(horizon):
-                residual = self.forward(motor=motor[:, i+1:self.past+i+1],
+                residual = self.forward(motor=motor[:, i + 1:self.past + i + 1],
                                         state=past_state,
-                                        embedding=embedding[:, i+1:self.past+i+1],
-                                        dt=dt[:, i+1:self.past+i+1])
-                next_state = self.model(motor=motor[:, i+1],
+                                        embedding=embedding[:, i + 1:self.past + i + 1],
+                                        dt=dt[:, i + 1:self.past + i + 1])
+                next_state = self.model(motor=motor[:, i + 1],
                                         state=prediction[-1].view(-1, 13),
-                                        dt=dt[:, i+1],
+                                        dt=dt[:, i + 1],
                                         residual=residual).view(-1, 1, 13)
                 prediction.append(next_state)
                 past_state = torch.cat([past_state[:, 1:], next_state], dim=1)
@@ -240,7 +275,8 @@ def _test():
                         activation=torch.tanh,
                         layer=3,
                         embedding="both",
-                        optimizer=lambda x: torch.optim.Adam(x, lr=1e-3))
+                        learning_rate=1e-3
+                        )
     model.configure_optimizers()
 
     res = model.forward(motor=motor[:, :past], state=state[:, :past],

@@ -1,13 +1,12 @@
 #!/bin/bash
-workspace=~/phd/turbulence/
-cd $workspace
+cd ~/phd/turbulence/
 singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.residual_lightning\
  --batch_size 128\
- --epochs 10000\
- --lr 1e-4\
+ --activation tanh\
+ --embedding none\
  --horizon 1\
+ --layer 3\
+ --lr 1e-4\
  --past 60\
  --unit_size 50\
- --activation tanh\
- --layer 3\
- --embedding none
+ --max_epochs 10000
