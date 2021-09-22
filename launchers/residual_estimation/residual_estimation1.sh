@@ -1,7 +1,7 @@
 #!/bin/bash
 cd ~/phd/turbulence/
-file="/home/qpossamai/phd/turbulence/analysis/euroc_mav_residual_training/"
-file+="GRUCNNResidual_depth/default/20210920_151437_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_depth/"
+file="/home/qpossamai/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_depth/default/"
+file+="20210920_151437_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_depth/"
 file+="checkpoints/epoch=8273-step=2424281.ckpt"
 singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.residual_lightning\
  --batch_size 64\

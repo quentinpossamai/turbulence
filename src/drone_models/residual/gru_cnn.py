@@ -12,7 +12,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="norm", type=str, help="Type of embedding to use")
+        parser.add_argument('--embedding', default="both", type=str, help="Type of embedding to use")
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")

@@ -30,17 +30,19 @@ def main():
     # Args are hyper parameters to optimize
     parser = argparse.ArgumentParser(description="Identify model on data.")
     # Program args
-    parser.add_argument('--batch_size', default=128, type=int, help="Size of a batch")
+    parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
     # Module args
     parser = GRUCNNResidual.add_model_specific_args(parser)
     # Trainer args
     parser = pl.Trainer.add_argparse_args(parser)  # accelerator, max_epochs
     args = parser.parse_args()
+
+    # Debug
+    # file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_both/default/"
+    # file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_both/"
+    # file += "checkpoints/epoch=8822-step=2585138.ckpt"
     # args.max_epochs = 20000
-    # args.resume_from_checkpoint = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/" \
-    #                               "GRUCNNResidual_norm/default/" \
-    #                               "20210920_151801_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_norm/" \
-    #                               "checkpoints/epoch=9999-step=2929999.ckpt"
+    # args.resume_from_checkpoint = file
 
     # Tensorboard
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/
