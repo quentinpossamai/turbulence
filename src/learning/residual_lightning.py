@@ -32,22 +32,15 @@ def main():
     # Program args
     parser.add_argument('--batch_size', default=128, type=int, help="Size of a batch")
     # Module args
-    # parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-    # parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
-    # parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
-    # parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
-    # parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
-    # parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
-    # parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
     parser = GRUCNNResidual.add_model_specific_args(parser)
     # Trainer args
     parser = pl.Trainer.add_argparse_args(parser)  # accelerator, max_epochs
     args = parser.parse_args()
-    args.max_epochs = -1
-    args.resume_from_checkpoint = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/" \
-                                  "GRUCNNResidual_norm/default/" \
-                                  "20210920_151801_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_norm/" \
-                                  "checkpoints/epoch=9999-step=2929999.ckpt"
+    # args.max_epochs = 20000
+    # args.resume_from_checkpoint = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/" \
+    #                               "GRUCNNResidual_norm/default/" \
+    #                               "20210920_151801_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_norm/" \
+    #                               "checkpoints/epoch=9999-step=2929999.ckpt"
 
     # Tensorboard
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/
@@ -69,7 +62,8 @@ def main():
         training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}_{args.embedding}/"
     else:
         version = args.resume_from_checkpoint.split("/")[-3]
-        training_path = "/".join(args.resume_from_checkpoint.split("/")[:-5]) + "/"
+        training_path = "/".join(args.resume_from_checkpoint.split("/")[:-4]) + "/"
+        print(training_path)
     # Reproducibility
     seed = 0
     torch.manual_seed(seed)
@@ -102,9 +96,11 @@ def main():
                                  batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT))
 
     if is_cluster():
-        trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs, accelerator="ddp")
+        trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs, accelerator="ddp",
+                             resume_from_checkpoint=args.resume_from_checkpoint)
     else:
-        trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs)
+        trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs,
+                             resume_from_checkpoint=args.resume_from_checkpoint)
     trainer.fit(run, train_data, validation_data)
 
 
