@@ -1,7 +1,6 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from torch.nn.functional import relu
 from typing import Callable
 
 from src.learning.run import Run
@@ -13,7 +12,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
+        parser.add_argument('--embedding', default="norm", type=str, help="Type of embedding to use")
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
@@ -43,7 +42,11 @@ class GRUCNNResidual(pl.LightningModule, Run):
         :param unit_size: The size of one layer.
         """
         super(GRUCNNResidual, self).__init__()
-        self.activation = activation
+        self.activation = None
+        if activation == "tanh":
+            self.activation = torch.tanh  # torch.tanh or f.relu
+        elif activation == "relu":
+            self.activation = torch.relu  # torch.tanh or f.relu
 
         emb_test = ["none", "depth", "norm", "both"]
         assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
@@ -163,7 +166,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
 
         return out.reshape(residual_shape)
 
-    def _step(self, batch):
+    def step(self, batch):
         """
         :param batch: {motor: (batch, time, 6),
                        state: (batch, time, 13),
@@ -196,12 +199,12 @@ class GRUCNNResidual(pl.LightningModule, Run):
         return loss.mean()
 
     def training_step(self, train_batch, batch_idx):
-        training_loss = self._step(train_batch)
+        training_loss = self.step(train_batch)
         self.log("train_loss", training_loss)
         return training_loss
 
     def validation_step(self, val_batch, batch_idx):
-        val_loss = self._step(val_batch)
+        val_loss = self.step(val_batch)
         self.log("val_loss", val_loss)
 
     def rollout(self, motor, state, embedding, dt, horizon):
@@ -289,7 +292,7 @@ def _test():
                         embedding=torch.cat([depth[:, :past], normal[:, :past]], dim=2), dt=dt[:, :past])
     assert res.shape == (batch_size, 6)
 
-    res = model._step(batch=batch)
+    res = model.step(batch=batch)
     assert type(res.item()) == float
 
     # res = model.training_step(train_batch=batch, batch_idx=3)

@@ -9,4 +9,4 @@ singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m 
  --lr 1e-6\
  --past 60\
  --unit_size 50\
- --max_epochs 10000
+ --max_epochs -1

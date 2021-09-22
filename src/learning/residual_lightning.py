@@ -29,43 +29,47 @@ print(f"GPU_COUNT: {GPU_COUNT}")
 def main():
     # Args are hyper parameters to optimize
     parser = argparse.ArgumentParser(description="Identify model on data.")
+    # Program args
     parser.add_argument('--batch_size', default=128, type=int, help="Size of a batch")
-    # parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
+    # Module args
+    # parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
+    # parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
     # parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
+    # parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
+    # parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
     # parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
     # parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
-    # parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-    # parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
-    # parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
     parser = GRUCNNResidual.add_model_specific_args(parser)
+    # Trainer args
     parser = pl.Trainer.add_argparse_args(parser)  # accelerator, max_epochs
     args = parser.parse_args()
-
-    # Training parameters
-    activation = None
-    if args.activation == "tanh":
-        activation = torch.tanh  # torch.tanh or f.relu
-    elif args.activation == "relu":
-        activation = torch.relu  # torch.tanh or f.relu
+    args.max_epochs = -1
+    args.resume_from_checkpoint = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/" \
+                                  "GRUCNNResidual_norm/default/" \
+                                  "20210920_151801_GRUCNNResidual_bs128_epch10000_lr1e-06_h1_p60_us50_tanh_l3_norm/" \
+                                  "checkpoints/epoch=9999-step=2929999.ckpt"
 
     # Tensorboard
-    # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/training/
+    # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/
     # --load_fast=false --samples_per_plugin scalars=999999999
-    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    version = (f"{now}_"
-               f"{GRUCNNResidual.__name__}_"
-               f"bs{args.batch_size}_"
-               f"epch{args.max_epochs}_"
-               f"lr{args.lr}_"
-               f"h{args.horizon}_"
-               f"p{args.past}_"
-               f"us{args.unit_size}_"
-               f"{activation.__name__}_"
-               f"l{args.layer}_"
-               f"{args.embedding}"
-               )
-    training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}_{args.embedding}/"
-
+    if args.resume_from_checkpoint is None:
+        now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        version = (f"{now}_"
+                   f"{GRUCNNResidual.__name__}_"
+                   f"bs{args.batch_size}_"
+                   f"epch{args.max_epochs}_"
+                   f"lr{args.lr}_"
+                   f"h{args.horizon}_"
+                   f"p{args.past}_"
+                   f"us{args.unit_size}_"
+                   f"{args.activation}_"
+                   f"l{args.layer}_"
+                   f"{args.embedding}"
+                   )
+        training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}_{args.embedding}/"
+    else:
+        version = args.resume_from_checkpoint.split("/")[-3]
+        training_path = "/".join(args.resume_from_checkpoint.split("/")[:-5]) + "/"
     # Reproducibility
     seed = 0
     torch.manual_seed(seed)
@@ -75,7 +79,7 @@ def main():
     tb_logger = pl_loggers.TensorBoardLogger(training_path, version=version)
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
     run = GRUCNNResidual(
-        activation=activation,
+        activation=args.activation,
         embedding=args.embedding,
         layer=args.layer,
         learning_rate=args.lr,
