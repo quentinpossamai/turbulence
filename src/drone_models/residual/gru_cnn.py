@@ -16,7 +16,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         # Debug
-        file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_none/default/"
+        file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
         file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_none/"
         file += "checkpoints/epoch=9999-step=2929999.ckpt"
         parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
