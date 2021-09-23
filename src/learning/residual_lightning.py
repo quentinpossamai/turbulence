@@ -93,7 +93,7 @@ def main():
 
     if is_cluster():
         trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs,
-                             # accelerator="ddp",
+                             accelerator="ddp",
                              resume_from_checkpoint=args.resume_from_checkpoint)
     else:
         trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs,
