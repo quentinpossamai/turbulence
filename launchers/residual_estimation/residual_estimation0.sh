@@ -6,7 +6,7 @@ file+="checkpoints/epoch=9999-step=2929999.ckpt"
 singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.residual_lightning\
  --batch_size 64\
  --activation tanh\
- --embedding none\
+ --embedding None\
  --horizon 1\
  --layer 3\
  --load_weights $file\
