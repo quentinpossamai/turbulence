@@ -12,9 +12,14 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="both", type=str, help="Type of embedding to use")
+        parser.add_argument('--embedding', default="None", type=str, help="Type of embedding to use")
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
+        # Debug
+        file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_none/default/"
+        file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_none/"
+        file += "checkpoints/epoch=9999-step=2929999.ckpt"
+        parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
@@ -25,6 +30,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
                  embedding: str,
                  layer: int,
                  learning_rate: float,
+                 load_weights: str,
                  model,
                  motor_size: int,
                  past: int,
@@ -36,6 +42,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         :param embedding: Type of embedding to use.
         :param layer: Number of layer for the neural network.
         :param learning_rate: Learning rate for Adam optimizer.
+        :param load_weights: A path is given, load the weights from checkpoint.
         :param model: The model to use the residual model with for the rollout.
         :param motor_size: The number of motors.
         :param past: The number of past state and motor measures to use.
@@ -48,7 +55,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         elif activation == "relu":
             self.activation = torch.relu  # torch.tanh or f.relu
 
-        emb_test = ["none", "depth", "norm", "both"]
+        emb_test = ["None", "depth", "norm", "both"]
         assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
         self.embedding = embedding
         self.emb_size = 0
@@ -62,6 +69,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         self.layer = layer
 
         self.learning_rate = learning_rate
+        self.load_weights = load_weights
         self.model = model
         self.motor_size = motor_size
         self.past = past
@@ -101,6 +109,10 @@ class GRUCNNResidual(pl.LightningModule, Run):
             self.linear0 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
+
+        if self.load_weights is not None:
+            weights = torch.load(self.load_weights, map_location=torch.device(self.device))
+            self.load_state_dict(weights["state_dict"])
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
