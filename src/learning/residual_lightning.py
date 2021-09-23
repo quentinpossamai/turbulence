@@ -21,8 +21,9 @@ mkdir_if_not_exist([ANALYSIS_PATH])
 
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
-GPU_COUNT = int(device != 'cpu')
+GPU_COUNT = int(device != torch.device("cpu"))
 
+print(device)
 print(f"GPU_COUNT: {GPU_COUNT}")
 
 
