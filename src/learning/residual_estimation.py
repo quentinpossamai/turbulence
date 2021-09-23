@@ -15,12 +15,11 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.drone_models.residual.groundthruth import GroundTruth  # Sanity check
 from src.drone_models.residual.mlp import MLPResidual
 from src.drone_models.residual.cnn import CNNResidual
-from src.drone_models.residual.gru import GRUResidual
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 from src.log import Logger
 
-ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
-mkdir_if_not_exist([ANALYSIS_PATH])
+EUROC_MAV_RESIDUAL = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
+mkdir_if_not_exist([EUROC_MAV_RESIDUAL])
 
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
@@ -40,7 +39,12 @@ def main():
     parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
     parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
     parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
-    parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
+
+    def none_or_str(value):
+        if value == 'None':
+            return None
+        return value
+    parser.add_argument('--embedding', default=None, type=none_or_str, help="Type of embedding to use")
     args = parser.parse_args()
 
     # Training parameters
@@ -62,7 +66,7 @@ def main():
             f"{activation.__name__}_"
             f"l{args.layer}_"
             f"{args.embedding}")
-    training_path = ANALYSIS_PATH + f"training/{name}/"
+    training_path = EUROC_MAV_RESIDUAL + f"training/{name}/"
 
     # Reproducibility
     torch.manual_seed(seed)

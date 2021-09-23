@@ -12,14 +12,20 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="None", type=str, help="Type of embedding to use")
+
+        def none_or_str(value):
+            if value == 'None':
+                return None
+            return value
+
+        parser.add_argument('--embedding', default="None", type=none_or_str, help="Type of embedding to use")
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         # Debug
         file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
         file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
         file += "checkpoints/epoch=9999-step=2929999.ckpt"
-        parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
+        parser.add_argument('--load_weights', default=None, type=str, help="Path to previous weights")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
@@ -55,7 +61,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         elif activation == "relu":
             self.activation = torch.relu  # torch.tanh or f.relu
 
-        emb_test = ["None", "depth", "norm", "both"]
+        emb_test = [None, "depth", "norm", "both"]
         assert embedding in emb_test, f"embedding parameter must be one of the following values {emb_test}"
         self.embedding = embedding
         self.emb_size = 0
@@ -117,16 +123,24 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def forward(self, motor, state, embedding, dt):
+    # def forward(self, motor, state, embedding, dt):
+    def forward(self, **kwargs):
         """
         Estimate the residual = GT - model
-        :param motor: (batch, step, values=6)
-        :param state: (batch, step, values=13)
-        :param embedding: (batch, step, values=128 or 256) or None
-        :param dt: (batch, step, values=1)
+        kwargs: motor: (batch, self.past, values=6)
+        kwargs: state: (batch, self.past, values=13)
+        kwargs: depth_emb: (batch, self.past, values=128)
+        kwargs: norm_emb: (batch, self.past, values=128)
+        kwargs: dt: (batch, self.past, values=1)
         :return: (batch, value=6)
         """
-        # 1.-Input any batch dim processing
+        # 1.-Input processing
+        motor = kwargs['motor']
+        state = kwargs['state']
+        depth_emb = kwargs['depth_emb']
+        norm_emb = kwargs['norm_emb']
+        dt = kwargs['dt']
+
         assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
         motor = motor.reshape(-1, self.past, self.motor_size)
@@ -135,11 +149,21 @@ class GRUCNNResidual(pl.LightningModule, Run):
         state_shape = state.shape
         state = state.reshape(-1, self.past, 13)
 
+        assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
+        depth_emb_shape = depth_emb.shape
+        depth_emb = depth_emb.reshape(-1, self.past, 128)
+
+        assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
+        norm_emb_shape = norm_emb.shape
+        norm_emb = norm_emb.reshape(-1, self.past, 128)
+
         assert dt.shape[-1] == 1, "dt len is not 1"
         dt_shape = dt.shape
         dt = dt.reshape(-1, self.past, 1)
 
         assert motor_shape[:-1] == state_shape[:-1]
+        assert motor_shape[:-1] == depth_emb_shape[:-1]
+        assert motor_shape[:-1] == norm_emb_shape[:-1]
         assert motor_shape[:-1] == dt_shape[:-1]
 
         state_motor_dt = torch.cat([motor, state, dt], dim=2)
@@ -150,15 +174,17 @@ class GRUCNNResidual(pl.LightningModule, Run):
         out, _ = self.gru0(out)  # gru output with shape: (step, batch, feature_size)
         out = out[:, -1]  # last hidden states, (batch, feature_size)
 
-        if self.emb_size != 0:
-            assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
-            embedding_shape = embedding.shape
-            embedding = embedding.reshape(-1, 1, self.past, self.emb_size)
-            assert motor_shape[:-1] == embedding_shape[:-1]
-            # Input any batch dim processing end
-
+        if self.embedding is not None:
             # 2.2-CNN embedding
-            out_emb = self.batch_norm_emb_0(embedding)
+            if self.embedding in ["depth"]:
+                embedding = depth_emb
+            elif self.embedding in ["norm"]:
+                embedding = norm_emb
+            else:
+                assert self.embedding in ['both']
+                embedding = torch.cat([depth_emb, norm_emb], dim=-1)
+            assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
+            out_emb = self.batch_norm_emb_0(embedding.reshape(-1, 1, self.past, self.emb_size))
             out_emb = self.activation(self.conv2d_emb_0(out_emb))
             out_emb = self.batch_norm_emb_1(out_emb)
             out_emb = self.activation(self.conv2d_emb_1(out_emb))
@@ -188,24 +214,16 @@ class GRUCNNResidual(pl.LightningModule, Run):
         """
         motor = batch["motor"][:, 1:self.past + 1]
         state = batch["state"][:, :self.past]
+        depth_emb = batch["depth_emb"][:, :self.past]
+        norm_emb = batch["norm_emb"][:, :self.past]
 
         motor_shape = motor.shape
-
         dt_shape = list(motor_shape)
         dt_shape[-1] = 1
         dt = torch.tensor(1 / 200, device=self.device).repeat(dt_shape)
 
         residual_gt = batch["residual"][:, self.past]
-
-        embedding = None
-        if self.embedding in ["depth"]:
-            embedding = batch["depth_emb"][:, :self.past]
-        if self.embedding in ["norm"]:
-            embedding = batch["norm_emb"][:, :self.past]
-        if self.embedding in ["both"]:
-            embedding = torch.cat([batch["depth_emb"][:, :self.past], batch["norm_emb"][:, :self.past]], dim=-1)
-
-        residual_hat = self.forward(motor=motor, state=state, embedding=embedding, dt=dt)
+        residual_hat = self.forward(motor=motor, state=state, depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
 
         loss = (residual_gt - residual_hat) ** 2
         return loss.mean()
@@ -219,16 +237,26 @@ class GRUCNNResidual(pl.LightningModule, Run):
         val_loss = self.step(val_batch)
         self.log("val_loss", val_loss)
 
-    def rollout(self, motor, state, embedding, dt, horizon):
+    # def rollout(self, motor, state, embedding, dt, horizon):
+    def rollout(self, **kwargs):
         """
-        :param motor: (*, past + horizon, motor_size). t+1
-        :param state: (*, past + horizon, 13). t
-        :param embedding: (*, past + horizon, 128 or 256). t+1 - t
-        :param dt: (*, past + horizon, 1). t+1 - t
-        :param horizon: int
+        kwargs: motor: (*, past + horizon, motor_size). t+1
+        kwargs: state: (*, past + horizon, 13). t
+        kwargs: depth_emb: (batch, past+horizon, values=128) t
+        kwargs: norm_emb: (batch, past+horizon, values=128) t
+        kwargs: embedding: (*, past + horizon, 128 or 256)
+        kwargs: dt: (*, past + horizon, 1). t+1 - t
+        kwargs: horizon: int
         :return: (*, horizon, 13). state t+1
         """
-        # Input any batch dim processing
+        # Input processing
+        motor = kwargs['motor']
+        state = kwargs['state']
+        dt = kwargs['dt']
+        depth_emb = kwargs['depth_emb']
+        norm_emb = kwargs['norm_emb']
+        horizon = kwargs['horizon']
+
         time_size = horizon + self.past
         assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
@@ -238,6 +266,14 @@ class GRUCNNResidual(pl.LightningModule, Run):
         state_shape = state.shape
         state = state.reshape(-1, time_size, 13)
 
+        assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
+        depth_emb_shape = depth_emb.shape
+        depth_emb = depth_emb.reshape(-1, time_size, 128)
+
+        assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
+        norm_emb_shape = norm_emb.shape
+        norm_emb = norm_emb.reshape(-1, time_size, 128)
+
         assert dt.shape[-1] == 1, "dt len is not 1"
         dt_shape = dt.shape
         dt = dt.reshape(-1, time_size, 1)
@@ -246,9 +282,11 @@ class GRUCNNResidual(pl.LightningModule, Run):
         pred_shape[-2] = horizon
 
         assert motor_shape[:-1] == state_shape[:-1]
+        assert motor_shape[:-1] == depth_emb_shape[:-1]
+        assert motor_shape[:-1] == norm_emb_shape[:-1]
         assert motor_shape[:-1] == dt_shape[:-1]
         assert time_size == motor_shape[-2]
-        # Input any batch dim processing end
+        # Input processing end
 
         next_state_gt = state[:, self.past:]
 
@@ -260,7 +298,8 @@ class GRUCNNResidual(pl.LightningModule, Run):
             for i in range(horizon):
                 residual = self.forward(motor=motor[:, i + 1:self.past + i + 1],
                                         state=past_state,
-                                        embedding=embedding[:, i + 1:self.past + i + 1],
+                                        depth_emb=depth_emb[:, i:self.past + i],
+                                        norm_emb=norm_emb[:, i:self.past + i],
                                         dt=dt[:, i + 1:self.past + i + 1])
                 next_state = self.model(motor=motor[:, i + 1],
                                         state=prediction[-1].view(-1, 13),
@@ -284,24 +323,25 @@ def _test():
     state = torch.randn(batch_size, time_size, 13, dtype=dtype)
     dt = torch.tensor(1 / 200, dtype=dtype).repeat(batch_size, time_size, 1)
     residual = torch.randn(batch_size, time_size, 6, dtype=dtype)
-    depth = torch.randn(batch_size, time_size, 128, dtype=dtype)
-    normal = torch.randn(batch_size, time_size, 128, dtype=dtype)
+    depth_emb = torch.randn(batch_size, time_size, 128, dtype=dtype)
+    norm_emb = torch.randn(batch_size, time_size, 128, dtype=dtype)
 
-    batch = {"motor": motor, "state": state, "residual": residual, "depth_emb": depth, "norm_emb": normal}
+    batch = {"motor": motor, "state": state, "residual": residual, "depth_emb": depth_emb, "norm_emb": norm_emb}
 
-    model = GRUCNNResidual(model=DynamicalModel(param="identification", dtype=torch.float32),
-                           past=60,
-                           unit_size=50,
-                           motor_size=6,
-                           activation=torch.tanh,
-                           layer=3,
-                           embedding="both",
-                           learning_rate=1e-3
-                           )
+    model = GRUCNNResidual(
+        activation='tanh',
+        embedding="both",
+        layer=3,
+        learning_rate=1e-3,
+        load_weights=None,
+        model=DynamicalModel(param="identification", dtype=torch.float32),
+        motor_size=6,
+        past=60,
+        unit_size=50,)
     model.configure_optimizers()
 
-    res = model.forward(motor=motor[:, :past], state=state[:, :past],
-                        embedding=torch.cat([depth[:, :past], normal[:, :past]], dim=2), dt=dt[:, :past])
+    res = model.forward(motor=motor[:, :past], state=state[:, :past], depth_emb=depth_emb[:, :past],
+                        norm_emb=norm_emb[:, :past], dt=dt[:, :past])
     assert res.shape == (batch_size, 6)
 
     res = model.step(batch=batch)
@@ -313,8 +353,7 @@ def _test():
     # res = model.validation_step(val_batch=batch, batch_idx=3)
     # assert res is None
 
-    error, error_tab, res = model.rollout(motor=motor, state=state,
-                                          embedding=torch.cat([depth, normal], dim=2),
+    error, error_tab, res = model.rollout(motor=motor, state=state, depth_emb=depth_emb, norm_emb=norm_emb,
                                           dt=dt, horizon=horizon)
     assert res.shape == (batch_size, time_size - past, 13)
 

@@ -4,23 +4,10 @@ from abc import ABC, abstractmethod
 
 
 class Run(ABC):
-
     @abstractmethod
-    def configure_optimizers(self, *args):
+    def forward(self, **kwargs):
         pass
 
     @abstractmethod
-    def forward(self, *args):
-        pass
-
-    @abstractmethod
-    def training_step(self, *args):
-        pass
-
-    @abstractmethod
-    def validation_step(self, *args):
-        pass
-
-    @abstractmethod
-    def rollout(self, *args):
+    def rollout(self, **kwargs):
         pass

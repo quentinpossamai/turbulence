@@ -1,11 +1,12 @@
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
 import src.utils.quaternion as quaternion
+from src.learning.run import Run
 
 
-class DynamicalModel(nn.Module):
+class DynamicalModel(nn.Module, Run):
     def __init__(self, param, dtype):
         """
         :param param: "paper", "identification", or dict["permutation", "theta"]
@@ -54,15 +55,21 @@ class DynamicalModel(nn.Module):
             self.theta = param["theta"]
             self.permutation = param["permutation"]
 
-    def forward(self, motor, state, dt, residual=None):
+    def forward(self, **kwargs):
         """
-        :param motor: (*, self.motor_size). t+1
-        :param state: (*, 13). t
-        :param dt: (*, 1). t+1 - t
-        :param residual: (*, 6). t+1
+        kwargs: motor: (*, self.motor_size). t+1
+        kwargs: state: (*, 13). t
+        kwargs: dt: (*, 1). t+1 - t
+        kwargs: residual: (*, 6). t+1
         :return: (*, 6). residual t+1
         """
-        assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
+        # 1.-Input processing
+        motor = kwargs['motor']
+        state = kwargs['state']
+        residual = kwargs['residual'] if 'residual' in kwargs else None  # Optional kwargs
+        dt = kwargs['dt']
+
+        assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
         motor = motor.reshape(-1, self.motor_size, 1)
 
@@ -70,7 +77,7 @@ class DynamicalModel(nn.Module):
         state_shape = state.shape
         state = state.reshape(-1, 13, 1)
 
-        assert dt.shape[-1] == 1,  "dt len is not 1"
+        assert dt.shape[-1] == 1, "dt len is not 1"
         dt_shape = dt.shape
         dt = dt.reshape(-1, 1, 1)
 
@@ -90,6 +97,7 @@ class DynamicalModel(nn.Module):
         assert motor_shape[:-1] == state_shape[:-1]
         assert motor_shape[:-1] == dt_shape[:-1]
         assert motor_shape[:-1] == residual_shape[:-1]
+        # Input processing end
 
         pos = state[:, :3]
         quat = state[:, 3:7]
@@ -126,7 +134,7 @@ class DynamicalModel(nn.Module):
         :param motor: (*, self.motor_size) t
         :return: (*, 4) t
         """
-        assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
+        assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
         motor = motor.reshape(-1, self.motor_size, 1)
         motor_torsor_shape = list(motor_shape)
@@ -151,7 +159,7 @@ class DynamicalModel(nn.Module):
         :param next_state: (*, 13). state t+1
         :return: (*, 6). residual t+1
         """
-        assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
+        assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
         motor = motor.reshape(-1, self.motor_size, 1)
 
@@ -159,7 +167,7 @@ class DynamicalModel(nn.Module):
         state_shape = state.shape
         state = state.reshape(-1, 13, 1)
 
-        assert dt.shape[-1] == 1,  "dt len is not 1"
+        assert dt.shape[-1] == 1, "dt len is not 1"
         dt_shape = dt.shape
         dt = dt.reshape(-1, 1, 1)
 
@@ -193,33 +201,40 @@ class DynamicalModel(nn.Module):
                  - t12_tensor * motor_torsor[:, :3])
         return torch.cat([kfa, ktaua], dim=1).reshape(residual_shape)
 
-    def rollout(self, motor, state, dt, horizon):
+    def rollout(self, **kwargs):
         """
-        :param motor: (*, horizon+1, motor_size). t+1
-        :param state: (*, horizon+1, 13). t
-        :param horizon: int
-        :param dt: (*, horizon+1, 1). t+1 - t
+        kwargs: motor: (*, horizon+1, motor_size). t+1
+        kwargs: state: (*, horizon+1, 13). t
+        kwargs: horizon: int
+        kwargs: dt: (*, horizon+1, 1). t+1 - t
         :return: (*, horizon, 13). state t+1
         """
-        assert motor.shape[-1] == self.motor_size,  f"motor len is not {self.motor_size}"
+        # Input processing
+        motor = kwargs['motor']
+        state = kwargs['state']
+        dt = kwargs['dt']
+        horizon = kwargs['horizon']
+
+        time_size = horizon + 1
+        assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
         motor_shape = motor.shape
-        motor = motor.reshape(-1, horizon + 1, self.motor_size)
+        motor = motor.reshape(-1, time_size, self.motor_size)
 
         assert state.shape[-1] == 13, "state len is not 13"
         state_shape = state.shape
-        state = state.reshape(-1, horizon + 1, 13)
+        state = state.reshape(-1, time_size, 13)
 
-        assert dt.shape[-1] == 1,  "dt len is not 1"
+        assert dt.shape[-1] == 1, "dt len is not 1"
         dt_shape = dt.shape
-        dt = dt.reshape(-1, horizon + 1, 1)
+        dt = dt.reshape(-1, time_size, 1)
 
         pred_shape = list(state_shape)
         pred_shape[-2] = horizon
 
-        size = len(motor)
         assert motor_shape[:-1] == state_shape[:-1]
         assert motor_shape[:-1] == dt_shape[:-1]
-        assert horizon + 1 == motor_shape[-2]
+        assert time_size == motor_shape[-2]
+        # Input processing end
 
         next_state_gt = state[:, 1:]
 
@@ -228,7 +243,7 @@ class DynamicalModel(nn.Module):
             # Prediction rollout
             prediction = [state[:, 0:1]]
             for i in range(horizon):
-                next_state = self.forward(motor=motor[:, i+1:i+2], state=prediction[-1], dt=dt[:, i+1:i+2])
+                next_state = self.forward(motor=motor[:, i + 1:i + 2], state=prediction[-1], dt=dt[:, i + 1:i + 2])
                 prediction.append(next_state)
 
         prediction = torch.cat(prediction, dim=1)[:, 1:]  # First is not a prediction

@@ -16,8 +16,8 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.drone_models.residual.gru_cnn import GRUCNNResidual
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist, is_cluster
 
-ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
-mkdir_if_not_exist([ANALYSIS_PATH])
+EUROC_MAV_RESIDUAL = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
+mkdir_if_not_exist([EUROC_MAV_RESIDUAL])
 
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
@@ -55,7 +55,7 @@ def main():
                    f"l{args.layer}_"
                    f"{args.embedding}"
                    )
-        training_path = ANALYSIS_PATH + f"{GRUCNNResidual.__name__}_{args.embedding}/"
+        training_path = EUROC_MAV_RESIDUAL + f"{GRUCNNResidual.__name__}_{args.embedding}/"
     else:
         version = args.resume_from_checkpoint.split("/")[-3]
         training_path = "/".join(args.resume_from_checkpoint.split("/")[:-4]) + "/"

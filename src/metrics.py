@@ -39,7 +39,7 @@ def load_euroc_mav_flights(mode):
     return flights
 
 
-def mse_error(model, residual_model, horizon, past, dataset, split):
+def mse_error(model, horizon, past, dataset, split):
     """ Return the mean squared error on the selected split, controlled by the horizon
     args:
     :param model: f(s_i, u_i) : the predictor (expect a Pytorch Module).
@@ -51,7 +51,6 @@ def mse_error(model, residual_model, horizon, past, dataset, split):
     :param past: The number of past elements given as an input to the model.
     :param dataset: The name of the dataset to use. euroc_mav or blackbird
     :param split: Allows to switch between the train, validation, test set.
-    :param residual_model: If the model predicts the residual or not.
     """
 
     assert split in ["train", "validation", "test"]
@@ -67,35 +66,59 @@ def mse_error(model, residual_model, horizon, past, dataset, split):
     error_per_flight = {flight_name: 0 for flight_name in flights.keys()}
 
     for k in tqdm(flights.keys()):  # Extract flight states and command
-        states = torch.FloatTensor(flights[k]["state"])
+        state = torch.FloatTensor(flights[k]["state"])
         motor = torch.FloatTensor(flights[k]["motor"])
         time = torch.FloatTensor(flights[k]['t'])
-        error_per_flight[k] = _compute_error(model=model, residual_model=residual_model, horizon=horizon, past=past,
-                                             states=states, motor=motor, time=time)
+        depth_emb = torch.FloatTensor(flights[k]['depth_emb'])
+        norm_emb = torch.FloatTensor(flights[k]['norm_emb'])
+        error_per_flight[k] = _compute_error(
+            model=model,
+            horizon=horizon,
+            past=past,
+            state=state,
+            motor=motor,
+            time=time,
+            depth_emb=depth_emb,
+            norm_emb=norm_emb,
+        )
 
     # Sum of error for all flights
     total_error = torch.FloatTensor(list(error_per_flight.values())).mean()
     return total_error
 
 
-def _compute_error(model, residual_model, horizon, past, states, motor, time):
+def _compute_error(**kwargs):
+    model = kwargs['model']
+    horizon = kwargs['horizon']
+    past = kwargs['past']
+    state = kwargs['state']
+    motor = kwargs['motor']
+    time = kwargs['time']
+    depth_emb = kwargs['depth_emb']
+    norm_emb = kwargs['norm_emb']
+
     crop_idx = (time.shape[0] - 1) // (past + horizon)  # remove last time step of states to fit N*(H+1) points
 
     # Batch-ify the trajectories to speed up computation
     # First step is to crop the trajectory to an whole number of horizon
     # Next, tensor are reshaped in batch of h-length array
     motor_size = motor.shape[1]
-    cropped_states = states[:crop_idx * (past + horizon)].view(-1, past + horizon, 13)
-    cropped_command = motor[:crop_idx * (past + horizon)].view(-1, past + horizon, motor_size)
+    cropped_states = state[:crop_idx * (past + horizon)].view(-1, past + horizon, 13)
+    cropped_motor = motor[:crop_idx * (past + horizon)].view(-1, past + horizon, motor_size)
+    cropped_depth_emb = depth_emb[:crop_idx * (past + horizon)].view(-1, past + horizon, 128)
+    cropped_norm_emb = norm_emb[:crop_idx * (past + horizon)].view(-1, past + horizon, 128)
     # cropped_dt = (time[1:] - time[:-1])[:crop_idx * (past + horizon)].view(-1, past + horizon, 1)
     sh = list(cropped_states.shape)
     sh[-1] = 1
     dt = torch.FloatTensor([[1 / 200]]).repeat(sh)
-    if residual_model is None:
-        error, error_rollout, pred = model.rollout(motor=cropped_command, state=cropped_states, dt=dt, horizon=horizon)
-    else:
-        # TODO change like hexarotor_4params.py
-        error, prediction = residual_model.rollout(motor=cropped_command, state=cropped_states, dt=dt, horizon=horizon)
+    error, error_rollout, pred = model.rollout(
+            motor=cropped_motor,
+            state=cropped_states,
+            dt=dt,
+            horizon=horizon,
+            depth_emb=cropped_depth_emb,
+            norm_emb=cropped_norm_emb,
+        )
     return error
 
 
