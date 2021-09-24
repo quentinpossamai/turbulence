@@ -32,6 +32,11 @@ def main():
     parser = argparse.ArgumentParser(description="Identify model on data.")
     # Program args
     parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
+    # Debug
+    file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
+    file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
+    file += "checkpoints/epoch=9999-step=2929999.ckpt"
+    parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
     # Module args
     parser = GRUCNNResidual.add_model_specific_args(parser)
     # Trainer args
@@ -68,18 +73,20 @@ def main():
 
     tb_logger = pl_loggers.TensorBoardLogger(training_path, version=version)
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
-    run = GRUCNNResidual(
-        activation=args.activation,
-        embedding=args.embedding,
-        layer=args.layer,
-        learning_rate=args.lr,
-        load_weights=args.load_weights,
-        model=analytic_model,
-        motor_size=6,
-        past=args.past,
-        unit_size=args.unit_size,
-    )
-
+    if args.load_weights is None:
+        run = GRUCNNResidual(
+            activation=args.activation,
+            embedding=args.embedding,
+            layer=args.layer,
+            learning_rate=args.lr,
+            model=analytic_model,
+            motor_size=6,
+            past=args.past,
+            unit_size=args.unit_size,
+        )
+    else:
+        run = GRUCNNResidual.load_from_checkpoint(args.load_weights, model=analytic_model, motor_size=6, embedding=None,
+                                                  activation='tanh')
     # Datasets
     train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
@@ -92,7 +99,7 @@ def main():
                                                         batch_dim=False),
                                  batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT))
 
-    if is_cluster():
+    if GPU_COUNT:
         trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs,
                              accelerator="ddp",
                              resume_from_checkpoint=args.resume_from_checkpoint)

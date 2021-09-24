@@ -73,10 +73,10 @@ def plot_rollout(model, horizon, past, dataset, train_test_validation):
         raise NotImplementedError
 
 
-def plot_residual(model, traj_len, past, dataset, train_test_validation):
+def plot_residual(model, traj_len, dataset, train_test_validation):
     if dataset == "euroc_mav":
         data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
-                                            traj_len=past + 1, dtype=torch.float32, batch_dim=False)
+                                            traj_len=traj_len, dtype=torch.float32, batch_dim=False)
         time = []
         residual_hat = []
         residual_gt = []
@@ -99,6 +99,11 @@ def plot_residual(model, traj_len, past, dataset, train_test_validation):
         time = torch.stack(time, dim=0)
         residual_gt = torch.stack(residual_gt, dim=0)
         residual_hat = torch.stack(residual_hat, dim=0)
+        loss = ((residual_gt - residual_hat) ** 2).mean().item()
+        print(f"{loss}")
+        # 1- 0.17300058901309967
+        # 2- 0.17300058901309967
+
 
         i = 0
         name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
@@ -207,27 +212,33 @@ def main():
     # Testing embeddings
     print('\nResidual model GRU CNN no embeddings')
     gru_cnn = EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
-    gru_cnn += "20210923_111845_GRUCNNResidual_bs64_epchNone_lr1e-06_h1_p60_us50_tanh_l3_None/"
-    gru_cnn += "checkpoints/epoch=86-step=50981.ckpt"
+    # gru_cnn += "20210923_111845_GRUCNNResidual_bs64_epchNone_lr1e-06_h1_p60_us50_tanh_l3_None/"
+    # gru_cnn += "checkpoints/epoch=86-step=50981.ckpt"
+    gru_cnn += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
+    gru_cnn += "checkpoints/epoch=9999-step=2929999.ckpt"
     from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
     from src.drone_models.residual.gru_cnn import GRUCNNResidual
     model = DynamicalModel(param='identification', dtype=torch.float32)
     past = 60
-    residual_model = GRUCNNResidual(activation='tanh',
-                                    embedding=None,
-                                    layer=3,
-                                    learning_rate=1e-6,
-                                    load_weights=gru_cnn,
-                                    model=model,
-                                    motor_size=6,
-                                    past=past,
-                                    unit_size=50)
-    weights = torch.load(gru_cnn, map_location=torch.device('cpu'))
-    residual_model.load_state_dict(weights["state_dict"])
+
+    # 1-Lightning loading
+    # residual_model = GRUCNNResidual(activation='tanh',
+    #                                 embedding=None,
+    #                                 layer=3,
+    #                                 learning_rate=1e-6,
+    #                                 load_weights=gru_cnn,
+    #                                 model=model,
+    #                                 motor_size=6,
+    #                                 past=past,
+    #                                 unit_size=50)
+
+    # 2-Lightning loading
+    residual_model = GRUCNNResidual.load_from_checkpoint(gru_cnn, model=model, motor_size=6, embedding=None, activation='tanh')
+
     residual_model.eval()
     # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
     # plot_rollout(residual_model, horizon=200, past=past, dataset='euroc_mav', train_test_validation='test')
-    plot_residual(residual_model, past=60, traj_len=1000, dataset='euroc_mav', train_test_validation="test")
+    plot_residual(residual_model, traj_len=past+1, dataset='euroc_mav', train_test_validation="validation")
 
 
 if __name__ == '__main__':
