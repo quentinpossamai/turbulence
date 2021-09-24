@@ -104,7 +104,6 @@ def plot_residual(model, traj_len, dataset, train_test_validation):
         # 1- 0.17300058901309967
         # 2- 0.17300058901309967
 
-
         i = 0
         name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
@@ -216,29 +215,47 @@ def main():
     # gru_cnn += "checkpoints/epoch=86-step=50981.ckpt"
     gru_cnn += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
     gru_cnn += "checkpoints/epoch=9999-step=2929999.ckpt"
+
+    file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
+    file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
+    file += "checkpoints/epoch=9999-step=2929999.ckpt"
+    assert gru_cnn == file
+
     from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
     from src.drone_models.residual.gru_cnn import GRUCNNResidual
     model = DynamicalModel(param='identification', dtype=torch.float32)
     past = 60
 
     # 1-Lightning loading
-    # residual_model = GRUCNNResidual(activation='tanh',
-    #                                 embedding=None,
-    #                                 layer=3,
-    #                                 learning_rate=1e-6,
-    #                                 load_weights=gru_cnn,
-    #                                 model=model,
-    #                                 motor_size=6,
-    #                                 past=past,
-    #                                 unit_size=50)
+    # residual_model = GRUCNNResidual(
+    #     activation='tanh',
+    #     embedding=None,
+    #     layer=3,
+    #     learning_rate=1e-6,
+    #     load_weights = gru_cnn,
+    #     model=model,
+    #     motor_size=6,
+    #     past=past,
+    #     unit_size=50
+    # )
 
     # 2-Lightning loading
-    residual_model = GRUCNNResidual.load_from_checkpoint(gru_cnn, model=model, motor_size=6, embedding=None, activation='tanh')
+    residual_model = GRUCNNResidual.load_from_checkpoint(
+            gru_cnn,
+            activation='tanh',
+            embedding=None,
+            layer=3,
+            learning_rate=1e-6,
+            model=model,
+            motor_size=6,
+            past=60,
+            unit_size=50,
+        )
 
     residual_model.eval()
     # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
     # plot_rollout(residual_model, horizon=200, past=past, dataset='euroc_mav', train_test_validation='test')
-    plot_residual(residual_model, traj_len=past+1, dataset='euroc_mav', train_test_validation="validation")
+    plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
 
 
 if __name__ == '__main__':

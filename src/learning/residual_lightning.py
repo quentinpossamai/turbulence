@@ -14,7 +14,7 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 # from src.drone_models.residual.mlp import MLPResidual
 # from src.drone_models.residual.cnn_lightning import CNNResidual
 from src.drone_models.residual.gru_cnn import GRUCNNResidual
-from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist, is_cluster
+from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 EUROC_MAV_RESIDUAL = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
 mkdir_if_not_exist([EUROC_MAV_RESIDUAL])
@@ -33,10 +33,10 @@ def main():
     # Program args
     parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
     # Debug
-    file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
-    file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
-    file += "checkpoints/epoch=9999-step=2929999.ckpt"
-    parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
+    # file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
+    # file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
+    # file += "checkpoints/epoch=9999-step=2929999.ckpt"
+    parser.add_argument('--load_weights', default=None, type=str, help="Path to previous weights")
     # Module args
     parser = GRUCNNResidual.add_model_specific_args(parser)
     # Trainer args
@@ -85,8 +85,17 @@ def main():
             unit_size=args.unit_size,
         )
     else:
-        run = GRUCNNResidual.load_from_checkpoint(args.load_weights, model=analytic_model, motor_size=6, embedding=None,
-                                                  activation='tanh')
+        run = GRUCNNResidual.load_from_checkpoint(
+            args.load_weights,
+            activation=args.activation,
+            embedding=args.embedding,
+            layer=args.layer,
+            learning_rate=args.lr,
+            model=analytic_model,
+            motor_size=6,
+            past=args.past,
+            unit_size=args.unit_size,
+        )
     # Datasets
     train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
@@ -101,7 +110,6 @@ def main():
 
     if GPU_COUNT:
         trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs,
-                             accelerator="ddp",
                              resume_from_checkpoint=args.resume_from_checkpoint)
     else:
         trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, max_epochs=args.max_epochs,
