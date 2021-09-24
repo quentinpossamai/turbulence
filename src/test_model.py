@@ -11,6 +11,7 @@ from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 from src import metrics
 from src.learning.residual_lightning import EUROC_MAV_RESIDUAL
 
+
 # BLACKBIRD_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
 # EUROC_MAV_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "euroc_mav_learned_hexarotor_training/"
 # mkdir_if_not_exist([BLACKBIRD_ANALYSIS_PATH])
@@ -40,61 +41,30 @@ def test_model(model, past, dataset, train_test_validation):
           f"E(0.025s): {res[0]:0.4e}, E(0.5s): {res[1]:0.4e}, E(1s): {res[2]:0.4e}")
 
 
-def plot_residual(model, horizon, past, dataset, train_test_validation):
+def plot_rollout(model, horizon, past, dataset, train_test_validation):
     if dataset == "euroc_mav":
-        traj_len = 3000
+        traj_len = past + horizon
         data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
-                                            traj_len=traj_len, dtype=torch.float32, batch_dim=True)
-        time = data[0]["t"].squeeze()
-        state = data[0]["state"]
-        dt = torch.FloatTensor([[1 / 200]]).unsqueeze(0)
-        motor = data[0]["motor"]
-        residual_gt = data[0]["residual"][past:].squeeze()
+                                            traj_len=traj_len, dtype=torch.float32, batch_dim=False)
+        trajectory = data[0]
+        time = trajectory["t"]
+        motor = trajectory["motor"]
+        state = trajectory["state"]
+        depth_emb = trajectory["depth_emb"]
+        norm_emb = trajectory["norm_emb"]
 
-        # Horizon 1
-        # with torch.no_grad():
-        #     residual_hat = []
-        #     for i in range(past, traj_len):
-        #         residual_hat.append(residual_model(motor=motor[:, i-past:i], state=state[:, i-past:i], dt=dt))
-        #     residual_hat = torch.stack(residual_hat, dim=0)
-        # print(f"{((residual_hat - residual_gt) ** 2).mean()=}")
+        dt_shape = list(state.shape)
+        dt_shape[-1] = 1
+        dt = torch.FloatTensor([[1 / 200]]).repeat(dt_shape)
+
         with torch.no_grad():
-            prediction = [state[:, past - 1]]
-            for i in range(traj_len - past):
-                past_states = torch.cat([state[:, i:past - 1],
-                                         torch.stack(prediction, dim=1)[:, -past:]],
-                                        dim=1)
-                past_motor = motor[:, i:past + i]
-                # past_dt = cropped_dt[:, i:past + i]
+            loss, rollout_loss, pred = model.rollout(motor=motor, state=state, dt=dt, depth_emb=depth_emb,
+                                                     norm_emb=norm_emb, horizon=horizon)
 
-                if residual_model is not None:
-                    residual = residual_model(state=past_states, motor=past_motor, dt=dt).view(1, 6)
-                    next_state = model(motor=past_motor[:, -1], state=past_states[:, -1], dt=dt.view(1, 1),
-                                       residual=residual)
-                else:
-                    next_state = model(motor=past_motor, state=past_states, dt=dt)
-                prediction.append(next_state)
-
-            prediction = torch.stack(prediction, dim=1)
-            # error = ((prediction - ground_truth) ** 2).mean()
-
-        i = 0
-        name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
         fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-        ax.plot(time[past:], residual_gt[:, i], label=f"{name[i]} GT")
-        ax.plot(time[past:], prediction[:, i], label=f"{name[i]} hat")  # TODO Check if prediction should be plotted
-        ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
-        ax.set_xlabel("Time [s]")
-        ax.grid()
-        ax.legend()
-        plt.show()
-
-        i = 0
-        name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
-        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-        ax.plot(time[past:], residual_gt[:, i], label=f"{name[i]} GT")
-        ax.plot(time[past:], prediction[:, i], label=f"{name[i]} hat")
-        ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
+        ax.plot(time[past:], state[past:, :3], label=f"GT")
+        ax.plot(time[past:], pred[:, :3], label=f"hat")
+        ax.set_ylabel("Position [m]")
         ax.set_xlabel("Time [s]")
         ax.grid()
         ax.legend()
@@ -103,8 +73,60 @@ def plot_residual(model, horizon, past, dataset, train_test_validation):
         raise NotImplementedError
 
 
+def plot_residual(model, traj_len, past, dataset, train_test_validation):
+    if dataset == "euroc_mav":
+        data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
+                                            traj_len=past + 1, dtype=torch.float32, batch_dim=False)
+        time = []
+        residual_hat = []
+        residual_gt = []
+        with torch.no_grad():
+            for i in range(2000):
+                trajectory = data[i]
+                motor = trajectory["motor"][1:]
+                state = trajectory["state"][:-1]
+                depth_emb = trajectory["depth_emb"][:-1]
+                norm_emb = trajectory["norm_emb"][:-1]
+
+                dt_shape = list(state.shape)
+                dt_shape[-1] = 1
+                dt = torch.FloatTensor([[1 / 200]]).repeat(dt_shape)
+
+                time.append(trajectory["t"][-1])
+                residual_gt.append(trajectory["residual"][-1])
+                residual_hat.append(model(motor=motor, state=state, dt=dt, depth_emb=depth_emb, norm_emb=norm_emb))
+
+        time = torch.stack(time, dim=0)
+        residual_gt = torch.stack(residual_gt, dim=0)
+        residual_hat = torch.stack(residual_hat, dim=0)
+
+        i = 0
+        name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
+        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        ax.plot(time, residual_gt[:, i], label=f"GT")
+        ax.plot(time, residual_hat[:, i], label=f"hat")
+        ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
+        ax.set_xlabel("Time [s]")
+        ax.grid()
+        ax.legend()
+        plt.show()
+
+    else:
+        raise NotImplementedError
+
+
 def main():
-    # BLACKBIRD
+    # # EUROC MAV
+    # from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+    # print('Dynamical model paper')
+    # model = DynamicalModel(param="paper", dtype=torch.float32)
+    # test_model(model=model, past=1, dataset="euroc_mav", train_test_validation="test")
+    # print('\nDynamical model identification')
+    # model = DynamicalModel(param="identification", dtype=torch.float32)
+    # test_model(model=model, past=1, dataset="euroc_mav", train_test_validation="test")
+
+    # --- TODO update
+    # - BLACKBIRD
     # phi_paper_param = quadrotor_4parms.DynamicalModel(paper=True)
     # test_model(phi_paper_param, "blackbird", "test", "normal")
 
@@ -113,19 +135,10 @@ def main():
 
     # mlp_int = "20210623_113455_OldMLPQuadrotor_bs_64000/8004_weights.pt"
     # test_blackbird_mlp_metrics(mlp_int)
-
+    ##
+    # EUROC MAV
     # mlp_symplectic = "20210621_145132_MLPQuadrotor_bs_64000/11136_weights.pt"
     # test_blackbird_mlp_metrics(mlp_symplectic)
-
-    # EUROC MAV
-    from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-    print('Dynamical model paper')
-    model = DynamicalModel(param="paper", dtype=torch.float32)
-    test_model(model=model, past=1, dataset="euroc_mav", train_test_validation="test")
-    print('\nDynamical model identification')
-    model = DynamicalModel(param="identification", dtype=torch.float32)
-    test_model(model=model, past=1, dataset="euroc_mav", train_test_validation="test")
-
     # mlp_symplectic = "20210630_144438_MLP_bs_32/9416_weights.pt"
     # test_euroc_mav_mlp_metrics(mlp_symplectic)
 
@@ -189,6 +202,7 @@ def main():
     # residual_model.eval()
     # test_model(model=model, residual_model=residual_model, past=past, dataset="euroc_mav",
     #            train_test_validation="test")
+    # --- TODO update
 
     # Testing embeddings
     print('\nResidual model GRU CNN no embeddings')
@@ -211,7 +225,9 @@ def main():
     weights = torch.load(gru_cnn, map_location=torch.device('cpu'))
     residual_model.load_state_dict(weights["state_dict"])
     residual_model.eval()
-    test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
+    # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
+    # plot_rollout(residual_model, horizon=200, past=past, dataset='euroc_mav', train_test_validation='test')
+    plot_residual(residual_model, past=60, traj_len=1000, dataset='euroc_mav', train_test_validation="test")
 
 
 if __name__ == '__main__':
