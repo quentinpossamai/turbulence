@@ -9,9 +9,9 @@ singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m 
  --embedding None\
  --horizon 1\
  --layer 3\
-# --load_weights \
  --lr 1e-4\
  --past 60\
  --unit_size 50\
  --max_epochs 20000
+# --load_weights \
 # --resume_from_checkpoint
