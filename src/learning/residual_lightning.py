@@ -100,13 +100,13 @@ def main():
     train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
                                                    batch_dim=False),
-                            batch_size=args.batch_size, shuffle=True, num_workers=1, pin_memory=bool(GPU_COUNT))
+                            batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=bool(GPU_COUNT))
 
     validation_data = DataLoader(EurocMAVDatasetHorizon("validation",
                                                         traj_len=args.past + args.horizon,
                                                         dtype=torch.float32,
                                                         batch_dim=False),
-                                 batch_size=args.batch_size, shuffle=False, num_workers=1, pin_memory=bool(GPU_COUNT))
+                                 batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT))
 
     trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger)
     trainer.fit(run, train_data, validation_data)
