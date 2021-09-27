@@ -4,6 +4,7 @@ import datetime
 import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning.utilities.seed import seed_everything
 import random
 import torch
 from torch.utils.data import DataLoader
@@ -65,11 +66,13 @@ def main():
         version = args.resume_from_checkpoint.split("/")[-3]
         training_path = "/".join(args.resume_from_checkpoint.split("/")[:-4]) + "/"
         print(training_path)
+
     # Reproducibility
     seed = 0
-    torch.manual_seed(seed)
-    random.seed(seed)
-    np.random.seed(seed)
+    # torch.manual_seed(seed)
+    # random.seed(seed)
+    # np.random.seed(seed)
+    seed_everything(seed=seed, workers=True)
 
     tb_logger = pl_loggers.TensorBoardLogger(training_path, version=version)
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
