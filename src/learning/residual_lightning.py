@@ -34,10 +34,10 @@ def main():
     # Program args
     parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
     # Debug
-    # file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
-    # file += "20210920_151437_GRUCNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
-    # file += "checkpoints/epoch=9999-step=2929999.ckpt"
-    parser.add_argument('--load_weights', default=None, type=str, help="Path to previous weights")
+    file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
+    file += "20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None//"
+    file += "checkpoints/epoch=358-step=210373.ckpt"
+    parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
     # Module args
     parser = GRUCNNResidual.add_model_specific_args(parser)
     # Trainer args
@@ -47,25 +47,23 @@ def main():
     # Tensorboard
     # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/
     # --load_fast=false --samples_per_plugin scalars=999999999
-    if args.resume_from_checkpoint is None:
-        now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        version = (f"{now}_"
-                   f"{GRUCNNResidual.__name__}_"
-                   f"bs{args.batch_size}_"
-                   f"epch{args.max_epochs}_"
-                   f"lr{args.lr}_"
-                   f"h{args.horizon}_"
-                   f"p{args.past}_"
-                   f"us{args.unit_size}_"
-                   f"{args.activation}_"
-                   f"l{args.layer}_"
-                   f"{args.embedding}"
-                   )
-        training_path = EUROC_MAV_RESIDUAL + f"{GRUCNNResidual.__name__}_{args.embedding}/"
-    else:
-        version = args.resume_from_checkpoint.split("/")[-3]
-        training_path = "/".join(args.resume_from_checkpoint.split("/")[:-4]) + "/"
-        print(training_path)
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    version = (f"{now}_"
+               f"{GRUCNNResidual.__name__}_"
+               f"bs{args.batch_size}_"
+               f"epch{args.max_epochs}_"
+               f"lr{args.lr}_"
+               f"h{args.horizon}_"
+               f"p{args.past}_"
+               f"us{args.unit_size}_"
+               f"{args.activation}_"
+               f"l{args.layer}_"
+               f"{args.embedding}"
+               )
+    training_path = EUROC_MAV_RESIDUAL + f"{GRUCNNResidual.__name__}_{args.embedding}/"
+
+    print(f"{training_path=}")
+    print(f"{version=}")
 
     # Reproducibility
     seed = 0

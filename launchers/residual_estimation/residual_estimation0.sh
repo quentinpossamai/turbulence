@@ -10,5 +10,4 @@ singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m 
  --past 60\
  --unit_size 50\
  --max_epochs 10000
-# --load_weights \
 # --resume_from_checkpoint
