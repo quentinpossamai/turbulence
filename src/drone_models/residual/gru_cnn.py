@@ -179,7 +179,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
             # 2.3-Fully connected merge
             out = self.batch_norm0(torch.cat([out, out_emb.squeeze()], dim=1))
         else:
-            out = self.batch_norm0(out)
+            out = self.batch_norm0(out)  # Batch size == 1 does not work with batch norm
 
         out = self.activation(self.linear0(out))
         out = self.batch_norm1(out)
@@ -188,9 +188,6 @@ class GRUCNNResidual(pl.LightningModule, Run):
         residual_shape = list(state_shape)
         residual_shape[-1] = 6
         del residual_shape[-2]
-
-        print(f"{out.norm()=}")
-
         return out.reshape(residual_shape)
 
     def step(self, batch):
