@@ -111,7 +111,7 @@ def main():
                                  batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT))
 
     if GPU_COUNT:
-        trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, accelerator="ddp")
+        trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger)
     else:
         trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger)
     trainer.fit(run, train_data, validation_data)
