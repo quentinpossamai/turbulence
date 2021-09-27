@@ -114,10 +114,10 @@ def main():
                                  batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT),
                                  drop_last=True)
 
-    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, deterministic=False,
-                         check_val_every_n_epoch=1,
-                         # limit_train_batches=1.0
-                         val_check_interval=1.0,
+    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger,
+                         # deterministic=False,
+                         # check_val_every_n_epoch=1,
+                         # val_check_interval=1.0,
                          )
     trainer.fit(run, train_data, validation_data)
 
