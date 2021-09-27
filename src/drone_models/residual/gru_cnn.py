@@ -71,8 +71,6 @@ class GRUCNNResidual(pl.LightningModule, Run):
         self.motor_size = motor_size
         self.past = past
         self.unit_size = unit_size
-        print(f"Lightning.device: {self.device}")
-
         self.feature_size = self.motor_size + 13 + 1
 
         self.save_hyperparameters(
@@ -109,6 +107,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
     def configure_optimizers(self):
+        print(f"Lightning.device: {self.device}")
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     # def forward(self, motor, state, embedding, dt):
