@@ -87,6 +87,7 @@ def main():
             unit_size=args.unit_size,
         )
     else:
+        print(f"Reloading weights from: {args.load_weights}")
         run = GRUCNNResidual.load_from_checkpoint(
             args.load_weights,
             activation=args.activation,
