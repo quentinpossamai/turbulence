@@ -105,19 +105,19 @@ def main():
                                                    dtype=torch.float32,
                                                    batch_dim=False),
                             batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=bool(GPU_COUNT),
-                            drop_last=True)
+                            drop_last=False)
 
     validation_data = DataLoader(EurocMAVDatasetHorizon("validation",
                                                         traj_len=args.past + args.horizon,
                                                         dtype=torch.float32,
                                                         batch_dim=False),
                                  batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT),
-                                 drop_last=True)
+                                 drop_last=False)
 
     trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger,
-                         # deterministic=False,
+                         # deterministic=True,
                          # check_val_every_n_epoch=1,
-                         # val_check_interval=1.0,
+                         # val_check_interval=1.0
                          )
     trainer.fit(run, train_data, validation_data)
 
