@@ -34,9 +34,10 @@ def main():
     # Program args
     parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
     # Debug
-    file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
+    file = "/home/qpossamai/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
     file += "20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None//"
     file += "checkpoints/epoch=358-step=210373.ckpt"
+
     parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
     # Module args
     parser = GRUCNNResidual.add_model_specific_args(parser)
