@@ -32,7 +32,7 @@ def main():
     # Args are hyper parameters to optimize
     parser = argparse.ArgumentParser(description="Identify model on data.")
     # Program args
-    parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
+    parser.add_argument('--batch_size', default=1, type=int, help="Size of a batch")
     # Debug
     file = "/home/qpossamai/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
     file += "20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None//"
