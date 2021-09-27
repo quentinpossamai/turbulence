@@ -218,11 +218,13 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def training_step(self, train_batch, batch_idx):
         training_loss = self.step(train_batch)
         self.log("train_loss", training_loss)
+        print(f"{training_loss=}")
         return training_loss
 
     def validation_step(self, val_batch, batch_idx):
         val_loss = self.step(val_batch)
         self.log("val_loss", val_loss)
+        print(f"{val_loss=}")
 
     # def rollout(self, motor, state, embedding, dt, horizon):
     def rollout(self, **kwargs):
