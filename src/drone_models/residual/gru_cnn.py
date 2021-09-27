@@ -71,6 +71,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         self.motor_size = motor_size
         self.past = past
         self.unit_size = unit_size
+        print(f"Lightning.device: {self.device}")
 
         self.feature_size = self.motor_size + 13 + 1
 
@@ -207,7 +208,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         motor_shape = motor.shape
         dt_shape = list(motor_shape)
         dt_shape[-1] = 1
-        dt = torch.tensor(1 / 200, device=self.device).repeat(dt_shape)
+        dt = torch.tensor(1 / 200).type_as(motor).repeat(dt_shape)
 
         residual_gt = batch["residual"][:, self.past]
         residual_hat = self.forward(motor=motor, state=state, depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
