@@ -67,7 +67,7 @@ def main():
     print(f"{version=}")
 
     # Reproducibility
-    seed = 1
+    seed = 0
     # torch.manual_seed(seed)
     # random.seed(seed)
     # np.random.seed(seed)
