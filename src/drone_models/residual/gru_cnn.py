@@ -189,7 +189,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         residual_shape[-1] = 6
         del residual_shape[-2]
 
-        print(f"{out.mean()=}")
+        print(f"{out.max()=}")
 
         return out.reshape(residual_shape)
 
