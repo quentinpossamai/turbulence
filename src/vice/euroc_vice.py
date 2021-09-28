@@ -73,14 +73,14 @@ def error_estimation(flight):
     print("VICE for ", flight_path)
 
     input_data = pickle.load(open(f"{flight_path}vice_data.pkl", 'rb'))
-    camera_parameters = pickle.load(open(f"{flight_path}camera_parameters.pkl", 'rb'))
+    cam_prms = pickle.load(open(f"{flight_path}camera_parameters.pkl", 'rb'))
     fps = 20
     width = 752
     height = 480
 
     estimator = ErrorEstimation(input_data=input_data,
-                                calibration_matrix=camera_parameters['K'],
-                                distortion_coefficient=camera_parameters['D'],
+                                calibration_matrix=cam_prms['K'],
+                                distortion_coefficient=cam_prms['D'],
                                 max_distance=5,
                                 width=width,
                                 height=height)

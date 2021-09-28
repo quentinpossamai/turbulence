@@ -2,14 +2,13 @@ from typing import Union, Tuple
 import cv2
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('TKAgg')
 import numpy as np
-import pandas as pd
-from cv2 import VideoWriter, VideoWriter_fourcc
 from tqdm import tqdm
 
-from src.utils.paths import Progress
 from src.utils.transform import Transform
+
+matplotlib.use('TKAgg')
+
 
 class ErrorEstimation(object):
     def __init__(self, input_data: dict, calibration_matrix: np.array, distortion_coefficient: np.array,
