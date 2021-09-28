@@ -194,7 +194,7 @@ def plot_acceleration():
     dt_shape[-1] = 1
     dt = torch.tensor(DT, dtype=DTYPE).repeat(dt_shape)
 
-    next_state_hat = model.forward(motor=motor, state=state, dt=dt)
+    next_state_hat = model.forward(dt, motor, state)
 
     dstate_gt = (next_state_gt - state) / dt
     dstate_hat = (next_state_hat - state) / dt

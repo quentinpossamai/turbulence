@@ -36,14 +36,23 @@ class GRUCNNResidual(pl.LightningModule, Run):
                  ):
         """
         Run with a CNN.
+
         :param activation: The activation function to use.
+
         :param embedding: Type of embedding to use.
+
         :param layer: Number of layer for the neural network.
+
         :param learning_rate: Learning rate for Adam optimizer.
+
         :param model: The model to use the residual model with for the rollout.
+
         :param motor_size: The number of motors.
+
         :param past: The number of past state and motor measures to use.
+
         :param unit_size: The size of one layer.
+
         """
         super(GRUCNNResidual, self).__init__()
         self.activation = None
@@ -115,11 +124,17 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def forward(self, **kwargs):
         """
         Estimate the residual = GT - model
+
         kwargs: motor: (batch, self.past, values=6)
+
         kwargs: state: (batch, self.past, values=13)
+
         kwargs: depth_emb: (batch, self.past, values=128)
+
         kwargs: norm_emb: (batch, self.past, values=128)
+
         kwargs: dt: (batch, self.past, values=1)
+
         :return: (batch, value=6)
         """
         # 1.-Input processing
@@ -197,6 +212,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
                        state: (batch, time, 13),
                        residual: (batch, time, 6),
                        embedding: (batch, time, self.emb_size)}
+
         :return: Loss
         """
         motor = batch["motor"][:, 1:self.past + 1]
@@ -228,12 +244,19 @@ class GRUCNNResidual(pl.LightningModule, Run):
     def rollout(self, **kwargs):
         """
         kwargs: motor: (*, past + horizon, motor_size). t+1
+
         kwargs: state: (*, past + horizon, 13). t
+
         kwargs: depth_emb: (batch, past+horizon, values=128) t
+
         kwargs: norm_emb: (batch, past+horizon, values=128) t
+
         kwargs: embedding: (*, past + horizon, 128 or 256)
+
         kwargs: dt: (*, past + horizon, 1). t+1 - t
+
         kwargs: horizon: int
+
         :return: (*, horizon, 13). state t+1
         """
         # Input processing

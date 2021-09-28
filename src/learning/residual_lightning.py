@@ -73,7 +73,7 @@ def main():
     # np.random.seed(seed)
     seed_everything(seed=seed, workers=True)
 
-    tb_logger = pl_loggers.TensorBoardLogger(training_path, version=version)
+    tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, )
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
     if args.load_weights is None:
         run = GRUCNNResidual(

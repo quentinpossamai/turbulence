@@ -10,6 +10,7 @@ class DynamicalModel(nn.Module, Run):
     def __init__(self, param, dtype):
         """
         :param param: "paper", "identification", or dict["permutation", "theta"]
+
         :param dtype: Datatype of the model.
         """
         super().__init__()
@@ -58,15 +59,19 @@ class DynamicalModel(nn.Module, Run):
     def forward(self, **kwargs):
         """
         kwargs: motor: (*, self.motor_size). t+1
+
         kwargs: state: (*, 13). t
+
         kwargs: dt: (*, 1). t+1 - t
-        kwargs: residual: (*, 6). t+1
+
+        kwargs optional: residual: (*, 6). t+1
+
         :return: (*, 6). residual t+1
         """
         # 1.-Input processing
         motor = kwargs['motor']
         state = kwargs['state']
-        residual = kwargs['residual'] if 'residual' in kwargs else None  # Optional kwargs
+        residual = kwargs['residual'] if 'residual' in kwargs else None
         dt = kwargs['dt']
 
         assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
@@ -132,6 +137,7 @@ class DynamicalModel(nn.Module, Run):
     def motor_dynamic(self, motor):
         """
         :param motor: (*, self.motor_size) t
+
         :return: (*, 4) t
         """
         assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
@@ -154,9 +160,13 @@ class DynamicalModel(nn.Module, Run):
     def residual_dynamic(self, motor, state, dt, next_state):
         """
         :param motor: (*, self.motor_size). t+1
+
         :param state: (*, 13). t
+
         :param dt: (*, 1). t+1 - t
+
         :param next_state: (*, 13). state t+1
+
         :return: (*, 6). residual t+1
         """
         assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
@@ -204,9 +214,13 @@ class DynamicalModel(nn.Module, Run):
     def rollout(self, **kwargs):
         """
         kwargs: motor: (*, horizon+1, motor_size). t+1
+        
         kwargs: state: (*, horizon+1, 13). t
+
         kwargs: horizon: int
+
         kwargs: dt: (*, horizon+1, 1). t+1 - t
+
         :return: (*, horizon, 13). state t+1
         """
         # Input processing
