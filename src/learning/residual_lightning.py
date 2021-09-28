@@ -87,7 +87,7 @@ def main():
             unit_size=args.unit_size,
         )
     else:
-        print(f"Reloading weights from: {args.load_weights}")
+        print(f"\nReloading weights from: {args.load_weights}")
         run = GRUCNNResidual.load_from_checkpoint(
             args.load_weights,
             activation=args.activation,
@@ -114,7 +114,7 @@ def main():
                                  batch_size=args.batch_size, shuffle=False, num_workers=4, pin_memory=bool(GPU_COUNT),
                                  drop_last=True)
 
-    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, deterministic=True)
+    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, deterministic=True, max_epochs=args.max_epochs)
     trainer.fit(run, train_data, validation_data)
 
 
