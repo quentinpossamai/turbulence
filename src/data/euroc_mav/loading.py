@@ -1,13 +1,13 @@
-import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
-from scipy import interpolate
+from scipy import interpolate, signal
 from scipy.fft import fft, fftfreq, ifft
 import torch
 from torch.utils.data import Dataset
 import os
 
+import src.data.euroc_mav.data_vis as data_vis
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.utils.paths import WD_PATH
 import src.utils.paths
@@ -160,35 +160,20 @@ def load_clean_data(flight):
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
     # 2.3.3-Denoising quaternion
-    # den_quat = quat  # no denoising
     # Ideal denoising
     frequencies = fftfreq(n, d=period)
     fc_quat = 5  # Hz
     fourier_quat = fft(quat, axis=0)
     den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0))
-    # fourier_dquat = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_quat
-    # Butterworth
-    # den_quat = np.zeros_like(quat)
-    # sos = signal.butter(1, fc_quat, 'lowpass', fs=1 / period, output='sos')
-    # for i in range(4):
-    #     den_quat[:, i] = signal.sosfilt(sos, quat[:, i])
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
+    # data_vis.plot_butterworth(quat, den_quat, fc_quat, period)
 
     # 2.3.4-Denoising translation
-    # den_trans = trans  # no denoising
     # Ideal denoising
     fc_trans = 5  # Hz
     fourier_trans = fft(trans, axis=0)
     den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
-    # fourier_dtrans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_trans
-    # fourier_d2trans = 2 * np.pi * complex(0, 1) * frequencies.reshape((-1, 1)) * fourier_dtrans
-    # Butterworth
-    # den_trans = np.zeros_like(trans)
-    # sos = signal.butter(1, fc_trans, 'lowpass', fs=1 / period, output='sos')
-    # for i in range(3):
-    #     den_trans[:, i] = signal.sosfilt(sos, trans[:, i])
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
-
     # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0
     has_started = False
@@ -264,7 +249,8 @@ def load_clean_data(flight):
     # print("std: ", abs(ang_vel2 - ang_vel).std())
 
     # 5.1.2.3-With Lie exponential
-    # https://math.stackexchange.com/questions/2282938/converting-from-quaternion-to-angular-velocity-then-back-to-quaternion
+    # https://math.stackexchange.com/questions/2282938/
+    # converting-from-quaternion-to-angular-velocity-then-back-to-quaternion
     # ang_vel3 = 2. * (quaternion.qmul_np(quat[:-1] * np.array([[-1, -1, -1, 1]]), quat[1:]))[:, :3] / dt
     # ang_vel3 = np.concatenate([np.zeros((1, 3)), ang_vel3], axis=0)
     # def exp_so3(w):
