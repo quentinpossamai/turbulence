@@ -25,7 +25,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         return parent_parser
 
     def __init__(self,
-                 activation: Callable,
+                 activation: str,
                  embedding: str,
                  layer: int,
                  learning_rate: float,
@@ -78,6 +78,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
             "embedding",
             "layer",
             "learning_rate",
+            "motor_size",
             "past",
             "unit_size"
         )
