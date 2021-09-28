@@ -1,11 +1,9 @@
 import argparse
 import datetime
 # import matplotlib.pyplot as plt
-import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.utilities.seed import seed_everything
-import random
 import torch
 from torch.utils.data import DataLoader
 
@@ -38,7 +36,7 @@ def main():
     file += "20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
     file += "checkpoints/epoch=358-step=210373.ckpt"
 
-    parser.add_argument('--load_weights', default=file, type=str, help="Path to previous weights")
+    parser.add_argument('--load_weights', default=None, type=str, help="Path to previous weights")
     # Module args
     parser = GRUCNNResidual.add_model_specific_args(parser)
     # Trainer args
@@ -73,7 +71,7 @@ def main():
     # np.random.seed(seed)
     seed_everything(seed=seed, workers=True)
 
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, )
+    tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, log_graph=True)
     analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
     if args.load_weights is None:
         run = GRUCNNResidual(
