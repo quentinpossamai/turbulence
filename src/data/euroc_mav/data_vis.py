@@ -1,10 +1,22 @@
+import cv2
+from cv2 import VideoWriter, VideoWriter_fourcc
+import imageio
+import matplotlib
 from matplotlib.widgets import Slider
 import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 from scipy import signal
+from scipy.spatial.transform import Rotation
+from tqdm import tqdm
 
 import src.data.euroc_mav.loading as euroc
+from src.utils.paths import mkdir_if_not_exist, GENERAL_ANALYSIS_PATH
+
+matplotlib.use('TKAgg')
+
+ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + 'data_vis_euroc_mav/'
+mkdir_if_not_exist([ANALYSIS_PATH])
 
 
 def plot_y_x():
@@ -148,9 +160,9 @@ def plot_butterworth(quat, den_quat, fc_quat, period):
                        orientation="horizontal")
 
     # The function to be called anytime a slider's value changes
-    def update(val):
+    def update(_):
         line[0].set_ydata(den_quat_butter[int(np.round(n_slider.val)),
-                                          int(np.round(wn_slider.val)), :, i])
+                          int(np.round(wn_slider.val)), :, i])
         fig.canvas.draw_idle()
 
     # register the update function with each slider
@@ -159,8 +171,110 @@ def plot_butterworth(quat, den_quat, fc_quat, period):
     print()
 
 
+def residual_video(flight):
+    flight_path = euroc.INTERMEDIATE_DATASET_PATH + flight
+    print("Processing: ", flight_path)
+
+    # 1-LOADING
+    # 1.1-Loading drone trajectory
+    data = euroc.load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
+    # data state is tf_origin_vicon0
+    data["state"][:, :3] = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
+
+    # 1.5-Cutting a the image frequency
+    cut_img = np.unique(data["cam0"])
+    data_ind = np.zeros(len(cut_img), dtype=int)
+
+    for i, img_timestamp in enumerate(cut_img):
+        ind = np.abs(img_timestamp - data["timestamp"]).argmin()
+        data_ind[i] = ind
+
+    # 2-CREATING VIDEO
+    # 2.1-Initialising video
+    fps = 20
+    camera_shape = [480, 752, 3]  # height, width, 3
+    frame_shape = [1080, 1920, 3]
+    dpi = 100
+    saving_path = f'{ANALYSIS_PATH}{flight}residual_video.mkv'
+    mkdir_if_not_exist([f'{ANALYSIS_PATH}{flight}'])
+    codec = VideoWriter_fourcc(*'H264')
+    video = VideoWriter(saving_path, codec, float(fps), (frame_shape[1], frame_shape[0]), True)  # width, height
+    print(f'Video will be saved at : {saving_path}')
+
+    # frames = np.zeros([len(cut_img)] + frame_shape, dtype=np.uint8)
+    for i, image_time in enumerate(tqdm(cut_img, desc="Creating a video")):
+        # 2.2-Constructing image
+        # 2.2.1-Camera image
+        image_name = str(image_time)
+        img = np.array(imageio.imread(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{image_name}.png"))
+        color_frame = np.uint8(np.zeros(camera_shape))
+        for j in range(3):  # color the image
+            color_frame[:, :, j] = img
+        img = color_frame
+        # Displaying image on figure (width, height)
+        fig = plt.figure(figsize=(frame_shape[1] / dpi, frame_shape[0] / dpi), dpi=dpi, facecolor='black')
+        ax = fig.add_axes([0, 0.5,  1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
+        ax.imshow(img)
+        ax.axis('off')
+        # Displaying legend: the drone position
+        trans = data['state'][data_ind[i], :3]
+        angles = Rotation.from_quat(data['state'][data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
+        legend = (f'Camera position\n'
+                  f'       x:{trans[0]:8.3f}m\n'
+                  f'       y:{trans[1]:8.3f}m\n'
+                  f'       z:{trans[2]:8.3f}m\n'
+                  f'   Rot x:{angles[0]:8.3f}°\n'
+                  f'   Rot y:{angles[1]:8.3f}°\n'
+                  f'   Rot z:{angles[2]:8.3f}°\n'
+                  f' data id:{data_ind[i]:9}\n'
+                  f'frame id:{i:9}')
+        ax.annotate(legend, (0.73, 0.95), xycoords='figure fraction', size=12, ha='left', va='top', family='monospace',
+                    color='white')
+
+        # 2.2.2-Plotting residual
+        left, bottom = 0.03, 0.03
+        ax = fig.add_axes([left, bottom,  0.99 - left, 0.49 - bottom])  # [distance to left, distance to bottom, width,
+        # height] on the figure
+        start, stop = data_ind[i] - 5 * 200, data_ind[i] + 5 * 200
+        ax.plot(np.linalg.norm(data['residual'][:, :3], axis=1), label='Forces norm')
+        ax.plot(np.linalg.norm(data['residual'][:, 3:], axis=1), label='Torques norm')
+        # ax.plot(data['residual'], label=['Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz'])
+        # legend = ax.legend(loc=1, bbox_to_anchor=(0.05, 1.35), frameon=False)
+        ax.axvline(data_ind[i])
+        legend = ax.legend(loc=1, bbox_to_anchor=(0.1, 1.15), frameon=False)
+        [e.set_color('white') for e in legend.get_texts()]
+        [e.set_fontsize(12) for e in legend.get_texts()]
+        ax.grid()
+        [ax.spines[e].set_color('white') for e in ['bottom', 'top', 'left', 'right']]
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.tick_params(axis='x', colors='white')
+        ax.tick_params(axis='y', colors='white')
+        ax.set_facecolor('black')
+        ax.set_xlim([start, stop])
+
+        fig.canvas.draw()
+        frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(frame_shape)
+        # plt.savefig(f'{ANALYSIS_PATH}{flight}test.png')
+        # input()
+        plt.close('all')
+        # frames[i] = frame
+        video.write(frame[:, :, ::-1])  # Because VideoWriter.write take BGR images
+
+    video.release()
+    cv2.destroyAllWindows()
+
+
 def main():
-    plot_y_x()
+    # flight = euroc.FLIGHT_LIST[0]
+    # residual_video(flight=flight)
+    # flight = euroc.FLIGHT_LIST[1]
+    # residual_video(flight=flight)
+    flight = euroc.FLIGHT_LIST[2]
+    residual_video(flight=flight)
+
+    # for flight in euroc.FLIGHT_LIST:
+    #     residual_video(flight=flight)
 
 
 if __name__ == '__main__':
