@@ -1,13 +1,13 @@
 import numpy as np
 import pathlib
 import pickle
-from scipy import interpolate, signal
+from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
 import torch
 from torch.utils.data import Dataset
 import os
 
-import src.data.euroc_mav.data_vis as data_vis
+# import src.data.euroc_mav.data_vis as data_vis
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.utils.paths import WD_PATH
 import src.utils.paths
@@ -174,6 +174,7 @@ def load_clean_data(flight):
     fourier_trans = fft(trans, axis=0)
     den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
+    
     # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0
     has_started = False

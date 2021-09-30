@@ -7,18 +7,20 @@ from scipy.spatial.transform.rotation import Rotation
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+import src.data.euroc_mav.loading as euroc
+
 plt.style.use("seaborn")
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--path_dataset', default='/Volumes/Samsung_T5/BlackBird/blackbird/intermediate', type=str)
-args = parser.parse_args()
-
-PATH = args.path_dataset
-FLIGHT_LIST = []
-for flight in os.listdir(PATH):
-    for orientation in os.listdir(PATH + "/" + flight):
-        for speed in os.listdir(PATH + "/" + flight + "/" + orientation):
-            FLIGHT_LIST.append(flight + "/" + orientation + "/" + speed + "/data.pkl")
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--path_dataset', default='/Volumes/Samsung_T5/BlackBird/blackbird/intermediate', type=str)
+# args = parser.parse_args()
+#
+# PATH = args.path_dataset
+# FLIGHT_LIST = []
+# for flight in os.listdir(PATH):
+#     for orientation in os.listdir(PATH + "/" + flight):
+#         for speed in os.listdir(PATH + "/" + flight + "/" + orientation):
+#             FLIGHT_LIST.append(flight + "/" + orientation + "/" + speed + "/data.pkl")
 
 
 def load_flight(flight_name):
@@ -89,64 +91,67 @@ def orientation_check(quaternion_gt, pred):
         plt.pause(0.0001)
 
 
+def main():
+    # data = load_flight(FLIGHT_LIST[k])
+    data = euroc.load_flight(euroc.FLIGHT_LIST[0])
+
+    START = 10_000
+    LENGTH = 5_000
+    time = data["t"][START:START + LENGTH]
+    dt = (time[1:] - time[:-1]).mean()
+    state = data["state"][START:START + LENGTH]
+    imu = data["imu_ang_acc"][START:START + LENGTH]
+
+    pi_rotation = Rotation.from_euler("zyx", np.array([np.pi / 2, 0, np.pi]), degrees=False)
+    imu_rpy = pi_rotation.apply(imu[:, :3])
+    # imu_rpy = imu_rpy[:, [1, 0, 2]] * np.array([1, -1, 1])
+    imu_acc = pi_rotation.apply(imu[:, 3:])
+    # imu_acc = imu_acc[:, [1, 0, 2]] * np.array([1, -1, 1])
+    imu = np.concatenate([imu_rpy, imu_acc], axis=-1)
+
+    acc = np.concatenate([np.zeros((1, 3)), (state[1:, 7:10] - state[:-1, 7:10]) / dt], axis=0)
+    state = np.concatenate([state, acc], axis=-1)
+    integration = [state[0]]
+    for k in range(time.shape[0] - 1):
+        integration.append(integrate(integration[-1], imu[k], dt))
+
+    integration = np.stack(integration, axis=0)
+    # orientation_check(state[:, 3:7], integration)
+
+    fig, ax = plt.subplots(4, 4)
+    label = ["X", "Y", "Z"]
+    for k in range(3):
+        ax[0][k].plot(time, state[:, k], label="gt")
+        ax[0][k].plot(time, integration[:, k], label="pred")
+        ax[0][k].set_title(label[k])
+        ax[0][k].legend()
+
+    label = ["Qx", "Qy", "Qz", "Qw"]
+    for k in range(4):
+        ax[1][k].plot(time, state[:, 3 + k], label="gt")
+        ax[1][k].plot(time, integration[:, 3 + k], label="pred")
+        ax[1][k].set_title(label[k])
+        ax[1][k].legend()
+
+    label = ["Vx", "Vy", "Vz"]
+    for k in range(3):
+        ax[2][k].plot(time, state[:, k + 7], label="gt")
+        ax[2][k].plot(time, integration[:, k + 7], label="pred")
+        ax[2][k].set_title(label[k])
+        ax[2][k].legend()
+
+    label = ["Wx", "Wy", "Wz"]
+    for k in range(3):
+        ax[3][k].plot(time, state[:, k + 10], label="gt")
+        ax[3][k].plot(time, integration[:, k + 10], label="pred")
+        ax[3][k].set_title(label[k])
+        ax[3][k].legend()
+    fig.tight_layout()
+    plt.show()
+
+    # plt.plot(integration)
+    plt.show()
+
+
 if __name__ == '__main__':
-
-    for k in range(4, len(FLIGHT_LIST)):
-        data = load_flight(FLIGHT_LIST[k])
-
-        START = 10_000
-        LENGTH = 5_000
-        time = data["t"][START:START + LENGTH]
-        dt = (time[1:] - time[:-1]).mean()
-        state = data["state"][START:START + LENGTH]
-        imu = data["imu_ang_acc"][START:START + LENGTH]
-
-        pi_rotation = Rotation.from_euler("zyx", np.array([np.pi / 2, 0, np.pi]), degrees=False)
-        imu_rpy = pi_rotation.apply(imu[:, :3])
-        # imu_rpy = imu_rpy[:, [1, 0, 2]] * np.array([1, -1, 1])
-        imu_acc = pi_rotation.apply(imu[:, 3:])
-        # imu_acc = imu_acc[:, [1, 0, 2]] * np.array([1, -1, 1])
-        imu = np.concatenate([imu_rpy, imu_acc], axis=-1)
-
-        acc = np.concatenate([np.zeros((1, 3)), (state[1:, 7:10] - state[:-1, 7:10]) / dt], axis=0)
-        state = np.concatenate([state, acc], axis=-1)
-        integration = [state[0]]
-        for k in range(time.shape[0] - 1):
-            integration.append(integrate(integration[-1], imu[k], dt))
-
-        integration = np.stack(integration, axis=0)
-        # orientation_check(state[:, 3:7], integration)
-
-        fig, ax = plt.subplots(4, 4)
-        label = ["X", "Y", "Z"]
-        for k in range(3):
-            ax[0][k].plot(time, state[:, k], label="gt")
-            ax[0][k].plot(time, integration[:, k], label="pred")
-            ax[0][k].set_title(label[k])
-            ax[0][k].legend()
-
-        label = ["Qx", "Qy", "Qz", "Qw"]
-        for k in range(4):
-            ax[1][k].plot(time, state[:, 3 + k], label="gt")
-            ax[1][k].plot(time, integration[:, 3 + k], label="pred")
-            ax[1][k].set_title(label[k])
-            ax[1][k].legend()
-
-        label = ["Vx", "Vy", "Vz"]
-        for k in range(3):
-            ax[2][k].plot(time, state[:, k + 7], label="gt")
-            ax[2][k].plot(time, integration[:, k + 7], label="pred")
-            ax[2][k].set_title(label[k])
-            ax[2][k].legend()
-
-        label = ["Wx", "Wy", "Wz"]
-        for k in range(3):
-            ax[3][k].plot(time, state[:, k + 10], label="gt")
-            ax[3][k].plot(time, integration[:, k + 10], label="pred")
-            ax[3][k].set_title(label[k])
-            ax[3][k].legend()
-        fig.tight_layout()
-        plt.show()
-
-        # plt.plot(integration)
-        plt.show()
+    main()
