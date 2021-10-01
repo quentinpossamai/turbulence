@@ -209,8 +209,8 @@ def main():
     # Testing embeddings
     print('\nResidual model GRU CNN no embeddings')
     gru_cnn = EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
-    gru_cnn += "20210928_090239_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/"
-    gru_cnn += "checkpoints/TO_COMPLETE.ckpt"
+    gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
+    gru_cnn += "epoch=999-step=584999.ckpt"
     from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
     from src.drone_models.residual.gru_cnn import GRUCNNResidual
     model = DynamicalModel(param='identification', dtype=torch.float32)
@@ -228,9 +228,9 @@ def main():
         )
 
     residual_model.eval()
-    test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
+    # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
     # plot_rollout(residual_model, horizon=200, past=past, dataset='euroc_mav', train_test_validation='test')
-    # plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
+    plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
 
 
 if __name__ == '__main__':

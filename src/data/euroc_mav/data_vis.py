@@ -183,51 +183,43 @@ def residual_video(flight):
     # 1.1-Loading drone trajectory
     data = euroc.load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
     # data state is tf_origin_vicon0
-    state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
 
-    # 1.5-Cutting a the image frequency
+    # 1.2-Predict non-fa residual
+    print('\nResidual model GRU CNN no embeddings')
+    gru_cnn = learned_model.EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
+    gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
+    gru_cnn += "epoch=999-step=584999.ckpt"
+
+    model = DynamicalModel(param='identification', dtype=torch.float32)
+    past = 60
+    residual_model = GRUCNNResidual.load_from_checkpoint(gru_cnn, model=model, motor_size=6)
+    residual_model.eval()
+
+    residual_hat = []
+    dt = torch.FloatTensor([[1 / 200]]).repeat([past, 1])
+    with torch.no_grad():
+        for i in range(len(data['motor']) - past - 1):
+            motor = torch.FloatTensor(data["motor"][i+1:past+i+1])
+            state = torch.FloatTensor(data["state"][i:past+i])
+            # depth_emb = data["depth_emb"][i:past+i]
+            # norm_emb = data["norm_emb"][i:past+i]
+
+            residual_hat.append(residual_model(motor=motor, state=state, dt=dt))
+    residual_hat = torch.stack(residual_hat, dim=0)
+    print()
+
+    # 1.3-Cutting a the image frequency
+    for key in data:
+        data[key] = data[key][past+1:]
     cut_img = np.unique(data["cam0"])
     data_ind = np.zeros(len(cut_img), dtype=int)
 
     for i, img_timestamp in enumerate(cut_img):
         ind = np.abs(img_timestamp - data["timestamp"]).argmin()
         data_ind[i] = ind
-
-    # 1.6-Predict non-fa residual
-    print('\nResidual model GRU CNN no embeddings')
-    gru_cnn = learned_model.EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
-    gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/"
-    gru_cnn += "epoch=999-step=584999.ckpt"
-
-    model = DynamicalModel(param='identification', dtype=torch.float32)
-    past = 60
-    residual_model = GRUCNNResidual.load_from_checkpoint(gru_cnn, model=model)
-    residual_model.eval()
-
-    time = []
-    residual_hat = []
-    residual_gt = []
-
-    trajectory = data[i]
-    motor = trajectory["motor"][1:-past]
-    state = trajectory["state"][:-past-1]
-    depth_emb = trajectory["depth_emb"][:-past-1]
-    norm_emb = trajectory["norm_emb"][:-past-1]
-
-    dt_shape = list(state.shape)
-    dt_shape[-1] = 1
-    dt = torch.FloatTensor([[1 / 200]]).repeat(dt_shape)
-
-    with torch.no_grad():
-        for i in range(len(data['motor'])):
-            time.append(trajectory["t"][-1])
-            residual_gt.append(trajectory["residual"][-1])
-            residual_hat.append(model(motor=motor, state=state, dt=dt, depth_emb=depth_emb, norm_emb=norm_emb))
-
-    time = torch.stack(time, dim=0)
-    residual_gt = torch.stack(residual_gt, dim=0)
-    residual_hat = torch.stack(residual_hat, dim=0)
-    loss = ((residual_gt - residual_hat) ** 2).mean().item()
+    residual_gt = torch.FloatTensor(data['residual'])
+    state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
+    residual = residual_gt - residual_hat
 
     # 2-CREATING VIDEO
     # 2.1-Initialising video
@@ -258,7 +250,7 @@ def residual_video(flight):
         ax.axis('off')
         # Displaying legend: the drone position
         trans = state_mean[data_ind[i], :3]
-        angles = Rotation.from_quat(state_mean[data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
+        angles = Rotation.from_quat(data['state'][data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
         legend = (f'Camera position\n'
                   f'       x:{trans[0]:8.3f}m\n'
                   f'       y:{trans[1]:8.3f}m\n'
@@ -276,12 +268,15 @@ def residual_video(flight):
         ax = fig.add_axes([left, bottom,  0.99 - left, 0.49 - bottom])  # [distance to left, distance to bottom, width,
         # height] on the figure
         start, stop = data_ind[i] - 5 * 200, data_ind[i] + 5 * 200
-        ax.plot(np.linalg.norm(data['residual'][:, :3], axis=1), label='Forces norm')
-        ax.plot(np.linalg.norm(data['residual'][:, 3:], axis=1), label='Torques norm')
-        # ax.plot(data['residual'], label=['Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz'])
-        # legend = ax.legend(loc=1, bbox_to_anchor=(0.05, 1.35), frameon=False)
+
+        # Choose to plot norm or not
+        # ax.plot(np.linalg.norm(residual[:, :3], axis=1), label='Forces norm')
+        # ax.plot(np.linalg.norm(residual[:, 3:], axis=1), label='Torques norm')
+        # legend = ax.legend(loc=1, bbox_to_anchor=(0.1, 1.15), frameon=False)
+        ax.plot(residual, label=['Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz'])
+        legend = ax.legend(loc=1, bbox_to_anchor=(0.05, 1.35), frameon=False)
+
         ax.axvline(data_ind[i])
-        legend = ax.legend(loc=1, bbox_to_anchor=(0.1, 1.15), frameon=False)
         [e.set_color('white') for e in legend.get_texts()]
         [e.set_fontsize(12) for e in legend.get_texts()]
         ax.grid()
@@ -306,12 +301,12 @@ def residual_video(flight):
 
 
 def main():
-    # flight = euroc.FLIGHT_LIST[0]
-    # residual_video(flight=flight)
+    flight = euroc.FLIGHT_LIST[0]
+    residual_video(flight=flight)
     # flight = euroc.FLIGHT_LIST[1]
     # residual_video(flight=flight)
-    flight = euroc.FLIGHT_LIST[2]
-    residual_video(flight=flight)
+    # flight = euroc.FLIGHT_LIST[2]
+    # residual_video(flight=flight)
 
     # for flight in euroc.FLIGHT_LIST:
     #     residual_video(flight=flight)
