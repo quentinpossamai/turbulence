@@ -219,7 +219,7 @@ def residual_video(flight):
     dt = torch.FloatTensor([[1 / 200]]).repeat(dt_shape)
 
     with torch.no_grad():
-        for i in len(data['motor']):
+        for i in range(len(data['motor'])):
             time.append(trajectory["t"][-1])
             residual_gt.append(trajectory["residual"][-1])
             residual_hat.append(model(motor=motor, state=state, dt=dt, depth_emb=depth_emb, norm_emb=norm_emb))
