@@ -357,9 +357,8 @@ def main_blackbird():
 
 
 def main_hilti():
-    extractor = Extractor('/Users/quentin/Downloads/IC_Office_1.bag')
+    extractor = Extractor('/Users/quentin/Downloads/Office_Mitte_1.bag')
     extractor.get_freq()
-    extractor.show_topics()
     # extractor.extract()
 
 

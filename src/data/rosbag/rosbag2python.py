@@ -30,7 +30,7 @@ class Extractor(object):
                 assert any(np.isnan(timestamps[topic]['t'])) is False
                 assert (timestamps[topic]['t'] == np.sort(timestamps[topic]['t'])).all()
                 assert (timestamps[topic]['t'] != 0).any()
-                period = timestamps[topic]['t'][-1] - timestamps[topic]['t'][0]
+                period = (timestamps[topic]['t'][-1] - timestamps[topic]['t'][0]) * 1e-9
                 if period == 0:
                     freq[topic] = 0
                 else:
