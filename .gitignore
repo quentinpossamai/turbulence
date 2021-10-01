@@ -2,5 +2,9 @@
 /src/autoencoder_depth/trained_models
 /src/autoencoder_depth/trained_models/
 /src/autoencoder_depth/logs/
+/analysis
+/data
+/models
+/reports
 *.pyc
 .idea
