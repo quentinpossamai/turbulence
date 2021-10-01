@@ -14,13 +14,12 @@ import src.utils.paths
 from src.utils import quaternion
 
 # Path
-ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "euroc_mav_processing_data/"
 DATASET_PATH = src.utils.paths.WD_PATH + "data/euroc_mav/"
 RAW_PYTHON_DATASET_PATH = DATASET_PATH + f"raw_python/"
 RAW_DATASET_PATH = DATASET_PATH + f"raw/"
 INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
-src.utils.paths.mkdir_if_not_exist([DATASET_PATH, ANALYSIS_SECTION_PATH, RAW_PYTHON_DATASET_PATH,
+src.utils.paths.mkdir_if_not_exist([DATASET_PATH, RAW_PYTHON_DATASET_PATH,
                                     INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]

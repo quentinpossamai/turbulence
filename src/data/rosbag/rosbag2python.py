@@ -262,4 +262,4 @@ def _process_geometry_msgs_point_stamped(msg):
     """
     geometry_msgs/PointStamped
     """
-    return 0
+    return msg
