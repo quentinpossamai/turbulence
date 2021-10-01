@@ -8,9 +8,13 @@ import numpy as np
 import pickle
 from scipy import signal
 from scipy.spatial.transform import Rotation
+import torch
 from tqdm import tqdm
 
 import src.data.euroc_mav.loading as euroc
+from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+from src.drone_models.residual.gru_cnn import GRUCNNResidual
+import src.learning.residual_lightning as learned_model
 from src.utils.paths import mkdir_if_not_exist, GENERAL_ANALYSIS_PATH
 
 matplotlib.use('TKAgg')
@@ -179,7 +183,7 @@ def residual_video(flight):
     # 1.1-Loading drone trajectory
     data = euroc.load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
     # data state is tf_origin_vicon0
-    data["state"][:, :3] = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
+    state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
 
     # 1.5-Cutting a the image frequency
     cut_img = np.unique(data["cam0"])
@@ -188,6 +192,42 @@ def residual_video(flight):
     for i, img_timestamp in enumerate(cut_img):
         ind = np.abs(img_timestamp - data["timestamp"]).argmin()
         data_ind[i] = ind
+
+    # 1.6-Predict non-fa residual
+    print('\nResidual model GRU CNN no embeddings')
+    gru_cnn = learned_model.EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
+    gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/"
+    gru_cnn += "epoch=999-step=584999.ckpt"
+
+    model = DynamicalModel(param='identification', dtype=torch.float32)
+    past = 60
+    residual_model = GRUCNNResidual.load_from_checkpoint(gru_cnn, model=model)
+    residual_model.eval()
+
+    time = []
+    residual_hat = []
+    residual_gt = []
+
+    trajectory = data[i]
+    motor = trajectory["motor"][1:-past]
+    state = trajectory["state"][:-past-1]
+    depth_emb = trajectory["depth_emb"][:-past-1]
+    norm_emb = trajectory["norm_emb"][:-past-1]
+
+    dt_shape = list(state.shape)
+    dt_shape[-1] = 1
+    dt = torch.FloatTensor([[1 / 200]]).repeat(dt_shape)
+
+    with torch.no_grad():
+        for i in len(data['motor']):
+            time.append(trajectory["t"][-1])
+            residual_gt.append(trajectory["residual"][-1])
+            residual_hat.append(model(motor=motor, state=state, dt=dt, depth_emb=depth_emb, norm_emb=norm_emb))
+
+    time = torch.stack(time, dim=0)
+    residual_gt = torch.stack(residual_gt, dim=0)
+    residual_hat = torch.stack(residual_hat, dim=0)
+    loss = ((residual_gt - residual_hat) ** 2).mean().item()
 
     # 2-CREATING VIDEO
     # 2.1-Initialising video
@@ -217,8 +257,8 @@ def residual_video(flight):
         ax.imshow(img)
         ax.axis('off')
         # Displaying legend: the drone position
-        trans = data['state'][data_ind[i], :3]
-        angles = Rotation.from_quat(data['state'][data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
+        trans = state_mean[data_ind[i], :3]
+        angles = Rotation.from_quat(state_mean[data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
         legend = (f'Camera position\n'
                   f'       x:{trans[0]:8.3f}m\n'
                   f'       y:{trans[1]:8.3f}m\n'
