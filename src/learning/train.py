@@ -62,8 +62,7 @@ def main():
     seed = 0
     seed_everything(seed=seed, workers=True)
 
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, log_graph=False)
-    # tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, log_graph=True)
+    tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, log_graph=True)
     # analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
     if args.load_weights is None:
         run = class_name(
