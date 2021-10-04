@@ -1,5 +1,4 @@
 import pytorch_lightning as pl
-from sklearn.metrics import roc_auc_score
 import torch
 import torch.nn as nn
 from typing import Optional
@@ -133,7 +132,8 @@ class PresenceClassifier(pl.LightningModule):
 
         # 2.1-GRU
         out = self.batch_norm0(embedding.reshape(-1, 1, self.past, self.emb_size))  # (batch, self.past, self.emb_size)
-        out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))  # gru output with shape: (batch, self.past, self.unit_size)
+        out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))  # gru output with shape: (batch, self.past,
+        # self.unit_size)
         out = out[:, -1]  # last hidden states, (batch, self.unit_size)
         # Fully connected
         out = self.batch_norm1(out)
