@@ -168,9 +168,9 @@ class PresenceClassifier(pl.LightningModule):
         fa_label_hat = self.forward(depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
 
         weights = fa_label_gt * 0.98 + 0.01
-        # loss_object = torch.nn.BCELoss(weights)
-        # loss = loss_object(fa_label_hat, fa_label_gt)
-        return torch.abs(fa_label_hat).mean()
+        loss_object = torch.nn.BCELoss(weights)
+        loss = loss_object(fa_label_hat, fa_label_gt)
+        return loss.mean()
 
     def training_step(self, train_batch, batch_idx):
         training_loss = self.step(train_batch)
