@@ -231,6 +231,7 @@ def residual_video(flight: str, double: bool, norm: bool):
             data_ind[i] = ind
         state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
         residual = data['residual']
+        past = 0
 
     # 2-CREATING VIDEO
     # 2.1-Initialising video
