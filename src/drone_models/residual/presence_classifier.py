@@ -81,7 +81,7 @@ class PresenceClassifier(pl.LightningModule):
             "unit_size"
         )
 
-        self.batch_norm0 = nn.BatchNorm2d(1)
+        self.batch_norm0 = nn.BatchNorm1d(self.past * self.emb_size)
         self.gru0 = nn.GRU(input_size=self.emb_size,
                            hidden_size=self.unit_size,
                            num_layers=self.layer,
@@ -131,8 +131,8 @@ class PresenceClassifier(pl.LightningModule):
         assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
 
         # 2.1-GRU
-        out = self.batch_norm0(embedding.reshape(-1, 1, self.past, self.emb_size))  # (batch, self.past, self.emb_size)
-        out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))  # gru output with shape: (batch, self.past,
+        out = self.batch_norm0(embedding.reshape(-1, self.past * self.emb_size))
+        out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))
         # self.unit_size)
         out = out[:, -1]  # last hidden states, (batch, self.unit_size)
         # Fully connected

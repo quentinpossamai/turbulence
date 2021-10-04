@@ -1,8 +1,12 @@
 rsync -rtv --delete ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
+echo "rsync from macbook to homedir done"  &&
 git push github main &&
+echo "Git: push from homedir to github done"  &&
 ssh remsto /bin/bash << EOF
   chmod -R 755 ~/phd/turbulence/data/euroc_mav/intermediate/ &&
+  echo "changing permission in homedir done"  &&
   rsync -rv ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/ &&
+  echo "rsync from homedir to storage done"  &&
   chmod -fR 775 /storage/Datasets/BlackBird/euroc_mav/intermediate/
   echo "chmod done"  &&
   chgrp -fR robotics /storage/Datasets/BlackBird/
