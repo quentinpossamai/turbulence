@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 import src.utils.quaternion as quaternion
-from src.learning.run import Run
+from src.learning.model_structure import Run
 
 
 class DynamicalModel(nn.Module, Run):

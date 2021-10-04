@@ -14,7 +14,7 @@ from tqdm import tqdm
 import src.data.euroc_mav.loading as euroc
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.drone_models.residual.gru_cnn import GRUCNNResidual
-import src.learning.residual_lightning as learned_model
+import src.learning.train as learned_model
 from src.utils.paths import mkdir_if_not_exist, GENERAL_ANALYSIS_PATH
 
 matplotlib.use('TKAgg')
