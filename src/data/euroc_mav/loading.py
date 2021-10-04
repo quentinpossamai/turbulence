@@ -173,7 +173,7 @@ def load_clean_data(flight):
     fourier_trans = fft(trans, axis=0)
     den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
-    
+
     # 3-CUT: Cut data and keep only when the drone is flying
     start, stop = 0, 0
     has_started = False
@@ -300,9 +300,12 @@ def euroc_mav_residual():
         # Test-2 integrating perfect derivative lead to perfect pose
         assert abs((state[1:, :3] - state[:-1, :3]) / dt[1:] - state[1:, 7:10]).sum() == 0
 
+        for key in data:
+            data[key] = data[key][1:]
+
         # Computing residual
         residual_torsor = model.residual_dynamic(motor=motor, state=state, dt=dt, next_state=next_state)
-        data["residual"] = torch.cat([torch.zeros((1, 6)), residual_torsor], dim=0).numpy()
+        data["residual"] = residual_torsor.numpy()
 
         # plot_residual_torsor(time, data["residual"], flight, xlim=(0, time[-1]))
 
@@ -331,6 +334,21 @@ def merge_embeddings():
         # Saving
         intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
         pickle.dump(data, open(intermediate_flight_path, "wb"))
+
+
+def label_surface_influence():
+    fa_presence = {FLIGHT_LIST[0]: [range(0, 106), range(26035, 26185), range(26800, 27541)],
+                   FLIGHT_LIST[1]: [range(15430, 15787)],
+                   FLIGHT_LIST[2]: [range(19286, 19401)]}
+    for flight in FLIGHT_LIST:
+        data = load_flight(flight)
+        fa_presence_array = np.zeros(len(data['state']))
+        for presence_range in fa_presence[flight]:
+            fa_presence_array[presence_range] = 1
+        data['fa_label'] = fa_presence_array
+        intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
+        pickle.dump(data, open(intermediate_flight_path, "wb"))
+    print()
 
 
 def splitting():
@@ -457,10 +475,11 @@ def load_flight(flight):
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        load_clean_data(flight)
-    euroc_mav_residual()
-    merge_embeddings()
+    # for flight in FLIGHT_LIST:
+    #     load_clean_data(flight)
+    # euroc_mav_residual()
+    # merge_embeddings()
+    label_surface_influence()
     splitting()
     # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
 
