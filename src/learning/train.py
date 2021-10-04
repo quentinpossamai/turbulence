@@ -43,15 +43,15 @@ def main():
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     version = (f"{now}_"
                f"{class_name.__name__}_"
+               f"{args.activation}_"
                f"bs{args.batch_size}_"
-               f"epch{args.max_epochs}_"
+               f"{args.embedding}"
+               # f"h{args.horizon}_"
+               f"l{args.layer}_"
                f"lr{args.lr}_"
-               f"h{args.horizon}_"
+               f"epch{args.max_epochs}_"
                f"p{args.past}_"
                f"us{args.unit_size}_"
-               f"{args.activation}_"
-               f"l{args.layer}_"
-               f"{args.embedding}"
                )
     training_path = EUROC_MAV_RESIDUAL + f"{class_name.__name__}_{args.embedding}/"
 

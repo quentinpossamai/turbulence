@@ -348,7 +348,7 @@ def label_surface_influence():
         data['fa_label'] = fa_presence_array
         intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
         pickle.dump(data, open(intermediate_flight_path, "wb"))
-    print()
+        print(f'''{flight=} | Portion of 1: {data['fa_label'].mean()}''')
 
 
 def splitting():
@@ -417,7 +417,7 @@ class EurocMAVDatasetHorizon(Dataset):
                                                val["imu_ang_acc"],  # len 6
                                                val["depth_emb"],  # len 128
                                                val["norm_emb"],  # len 128
-                                               val["fa_label"]  # len 1
+                                               val["fa_label"].reshape((-1, 1))  # len 1
                                                ], axis=1)
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)

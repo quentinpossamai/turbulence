@@ -1,4 +1,5 @@
 import pytorch_lightning as pl
+from sklearn.metrics import roc_auc_score
 import torch
 import torch.nn as nn
 from typing import Optional
@@ -11,7 +12,8 @@ class PresenceClassifier(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="depth", type=none_or_str, help="Type of embedding to use")
+        parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
+        parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
@@ -155,7 +157,7 @@ class PresenceClassifier(pl.LightningModule):
         """
         depth_emb = batch["depth_emb"][:, :self.past]
         norm_emb = batch["norm_emb"][:, :self.past]
-        fa_label = batch["fa_label"][:, self.past]
+        fa_label_gt = batch["fa_label"][:, self.past - 1]
 
         depth_emb_shape = depth_emb.shape
         dt_shape = list(depth_emb_shape)
@@ -164,8 +166,9 @@ class PresenceClassifier(pl.LightningModule):
 
         fa_label_hat = self.forward(depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
 
-        nllloss = torch.nn.NLLLoss()
-        loss = nllloss(torch.log(fa_label_hat), fa_label)
+        weight = fa_label_gt * 0.98 + 0.01
+        loss_object = torch.nn.BCELoss(weights)
+        loss = loss_object(fa_label_hat, fa_label_gt)
         return loss.mean()
 
     def training_step(self, train_batch, batch_idx):
