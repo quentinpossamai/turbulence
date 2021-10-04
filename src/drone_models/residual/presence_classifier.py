@@ -11,7 +11,7 @@ class PresenceClassifier(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="depth", type=str, help="Type of embedding to use")
+        parser.add_argument('--embedding', default="both", type=str, help="Type of embedding to use")
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
@@ -93,7 +93,8 @@ class PresenceClassifier(pl.LightningModule):
         self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
         self.linear2 = nn.Linear(in_features=self.unit_size, out_features=1, bias=True)
 
-        self.example_input_array = [torch.zeros(10, self.past, 128),
+        self.example_input_array = [torch.zeros(10, self.past, 1),
+                                    torch.zeros(10, self.past, 128),
                                     torch.zeros(10, self.past, 128)]
 
     def configure_optimizers(self):
