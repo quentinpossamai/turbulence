@@ -12,7 +12,8 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 # from src.drone_models.residual.groundthruth import GroundTruth  # Sanity check
 # from src.drone_models.residual.mlp import MLPResidual
 # from src.drone_models.residual.cnn_lightning import CNNResidual
-from src.drone_models.residual.gru_cnn import GRUCNNResidual
+# from src.drone_models.residual.gru_cnn import GRUCNNResidual
+from src.drone_models.residual.presence_classifier import PresenceClassifier
 from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
 
 EUROC_MAV_RESIDUAL = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
@@ -31,24 +32,17 @@ def main():
     parser = argparse.ArgumentParser(description="Identify model on data.")
     # Program args
     parser.add_argument('--batch_size', default=64, type=int, help="Size of a batch")
-    # Debug
-    file = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/GRUCNNResidual_None/default/"
-    file += "20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
-    file += "checkpoints/epoch=358-step=210373.ckpt"
-
     parser.add_argument('--load_weights', default=None, type=str, help="Path to previous weights")
+    class_name = PresenceClassifier
     # Module args
-    parser = GRUCNNResidual.add_model_specific_args(parser)
+    parser = class_name.add_model_specific_args(parser)
     # Trainer args
     parser = pl.Trainer.add_argparse_args(parser)  # accelerator, max_epochs
     args = parser.parse_args()
 
-    # Tensorboard
-    # tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/
-    # --load_fast=false --samples_per_plugin scalars=999999999
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     version = (f"{now}_"
-               f"{GRUCNNResidual.__name__}_"
+               f"{class_name.__name__}_"
                f"bs{args.batch_size}_"
                f"epch{args.max_epochs}_"
                f"lr{args.lr}_"
@@ -59,40 +53,37 @@ def main():
                f"l{args.layer}_"
                f"{args.embedding}"
                )
-    training_path = EUROC_MAV_RESIDUAL + f"{GRUCNNResidual.__name__}_{args.embedding}/"
+    training_path = EUROC_MAV_RESIDUAL + f"{class_name.__name__}_{args.embedding}/"
 
     print(f"{training_path=}")
     print(f"{version=}")
 
     # Reproducibility
     seed = 0
-    # torch.manual_seed(seed)
-    # random.seed(seed)
-    # np.random.seed(seed)
     seed_everything(seed=seed, workers=True)
 
     tb_logger = pl_loggers.TensorBoardLogger(save_dir=training_path, version=version, log_graph=True)
-    analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
+    # analytic_model = DynamicalModel(param="identification", dtype=torch.float32)
     if args.load_weights is None:
-        run = GRUCNNResidual(
+        run = class_name(
             activation=args.activation,
             embedding=args.embedding,
             layer=args.layer,
             learning_rate=args.lr,
-            model=analytic_model,
+            # model=analytic_model,
             motor_size=6,
             past=args.past,
             unit_size=args.unit_size,
         )
     else:
         print(f"\nReloading weights from: {args.load_weights}")
-        run = GRUCNNResidual.load_from_checkpoint(
+        run = class_name.load_from_checkpoint(
             args.load_weights,
             activation=args.activation,
             embedding=args.embedding,
             layer=args.layer,
             learning_rate=args.lr,
-            model=analytic_model,
+            # model=analytic_model,
             motor_size=6,
             past=args.past,
             unit_size=args.unit_size,
