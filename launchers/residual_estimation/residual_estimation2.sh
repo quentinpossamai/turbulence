@@ -4,7 +4,7 @@ cd ~/phd/turbulence/
 #file+="20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
 #file+="checkpoints/epoch=358-step=210373.ckpt"
 singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.train\
- --batch_size 128\
+ --batch_size 64\
  --activation tanh\
  --embedding both\
  --horizon 1\
