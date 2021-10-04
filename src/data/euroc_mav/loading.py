@@ -416,19 +416,12 @@ class EurocMAVDatasetHorizon(Dataset):
                                                val["residual"],  # len 6
                                                val["imu_ang_acc"],  # len 6
                                                val["depth_emb"],  # len 128
-                                               val["norm_emb"]  # len 128
+                                               val["norm_emb"],  # len 128
+                                               val["fa_label"]  # len 1
                                                ], axis=1)
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
         self.data = torch.from_numpy(self.data).type(self.dtype)
-
-        # print(np.min(self.data[:, 20:], axis=0))
-        # print(np.max(self.data[:, 20:], axis=0))
-
-        # self.min_res = torch.tensor([-2.56919551, -1.6980865, -2.45562077,
-        #                              -14.32858562, -11.89167309, -4.79519939]).view(1, 6)
-        # self.max_res = torch.tensor([4.07108498, 2.69354105, 2.62223434,
-        #                              13.02334404, 15.27588463, 6.88414383]).view(1, 6)
 
     def __len__(self):
         return self.cum_dataset_idx[-1]
@@ -451,7 +444,9 @@ class EurocMAVDatasetHorizon(Dataset):
                     "residual": data[:, 20:26].view((1, -1, 6)),
                     "imu_ang_acc": data[:, 26:32].view((1, -1, 6)),
                     "depth_emb": data[:, 32:160].view((1, -1, 128)),
-                    "norm_emb": data[:, 160:288].view((1, -1, 128))}
+                    "norm_emb": data[:, 160:288].view((1, -1, 128)),
+                    "fa_label": data[:, 288:289].view((1, -1, 1)),
+                    }
 
         else:
             return {"t": data[:, :1],
@@ -460,7 +455,9 @@ class EurocMAVDatasetHorizon(Dataset):
                     "residual": data[:, 20:26],
                     "imu_ang_acc": data[:, 26:32],
                     "depth_emb": data[:, 32:160],
-                    "norm_emb": data[:, 160:288]}
+                    "norm_emb": data[:, 160:288],
+                    "fa_label": data[:, 288:289],
+                    }
 
 
 def load_flight(flight):
