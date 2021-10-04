@@ -1,5 +1,4 @@
 import pytorch_lightning as pl
-from sklearn.metrics import roc_auc_score
 import torch
 import torch.nn as nn
 from typing import Optional
@@ -82,7 +81,7 @@ class PresenceClassifier(pl.LightningModule):
             "unit_size"
         )
 
-        self.batch_norm0 = nn.BatchNorm2d(1)
+        self.batch_norm0 = nn.BatchNorm1d(self.past * self.emb_size)
         self.gru0 = nn.GRU(input_size=self.emb_size,
                            hidden_size=self.unit_size,
                            num_layers=self.layer,
@@ -92,7 +91,7 @@ class PresenceClassifier(pl.LightningModule):
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
-        self.linear2 = nn.Linear(in_features=self.unit_size, out_features=2, bias=True)
+        self.linear2 = nn.Linear(in_features=self.unit_size, out_features=1, bias=True)
 
         self.example_input_array = [torch.zeros(10, self.past, 128),
                                     torch.zeros(10, self.past, 128)]
@@ -132,8 +131,9 @@ class PresenceClassifier(pl.LightningModule):
         assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
 
         # 2.1-GRU
-        out = self.batch_norm0(embedding)  # (batch, self.past, self.emb_size)
-        out, _ = self.gru0(out)  # gru output with shape: (batch, self.past, self.unit_size)
+        out = self.batch_norm0(embedding.reshape(-1, self.past * self.emb_size))
+        out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))
+        # self.unit_size)
         out = out[:, -1]  # last hidden states, (batch, self.unit_size)
         # Fully connected
         out = self.batch_norm1(out)
@@ -142,7 +142,7 @@ class PresenceClassifier(pl.LightningModule):
         out = torch.softmax(self.linear2(out), dim=1)
 
         out_shape = list(embedding.shape)
-        out_shape[-1] = 2
+        out_shape[-1] = 1
         del out_shape[-2]
         return out.reshape(out_shape)
 
@@ -166,7 +166,7 @@ class PresenceClassifier(pl.LightningModule):
 
         fa_label_hat = self.forward(depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
 
-        weight = fa_label_gt * 0.98 + 0.01
+        weights = fa_label_gt * 0.98 + 0.01
         loss_object = torch.nn.BCELoss(weights)
         loss = loss_object(fa_label_hat, fa_label_gt)
         return loss.mean()
