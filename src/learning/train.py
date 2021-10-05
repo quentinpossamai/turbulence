@@ -89,18 +89,20 @@ def main():
             unit_size=args.unit_size,
         )
 
+    num_workers = 12 if GPU_COUNT else 4
     # Datasets
     train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
                                                    batch_dim=False),
-                            batch_size=args.batch_size, shuffle=True, num_workers=0, pin_memory=False,
+                            batch_size=args.batch_size, shuffle=True, num_workers=num_workers, pin_memory=False,
                             drop_last=True)
 
     validation_data = DataLoader(EurocMAVDatasetHorizon("validation",
                                                         traj_len=args.past + args.horizon,
                                                         dtype=torch.float32,
                                                         batch_dim=False),
-                                 batch_size=args.batch_size, shuffle=False, num_workers=0, pin_memory=False,
+                                 batch_size=args.batch_size,
+                                 shuffle=False, num_workers=num_workers, pin_memory=False,
                                  drop_last=True)
 
     trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, deterministic=True, max_epochs=args.max_epochs,
