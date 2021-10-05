@@ -13,7 +13,7 @@ ssh remsto /bin/bash << EOF
   echo "chgrp done"  &&
   cd ~/phd/turbulence/launchers/residual_estimation/ &&
   git pull github main &&
-  sbatch --mem 10G --gres=gpu:1 -p part2 -J classifier_depth -o log-classifier_depth-%A.out residual_estimation0.sh
+  sbatch --mem 10G --gres=gpu:1 -p part2 -J debug_include_fa -o log-debug_include_fa-%A.out debug_include_fa.sh
   sbatch --mem 20G --gres=gpu:1 -p part2 -J classifier_norm -o log-classifier_norm-%A.out residual_estimation1.sh
   sbatch --mem 10G --gres=gpu:1 -p part2 -J classifier_both -o log-classifier_both-%A.out residual_estimation2.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J both -o log-both-%A.out residual_estimation3.sh

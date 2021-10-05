@@ -4,7 +4,6 @@
 /src/autoencoder_depth/logs/
 /analysis
 /data
-/models
 /reports
 *.pyc
 .idea

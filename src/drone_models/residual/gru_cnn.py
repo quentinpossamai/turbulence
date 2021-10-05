@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from typing import Optional
 
-from src.learning.model_structure import Run
+from src.drone_models.model_structure import Run
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 
 
