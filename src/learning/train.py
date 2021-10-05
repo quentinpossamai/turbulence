@@ -104,8 +104,8 @@ def main():
                                  drop_last=True)
 
     trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, deterministic=True, max_epochs=args.max_epochs,
-                         fast_dev_run=1000,
-                         track_grad_norm=2,
+                         fast_dev_run=False,
+                         # track_grad_norm=2,
                          log_gpu_memory=True,
                          )
     trainer.fit(run, train_data, validation_data)
