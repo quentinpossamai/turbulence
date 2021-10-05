@@ -94,20 +94,31 @@ def main():
     train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
                                                    batch_dim=False),
-                            batch_size=args.batch_size, shuffle=True, num_workers=num_workers, pin_memory=False,
-                            drop_last=True)
+                            batch_size=args.batch_size,
+                            shuffle=True,
+                            num_workers=num_workers,
+                            pin_memory=True,
+                            drop_last=True
+                            )
 
     validation_data = DataLoader(EurocMAVDatasetHorizon("validation",
                                                         traj_len=args.past + args.horizon,
                                                         dtype=torch.float32,
                                                         batch_dim=False),
                                  batch_size=args.batch_size,
-                                 shuffle=False, num_workers=num_workers, pin_memory=False,
-                                 drop_last=True)
+                                 shuffle=False,
+                                 num_workers=num_workers,
+                                 pin_memory=True,
+                                 drop_last=True
+                                 )
 
-    trainer = pl.Trainer(gpus=GPU_COUNT, logger=tb_logger, deterministic=True, max_epochs=args.max_epochs,
-                         fast_dev_run=False,
+    trainer = pl.Trainer(gpus=GPU_COUNT,
+                         logger=tb_logger,
+                         deterministic=True,
+                         max_epochs=args.max_epochs,
+                         # fast_dev_run=False,
                          # track_grad_norm=2,
+                         accelerator='ddp' if GPU_COUNT else None,
                          log_gpu_memory=True,
                          )
     trainer.fit(run, train_data, validation_data)
