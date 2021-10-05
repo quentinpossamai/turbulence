@@ -41,13 +41,13 @@ def test_model(model, past, dataset, train_test_validation):
           f"E(0.025s): {res[0]:0.4e}, E(0.5s): {res[1]:0.4e}, E(1s): {res[2]:0.4e}")
 
 
-def plot_rollout(model, horizon, past, dataset, train_test_validation):
+def plot_rollout(model, horizon, past, dataset, train_test_validation, plot_range=None):
     if dataset == "euroc_mav":
         traj_len = past + horizon
         data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
                                             traj_len=traj_len, dtype=torch.float32, batch_dim=False)
         trajectory = data[0]
-        time = trajectory["t"]
+        t = trajectory["t"]
         motor = trajectory["motor"]
         state = trajectory["state"]
         depth_emb = trajectory["depth_emb"]
@@ -58,17 +58,99 @@ def plot_rollout(model, horizon, past, dataset, train_test_validation):
         dt = torch.FloatTensor([[1 / 200]]).repeat(dt_shape)
 
         with torch.no_grad():
-            loss, rollout_loss, pred = model.rollout(motor=motor, state=state, dt=dt, depth_emb=depth_emb,
-                                                     norm_emb=norm_emb, horizon=horizon)
+            loss, rollout_loss, prediction = model.rollout(motor=motor, state=state, dt=dt, depth_emb=depth_emb,
+                                                           norm_emb=norm_emb, horizon=horizon)
+        state = state[past:]
+        t = t[past:]
+        if plot_range is not None:
+            state = state[plot_range[0]:plot_range[1]]
+            prediction = prediction[plot_range[0]:plot_range[1]]
+            t = t[plot_range[0]:plot_range[1]]
 
-        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-        ax.plot(time[past:], state[past:, :3], label=f"GT")
-        ax.plot(time[past:], pred[:, :3], label=f"hat")
-        ax.set_ylabel("Position [m]")
-        ax.set_xlabel("Time [s]")
-        ax.grid()
-        ax.legend()
+        fig = plt.figure(figsize=(19.2, 10.8), dpi=100)
+        ax_pos = [fig.add_subplot(4, 4, 1), fig.add_subplot(4, 4, 2), fig.add_subplot(4, 4, 3)]
+        ax_quat = [fig.add_subplot(4, 4, 5), fig.add_subplot(4, 4, 6), fig.add_subplot(4, 4, 7),
+                   fig.add_subplot(4, 4, 8)]
+        ax_vel = [fig.add_subplot(4, 4, 9), fig.add_subplot(4, 4, 10), fig.add_subplot(4, 4, 11)]
+        ax_rpy = [fig.add_subplot(4, 4, 13), fig.add_subplot(4, 4, 14), fig.add_subplot(4, 4, 15)]
+
+        ax_pos[0].set_title("X")
+        ax_pos[1].set_title("Y")
+        ax_pos[2].set_title("Z")
+
+        ax_quat[0].set_title("Qx")
+        ax_quat[1].set_title("Qy")
+        ax_quat[2].set_title("Qz")
+        ax_quat[3].set_title("Qw")
+
+        ax_vel[0].set_title("Vx")
+        ax_vel[1].set_title("Vy")
+        ax_vel[2].set_title("Vz")
+
+        ax_rpy[0].set_title("Wx")
+        ax_rpy[1].set_title("Wy")
+        ax_rpy[2].set_title("Wz")
+        for i in range(3):
+            ax_pos[i].plot(t, state[:, i], label="GT")
+            ax_pos[i].plot(t, prediction[:, i], label="Prediction")
+            ax_vel[i].plot(t, state[:, 7 + i])
+            ax_vel[i].plot(t, prediction[:, 7 + i])
+            ax_rpy[i].plot(t, state[:, 10 + i])
+            ax_rpy[i].plot(t, prediction[:, 10 + i])
+            # ax_pos[i].tick_params(axis='both', labelsize=5)
+            # ax_vel[i].tick_params(axis='both', labelsize=5)
+            # ax_rpy[i].tick_params(axis='both', labelsize=5)
+            ax_pos[i].grid()
+            ax_vel[i].grid()
+            ax_rpy[i].grid()
+
+        for i in range(4):
+            ax_quat[i].plot(t, state[:, 3 + i])
+            ax_quat[i].plot(t, prediction[:, 3 + i])
+            # ax_quat[i].tick_params(axis='both', labelsize=5)
+            ax_quat[i].grid()
+
+        handles, labels = ax_pos[-1].get_legend_handles_labels()
+        fig.legend(handles, labels, loc=(0.8, 0.85), frameon=True)
+        plt.tight_layout()
+
         plt.show()
+
+        # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        # ax.plot(time[past:], state[past:, :3], label=f"GT")
+        # ax.plot(time[past:], prediction[:, :3], label=f"hat")
+        # ax.set_ylabel("Position [m]")
+        # ax.set_xlabel("Time [s]")
+        # ax.grid()
+        # ax.legend()
+        # plt.show()
+        #
+        # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        # ax.plot(time[past:], state[past:, 3:7], label=f"GT")
+        # ax.plot(time[past:], prediction[:, 3:7], label=f"hat")
+        # ax.set_ylabel("Quaternion")
+        # ax.set_xlabel("Time [s]")
+        # ax.grid()
+        # ax.legend()
+        # plt.show()
+        #
+        # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        # ax.plot(time[past:], state[past:, 7:10], label=f"GT")
+        # ax.plot(time[past:], prediction[:, 7:10], label=f"hat")
+        # ax.set_ylabel("Linear speed [m]")
+        # ax.set_xlabel("Time [s]")
+        # ax.grid()
+        # ax.legend()
+        # plt.show()
+        #
+        # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+        # ax.plot(time[past:], state[past:, 10:13], label=f"GT")
+        # ax.plot(time[past:], prediction[:, 10:13], label=f"hat")
+        # ax.set_ylabel("Angular velocity [m]")
+        # ax.set_xlabel("Time [s]")
+        # ax.grid()
+        # ax.legend()
+        # plt.show()
     else:
         raise NotImplementedError
 
@@ -102,16 +184,16 @@ def plot_residual(model, traj_len, dataset, train_test_validation):
         loss = ((residual_gt - residual_hat) ** 2).mean().item()
         print(f"{loss=}")
 
-        i = 0
-        name = ["Fa x", "Fa y", "Fa z", "Ta x", "Ta y", "Ta z"]
-        fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-        ax.plot(time, residual_gt[:, i], label=f"GT")
-        ax.plot(time, residual_hat[:, i], label=f"hat")
-        ax.set_ylabel("Fa [m/s2]" if i // 3 == 0 else "Ta [rad/s2]")
-        ax.set_xlabel("Time [s]")
-        ax.grid()
-        ax.legend()
-        plt.show()
+        for i in range(6):
+            name = ["Fa x [m/s2]", "Fa y [m/s2]", "Fa z [m/s2]", "Ta x [rad/s2]", "Ta y [rad/s2]", "Ta z [rad/s2]"]
+            fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
+            ax.plot(time, residual_gt[:, i], label=f"GT")
+            ax.plot(time, residual_hat[:, i], label=f"hat")
+            ax.set_ylabel(name[i])
+            ax.set_xlabel("Time [s]")
+            ax.grid()
+            ax.legend()
+            plt.show()
 
     else:
         raise NotImplementedError
@@ -229,8 +311,9 @@ def main():
 
     residual_model.eval()
     # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
-    # plot_rollout(residual_model, horizon=200, past=past, dataset='euroc_mav', train_test_validation='test')
-    plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
+    plot_rollout(residual_model, horizon=300, past=past, dataset='euroc_mav', train_test_validation='test',
+                 plot_range=[0, 300])
+    # plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
 
 
 if __name__ == '__main__':
