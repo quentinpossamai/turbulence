@@ -7,4 +7,5 @@
 /models
 /reports
 *.pyc
+*.out
 .idea
