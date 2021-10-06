@@ -1,4 +1,4 @@
-rsync -rtv --delete ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
+rsync -rtv ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
 echo "rsync from macbook to homedir done"  &&
 git push github main &&
 echo "Git: push from homedir to github done"  &&
