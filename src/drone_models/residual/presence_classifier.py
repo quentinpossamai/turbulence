@@ -149,8 +149,7 @@ class PresenceClassifier(pl.LightningModule):
 
     def step(self, batch):
         """
-        :param batch: {
-                       depth_emb: (batch, time, 128),
+        :param batch: {depth_emb: (batch, time, 128),
                        norm_emb: (batch, time, 128),
                        fa_label: (batch, time, 1)}
 
