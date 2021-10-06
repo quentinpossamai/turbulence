@@ -171,7 +171,7 @@ class GroundTruthInterpolator(object):
             data = load_flight(flight)
             trans = data["state"][:, :3] + TRANS_MEAN[flight].reshape((1, 3))
             tf_vicon0_origin = Transform.from_quat_trans(data["state"][:, 3:7],
-                                                         data["state"][:, :3]).inv().as_matrix()
+                                                         trans).inv().as_matrix()
             tf_origin_body = Transform.from_matrix(TF_BODY_VICON0 @ tf_vicon0_origin).inv().as_matrix()
             quat, trans = Transform.from_matrix(tf_origin_body).as_quat_trans()
             quat = quaternion.qfix(quat)

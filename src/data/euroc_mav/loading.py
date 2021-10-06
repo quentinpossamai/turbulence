@@ -176,51 +176,14 @@ def load_clean_data(flight):
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
 
     # 3-CUT: Cut data and keep only when the drone is flying
-    # todo
     cut_motor_idx = {FLIGHT_LIST[0]: [1113, 28294],
-               FLIGHT_LIST[1]: [954, 16503],
-               FLIGHT_LIST[2]: [1510, 20855]}
+                     FLIGHT_LIST[1]: [954, 16503],
+                     FLIGHT_LIST[2]: [1510, 20855]}
 
-    # fig, axs = plt.subplots(2, 1, figsize=(19.2, 10.8))
-    # ax = axs[0]
-    # ax.plot(den_pose_dict['t'] - den_motor_dict['t'][0], den_pose_dict['pose'][:, :3])
-    # ax.grid()
-    # ax = axs[1]
-    # ax.plot(den_motor_dict['t'] - den_motor_dict['t'][0], den_motor_dict['motor'])
-    # ax.grid()
-    # # [ax.set_xlim([140, 150]) for ax in axs]
-    # lines = [ax.axvline(10) for ax in axs]
-    # from matplotlib.widgets import Slider
-    # ax_n = plt.axes([0.05, 0.1, 0.0225, 0.83], facecolor='lightgoldenrodyellow')
-    # n_slider = Slider(ax=ax_n,
-    #                   label="Cut val",
-    #                   valmin=0,
-    #                   valmax=den_motor_dict['t'][-1] - den_motor_dict['t'][0],
-    #                   valinit=0,
-    #                   orientation="vertical")
-    # def update(_):
-    #     slider_value = n_slider.val
-    #     lines[0].set_xdata(slider_value)
-    #     lines[1].set_xdata(slider_value)
-    #     fig.canvas.draw_idle()
-    #     print(f'Motor idx: {np.argmin(abs(slider_value - (den_motor_dict["t"] - den_motor_dict["t"][0])))}')
-    # n_slider.on_changed(update)
-
-
-    # start, stop = 0, 0
-    # has_started = False
-    # for i, ms in enumerate(den_motor_dict["motor"]):
-    #     if (ms > 120).any() and not has_started:
-    #         start = i
-    #         has_started = True
-    #     if has_started and (ms < 80).any():
-    #         stop = i
-    #         break
-    # assert start != stop
-    # print(f"""start: {start} | stop: {stop} | total: {len(den_motor_dict["t"])}""")
     for key in motor_dict:
         start, stop = cut_motor_idx[flight]
         den_motor_dict[key] = den_motor_dict[key][start:stop]
+        print(f'Cut len: {stop-start}')
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
@@ -355,7 +318,8 @@ def merge_embeddings():
         # list[dict_keys(['timestamp', 'embedding', 'MSE', 'GradMSE'])]
         depth_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}depth_embedding.pkl", "rb"))
         depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])[1:]
-        assert (data["t"] == np.array([e["timestamp"] for e in depth_emb])).all
+        depth_t = np.array([e["timestamp"] for e in depth_emb])
+        assert (data["t"] == depth_t).all
         data["depth_emb"] = np.array([e["embedding"].numpy().flatten() for e in depth_emb]).astype(float)
 
         # list[dict_keys(['timestamp', 'embedding', 'MSE', 'CrossProduct'])]
@@ -506,7 +470,6 @@ def load_flight(flight):
 
 def main():
     for flight in FLIGHT_LIST:
-        flight = FLIGHT_LIST[2]
         load_clean_data(flight)
     euroc_mav_residual()
     merge_embeddings()
