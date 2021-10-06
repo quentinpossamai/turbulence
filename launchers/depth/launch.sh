@@ -11,7 +11,7 @@ ssh remsto /bin/bash << EOF
   echo "chmod done"  &&
   chgrp -fR robotics /storage/Datasets/BlackBird/
   echo "chgrp done"  &&
-  cd ~/phd/turbulence/launchers/residual_estimation/ &&
+  cd ~/phd/turbulence/launchers/depth/ &&
   git pull github main &&
   sbatch --mem 10G -p part3 -J gen0 -o log-depth0-%A.out generate_depth0.sh
   sbatch --mem 10G -p part3 -J gen1 -o log-depth1-%A.out generate_depth1.sh

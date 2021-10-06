@@ -335,7 +335,7 @@ def gen_img(pipe, transform, xyz):
 def main():
     if args.integrated:
         gti = GroundTruthInterpolator(int(args.room_path))
-        xyz = np.load(WD_PATH + "src/depth_estimation/pointcloud.npy")
+        xyz = np.load(INTERMEDIATE_DATASET_PATH + "depth_estimation/pointcloud.npy")
     else:
         # GT position/orientation interpolator
         gti = GroundTruthInterpolator(os.path.join(args.room_path, 'state_groundtruth_estimate0/data.csv'))
