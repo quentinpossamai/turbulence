@@ -45,9 +45,9 @@ class EurocMavLoader(Dataset):
         dir = self.dataloc + "depth_estimation/" + self.index[item]
         try:
             depth_map = torch.FloatTensor(cv2.imread(dir)[:, :, 0]).unsqueeze(0)
-        except TypeError:
+        except TypeError as e:
             print(self.index[item])
-            raise TypeError("DTC")
+            raise TypeError(".DS_Store probably in data") from e
         depth_map = depth_map / 255 * 2 - 1
         depth_map = depth_map  # * ZMAX
 
