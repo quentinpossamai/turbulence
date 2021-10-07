@@ -89,9 +89,11 @@ def main():
             unit_size=args.unit_size,
         )
 
+    # num_workers = 0
     num_workers = 12 if GPU_COUNT else 4
     # Datasets
-    train_data = DataLoader(EurocMAVDatasetHorizon("train", traj_len=args.past + args.horizon,
+    train_data = DataLoader(EurocMAVDatasetHorizon("train",
+                                                   traj_len=args.past + args.horizon,
                                                    dtype=torch.float32,
                                                    batch_dim=False),
                             batch_size=args.batch_size,
@@ -118,6 +120,7 @@ def main():
                          max_epochs=args.max_epochs,
                          # fast_dev_run=False,
                          # track_grad_norm=2,
+                         # accelerator=None,
                          accelerator='ddp' if GPU_COUNT else None,
                          log_gpu_memory=True,
                          )

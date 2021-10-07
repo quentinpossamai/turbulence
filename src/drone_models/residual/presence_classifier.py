@@ -115,6 +115,7 @@ class PresenceClassifier(pl.LightningModule):
 
         :return: (batch, value=6)
         """
+        print(f'presence_classifier.py forward start {self.current_epoch=} {self.global_step=}')
         # 1.-Input processing
         if depth_emb is not None:
             assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
@@ -145,6 +146,7 @@ class PresenceClassifier(pl.LightningModule):
         out_shape = list(embedding.shape)
         out_shape[-1] = 1
         del out_shape[-2]
+        print(f'presence_classifier.py forward end {self.current_epoch=} {self.global_step=}')
         return out.reshape(out_shape)
 
     def step(self, batch):
@@ -155,6 +157,7 @@ class PresenceClassifier(pl.LightningModule):
 
         :return: Loss
         """
+        print(f'presence_classifier.py step start {self.current_epoch=} {self.global_step=}')
         depth_emb = batch["depth_emb"][:, :self.past]
         norm_emb = batch["norm_emb"][:, :self.past]
         fa_label_gt = batch["fa_label"][:, self.past - 1]
@@ -169,15 +172,21 @@ class PresenceClassifier(pl.LightningModule):
         weights = fa_label_gt * 0.98 + 0.01
         loss_object = torch.nn.BCELoss(weights)
         loss = loss_object(fa_label_hat, fa_label_gt)
+        print(f'presence_classifier.py step end {self.current_epoch=} {self.global_step=}')
         return loss.mean()
 
     def training_step(self, train_batch, batch_idx):
+        print(f'presence_classifier.py train end {self.current_epoch=} {self.global_step=}')
         training_loss = self.step(train_batch)
         self.log("train_loss", training_loss)
+        print(f'presence_classifier.py train end {self.current_epoch=} {self.global_step=}')
+
         return training_loss
 
     def validation_step(self, val_batch, batch_idx):
+        print(f'presence_classifier.py validation_step start {self.current_epoch=} {self.global_step=}')
         val_loss = self.step(val_batch)
+        print(f'presence_classifier.py validation_step end {self.current_epoch=} {self.global_step=}')
         self.log("val_loss", val_loss)
 
 
