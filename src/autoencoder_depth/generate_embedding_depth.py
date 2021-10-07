@@ -18,6 +18,8 @@ parser.add_argument('--flight', default="V1_01_easy", type=str)
 parser.add_argument('--lr', default=1e-3, type=float)
 parser.add_argument('--feature_size', default=128, type=int)
 parser.add_argument('--name', default='autoencoder_depth_irs_128', type=str)
+parser.add_argument('--weight_grad', default=1, type=int)
+
 
 args = parser.parse_args()
 

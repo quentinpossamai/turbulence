@@ -24,7 +24,7 @@ ssh remsto /bin/bash << EOF
   sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_depth1 -o log-gen_depth1-%A.out generate_embeddings_depth1.sh
   sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_depth2 -o log-gen_depth2-%A.out generate_embeddings_depth2.sh
   sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_depth3 -o log-gen_depth3-%A.out generate_embeddings_depth3.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_norm1 -o log-gen_norm1-%A.out generate_embeddings_normal1.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_norm2 -o log-gen_norm2-%A.out generate_embeddings_normal2.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_norm3 -o log-gen_norm3-%A.out generate_embeddings_normal3.sh
+  sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_norm1 -o log-gen_norm1-%A.out generate_embeddings_normal1.sh
+  sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_norm2 -o log-gen_norm2-%A.out generate_embeddings_normal2.sh
+  sbatch --mem 10G --gres=gpu:1 -p part3 -J gen_norm3 -o log-gen_norm3-%A.out generate_embeddings_normal3.sh
 EOF
