@@ -82,7 +82,8 @@ def main():
     model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
     try:
         state_dict = torch.load(
-            f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
+            # f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
+            f"/home/qpossamai/phd/turbulence/models/autoencoder_cophylike/{args.name}.nn",
             map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(

@@ -1,4 +1,4 @@
-rsync -rtv ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
+rsync -rtv remsto:~/phd/turbulence/data/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/ &&
 echo "rsync from macbook to homedir done"  &&
 git push github debug &&
 echo "Git: push from homedir to github done"  &&
