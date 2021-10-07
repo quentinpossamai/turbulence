@@ -1,16 +1,16 @@
-import torch
 import argparse
-import torch.nn as nn
-from Models.model_CoPhy_like import Autoencoder
-import pickle
-import random
 import cv2
 import numpy as np
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-import torch.nn.functional as F
 import os
-from torch.utils.data import Dataset
+import pickle
+import random
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
+from tqdm import tqdm
+
+from src.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', default=0, type=int)
