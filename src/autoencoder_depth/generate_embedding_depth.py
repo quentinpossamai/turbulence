@@ -34,7 +34,7 @@ class EurocMavLoader(Dataset):
         super(EurocMavLoader, self).__init__()
         self.dataloc = f"/Volumes/Samsung_T5/BlackBird/euroc_mav/intermediate/{split}/"
         if not os.path.isdir(self.dataloc):
-            self.dataloc = f"/storage/Dataset/BlackBird/euroc_mav/intermediate/{split}/"
+            self.dataloc = f"/storage/Datasets/BlackBird/euroc_mav/intermediate/{split}/"
 
         self.index = os.listdir(self.dataloc + "depth_estimation")
 
