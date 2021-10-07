@@ -106,7 +106,8 @@ def main():
         out = model(depthmap)
         costs = get_loss(depthmap, out)
         data.append(
-            {'timestamp': ex, 'embedding': out["feature"], "MSE": costs[1].detach().numpy(), "GradMSE": costs[-1]})
+            {'timestamp': ex, 'embedding': out["feature"].cpu(),
+             "MSE": costs[1].cpu().detach().numpy(), "GradMSE": costs[-1].cpu()})
     pickle.dump(data, open(f"/storage/Datasets/BlackBird/{args.flight}_depth.pkl"))
 
 
