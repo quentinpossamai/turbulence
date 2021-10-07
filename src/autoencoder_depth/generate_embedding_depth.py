@@ -51,7 +51,7 @@ class EurocMavLoader(Dataset):
         depth_map = depth_map / 255 * 2 - 1
         depth_map = depth_map  # * ZMAX
 
-        return {"depth": depth_map, "normal": None, "ex": self.index[item]}
+        return {"depth": depth_map, "ex": self.index[item]}
 
 
 def compute_grad(rgb):
