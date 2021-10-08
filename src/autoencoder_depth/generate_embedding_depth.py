@@ -83,13 +83,13 @@ def main():
     dataloader = DataLoader(EurocMavLoader(split=args.flight), batch_size=1,
                             shuffle=True,
                             num_workers=0,
-                            pin_memory=True)
+                            pin_memory=False)
 
     model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
     try:
         state_dict = torch.load(
             # f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
-            f"/home/qpossamai/phd/turbulence/models/autoencoder_cophylike/{args.name}.nn",
+            f"/home/qpossamai/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
             map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
@@ -106,9 +106,10 @@ def main():
         out = model(depthmap)
         costs = get_loss(depthmap, out)
         data.append(
-            {'timestamp': ex, 'embedding': out["feature"].cpu(),
-             "MSE": costs[1].cpu().detach().numpy(), "GradMSE": costs[-1].cpu()})
-    pickle.dump(data, open(f"/storage/Datasets/BlackBird/{args.flight}_depth.pkl"))
+            {'timestamp': ex, 'embedding': out["feature"].cpu().detach().numpy(),
+             "MSE": costs[1].cpu().detach().numpy(), "GradMSE": costs[-1].cpu().detach().numpy()})
+    pickle.dump(data, open(f"/storage/Datasets/BlackBird/euroc_mav/"
+                           f"intermediate/{args.flight}/depth_embedding.pkl", "wb"))
 
 
 if __name__ == '__main__':

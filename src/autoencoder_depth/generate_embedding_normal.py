@@ -82,7 +82,7 @@ def main():
     try:
         state_dict = torch.load(
             # f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
-            f"/home/qpossamai/phd/turbulence/models/autoencoder_cophylike/{args.name}.nn",
+            f"/home/qpossamai/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
             map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
@@ -100,8 +100,10 @@ def main():
         out = model(depthmap)
         costs = get_loss(normal, out)
         data.append(
-            {'timestamp': ex, 'embedding': out["feature"][0].cpu().detach().numpy(), "MSE": costs[1].cpu().detach().numpy(), "CrossProduct": costs[-1].cpu().detach().numpy()})
-    pickle.dump(data, open(f"/storage/Datasets/BlackBird/{args.flight}.pkl", "wb"))
+            {'timestamp': ex, 'embedding': out["feature"][0].cpu().detach().numpy(),
+             "MSE": costs[1].cpu().detach().numpy(), "CrossProduct": costs[-1].cpu().detach().numpy()})
+    pickle.dump(data, open(f"/storage/Datasets/BlackBird/euroc_mav/"
+                           f"intermediate/{args.flight}/normal_embedding.pkl", "wb"))
 
 
 if __name__ == '__main__':
