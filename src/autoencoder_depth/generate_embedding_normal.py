@@ -82,7 +82,8 @@ def main():
     try:
         state_dict = torch.load(
             # f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
-            f"/home/qpossamai/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
+            # f"/home/qpossamai/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
+            f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/{args.name}.nn",
             map_location=device)
     except FileNotFoundError:
         state_dict = torch.load(
