@@ -1,12 +1,14 @@
+from collections import OrderedDict
 import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
+import os
 from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
+from sklearn.model_selection import train_test_split
 import torch
 from torch.utils.data import Dataset
-import os
 
 # import src.data.euroc_mav.data_vis as data_vis
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
@@ -183,7 +185,7 @@ def load_clean_data(flight):
     for key in motor_dict:
         start, stop = cut_motor_idx[flight]
         den_motor_dict[key] = den_motor_dict[key][start:stop]
-        print(f'Cut len: {stop-start}')
+        print(f'Cut len: {stop - start}')
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
@@ -371,6 +373,45 @@ def splitting():
             pickle.dump(test_data, open(INTERMEDIATE_DATASET_PATH + flight + "/test.pkl", "wb"))
 
 
+def splitting_uniform_turbulence():
+    for flight in FLIGHT_LIST:
+        print("Splitting: ", flight)
+        data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
+        assert all(np.array([len(data[key]) for key in data]) == len(data["t"])), f"All Data key must have same" \
+                                                                                  f" length"
+        # Todo: Debug
+        flight_len = len(data["t"])
+        print(flight, flight_len)
+        data['fa_label'] = np.zeros(len(data['t']))
+        data['fa_label'][:round(flight_len * 0.01)] = 1
+        np.random.shuffle(data['fa_label'])
+
+        data_idx = np.arange(len(data['t']))
+        temp_idx, test_idx = train_test_split(data_idx, test_size=0.2, shuffle=True, stratify=data['fa_label'])
+        train_idx, val_idx = train_test_split(temp_idx, test_size=0.25, shuffle=True,
+                                              stratify=data['fa_label'][temp_idx])
+
+        train_data = {key: data[key][train_idx] for key in data}
+        pickle.dump(train_data, open(INTERMEDIATE_DATASET_PATH + flight + "/train_uniform_turbulence.pkl", "wb"))
+        validation_data = {key: data[key][val_idx] for key in data}
+        pickle.dump(validation_data, open(INTERMEDIATE_DATASET_PATH + flight + "/validation_uniform_turbulence.pkl",
+                                          "wb"))
+        test_data = {key: data[key][test_idx] for key in data}
+        pickle.dump(test_data, open(INTERMEDIATE_DATASET_PATH + flight + "/test_uniform_turbulence.pkl", "wb"))
+
+
+DATASET_RANGE = OrderedDict({  # [stat, stop , size]
+    "t": [0, 1, 1],
+    "state": [1, 14, 13],
+    "motor": [14, 20, 6],
+    "residual": [20, 26, 6],
+    "imu_ang_acc": [26, 32, 6],
+    # "depth_emb": [32, 160, 128],
+    # "norm_emb": [160, 288, 128],
+    "fa_label": [288, 289, 1],
+})
+
+
 class EurocMAVDatasetHorizon(Dataset):
     def __init__(self, train_validation_test: str, traj_len: int, dtype, batch_dim: bool):
         """
@@ -441,26 +482,52 @@ class EurocMAVDatasetHorizon(Dataset):
         assert len(data) == self.traj_len
         print(f'loading.py EurocMAVDatasetHorizon __getitem__ {self.train_validation_test=} {idx=}')
         if self.batch_dim:
-            return {"t": data[:, 0:1].view((1, -1, 1)),
-                    "state": data[:, 1:14].view((1, -1, 13)),
-                    "motor": data[:, 14:20].view((1, -1, 6)),
-                    "residual": data[:, 20:26].view((1, -1, 6)),
-                    "imu_ang_acc": data[:, 26:32].view((1, -1, 6)),
-                    "depth_emb": data[:, 32:160].view((1, -1, 128)),
-                    "norm_emb": data[:, 160:288].view((1, -1, 128)),
-                    "fa_label": data[:, 288:289].view((1, -1, 1)),
-                    }
+            if self.batch_dim:
+                return {key: data[:, dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
+            else:
+                return {key: data[:, dr[0]:dr[1]] for key, dr in DATASET_RANGE.items()}
 
+
+class EurocMAVDatasetTurbulence(Dataset):
+    def __init__(self, train_validation_test: str, dtype, batch_dim: bool):
+        """
+        Create a torch Dataset to be used in training with Dataloader.
+        :param train_validation_test: train, validation or test to load the appropriate dataset
+        :param dtype: Datatype of the model.
+        :param batch_dim: If the Dataset will be used with a Dataloader or not.
+        """
+        assert dtype in [torch.float32, torch.float64]
+        self.batch_dim = batch_dim
+        self.dtype = dtype
+        if train_validation_test not in ["train", "validation", "test"]:
+            raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
+        self.train_validation_test = train_validation_test
+        loaded_data = {flight: pickle.load(open(f'{INTERMEDIATE_DATASET_PATH}{flight}'
+                                                f'{train_validation_test}_uniform_turbulence.pkl',
+                                                "rb")) for flight in FLIGHT_LIST}
+        # Loading data
+        for flight, val in loaded_data.items():
+            concatenation = []
+            for data_key, dr in DATASET_RANGE.items():
+                concatenation.append(val[data_key].reshape((-1, 1)) if dr[2] == 1 else val[data_key])
+            loaded_data[flight] = np.concatenate(concatenation, axis=1)
+
+        self.data = np.concatenate([loaded_data[flight] for flight in FLIGHT_LIST], axis=0)
+        self.data = torch.from_numpy(self.data).type(self.dtype)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        """
+        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128, fa_label:1
+
+        """
+        data = self.data[idx]
+        if self.batch_dim:
+            return {key: data[:, dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
         else:
-            return {"t": data[:, :1],
-                    "state": data[:, 1:14],
-                    "motor": data[:, 14:20],
-                    "residual": data[:, 20:26],
-                    "imu_ang_acc": data[:, 26:32],
-                    "depth_emb": data[:, 32:160],
-                    "norm_emb": data[:, 160:288],
-                    "fa_label": data[:, 288:289],
-                    }
+            return {key: data[:, dr[0]:dr[1]] for key, dr in DATASET_RANGE.items()}
 
 
 def load_flight(flight):
@@ -475,13 +542,17 @@ def load_flight(flight):
 
 
 def main():
-    for flight in FLIGHT_LIST:
-        load_clean_data(flight)
-    euroc_mav_residual()
-    merge_embeddings()
-    label_surface_influence()
-    splitting()
+    # for flight in FLIGHT_LIST:
+    #     load_clean_data(flight)
+    # euroc_mav_residual()
+    # merge_embeddings()
+    # label_surface_influence()
+    # splitting()
+    splitting_uniform_turbulence()
     # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
+    data = EurocMAVDatasetTurbulence(train_validation_test="train", dtype=torch.float64, batch_dim=False)
+    print(len(data))
+    print(data[0])
 
 
 if __name__ == '__main__':
