@@ -23,8 +23,8 @@ use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")
 GPU_COUNT = int(device != torch.device("cpu"))
 
-print(f"{device=}")
-print(f"{GPU_COUNT=}")
+print(f"device={device}")
+print(f"GPU_COUNT={GPU_COUNT}")
 
 
 def main():
@@ -55,8 +55,8 @@ def main():
                )
     training_path = EUROC_MAV_RESIDUAL + f"{class_name.__name__}_{args.embedding}/"
 
-    print(f"{training_path=}")
-    print(f"{version=}")
+    print(f"training_path={training_path}")
+    print(f"version={version}")
 
     # Reproducibility
     seed = 0
