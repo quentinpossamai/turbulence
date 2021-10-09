@@ -6,7 +6,8 @@ import pickle
 import os
 from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
-# from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split
+import sklearn
 import torch
 from torch.utils.data import Dataset
 
@@ -347,7 +348,7 @@ def label_surface_influence():
         data['fa_label'] = fa_presence_array
         intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
         pickle.dump(data, open(intermediate_flight_path, "wb"))
-        print(f'''{flight=} | Portion of 1: {data['fa_label'].mean()}''')
+        print(f'''flight={flight} | Portion of 1: {data['fa_label'].mean()}''')
 
 
 def splitting():
@@ -421,8 +422,8 @@ class EurocMAVDatasetHorizon(Dataset):
         :param dtype: Datatype of the model.
         :param batch_dim: If the Dataset will be used with a Dataloader or not.
         """
-        print(f'loading.py EurocMAVDatasetHorizon __init__ start {train_validation_test=}'
-              f'{traj_len=} {dtype=} {batch_dim=}')
+        print(f'loading.py EurocMAVDatasetHorizon __init__ start train_validation_test={train_validation_test}'
+              f'traj_len={traj_len} dtype={dtype} batch_dim={batch_dim}')
         assert dtype in [torch.float32, torch.float64]
         self.batch_dim = batch_dim
         self.dtype = dtype
@@ -463,8 +464,8 @@ class EurocMAVDatasetHorizon(Dataset):
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
         self.data = torch.from_numpy(self.data).type(self.dtype)
-        print(f'loading.py EurocMAVDatasetHorizon __init__ end {train_validation_test=}'
-              f'{traj_len=} {dtype=} {batch_dim=}')
+        print(f'loading.py EurocMAVDatasetHorizon __init__ end train_validation_test={train_validation_test}'
+              f'traj_len={traj_len} dtype={dtype} batch_dim={batch_dim}')
 
     def __len__(self):
         return self.cum_dataset_idx[-1]
@@ -480,7 +481,8 @@ class EurocMAVDatasetHorizon(Dataset):
         stop = local_idx + self.traj_len
         data = self.data[start:stop]
         assert len(data) == self.traj_len
-        print(f'loading.py EurocMAVDatasetHorizon __getitem__ {self.train_validation_test=} {idx=}')
+        print(f'loading.py EurocMAVDatasetHorizon __getitem__ '
+              f'train_validation_test={self.train_validation_test} idx{idx}')
         if self.batch_dim:
             if self.batch_dim:
                 return {key: data[:, dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
