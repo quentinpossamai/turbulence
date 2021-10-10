@@ -21,7 +21,7 @@ ssh remsto /bin/bash << EOF
 # rsync -rtv --delete /storage/Datasets/BlackBird/ oggy:/storage/Datasets/BlackBird/ &&
 # rsync -rtv oggy:/storage/Datasets/BlackBird/ /storage/Datasets/BlackBird/ &&  # revert
 #  echo "Synchronise Oggy with remsto" &&
-  cd ~/phd/turbulence/launchers/depth/ &&
+  cd ~/phd/turbulence/launchers/residual_estimation/ &&
   git pull github main &&
   sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_depth -o log-classifier_depth-%A.out residual_estimation0.sh
   sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_norm -o log-classifier_norm-%A.out residual_estimation1.sh
