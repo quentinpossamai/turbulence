@@ -1,5 +1,4 @@
 from collections import OrderedDict
-import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
 import pickle
@@ -7,11 +6,11 @@ import os
 from scipy import interpolate
 from scipy.fft import fft, fftfreq, ifft
 from sklearn.model_selection import train_test_split
-import sklearn
 import torch
 from torch.utils.data import Dataset
+from typing import Union
 
-import src.data.euroc_mav.data_vis as data_vis
+# import src.data.euroc_mav.data_vis as data_vis
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.utils.paths import WD_PATH, mkdir_if_not_exist
 from src.utils import quaternion
@@ -162,7 +161,7 @@ def load_clean_data(flight):
 
     # 2.3.3-Denoising quaternion
     # Ideal denoising
-    frequencies = fftfreq(n, d=period)
+    frequencies = fftfreq(n, d=float(period))
     fc_quat = 5  # Hz
     fourier_quat = fft(quat, axis=0)
     den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0))
@@ -336,11 +335,12 @@ def merge_embeddings():
 
 
 def label_surface_influence():
-    fa_presence = {FLIGHT_LIST[0]: [range(0, 106), range(26035, 26185), range(26800, 27541)],
-                   FLIGHT_LIST[1]: [range(15430, 15787)],
-                   FLIGHT_LIST[2]: [range(19286, 19401)]}
     for flight in FLIGHT_LIST:
         data = load_flight(flight)
+        last_idx = len(data['t'])
+        fa_presence = {FLIGHT_LIST[0]: [range(25943, 26073), range(26513, last_idx)],
+                       FLIGHT_LIST[1]: [range(0, 180), range(15350, last_idx)],
+                       FLIGHT_LIST[2]: [range(18966, last_idx)]}
         fa_presence_array = np.zeros(len(data['state']))
         for presence_range in fa_presence[flight]:
             fa_presence_array[presence_range] = 1
@@ -379,13 +379,8 @@ def splitting_uniform_turbulence():
         data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
         assert all(np.array([len(data[key]) for key in data]) == len(data["t"])), f"All Data key must have same" \
                                                                                   f" length"
-        # Todo: Debug
         flight_len = len(data["t"])
         print(flight, flight_len)
-        data['fa_label'] = np.zeros(len(data['t']))
-        data['fa_label'][:round(flight_len * 0.01)] = 1
-        np.random.shuffle(data['fa_label'])
-
         data_idx = np.arange(len(data['t']))
         temp_idx, test_idx = train_test_split(data_idx, test_size=0.2, shuffle=True, stratify=data['fa_label'])
         train_idx, val_idx = train_test_split(temp_idx, test_size=0.25, shuffle=True,
@@ -406,8 +401,8 @@ DATASET_RANGE = OrderedDict({  # [stat, stop , size]
     "motor": [14, 20, 6],
     "residual": [20, 26, 6],
     "imu_ang_acc": [26, 32, 6],
-    # "depth_emb": [32, 160, 128],
-    # "norm_emb": [160, 288, 128],
+    "depth_emb": [32, 160, 128],
+    "norm_emb": [160, 288, 128],
     "fa_label": [288, 289, 1],
 })
 
@@ -490,7 +485,7 @@ class EurocMAVDatasetHorizon(Dataset):
 
 
 class EurocMAVDatasetTurbulence(Dataset):
-    def __init__(self, train_validation_test: str, dtype, batch_dim: bool):
+    def __init__(self, train_validation_test: str, dtype: Union[type, torch.dtype], batch_dim: bool):
         """
         Create a torch Dataset to be used in training with Dataloader.
         :param train_validation_test: train, validation or test to load the appropriate dataset
@@ -526,9 +521,9 @@ class EurocMAVDatasetTurbulence(Dataset):
         """
         data = self.data[idx]
         if self.batch_dim:
-            return {key: data[:, dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
+            return {key: data[dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
         else:
-            return {key: data[:, dr[0]:dr[1]] for key, dr in DATASET_RANGE.items()}
+            return {key: data[dr[0]:dr[1]] for key, dr in DATASET_RANGE.items()}
 
 
 def load_flight(flight):

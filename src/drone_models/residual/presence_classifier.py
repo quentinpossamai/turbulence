@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 from typing import Optional
 
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-
 
 class PresenceClassifier(pl.LightningModule):
     @staticmethod
@@ -15,7 +13,7 @@ class PresenceClassifier(pl.LightningModule):
         parser.add_argument('--horizon', default=1, type=int, help="Number of time step to predict by rollout")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
-        parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
+        parser.add_argument('--past', default=1, type=int, help="Number of past information to take in the model")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
         return parent_parser
 
@@ -82,12 +80,12 @@ class PresenceClassifier(pl.LightningModule):
         )
 
         self.batch_norm0 = nn.BatchNorm1d(self.past * self.emb_size)
-        self.gru0 = nn.GRU(input_size=self.emb_size,
-                           hidden_size=self.unit_size,
-                           num_layers=self.layer,
-                           bias=True,
-                           batch_first=True)
-
+        # self.gru0 = nn.GRU(input_size=self.emb_size,
+        #                    hidden_size=self.unit_size,
+        #                    num_layers=self.layer,
+        #                    bias=True,
+        #                    batch_first=True)
+        self.linear0 = nn.Linear(in_features=self.past * self.emb_size, out_features=self.unit_size, bias=True)
         self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
         self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
@@ -119,12 +117,12 @@ class PresenceClassifier(pl.LightningModule):
         if depth_emb is not None:
             assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
             depth_emb_shape = depth_emb.shape
-            depth_emb = depth_emb.reshape(-1, self.past, 128)
+            depth_emb = depth_emb.reshape(-1, 128)
             embedding = depth_emb
         if norm_emb is not None:
             assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
             norm_emb_shape = norm_emb.shape
-            norm_emb = norm_emb.reshape(-1, self.past, 128)
+            norm_emb = norm_emb.reshape(-1, 128)
             embedding = norm_emb
         if self.embedding in ['both']:
             assert depth_emb_shape[:-1] == norm_emb_shape[:-1]
@@ -133,18 +131,18 @@ class PresenceClassifier(pl.LightningModule):
 
         # 2.1-GRU
         out = self.batch_norm0(embedding.reshape(-1, self.past * self.emb_size))
-        out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))
-        # self.unit_size)
-        out = out[:, -1]  # last hidden states, (batch, self.unit_size)
+        # out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))
+        # out = out[:, -1]  # last hidden states, (batch, self.unit_size)
+        out = self.activation(self.linear0(out))
         # Fully connected
         out = self.batch_norm1(out)
         out = self.activation(self.linear1(out))
         out = self.batch_norm2(out)
-        out = torch.softmax(self.linear2(out), dim=1)
+        out = torch.sigmoid(self.linear2(out))
 
         out_shape = list(embedding.shape)
         out_shape[-1] = 1
-        del out_shape[-2]
+        # del out_shape[-2]
         return out.reshape(out_shape)
 
     def step(self, batch):
@@ -155,9 +153,9 @@ class PresenceClassifier(pl.LightningModule):
 
         :return: Loss
         """
-        depth_emb = batch["depth_emb"][:, :self.past]
-        norm_emb = batch["norm_emb"][:, :self.past]
-        fa_label_gt = batch["fa_label"][:, self.past - 1]
+        depth_emb = batch["depth_emb"]
+        norm_emb = batch["norm_emb"]
+        fa_label_gt = batch["fa_label"]
 
         depth_emb_shape = depth_emb.shape
         dt_shape = list(depth_emb_shape)
@@ -197,19 +195,17 @@ def _test():
 
     batch = {"motor": motor, "state": state, "residual": residual, "depth_emb": depth_emb, "norm_emb": norm_emb}
 
-    model = GRUCNNResidual(
+    model = PresenceClassifier(
         activation='tanh',
         embedding="both",
         layer=3,
         learning_rate=1e-3,
-        model=DynamicalModel(param="identification", dtype=torch.float32),
         motor_size=6,
         past=60,
         unit_size=50, )
     model.configure_optimizers()
 
-    res = model.forward(motor=motor[:, :past], state=state[:, :past], depth_emb=depth_emb[:, :past],
-                        norm_emb=norm_emb[:, :past], dt=dt[:, :past])
+    res = model.forward(depth_emb=depth_emb[:, :past], norm_emb=norm_emb[:, :past], dt=dt[:, :past])
     assert res.shape == (batch_size, 6)
 
     res = model.step(batch=batch)

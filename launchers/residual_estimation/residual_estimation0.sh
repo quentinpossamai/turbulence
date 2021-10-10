@@ -4,13 +4,13 @@ cd ~/phd/turbulence/
 #file+="20210927_091013_GRUCNNResidual_bs64_epch10000_lr0.0001_h1_p60_us50_tanh_l3_None/"
 #file+="checkpoints/epoch=358-step=210373.ckpt"
 singularity_3.7.1 exec --nv --bind /storage launchers/turbulence.sif python3 -m src.learning.train\
- --batch_size 64\
+ --batch_size 256\
  --activation tanh\
  --embedding depth\
  --horizon 1\
  --layer 3\
  --lr 1e-5\
- --past 60\
+ --past 0\
  --unit_size 50\
  --max_epochs 10000
 # --load_weights $file
