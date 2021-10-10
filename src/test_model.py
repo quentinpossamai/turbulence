@@ -7,7 +7,7 @@ import src.data.blackbird.loading as blackbird
 import src.data.euroc_mav.loading as euroc
 
 # Models
-from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
+from src.utils.paths import ANALYSIS_PATH, mkdir_if_not_exist
 from src import metrics
 from src.learning.train import EUROC_MAV_RESIDUAL
 

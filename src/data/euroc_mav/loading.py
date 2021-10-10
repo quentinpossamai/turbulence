@@ -11,20 +11,18 @@ import sklearn
 import torch
 from torch.utils.data import Dataset
 
-# import src.data.euroc_mav.data_vis as data_vis
+import src.data.euroc_mav.data_vis as data_vis
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-from src.utils.paths import WD_PATH
-import src.utils.paths
+from src.utils.paths import WD_PATH, mkdir_if_not_exist
 from src.utils import quaternion
 
 # Path
-DATASET_PATH = src.utils.paths.WD_PATH + "data/euroc_mav/"
+DATASET_PATH = WD_PATH + "data/euroc_mav/"
 RAW_PYTHON_DATASET_PATH = DATASET_PATH + f"raw_python/"
 RAW_DATASET_PATH = DATASET_PATH + f"raw/"
 INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
-src.utils.paths.mkdir_if_not_exist([DATASET_PATH, RAW_PYTHON_DATASET_PATH,
-                                    INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
+mkdir_if_not_exist([DATASET_PATH, RAW_PYTHON_DATASET_PATH, INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 
@@ -179,14 +177,15 @@ def load_clean_data(flight):
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
 
     # 3-CUT: Cut data and keep only when the drone is flying
+    # data_vis.found_fa(flight, den_motor_dict, den_pose_dict, cam0_dict)
     cut_motor_idx = {FLIGHT_LIST[0]: [1113, 28294],
                      FLIGHT_LIST[1]: [954, 16503],
                      FLIGHT_LIST[2]: [1510, 20855]}
 
+    start, stop = cut_motor_idx[flight]
     for key in motor_dict:
-        start, stop = cut_motor_idx[flight]
         den_motor_dict[key] = den_motor_dict[key][start:stop]
-        print(f'Cut len: {stop - start}')
+    print(f'Cut len: {stop - start}')
 
     # 4-SYNCHRONISATION    
     # Highest frequency comes from the fcu (flight control unit). Motor timestamp will be taken for synchronisation
@@ -320,14 +319,14 @@ def merge_embeddings():
 
         # list[dict_keys(['timestamp', 'embedding', 'MSE', 'GradMSE'])]
         depth_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}depth_embedding.pkl", "rb"))
-        depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])[1:]
+        depth_emb = sorted(depth_emb, key=lambda x: x["timestamp"])
         depth_t = np.array([e["timestamp"] for e in depth_emb])
         assert (data["t"] == depth_t).all
-        data["depth_emb"] = np.array([e["embedding"].numpy().flatten() for e in depth_emb]).astype(float)
+        data["depth_emb"] = np.array([e["embedding"].flatten() for e in depth_emb]).astype(float)
 
         # list[dict_keys(['timestamp', 'embedding', 'MSE', 'CrossProduct'])]
         norm_emb = pickle.load(open(f"{INTERMEDIATE_DATASET_PATH}{flight}normal_embedding.pkl", "rb"))
-        norm_emb = sorted(norm_emb, key=lambda x: x["timestamp"])[1:]
+        norm_emb = sorted(norm_emb, key=lambda x: x["timestamp"])
         assert (data["t"] == np.array([e["timestamp"] for e in norm_emb])).all
         data["norm_emb"] = np.array([e["embedding"].flatten() for e in norm_emb]).astype(float)
 
@@ -535,7 +534,7 @@ class EurocMAVDatasetTurbulence(Dataset):
 def load_flight(flight):
     """
     :param flight: The flight to from FLIGHT_LIST
-    :return: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
+    :return: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual', 'depth_emb', 'norm_emb', 'fa_label'])
     """
     #     data = {"t", "imu_ang_acc", "motor", "state"}
     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
@@ -544,14 +543,15 @@ def load_flight(flight):
 
 
 def main():
-    # for flight in FLIGHT_LIST:
-    #     load_clean_data(flight)
-    # euroc_mav_residual()
-    # merge_embeddings()
-    # label_surface_influence()
-    # splitting()
+    load_clean_data(FLIGHT_LIST[0])
+    load_clean_data(FLIGHT_LIST[1])
+    load_clean_data(FLIGHT_LIST[2])
+    euroc_mav_residual()
+    merge_embeddings()
+    label_surface_influence()
+    splitting()
     splitting_uniform_turbulence()
-    # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
+    # # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
     data = EurocMAVDatasetTurbulence(train_validation_test="train", dtype=torch.float64, batch_dim=False)
     print(len(data))
     print(data[0])

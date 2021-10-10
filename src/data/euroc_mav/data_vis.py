@@ -14,13 +14,10 @@ from tqdm import tqdm
 import src.data.euroc_mav.loading as euroc
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.drone_models.residual.gru_cnn import GRUCNNResidual
-import src.learning.train as learned_model
-from src.utils.paths import mkdir_if_not_exist, GENERAL_ANALYSIS_PATH
+from src.utils.paths import mkdir_if_not_exist, ANALYSIS_DATA_VIS_EUROC_MAV, ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
 
 matplotlib.use('TKAgg')
-
-ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + 'data_vis_euroc_mav/'
-mkdir_if_not_exist([ANALYSIS_PATH])
+mkdir_if_not_exist([ANALYSIS_DATA_VIS_EUROC_MAV])
 
 
 def plot_y_x():
@@ -141,7 +138,7 @@ def plot_butterworth(quat, den_quat, fc_quat, period):
     i = 0
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=100)
     plt.plot(quat[:, i], label='gt')
-    plt.plot(den_quat[:, i], label=f'ideal {fc_quat=}')
+    plt.plot(den_quat[:, i], label=f'ideal fc_quat={fc_quat}')
     line = plt.plot(den_quat_butter[0, 0, :, i], label=f'butter')
     plt.grid()
     plt.legend()
@@ -181,13 +178,13 @@ def residual_video(flight: str, double: bool, norm: bool):
 
     # 1-LOADING
     # 1.1-Loading drone trajectory
-    data = euroc.load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
+    data = euroc.load_flight(flight)
     # data state is tf_origin_vicon0
 
     if double:
         # 1.2-Predict non-fa residual
         print('\nResidual model GRU CNN no embeddings')
-        gru_cnn = learned_model.EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
+        gru_cnn = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "GRUCNNResidual_None/default/"
         gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
         gru_cnn += "epoch=999-step=584999.ckpt"
 
@@ -199,7 +196,7 @@ def residual_video(flight: str, double: bool, norm: bool):
         residual_hat = []
         dt = torch.FloatTensor([[1 / 200]]).repeat([past, 1])
         with torch.no_grad():
-            for i in range(len(data['motor']) - past - 1):
+            for i in range(len(data['motor']) - past):
                 motor = torch.FloatTensor(data["motor"][i+1:past+i+1])
                 state = torch.FloatTensor(data["state"][i:past+i])
                 # depth_emb = data["depth_emb"][i:past+i]
@@ -209,29 +206,20 @@ def residual_video(flight: str, double: bool, norm: bool):
         residual_hat = torch.stack(residual_hat, dim=0)
         print()
 
-        # 1.3-Cutting a the image frequency
-        for key in data:
-            data[key] = data[key][past+1:]
-        cut_img = np.unique(data["cam0"])
-        data_ind = np.zeros(len(cut_img), dtype=int)
-
-        for i, img_timestamp in enumerate(cut_img):
-            ind = np.abs(img_timestamp - data["timestamp"]).argmin()
-            data_ind[i] = ind
         residual_gt = torch.FloatTensor(data['residual'])
-        state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
-        residual = residual_gt - residual_hat
+        residual = residual_gt[past:] - residual_hat
     else:
-        # 1.3-Cutting a the image frequency
-        cut_img = np.unique(data["cam0"])
-        data_ind = np.zeros(len(cut_img), dtype=int)
-
-        for i, img_timestamp in enumerate(cut_img):
-            ind = np.abs(img_timestamp - data["timestamp"]).argmin()
-            data_ind[i] = ind
-        state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
-        residual = data['residual']
         past = 0
+        residual = data['residual']
+
+    # 1.3-Cutting a the image frequency
+    cut_img = np.unique(data["cam0"][past:])
+    data_ind = np.zeros(len(cut_img), dtype=int)
+
+    for i, img_timestamp in enumerate(cut_img):
+        ind = np.abs(img_timestamp - data["timestamp"]).argmin()
+        data_ind[i] = ind
+    state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
 
     # 2-CREATING VIDEO
     # 2.1-Initialising video
@@ -239,13 +227,12 @@ def residual_video(flight: str, double: bool, norm: bool):
     camera_shape = [480, 752, 3]  # height, width, 3
     frame_shape = [1080, 1920, 3]
     dpi = 100
-    saving_path = f'{ANALYSIS_PATH}{flight}residual_video.mkv'
-    mkdir_if_not_exist([f'{ANALYSIS_PATH}{flight}'])
+    saving_path = f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}residual_video.mkv'
+    mkdir_if_not_exist([f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}'])
     codec = VideoWriter_fourcc(*'H264')
     video = VideoWriter(saving_path, codec, float(fps), (frame_shape[1], frame_shape[0]), True)  # width, height
     print(f'Video will be saved at : {saving_path}')
 
-    # frames = np.zeros([len(cut_img)] + frame_shape, dtype=np.uint8)
     for i, image_time in enumerate(tqdm(cut_img, desc="Creating a video")):
         # 2.2-Constructing image
         # 2.2.1-Camera image
@@ -303,7 +290,7 @@ def residual_video(flight: str, double: bool, norm: bool):
 
         fig.canvas.draw()
         frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(frame_shape)
-        # plt.savefig(f'{ANALYSIS_PATH}{flight}test.png')
+        # plt.savefig(f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}test.png')
         # input()
         plt.close('all')
         # frames[i] = frame
@@ -313,16 +300,54 @@ def residual_video(flight: str, double: bool, norm: bool):
     cv2.destroyAllWindows()
 
 
+def found_fa(flight, den_motor_dict, den_pose_dict, cam0_dict):
+    cam0_sync = np.zeros(len(den_motor_dict["timestamp"]), dtype=int)  # The timestamp of the image
+    for i, timestamp in enumerate(den_motor_dict["timestamp"]):
+        cam0_sync[i] = cam0_dict["timestamp"][np.abs(timestamp - cam0_dict["timestamp"]).argmin()]
+
+    fig, axs = plt.subplots(3, 1, figsize=(19.2, 10.8))
+    ax = axs[0]
+    ax.plot(den_pose_dict['t'] - den_motor_dict['t'][0], den_pose_dict['pose'][:, :3])
+    ax.grid()
+    ax = axs[1]
+    ax.plot(den_motor_dict['t'] - den_motor_dict['t'][0], den_motor_dict['motor'])
+    ax.grid()
+    img_loaded = np.array(imageio.imread(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{cam0_sync[0]}.png"))
+    axs[2].imshow(img_loaded)
+    # [ax.set_xlim([140, 150]) for ax in axs]
+    lines = [ax.axvline(10) for ax in axs]
+    from matplotlib.widgets import Slider
+    ax_n = plt.axes([0.05, 0.1, 0.0225, 0.83], facecolor='lightgoldenrodyellow')
+    n_slider = Slider(ax=ax_n,
+                      label="Cut val",
+                      valmin=0,
+                      valmax=den_motor_dict['t'][-1] - den_motor_dict['t'][0],
+                      valinit=0,
+                      orientation="vertical")
+
+    def update(_):
+        slider_value = n_slider.val
+        lines[0].set_xdata(slider_value)
+        lines[1].set_xdata(slider_value)
+        fig.canvas.draw_idle()
+        motor_ind = np.argmin(abs(slider_value - (den_motor_dict["t"] - den_motor_dict["t"][0])))
+        img_loaded_f = np.array(imageio.imread(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{cam0_sync[motor_ind]}.png"))
+        axs[2].imshow(img_loaded_f)
+        # img.set_data
+        print(f'Motor idx: {motor_ind}')
+        print(f'cam0_dict position: {np.where(cam0_sync[motor_ind] == cam0_dict["timestamp"])[0][0]}')
+    n_slider.on_changed(update)
+    plt.show()
+    print()
+
+
 def main():
     # flight = euroc.FLIGHT_LIST[0]
-    # residual_video(flight=flight, double=False, norm=False)
-    flight = euroc.FLIGHT_LIST[1]
-    residual_video(flight=flight, double=False, norm=False)
-    # flight = euroc.FLIGHT_LIST[2]
-    # residual_video(flight=flight, double=False, norm=False)
-
-    # for flight in euroc.FLIGHT_LIST:
-    #     residual_video(flight=flight)
+    # residual_video(flight=flight, double=True, norm=False)
+    # flight = euroc.FLIGHT_LIST[1]
+    # residual_video(flight=flight, double=True, norm=False)
+    flight = euroc.FLIGHT_LIST[2]
+    residual_video(flight=flight, double=True, norm=False)
 
 
 if __name__ == '__main__':

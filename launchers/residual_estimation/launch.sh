@@ -1,18 +1,28 @@
-rsync -rtv remsto:~/phd/turbulence/data/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/ &&
+rsync -rtv ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
+# rsync -rtv remsto:~/phd/turbulence/data/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/  # revert
 echo "rsync from macbook to homedir done"  &&
-git push github debug &&
+git push github main &&
 echo "Git: push from homedir to github done"  &&
 ssh remsto /bin/bash << EOF
   chmod -R 755 ~/phd/turbulence/data/euroc_mav/intermediate/ &&
   echo "changing permission in homedir done"  &&
-  rsync -rtv ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/
+  find . -name ".DS_Store" -delete &&
+  echo "Removing .DS_Store in homedir" &&
+  rsync -rtv --delete ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/ &&
+#  rsync -rtv /storage/Datasets/BlackBird/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/ && # revert
   echo "rsync from homedir to storage done"  &&
   chmod -fR 775 /storage/Datasets/BlackBird/euroc_mav/intermediate/
   echo "chmod done"  &&
   chgrp -fR robotics /storage/Datasets/BlackBird/
   echo "chgrp done"  &&
-  cd ~/phd/turbulence/launchers/residual_estimation/ &&
-  git pull github debug &&
+  cd /storage/Datasets/BlackBird &&
+  find . -name ".DS_Store" -delete &&
+  echo "Removing .DS_Store in /storage/Datasets/BlackBird" &&
+# rsync -rtv --delete /storage/Datasets/BlackBird/ oggy:/storage/Datasets/BlackBird/ &&
+# rsync -rtv oggy:/storage/Datasets/BlackBird/ /storage/Datasets/BlackBird/ &&  # revert
+#  echo "Synchronise Oggy with remsto" &&
+  cd ~/phd/turbulence/launchers/depth/ &&
+  git pull github main &&
   sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_depth -o log-classifier_depth-%A.out residual_estimation0.sh
   sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_norm -o log-classifier_norm-%A.out residual_estimation1.sh
   sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_both -o log-classifier_both-%A.out residual_estimation2.sh

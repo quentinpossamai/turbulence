@@ -14,9 +14,9 @@ from tqdm import tqdm
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 import src.data.euroc_mav.loading as euroc
 from src.utils.quaternion import qrot
-from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
+from src.utils.paths import ANALYSIS_PATH, mkdir_if_not_exist
 
-ANALYSIS_PATH = f"{GENERAL_ANALYSIS_PATH}euroc_identification/"
+ANALYSIS_PATH = f"{ANALYSIS_PATH}euroc_identification/"
 mkdir_if_not_exist([ANALYSIS_PATH])
 
 DTYPE = torch.float64

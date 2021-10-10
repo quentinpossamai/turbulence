@@ -14,10 +14,9 @@ from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 # from src.drone_models.residual.cnn_lightning import CNNResidual
 # from src.drone_models.residual.gru_cnn import GRUCNNResidual
 from src.drone_models.residual.presence_classifier import PresenceClassifier
-from src.utils.paths import GENERAL_ANALYSIS_PATH, mkdir_if_not_exist
+from src.utils.paths import ANALYSIS_PATH, mkdir_if_not_exist, ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
 
-EUROC_MAV_RESIDUAL = GENERAL_ANALYSIS_PATH + "euroc_mav_residual_training/"
-mkdir_if_not_exist([EUROC_MAV_RESIDUAL])
+mkdir_if_not_exist([ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING])
 
 use_cuda = True
 device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu")

@@ -13,7 +13,9 @@ from typing import Union, Tuple, List, Iterable
 
 WD_PATH = os.getcwd() + "/"
 MODELS_PATH = WD_PATH + "models/"
-GENERAL_ANALYSIS_PATH = WD_PATH + "analysis/"
+ANALYSIS_PATH = WD_PATH + "analysis/"
+ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = ANALYSIS_PATH + "euroc_mav_residual_training/"  # train.py
+ANALYSIS_DATA_VIS_EUROC_MAV = ANALYSIS_PATH + 'data_vis_euroc_mav/'  # euroc_mav.data_vis.py
 
 
 def mkdir_if_not_exist(paths: list):
@@ -26,7 +28,7 @@ def mkdir_if_not_exist(paths: list):
             pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
-mkdir_if_not_exist([MODELS_PATH, GENERAL_ANALYSIS_PATH])
+mkdir_if_not_exist([MODELS_PATH, ANALYSIS_PATH])
 
 
 def is_cluster():

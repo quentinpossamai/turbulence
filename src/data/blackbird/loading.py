@@ -16,7 +16,7 @@ import src.utils.paths
 from src.utils import quaternion
 
 # Path
-ANALYSIS_SECTION_PATH = src.utils.paths.GENERAL_ANALYSIS_PATH + "blackbird_processing_data/"
+ANALYSIS_SECTION_PATH = src.utils.paths.ANALYSIS_PATH + "blackbird_processing_data/"
 DATASET_PATH = src.utils.paths.WD_PATH + "data/blackbird/"
 INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
