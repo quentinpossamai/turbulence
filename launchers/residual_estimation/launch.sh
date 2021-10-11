@@ -23,9 +23,9 @@ ssh remsto /bin/bash << EOF
 #  echo "Synchronise Oggy with remsto" &&
   cd ~/phd/turbulence/launchers/residual_estimation/ &&
   git pull github main &&
-  sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_depth -o log-classifier_depth-%A.out residual_estimation0.sh
-  sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_norm -o log-classifier_norm-%A.out residual_estimation1.sh
-  sbatch --mem 10G --gres=gpu:1 -p part3 -J classifier_both -o log-classifier_both-%A.out residual_estimation2.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J classifier_depth -o log-classifier_depth-%A.out residual_estimation0.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J classifier_norm -o log-classifier_norm-%A.out residual_estimation1.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J classifier_both -o log-classifier_both-%A.out residual_estimation2.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J both -o log-both-%A.out residual_estimation3.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J residua4 -o log-residua4-%A.out residual_estimation4.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J residua5 -o log-residua5-%A.out residual_estimation5.sh
