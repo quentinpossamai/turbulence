@@ -3,13 +3,12 @@ import numpy as np
 import torch
 
 # Data
-import src.data.blackbird.loading as blackbird
+# import src.data.blackbird.loading as blackbird
 import src.data.euroc_mav.loading as euroc
 
 # Models
-from src.utils.paths import ANALYSIS_PATH, mkdir_if_not_exist
 from src import metrics
-from src.learning.train import EUROC_MAV_RESIDUAL
+from src.utils.paths import ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
 
 
 # BLACKBIRD_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"
@@ -17,34 +16,34 @@ from src.learning.train import EUROC_MAV_RESIDUAL
 # mkdir_if_not_exist([BLACKBIRD_ANALYSIS_PATH])
 
 
-def test_model(model, past, dataset, train_test_validation):
+def test_model(model, past, dataset, train_validation_test):
     """
     Print the error on 0.025s, 0.5s and 1s of one model on one dataset split.
     :param model: The model to evaluate.
     :param past: Number of samples to give to the model
     :param dataset: The dataset to use for evaluation. "blackbird" or "euroc_mav".
-    :param train_test_validation: The split to evaluate on. "train", "validation" or "test".
+    :param train_validation_test: The split to evaluate on. "train", "validation" or "test".
     """
-    assert train_test_validation in ["train", "validation", "test"]
+    assert train_validation_test in ["train", "validation", "test"]
     assert dataset in ["blackbird", "euroc_mav"]
 
     res = np.zeros(3)
     if dataset == "euroc_mav":
         for i, e_i in enumerate([5, 100, 200]):
             res[i] = (metrics.mse_error(model=model, horizon=e_i, past=past,
-                                        dataset="euroc_mav", split=train_test_validation).item())
+                                        dataset="euroc_mav", split=train_validation_test).item())
     else:  # dataset == "blackbird"
         for i, e_i in enumerate([9, 180, 360]):
             res[i] = (metrics.mse_error(model=model, horizon=e_i, past=past,
-                                        dataset="blackbird", split=train_test_validation).item())
-    print(f"Model {model.__class__.__name__} on {train_test_validation} "
+                                        dataset="blackbird", split=train_validation_test).item())
+    print(f"Model {model.__class__.__name__} on {train_validation_test} "
           f"E(0.025s): {res[0]:0.4e}, E(0.5s): {res[1]:0.4e}, E(1s): {res[2]:0.4e}")
 
 
-def plot_rollout(model, horizon, past, dataset, train_test_validation, plot_range=None):
+def plot_rollout(model, horizon, past, dataset, train_validation_test, plot_range=None):
     if dataset == "euroc_mav":
         traj_len = past + horizon
-        data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
+        data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_validation_test,
                                             traj_len=traj_len, dtype=torch.float32, batch_dim=False)
         trajectory = data[0]
         t = trajectory["t"]
@@ -155,9 +154,9 @@ def plot_rollout(model, horizon, past, dataset, train_test_validation, plot_rang
         raise NotImplementedError
 
 
-def plot_residual(model, traj_len, dataset, train_test_validation):
+def plot_residual(model, traj_len, dataset, train_validation_test):
     if dataset == "euroc_mav":
-        data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_test_validation,
+        data = euroc.EurocMAVDatasetHorizon(train_validation_test=train_validation_test,
                                             traj_len=traj_len, dtype=torch.float32, batch_dim=False)
         time = []
         residual_hat = []
@@ -182,7 +181,7 @@ def plot_residual(model, traj_len, dataset, train_test_validation):
         residual_gt = torch.stack(residual_gt, dim=0)
         residual_hat = torch.stack(residual_hat, dim=0)
         loss = ((residual_gt - residual_hat) ** 2).mean().item()
-        print(f"{loss=}")
+        print(f"loss={loss}")
 
         for i in range(6):
             name = ["Fa x [m/s2]", "Fa y [m/s2]", "Fa z [m/s2]", "Ta x [rad/s2]", "Ta y [rad/s2]", "Ta z [rad/s2]"]
@@ -195,6 +194,57 @@ def plot_residual(model, traj_len, dataset, train_test_validation):
             ax.legend()
             plt.show()
 
+    else:
+        raise NotImplementedError
+
+
+def presence_classification_test(classifier, dataset, train_validation_test):
+    # Computing model prediction
+    possible_dataset = ['euroc_mav', 'blackbird']
+    assert dataset in possible_dataset, f'Possible dataset are {possible_dataset}'
+    if dataset == 'euroc_mav':
+        data = euroc.EurocMAVDatasetTurbulence(train_validation_test, dtype=torch.float32, batch_dim=False)
+        prediction = []
+        truth = []
+        with torch.no_grad():
+            for batch in data:
+                prediction.append(classifier(depth_emb=batch['depth_emb'], norm_emb=batch['depth_emb']))
+                truth.append(batch['fa_label'])
+        prediction = torch.cat(prediction, dim=0)
+        prediction = torch.round(prediction)
+        truth = torch.cat(truth, dim=0)
+
+        # Analysis
+        total = len(truth)
+        truth_is_0 = torch.where(truth == 0)[0]
+        truth_is_1 = torch.where(truth == 1)[0]
+        tp = (prediction[truth_is_1] == 1).float().sum()  # true positive, prediction is positive and it is true
+        fp = (prediction[truth_is_0] == 1).float().sum()  # false positive, prediction is positive but it is false
+        tn = (prediction[truth_is_0] == 0).float().sum()  # true negative, prediction is negative and it is true
+        fn = (prediction[truth_is_1] == 0).float().sum()  # false negative, prediction is negative but it is false
+        assert tp + fp + tn + fn == total
+        print(f'{train_validation_test}: True positive rate :{tp.item() / total * 100:0.2f}%')
+        print(f'{train_validation_test}: False positive rate: {fp.item() / total * 100:0.2f}%')
+        print(f'{train_validation_test}: True negative rate: {tn.item() / total * 100:0.2f}%')
+        print(f'{train_validation_test}: False negative rate: {fn.item() / total * 100:0.2f}%')
+
+        # accuracy = (1 - abs(prediction - label)).mean()
+        tpr = tp / (tp + fn)  # sensitivity, recall, hit rate, or true positive rate (TPR)
+        tnr = tn / (tn + fp)  # specificity, selectivity or true negative rate (TNR)
+        ppv = tp / (tp + fp)  # precision or positive predictive value (PPV)
+        npv = tn / (tn + fn)  # negative predictive value (NPV)
+        fnr = fn / (fn + tp)  # miss rate or false negative rate (FNR)
+        fpr = fp / (fp + tn)  # fall-out or false positive rate (FPR)
+        fdr = fp / (fp + tp)  # false discovery rate (FDR)
+        for_ = fn / (fn + tn)  # false omission rate (FOR)
+        # pt = (torch.sqrt(tpr * (-tnr + 1)) + (tnr - 1)) / (tpr + tnr - 1)  # prevalence threshold (PT)
+        # ts = tp / (tp + fn + fp)  # threat score (TS) or critical success index (CSI)
+        # accuracy = (tp + tn) / (tp + fp + tn + fn)
+        # fp1_score = 2 * (ppv * tpr) / (ppv + tpr)
+        assert torch.allclose(tpr, 1 - fnr)
+        assert torch.allclose(tnr, 1 - fpr)
+        assert torch.allclose(ppv, 1 - fdr)
+        assert torch.allclose(npv, 1 - for_)
     else:
         raise NotImplementedError
 
@@ -246,7 +296,8 @@ def main():
     # cnn_residual = "20210803_115051_CNNResidual_bs32_epch10000_lr0.001_h1_p20_us50/567525_weights.pt"
     # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     # past = 20
-    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # weights = torch.load(ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING +
+    # f"training/{cnn_residual}", map_location=torch.device('cpu'))
     # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
     #                                                        device="cpu")
     # residual_model.load_state_dict(weights)
@@ -260,7 +311,8 @@ def main():
     # # cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
     # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     # past = 20
-    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # weights = torch.load(ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING +
+    # f"training/{cnn_residual}", map_location=torch.device('cpu'))
     # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
     #                                                        device="cpu")
     # residual_model.load_state_dict(weights)
@@ -275,7 +327,8 @@ def main():
     # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     # past = 60
     # layer = 3
-    # weights = torch.load(EUROC_MAV_RESIDUAL + f"training/{cnn_residual}", map_location=torch.device('cpu'))
+    # weights = torch.load(ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING +
+    # f"training/{cnn_residual}", map_location=torch.device('cpu'))
     # for old_key, new_key in [["conv2d1", "conv2d_end"]]:
     #     weights[f"{new_key}.weight"] = weights.pop(f"{old_key}.weight")
     #     weights[f"{new_key}.bias"] = weights.pop(f"{old_key}.bias")
@@ -288,31 +341,61 @@ def main():
     #            train_test_validation="test")
     # --- TODO update
 
+    # # Testing embeddings
+    # print('\nResidual model GRU CNN no embeddings')
+    # gru_cnn = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "GRUCNNResidual_None/default/"
+    # gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
+    # gru_cnn += "epoch=999-step=584999.ckpt"
+    # from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+    # from src.drone_models.residual.gru_cnn import GRUCNNResidual
+    # model = DynamicalModel(param='identification', dtype=torch.float32)
+    # past = 60
+    # residual_model = GRUCNNResidual.load_from_checkpoint(
+    #         gru_cnn,
+    #         activation='tanh',
+    #         embedding=None,
+    #         layer=3,
+    #         # learning_rate=1e-6,
+    #         model=model,
+    #         motor_size=6,
+    #         past=past,
+    #         # unit_size=50,
+    #     )
+    #
+    # residual_model.eval()
+    # # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
+    # plot_rollout(residual_model, horizon=300, past=past, dataset='euroc_mav', train_test_validation='test',
+    #              plot_range=[0, 300])
+    # # plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
+
     # Testing embeddings
-    print('\nResidual model GRU CNN no embeddings')
-    gru_cnn = EUROC_MAV_RESIDUAL + "GRUCNNResidual_None/default/"
-    gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
-    gru_cnn += "epoch=999-step=584999.ckpt"
+    print('\nResidual model Presence Classifier')
+    mlp = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "PresenceClassifier_norm/default/"
+    mlp += '20211010_155504_PresenceClassifier_tanh_bs256_norml3_lr1e-05_epch10000_p1_us50_/checkpoints/'
+    mlp += "epoch=2286-step=331614.ckpt"
     from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-    from src.drone_models.residual.gru_cnn import GRUCNNResidual
+    from src.drone_models.residual.presence_classifier import PresenceClassifier
     model = DynamicalModel(param='identification', dtype=torch.float32)
-    past = 60
-    residual_model = GRUCNNResidual.load_from_checkpoint(
-            gru_cnn,
-            activation='tanh',
-            embedding=None,
-            layer=3,
-            # learning_rate=1e-6,
-            model=model,
-            motor_size=6,
-            past=past,
-            # unit_size=50,
-        )
+    past = 1
+    residual_model = PresenceClassifier.load_from_checkpoint(
+        mlp,
+        activation='tanh',
+        embedding='norm',
+        layer=3,
+        # learning_rate=1e-6,
+        model=model,
+        motor_size=6,
+        past=past,
+        # unit_size=50,  # not
+    )
 
     residual_model.eval()
+    presence_classification_test(classifier=residual_model, dataset='euroc_mav', train_validation_test='train')
+    presence_classification_test(classifier=residual_model, dataset='euroc_mav', train_validation_test='validation')
+    presence_classification_test(classifier=residual_model, dataset='euroc_mav', train_validation_test='test')
     # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
-    plot_rollout(residual_model, horizon=300, past=past, dataset='euroc_mav', train_test_validation='test',
-                 plot_range=[0, 300])
+    # plot_rollout(residual_model, horizon=300, past=past, dataset='euroc_mav', train_test_validation='test',
+    #              plot_range=[0, 300])
     # plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
 
 

@@ -99,13 +99,9 @@ class PresenceClassifier(pl.LightningModule):
         print(f"Lightning.device: {self.device}")
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def forward(self, dt: torch.Tensor,
-                depth_emb: Optional[torch.Tensor] = None,
-                norm_emb: Optional[torch.Tensor] = None):
+    def forward(self, depth_emb: Optional[torch.Tensor] = None, norm_emb: Optional[torch.Tensor] = None):
         """
         Estimate the residual = GT - model
-
-        :param dt: (batch, self.past, values=1)
 
         :param depth_emb: (batch, self.past, values=128)
 
@@ -140,7 +136,7 @@ class PresenceClassifier(pl.LightningModule):
         out = self.batch_norm2(out)
         out = torch.sigmoid(self.linear2(out))
 
-        out_shape = list(embedding.shape)
+        out_shape = list(depth_emb_shape)
         out_shape[-1] = 1
         # del out_shape[-2]
         return out.reshape(out_shape)
@@ -156,13 +152,7 @@ class PresenceClassifier(pl.LightningModule):
         depth_emb = batch["depth_emb"]
         norm_emb = batch["norm_emb"]
         fa_label_gt = batch["fa_label"]
-
-        depth_emb_shape = depth_emb.shape
-        dt_shape = list(depth_emb_shape)
-        dt_shape[-1] = 1
-        dt = torch.tensor(1 / 200).type_as(depth_emb).repeat(dt_shape)
-
-        fa_label_hat = self.forward(depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
+        fa_label_hat = self.forward(depth_emb=depth_emb, norm_emb=norm_emb)
 
         weights = fa_label_gt * 0.98 + 0.01
         loss_object = torch.nn.BCELoss(weights)
@@ -188,7 +178,7 @@ def _test():
     time_size = past + horizon
     motor = torch.randn(batch_size, time_size, 6, dtype=dtype)
     state = torch.randn(batch_size, time_size, 13, dtype=dtype)
-    dt = torch.tensor(1 / 200, dtype=dtype).repeat(batch_size, time_size, 1)
+    # dt = torch.tensor(1 / 200, dtype=dtype).repeat(batch_size, time_size, 1)
     residual = torch.randn(batch_size, time_size, 6, dtype=dtype)
     depth_emb = torch.randn(batch_size, time_size, 128, dtype=dtype)
     norm_emb = torch.randn(batch_size, time_size, 128, dtype=dtype)
@@ -205,7 +195,7 @@ def _test():
         unit_size=50, )
     model.configure_optimizers()
 
-    res = model.forward(depth_emb=depth_emb[:, :past], norm_emb=norm_emb[:, :past], dt=dt[:, :past])
+    res = model.forward(depth_emb=depth_emb[:, :past], norm_emb=norm_emb[:, :past])
     assert res.shape == (batch_size, 6)
 
     res = model.step(batch=batch)
@@ -218,7 +208,7 @@ def _test():
     # assert res is None
 
     error, error_tab, res = model.rollout(motor=motor, state=state, depth_emb=depth_emb, norm_emb=norm_emb,
-                                          dt=dt, horizon=horizon)
+                                          horizon=horizon)
     assert res.shape == (batch_size, time_size - past, 13)
 
 
