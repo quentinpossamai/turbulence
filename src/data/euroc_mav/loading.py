@@ -266,6 +266,7 @@ def load_clean_data(flight):
     syn["state"] = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
     del syn["pose"]
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
+    syn['dt'] = np.zeros_like(syn['t']) + 1/200
 
     for e in syn:
         syn[e] = syn[e][1:]  # Reject first speed
@@ -283,7 +284,7 @@ def euroc_mav_residual():
         data = load_flight(flight)
         # time = torch.from_numpy(data["t"][:-1])
         motor = torch.from_numpy(data["motor"][1:])
-        dt = torch.tensor([1 / 200], dtype=dtype).repeat(len(motor), 1)
+        dt = torch.from_numpy(data["dt"][1:])
         state = torch.from_numpy(data["state"][:-1])
         next_state = torch.from_numpy(data["state"][1:])
 
@@ -404,6 +405,7 @@ DATASET_RANGE = OrderedDict({  # [stat, stop , size]
     "depth_emb": [32, 160, 128],
     "norm_emb": [160, 288, 128],
     "fa_label": [288, 289, 1],
+    "dt": [289, 290, 1],
 })
 
 
@@ -488,9 +490,15 @@ class EurocMAVDatasetTurbulence(Dataset):
     def __init__(self, train_validation_test: str, dtype: Union[type, torch.dtype], batch_dim: bool):
         """
         Create a torch Dataset to be used in training with Dataloader.
+
         :param train_validation_test: train, validation or test to load the appropriate dataset
+
         :param dtype: Datatype of the model.
+
         :param batch_dim: If the Dataset will be used with a Dataloader or not.
+
+        Output keys are: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual', 'depth_emb',
+        'norm_emb', 'fa_label', 'dt'])
         """
         assert dtype in [torch.float32, torch.float64]
         self.batch_dim = batch_dim
@@ -529,7 +537,8 @@ class EurocMAVDatasetTurbulence(Dataset):
 def load_flight(flight):
     """
     :param flight: The flight to from FLIGHT_LIST
-    :return: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual', 'depth_emb', 'norm_emb', 'fa_label'])
+    :return: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual', 'depth_emb', 'norm_emb', 'fa_label',
+                        'dt'])
     """
     #     data = {"t", "imu_ang_acc", "motor", "state"}
     intermediate_flight_path = INTERMEDIATE_DATASET_PATH + f"{flight}/data.pkl"
