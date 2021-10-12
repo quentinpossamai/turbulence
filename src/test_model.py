@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 # Data
 # import src.data.blackbird.loading as blackbird
@@ -199,29 +200,28 @@ def plot_residual(model, traj_len, dataset, train_validation_test):
 
 
 def presence_classification_test(classifier, dataset, train_validation_test):
-    # Computing model prediction
+    classifier.eval()
+
     possible_dataset = ['euroc_mav', 'blackbird']
     assert dataset in possible_dataset, f'Possible dataset are {possible_dataset}'
     if dataset == 'euroc_mav':
-        data = euroc.EurocMAVDatasetTurbulence(train_validation_test, dtype=torch.float32, batch_dim=False)
-        prediction = []
-        truth = []
+        dataset = euroc.EurocMAVDatasetTurbulence(train_validation_test, dtype=torch.float32, batch_dim=False)
+        data = next(iter(DataLoader(dataset, batch_size=len(dataset))))
+        depth_emb = data['depth_emb']
+        norm_emb = data['norm_emb']
+        fa_label = data['fa_label']
         with torch.no_grad():
-            for batch in data:
-                prediction.append(classifier(depth_emb=batch['depth_emb'], norm_emb=batch['depth_emb']))
-                truth.append(batch['fa_label'])
-        prediction = torch.cat(prediction, dim=0)
-        prediction = torch.round(prediction)
-        truth = torch.cat(truth, dim=0)
+            prediction = torch.round(classifier(depth_emb=depth_emb, norm_emb=norm_emb)).squeeze()
+        truth = fa_label.squeeze()
 
         # Analysis
         total = len(truth)
         truth_is_0 = torch.where(truth == 0)[0]
         truth_is_1 = torch.where(truth == 1)[0]
-        tp = (prediction[truth_is_1] == 1).float().sum()  # true positive, prediction is positive and it is true
-        fp = (prediction[truth_is_0] == 1).float().sum()  # false positive, prediction is positive but it is false
-        tn = (prediction[truth_is_0] == 0).float().sum()  # true negative, prediction is negative and it is true
-        fn = (prediction[truth_is_1] == 0).float().sum()  # false negative, prediction is negative but it is false
+        tp = (prediction[truth_is_1] == 1).float().sum().numpy()  # true positive, prediction is positive and it is true
+        fp = (prediction[truth_is_0] == 1).float().sum().numpy()  # false positive, prediction is positive but it is false
+        tn = (prediction[truth_is_0] == 0).float().sum().numpy()  # true negative, prediction is negative and it is true
+        fn = (prediction[truth_is_1] == 0).float().sum().numpy()  # false negative, prediction is negative but it is false
         assert tp + fp + tn + fn == total
         print(f'{train_validation_test}: True positive rate :{tp.item() / total * 100:0.2f}%')
         print(f'{train_validation_test}: False positive rate: {fp.item() / total * 100:0.2f}%')
@@ -241,10 +241,10 @@ def presence_classification_test(classifier, dataset, train_validation_test):
         # ts = tp / (tp + fn + fp)  # threat score (TS) or critical success index (CSI)
         # accuracy = (tp + tn) / (tp + fp + tn + fn)
         # fp1_score = 2 * (ppv * tpr) / (ppv + tpr)
-        assert torch.allclose(tpr, 1 - fnr)
-        assert torch.allclose(tnr, 1 - fpr)
-        assert torch.allclose(ppv, 1 - fdr)
-        assert torch.allclose(npv, 1 - for_)
+        print(f'tpr: {tpr} | 1 - fnr {1 - fnr} Must be equal ')
+        print(f'tnr: {tnr} | 1 - fpr {1 - fpr} Must be equal ')
+        print(f'ppv: {ppv} | 1 - fdr {1 - fdr} Must be equal ')
+        print(f'npv: {npv} | 1 - for_ {1 - for_} Must be equal ')
     else:
         raise NotImplementedError
 
@@ -373,19 +373,15 @@ def main():
     mlp = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "PresenceClassifier_norm/default/"
     mlp += '20211010_155504_PresenceClassifier_tanh_bs256_norml3_lr1e-05_epch10000_p1_us50_/checkpoints/'
     mlp += "epoch=2286-step=331614.ckpt"
-    from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
     from src.drone_models.residual.presence_classifier import PresenceClassifier
-    model = DynamicalModel(param='identification', dtype=torch.float32)
-    past = 1
     residual_model = PresenceClassifier.load_from_checkpoint(
         mlp,
         activation='tanh',
         embedding='norm',
         layer=3,
         # learning_rate=1e-6,
-        model=model,
         motor_size=6,
-        past=past,
+        past=1,
         # unit_size=50,  # not
     )
 

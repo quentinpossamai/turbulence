@@ -375,9 +375,7 @@ def splitting():
 
 
 def splitting_uniform_turbulence():
-    import random
-    random.seed(0)
-    np.random.seed(0)
+    seed = 0
     for flight in FLIGHT_LIST:
         print("Splitting: ", flight)
         data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
@@ -386,9 +384,10 @@ def splitting_uniform_turbulence():
         flight_len = len(data["t"])
         print(flight, flight_len)
         data_idx = np.arange(len(data['t']))
-        temp_idx, test_idx = train_test_split(data_idx, test_size=0.2, shuffle=True, stratify=data['fa_label'])
+        temp_idx, test_idx = train_test_split(data_idx, test_size=0.2, shuffle=True, stratify=data['fa_label'],
+                                              random_state=seed)
         train_idx, val_idx = train_test_split(temp_idx, test_size=0.25, shuffle=True,
-                                              stratify=data['fa_label'][temp_idx])
+                                              stratify=data['fa_label'][temp_idx], random_state=seed)
 
         train_data = {key: data[key][train_idx] for key in data}
         pickle.dump(train_data, open(INTERMEDIATE_DATASET_PATH + flight + "/train_uniform_turbulence.pkl", "wb"))
