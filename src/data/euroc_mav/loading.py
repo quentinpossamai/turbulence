@@ -266,7 +266,7 @@ def load_clean_data(flight):
     syn["state"] = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
     del syn["pose"]
     syn["state"][:, 3:7] = syn["state"][:, 3:7] / np.linalg.norm(syn["state"][:, 3:7], axis=1).reshape((-1, 1))
-    syn['dt'] = np.zeros_like(syn['t']) + 1/200
+    syn['dt'] = np.zeros_like(syn['t']) + 1 / 200
 
     for e in syn:
         syn[e] = syn[e][1:]  # Reject first speed
@@ -375,6 +375,9 @@ def splitting():
 
 
 def splitting_uniform_turbulence():
+    import random
+    random.seed(0)
+    np.random.seed(0)
     for flight in FLIGHT_LIST:
         print("Splitting: ", flight)
         data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
@@ -524,7 +527,8 @@ class EurocMAVDatasetTurbulence(Dataset):
 
     def __getitem__(self, idx):
         """
-        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128, fa_label:1
+        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128, fa_label:1,
+        dt: 1
 
         """
         data = self.data[idx]
@@ -547,13 +551,13 @@ def load_flight(flight):
 
 
 def main():
-    load_clean_data(FLIGHT_LIST[0])
-    load_clean_data(FLIGHT_LIST[1])
-    load_clean_data(FLIGHT_LIST[2])
-    euroc_mav_residual()
-    merge_embeddings()
-    label_surface_influence()
-    splitting()
+    # load_clean_data(FLIGHT_LIST[0])
+    # load_clean_data(FLIGHT_LIST[1])
+    # load_clean_data(FLIGHT_LIST[2])
+    # euroc_mav_residual()
+    # merge_embeddings()
+    # label_surface_influence()
+    # splitting()
     splitting_uniform_turbulence()
     # # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
     data = EurocMAVDatasetTurbulence(train_validation_test="train", dtype=torch.float64, batch_dim=False)
