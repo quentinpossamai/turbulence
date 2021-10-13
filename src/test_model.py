@@ -370,14 +370,18 @@ def main():
 
     # Testing embeddings
     print('\nResidual model Presence Classifier')
-    mlp = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "PresenceClassifier_norm/default/"
-    mlp += '20211010_155504_PresenceClassifier_tanh_bs256_norml3_lr1e-05_epch10000_p1_us50_/checkpoints/'
-    mlp += "epoch=2286-step=331614.ckpt"
+    # mlp = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "PresenceClassifier_norm/default/"
+    # mlp += '20211010_155504_PresenceClassifier_tanh_bs256_norml3_lr1e-05_epch10000_p1_us50_/checkpoints/'
+    # mlp += "epoch=2286-step=331614.ckpt"
+
+    mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_both/default/' \
+          '20211013_142008_PresenceClassifier_tanh_bs256_both_l3_lr1e-05_epch10000_us50_/checkpoints/' \
+          'epoch=689-step=100049.ckpt'
     from src.drone_models.residual.presence_classifier import PresenceClassifier
     residual_model = PresenceClassifier.load_from_checkpoint(
         mlp,
         activation='tanh',
-        embedding='norm',
+        embedding='both',
         layer=3,
         # learning_rate=1e-6,
         motor_size=6,
