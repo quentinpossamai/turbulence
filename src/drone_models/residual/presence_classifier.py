@@ -102,12 +102,12 @@ class PresenceClassifier(pl.LightningModule):
         :return: (*, values=1)
         """
         # 1.-Input processing
-        if depth_emb is not None:
+        if self.embedding in ['depth', 'both']:
             assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
             depth_emb_shape = depth_emb.shape
             depth_emb = depth_emb.reshape(-1, 128)
             embedding = depth_emb
-        if norm_emb is not None:
+        if self.embedding in ['norm', 'both']:
             assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
             norm_emb_shape = norm_emb.shape
             norm_emb = norm_emb.reshape(-1, 128)

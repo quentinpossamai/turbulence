@@ -15,8 +15,8 @@ os.system(f'ssh remsto /bin/bash << EOF\n'
 # os.system(f"rsync -av --delete remsto:{tb_cluster_path} {tb_local_path}")  # exception
 
 # Launch tensorboard
-tensorboard_cmd = f"tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_estimation/" \
-                  "training/ --load_fast=false --samples_per_plugin scalars=999999999"
+tensorboard_cmd = f"tensorboard --logdir /Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/" \
+                  " --load_fast=false --samples_per_plugin scalars=999999999"
 print(tensorboard_cmd)
 # os.system(tensorboard_cmd)
 
