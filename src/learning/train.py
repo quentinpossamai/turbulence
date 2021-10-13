@@ -45,12 +45,10 @@ def main():
                f"{class_name.__name__}_"
                f"{args.activation}_"
                f"bs{args.batch_size}_"
-               f"{args.embedding}"
-               # f"h{args.horizon}_"
+               f"{args.embedding}_"
                f"l{args.layer}_"
                f"lr{args.lr}_"
                f"epch{args.max_epochs}_"
-               f"p{args.past}_"
                f"us{args.unit_size}_"
                )
     training_path = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + f"{class_name.__name__}_{args.embedding}/"
@@ -72,7 +70,6 @@ def main():
             learning_rate=args.lr,
             # model=analytic_model,
             motor_size=6,
-            past=args.past,
             unit_size=args.unit_size,
         )
     else:
@@ -85,7 +82,6 @@ def main():
             learning_rate=args.lr,
             # model=analytic_model,
             motor_size=6,
-            past=args.past,
             unit_size=args.unit_size,
         )
 

@@ -21,7 +21,6 @@ class PresenceClassifier(pl.LightningModule):
                  layer: int,
                  learning_rate: float,
                  motor_size: int,
-                 past: int,
                  unit_size: int,
                  ):
         """
@@ -36,8 +35,6 @@ class PresenceClassifier(pl.LightningModule):
         :param learning_rate: Learning rate for Adam optimizer.
 
         :param motor_size: The number of motors.
-
-        :param past: The number of past state and motor measures to use.
 
         :param unit_size: The size of one layer.
 
@@ -72,7 +69,6 @@ class PresenceClassifier(pl.LightningModule):
             "layer",
             "learning_rate",
             "motor_size",
-            "past",
             "unit_size"
         )
 
@@ -103,7 +99,7 @@ class PresenceClassifier(pl.LightningModule):
 
         :param norm_emb: (*, values=128)
 
-        :return: (*, valuse=1)
+        :return: (*, values=1)
         """
         # 1.-Input processing
         if depth_emb is not None:
@@ -187,7 +183,6 @@ def _test():
         layer=3,
         learning_rate=1e-3,
         motor_size=6,
-        past=60,
         unit_size=50, )
     model.configure_optimizers()
 
