@@ -1,5 +1,5 @@
-rsync -rtv ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
-# rsync -rtv remsto:~/phd/turbulence/data/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/  # revert
+rsync -rtv --exclude=.DS_Store ~/phd/turbulence/data/euroc_mav/intermediate/ remsto:~/phd/turbulence/data/euroc_mav/intermediate/ &&
+# rsync -rtv --exclude=.DS_Store remsto:~/phd/turbulence/data/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/  # revert
 echo "rsync from macbook to homedir done"  &&
 git push github main &&
 echo "Git: push from homedir to github done"  &&
@@ -8,8 +8,8 @@ ssh remsto /bin/bash << EOF
   echo "changing permission in homedir done"  &&
   find . -name ".DS_Store" -delete &&
   echo "Removing .DS_Store in homedir" &&
-  rsync -rtv --delete ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/ &&
-#  rsync -rtv /storage/Datasets/BlackBird/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/ && # revert
+  rsync -rtv --exclude=.DS_Store --delete ~/phd/turbulence/data/euroc_mav/intermediate/ /storage/Datasets/BlackBird/euroc_mav/intermediate/ &&
+#  rsync -rtv --exclude=.DS_Store /storage/Datasets/BlackBird/euroc_mav/intermediate/ ~/phd/turbulence/data/euroc_mav/intermediate/ && # revert
   echo "rsync from homedir to storage done"  &&
   chmod -fR 775 /storage/Datasets/BlackBird/euroc_mav/intermediate/
   echo "chmod done"  &&
@@ -18,8 +18,8 @@ ssh remsto /bin/bash << EOF
   cd /storage/Datasets/BlackBird &&
   find . -name ".DS_Store" -delete &&
   echo "Removing .DS_Store in /storage/Datasets/BlackBird" &&
-# rsync -rtv --delete /storage/Datasets/BlackBird/ oggy:/storage/Datasets/BlackBird/ &&
-# rsync -rtv oggy:/storage/Datasets/BlackBird/ /storage/Datasets/BlackBird/ &&  # revert
+# rsync -rtv --exclude=.DS_Store --delete /storage/Datasets/BlackBird/ oggy:/storage/Datasets/BlackBird/ &&
+# rsync -rtv --exclude=.DS_Store oggy:/storage/Datasets/BlackBird/ /storage/Datasets/BlackBird/ &&  # revert
 #  echo "Synchronise Oggy with remsto" &&
   cd ~/phd/turbulence/launchers/residual_estimation/ &&
   git pull github main &&

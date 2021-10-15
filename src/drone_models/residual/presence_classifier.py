@@ -9,7 +9,7 @@ class PresenceClassifier(pl.LightningModule):
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default="both", type=str, help="Type of embedding to use")
+        parser.add_argument('--embedding', default="norm", type=str, help="Type of embedding to use")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
@@ -88,7 +88,6 @@ class PresenceClassifier(pl.LightningModule):
                                     torch.zeros(10, 128)]
 
     def configure_optimizers(self):
-        print(f"Lightning.device: {self.device}")
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, depth_emb: Optional[torch.Tensor] = None, norm_emb: Optional[torch.Tensor] = None):
@@ -107,14 +106,17 @@ class PresenceClassifier(pl.LightningModule):
             depth_emb_shape = depth_emb.shape
             depth_emb = depth_emb.reshape(-1, 128)
             embedding = depth_emb
+            embedding_shape = embedding.shape
         if self.embedding in ['norm', 'both']:
             assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
             norm_emb_shape = norm_emb.shape
             norm_emb = norm_emb.reshape(-1, 128)
             embedding = norm_emb
+            embedding_shape = embedding.shape
         if self.embedding in ['both']:
             assert depth_emb_shape[:-1] == norm_emb_shape[:-1]
             embedding = torch.cat([depth_emb, norm_emb], dim=-1)
+            embedding_shape = embedding.shape
         assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
 
         # 2.1-MLP
@@ -128,9 +130,8 @@ class PresenceClassifier(pl.LightningModule):
         out = self.batch_norm2(out)
         out = torch.sigmoid(self.linear2(out))
 
-        out_shape = list(depth_emb_shape)
+        out_shape = list(embedding_shape)
         out_shape[-1] = 1
-        # del out_shape[-2]
         return out.reshape(out_shape)
 
     def step(self, batch):
