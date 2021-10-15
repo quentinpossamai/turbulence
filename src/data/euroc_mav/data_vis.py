@@ -195,11 +195,11 @@ def residual_video(flight: str, double: bool, norm: bool):
         residual_model.eval()
 
         # Presence classifier
-        mlp = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "PresenceClassifier_norm/default/"
-        mlp += '20211010_155504_PresenceClassifier_tanh_bs256_norml3_lr1e-05_epch10000_p1_us50_/checkpoints/'
-        mlp += "epoch=2286-step=331614.ckpt"
+        mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_both/default/' \
+              '20211013_142008_PresenceClassifier_tanh_bs256_both_l3_lr1e-05_epch10000_us50_/checkpoints/' \
+              'epoch=689-step=100049.ckpt'
         from src.drone_models.residual.presence_classifier import PresenceClassifier
-        classifier = PresenceClassifier.load_from_checkpoint(mlp, activation='tanh', embedding='norm', layer=3,
+        classifier = PresenceClassifier.load_from_checkpoint(mlp, activation='tanh', embedding='both', layer=3,
                                                              motor_size=6, past=1)
         classifier.eval()
         with torch.no_grad():
@@ -229,122 +229,122 @@ def residual_video(flight: str, double: bool, norm: bool):
 
         assert (len(tp) == tp_count) and (len(fp) == fp_count) and (len(tn) == tn_count) and (len(fn) == fn_count)
 
-    #     residual_hat = []
-    #     dt = torch.FloatTensor([[1 / 200]]).repeat([past, 1])
-    #     with torch.no_grad():
-    #         for i in tqdm(range(len(data['motor']) - past), desc='Computing fa'):
-    #             motor = torch.FloatTensor(data["motor"][i + 1:past + i + 1])
-    #             state = torch.FloatTensor(data["state"][i:past + i])
-    #             residual_hat.append(residual_model(motor=motor, state=state, dt=dt))
-    #     residual_hat = torch.stack(residual_hat, dim=0)
-    #     residual_gt = torch.FloatTensor(data['residual'])
-    #     residual = (residual_gt[past:] - residual_hat).numpy()
-    #
-    # else:
-    #     past = 0
-    #     residual = data['residual']
-    #
-    # # 1.3-Cutting a the image frequency
-    # cut_img = np.unique(data["cam0"][past:])
-    # data_ind = np.zeros(len(cut_img), dtype=int)
-    #
-    # for i, img_timestamp in enumerate(cut_img):
-    #     ind = np.abs(img_timestamp - data["timestamp"]).argmin()
-    #     data_ind[i] = ind
-    # state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
-    #
-    # # 2-CREATING VIDEO
-    # # 2.1-Initialising video
-    # fps = 20
-    # camera_shape = [480, 752, 3]  # height, width, 3
-    # frame_shape = [1080, 1920, 3]
-    # dpi = 100
-    # saving_path = f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}residual_video.mkv'
-    # mkdir_if_not_exist([f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}'])
-    # codec = VideoWriter_fourcc(*'H264')
-    # video = VideoWriter(saving_path, codec, float(fps), (frame_shape[1], frame_shape[0]), True)  # width, height
-    # print(f'Video will be saved at : {saving_path}')
-    #
-    # for i, image_time in enumerate(tqdm(cut_img, desc="Creating a video")):
-    #     # 2.2-Constructing image
-    #     # 2.2.1-Camera image
-    #     image_name = str(image_time)
-    #     img = np.array(imageio.imread(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{image_name}.png"))
-    #     color_frame = np.uint8(np.zeros(camera_shape))
-    #     for j in range(3):  # color the image
-    #         color_frame[:, :, j] = img
-    #     img = color_frame
-    #
-    #     # Displaying image on figure (width, height)
-    #     fig = plt.figure(figsize=(frame_shape[1] / dpi, frame_shape[0] / dpi), dpi=dpi, facecolor='black')
-    #     ax = fig.add_axes([0, 0.5, 1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
-    #     ax.imshow(img)
-    #     ax.axis('off')
-    #     # Displaying legend: the drone position
-    #     trans = state_mean[data_ind[i], :3]
-    #     angles = Rotation.from_quat(data['state'][data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
-    #     legend = (f'Camera position\n'
-    #               f'       x:{trans[0]:8.3f}m\n'
-    #               f'       y:{trans[1]:8.3f}m\n'
-    #               f'       z:{trans[2]:8.3f}m\n'
-    #               f'   Rot x:{angles[0]:8.3f}°\n'
-    #               f'   Rot y:{angles[1]:8.3f}°\n'
-    #               f'   Rot z:{angles[2]:8.3f}°\n'
-    #               f' data id:{data_ind[i]:9}\n'
-    #               f'frame id:{i:9}')
-    #     ax.annotate(legend, (0.73, 0.95), xycoords='figure fraction', size=12, ha='left', va='top', family='monospace',
-    #                 color='white')
-    #
-    #     # 2.2.2-Plotting residual
-    #     left, bottom = 0.03, 0.03
-    #     ax = fig.add_axes([left, bottom, 0.99 - left, 0.49 - bottom])  # [distance to left, distance to bottom, width,
-    #     # height] on the figure
-    #     start, stop = data_ind[i] - 5 * 200, data_ind[i] + 5 * 200
-    #
-    #     if norm:
-    #         ax.plot(np.linalg.norm(residual[:, :3], axis=1), label='Forces norm')
-    #         ax.plot(np.linalg.norm(residual[:, 3:], axis=1), label='Torques norm')
-    #         legend = ax.legend(loc=1, bbox_to_anchor=(0.1, 1.15), frameon=False)
-    #     else:
-    #         ax.plot(list(range(past, len(data['t']))), residual, label=['Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz'])
-    #         legend = ax.legend(loc=1, bbox_to_anchor=(0.05, 1.35), frameon=False)
-    #     if double:
-    #         # Rectangle(0.2)
-    #         # matplotlib.pat = fig.add_axes([0.2, 0.6, 1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
-    #         color = {1: 'green', 2: 'orange', 3: 'maroon'}
-    #         for j in range(-1000, 1000):
-    #             if data_ind[i] + j < 0 or data_ind[i] + j >= len(pcolor_classification):
-    #                 continue
-    #             if pcolor_classification[data_ind[i] + j] == 0:
-    #                 continue
-    #             y1, y2 = ax.get_ylim()
-    #             # print(f'j: {i+j} | pcolor_classification: {pcolor_classification[i+j]} | y1: {y1} | y2: {y2}')
-    #             c = color[pcolor_classification[data_ind[i] + j]]
-    #             ax.fill_between(x=[data_ind[i]+j - 0.49, data_ind[i]+j + 0.49], y1=y1, y2=y2, alpha=0.1, color=[c, c])
-    #             ax.set_ylim([y1, y2])
-    #     ax.axvline(data_ind[i])
-    #     [e.set_color('white') for e in legend.get_texts()]
-    #     [e.set_fontsize(12) for e in legend.get_texts()]
-    #     ax.grid()
-    #     [ax.spines[e].set_color('white') for e in ['bottom', 'top', 'left', 'right']]
-    #     ax.xaxis.label.set_color('white')
-    #     ax.yaxis.label.set_color('white')
-    #     ax.tick_params(axis='x', colors='white')
-    #     ax.tick_params(axis='y', colors='white')
-    #     ax.set_facecolor('black')
-    #     ax.set_xlim([start, stop])
-    #     # ax.set_xlim([0, 100])
-    #
-    #     fig.canvas.draw()
-    #     frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(frame_shape)
-    #     # plt.savefig(f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}test.png')
-    #     # input()
-    #     plt.close('all')
-    #     # frames[i] = frame
-    #     video.write(frame[:, :, ::-1])  # Because VideoWriter.write take BGR images
-    #
-    # video.release()
-    # cv2.destroyAllWindows()
+        residual_hat = []
+        dt = torch.FloatTensor([[1 / 200]]).repeat([past, 1])
+        with torch.no_grad():
+            for i in tqdm(range(len(data['motor']) - past), desc='Computing fa'):
+                motor = torch.FloatTensor(data["motor"][i + 1:past + i + 1])
+                state = torch.FloatTensor(data["state"][i:past + i])
+                residual_hat.append(residual_model(motor=motor, state=state, dt=dt))
+        residual_hat = torch.stack(residual_hat, dim=0)
+        residual_gt = torch.FloatTensor(data['residual'])
+        residual = (residual_gt[past:] - residual_hat).numpy()
+
+    else:
+        past = 0
+        residual = data['residual']
+
+    # 1.3-Cutting a the image frequency
+    cut_img = np.unique(data["cam0"][past:])
+    data_ind = np.zeros(len(cut_img), dtype=int)
+
+    for i, img_timestamp in enumerate(cut_img):
+        ind = np.abs(img_timestamp - data["timestamp"]).argmin()
+        data_ind[i] = ind
+    state_mean = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
+
+    # 2-CREATING VIDEO
+    # 2.1-Initialising video
+    fps = 20
+    camera_shape = [480, 752, 3]  # height, width, 3
+    frame_shape = [1080, 1920, 3]
+    dpi = 100
+    saving_path = f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}residual_video.mkv'
+    mkdir_if_not_exist([f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}'])
+    codec = VideoWriter_fourcc(*'H264')
+    video = VideoWriter(saving_path, codec, float(fps), (frame_shape[1], frame_shape[0]), True)  # width, height
+    print(f'Video will be saved at : {saving_path}')
+
+    for i, image_time in enumerate(tqdm(cut_img, desc="Creating a video")):
+        # 2.2-Constructing image
+        # 2.2.1-Camera image
+        image_name = str(image_time)
+        img = np.array(imageio.imread(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{image_name}.png"))
+        color_frame = np.uint8(np.zeros(camera_shape))
+        for j in range(3):  # color the image
+            color_frame[:, :, j] = img
+        img = color_frame
+
+        # Displaying image on figure (width, height)
+        fig = plt.figure(figsize=(frame_shape[1] / dpi, frame_shape[0] / dpi), dpi=dpi, facecolor='black')
+        ax = fig.add_axes([0, 0.5, 1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
+        ax.imshow(img)
+        ax.axis('off')
+        # Displaying legend: the drone position
+        trans = state_mean[data_ind[i], :3]
+        angles = Rotation.from_quat(data['state'][data_ind[i], 3:7]).as_euler(seq='zyx', degrees=True)[::-1]
+        legend = (f'Camera position\n'
+                  f'       x:{trans[0]:8.3f}m\n'
+                  f'       y:{trans[1]:8.3f}m\n'
+                  f'       z:{trans[2]:8.3f}m\n'
+                  f'   Rot x:{angles[0]:8.3f}°\n'
+                  f'   Rot y:{angles[1]:8.3f}°\n'
+                  f'   Rot z:{angles[2]:8.3f}°\n'
+                  f' data id:{data_ind[i]:9}\n'
+                  f'frame id:{i:9}')
+        ax.annotate(legend, (0.73, 0.95), xycoords='figure fraction', size=12, ha='left', va='top', family='monospace',
+                    color='white')
+
+        # 2.2.2-Plotting residual
+        left, bottom = 0.03, 0.03
+        ax = fig.add_axes([left, bottom, 0.99 - left, 0.49 - bottom])  # [distance to left, distance to bottom, width,
+        # height] on the figure
+        start, stop = data_ind[i] - 5 * 200, data_ind[i] + 5 * 200
+
+        if norm:
+            ax.plot(np.linalg.norm(residual[:, :3], axis=1), label='Forces norm')
+            ax.plot(np.linalg.norm(residual[:, 3:], axis=1), label='Torques norm')
+            legend = ax.legend(loc=1, bbox_to_anchor=(0.1, 1.15), frameon=False)
+        else:
+            ax.plot(list(range(past, len(data['t']))), residual, label=['Fx', 'Fy', 'Fz', 'Tx', 'Ty', 'Tz'])
+            legend = ax.legend(loc=1, bbox_to_anchor=(0.05, 1.35), frameon=False)
+        if double:
+            # Rectangle(0.2)
+            # matplotlib.pat = fig.add_axes([0.2, 0.6, 1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
+            color = {1: 'green', 2: 'orange', 3: 'maroon'}
+            for j in range(-1000, 1000):
+                if data_ind[i] + j < 0 or data_ind[i] + j >= len(pcolor_classification):
+                    continue
+                if pcolor_classification[data_ind[i] + j] == 0:
+                    continue
+                y1, y2 = ax.get_ylim()
+                # print(f'j: {i+j} | pcolor_classification: {pcolor_classification[i+j]} | y1: {y1} | y2: {y2}')
+                c = color[pcolor_classification[data_ind[i] + j]]
+                ax.fill_between(x=[data_ind[i]+j - 0.49, data_ind[i]+j + 0.49], y1=y1, y2=y2, alpha=0.1, color=[c, c])
+                ax.set_ylim([y1, y2])
+        ax.axvline(data_ind[i])
+        [e.set_color('white') for e in legend.get_texts()]
+        [e.set_fontsize(12) for e in legend.get_texts()]
+        ax.grid()
+        [ax.spines[e].set_color('white') for e in ['bottom', 'top', 'left', 'right']]
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.tick_params(axis='x', colors='white')
+        ax.tick_params(axis='y', colors='white')
+        ax.set_facecolor('black')
+        ax.set_xlim([start, stop])
+        # ax.set_xlim([0, 100])
+
+        fig.canvas.draw()
+        frame = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8).reshape(frame_shape)
+        # plt.savefig(f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}test.png')
+        # input()
+        plt.close('all')
+        # frames[i] = frame
+        video.write(frame[:, :, ::-1])  # Because VideoWriter.write take BGR images
+
+    video.release()
+    cv2.destroyAllWindows()
 
 
 def data_cursor(flight, den_motor_dict, den_pose_dict, cam0_dict):
@@ -390,12 +390,12 @@ def data_cursor(flight, den_motor_dict, den_pose_dict, cam0_dict):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[0]
-    residual_video(flight=flight, double=True, norm=False)
+    # flight = euroc.FLIGHT_LIST[0]
+    # residual_video(flight=flight, double=True, norm=False)
     flight = euroc.FLIGHT_LIST[1]
     residual_video(flight=flight, double=True, norm=False)
-    flight = euroc.FLIGHT_LIST[2]
-    residual_video(flight=flight, double=True, norm=False)
+    # flight = euroc.FLIGHT_LIST[2]
+    # residual_video(flight=flight, double=True, norm=False)
 
 
 if __name__ == '__main__':

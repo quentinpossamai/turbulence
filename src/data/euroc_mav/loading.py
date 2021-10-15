@@ -284,7 +284,7 @@ def euroc_mav_residual():
         data = load_flight(flight)
         # time = torch.from_numpy(data["t"][:-1])
         motor = torch.from_numpy(data["motor"][1:])
-        dt = torch.from_numpy(data["dt"][1:])
+        dt = torch.from_numpy(data["dt"][1:]).reshape((-1, 1))
         state = torch.from_numpy(data["state"][:-1])
         next_state = torch.from_numpy(data["state"][1:])
 
@@ -339,9 +339,9 @@ def label_surface_influence():
     for flight in FLIGHT_LIST:
         data = load_flight(flight)
         last_idx = len(data['t'])
-        fa_presence = {FLIGHT_LIST[0]: [range(25943, 26073), range(26513, last_idx)],
-                       FLIGHT_LIST[1]: [range(0, 180), range(15350, last_idx)],
-                       FLIGHT_LIST[2]: [range(18966, last_idx)]}
+        fa_presence = {FLIGHT_LIST[0]: [range(25943, 26213), range(26513, last_idx)],
+                       FLIGHT_LIST[1]: [range(0, 250), range(15240, last_idx)],
+                       FLIGHT_LIST[2]: [range(18626, last_idx)]}
         fa_presence_array = np.zeros(len(data['state']))
         for presence_range in fa_presence[flight]:
             fa_presence_array[presence_range] = 1
@@ -372,30 +372,6 @@ def splitting():
             pickle.dump(validation_data, open(INTERMEDIATE_DATASET_PATH + flight + "/validation.pkl", "wb"))
             test_data = {key: data[key][val_test_idx:flight_len] for key in data}
             pickle.dump(test_data, open(INTERMEDIATE_DATASET_PATH + flight + "/test.pkl", "wb"))
-
-
-def splitting_uniform_turbulence():
-    seed = 0
-    for flight in FLIGHT_LIST:
-        print("Splitting: ", flight)
-        data = load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'state', 'residual'])
-        assert all(np.array([len(data[key]) for key in data]) == len(data["t"])), f"All Data key must have same" \
-                                                                                  f" length"
-        flight_len = len(data["t"])
-        print(flight, flight_len)
-        data_idx = np.arange(len(data['t']))
-        temp_idx, test_idx = train_test_split(data_idx, test_size=0.2, shuffle=True, stratify=data['fa_label'],
-                                              random_state=seed)
-        train_idx, val_idx = train_test_split(temp_idx, test_size=0.25, shuffle=True,
-                                              stratify=data['fa_label'][temp_idx], random_state=seed)
-
-        train_data = {key: data[key][train_idx] for key in data}
-        pickle.dump(train_data, open(INTERMEDIATE_DATASET_PATH + flight + "/train_uniform_turbulence.pkl", "wb"))
-        validation_data = {key: data[key][val_idx] for key in data}
-        pickle.dump(validation_data, open(INTERMEDIATE_DATASET_PATH + flight + "/validation_uniform_turbulence.pkl",
-                                          "wb"))
-        test_data = {key: data[key][test_idx] for key in data}
-        pickle.dump(test_data, open(INTERMEDIATE_DATASET_PATH + flight + "/test_uniform_turbulence.pkl", "wb"))
 
 
 DATASET_RANGE = OrderedDict({  # [stat, stop , size]
@@ -508,9 +484,10 @@ class EurocMAVDatasetTurbulence(Dataset):
         if train_validation_test not in ["train", "validation", "test"]:
             raise ValueError("train_validation_test must be 'train', 'validation' or 'test'.")
         self.train_validation_test = train_validation_test
-        loaded_data = {flight: pickle.load(open(f'{INTERMEDIATE_DATASET_PATH}{flight}'
-                                                f'{train_validation_test}_uniform_turbulence.pkl',
-                                                "rb")) for flight in FLIGHT_LIST}
+        if self.train_validation_test in ['train']:
+            loaded_data = {flight: load_flight(flight) for flight in [FLIGHT_LIST[0], FLIGHT_LIST[2]]}
+        else:
+            loaded_data = {flight: load_flight(flight) for flight in [FLIGHT_LIST[1]]}
         # Loading data
         for flight, val in loaded_data.items():
             concatenation = []
@@ -518,7 +495,7 @@ class EurocMAVDatasetTurbulence(Dataset):
                 concatenation.append(val[data_key].reshape((-1, 1)) if dr[2] == 1 else val[data_key])
             loaded_data[flight] = np.concatenate(concatenation, axis=1)
 
-        self.data = np.concatenate([loaded_data[flight] for flight in FLIGHT_LIST], axis=0)
+        self.data = np.concatenate([loaded_data[flight] for flight in loaded_data.keys()], axis=0)
         self.data = torch.from_numpy(self.data).type(self.dtype)
 
     def __len__(self):
@@ -557,11 +534,17 @@ def main():
     # merge_embeddings()
     # label_surface_influence()
     # splitting()
-    splitting_uniform_turbulence()
     # # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
-    data = EurocMAVDatasetTurbulence(train_validation_test="train", dtype=torch.float64, batch_dim=False)
-    print(len(data))
-    print(data[0])
+    from torch.utils.data import DataLoader
+
+    all_data = {}
+    for key in ['train', 'validation', 'test']:
+        dataset = EurocMAVDatasetTurbulence(train_validation_test=key, dtype=torch.float32, batch_dim=False)
+        all_data[key] = next(iter(DataLoader(dataset, batch_size=len(dataset))))
+    for emb in ['depth_emb', 'norm_emb']:
+        for data_to_test in ['validation', 'test']:
+            for i, sample in enumerate(all_data['train'][emb]):
+                assert len(torch.where((sample == all_data[data_to_test][emb]).all(dim=1))[0]) == 0
 
 
 if __name__ == '__main__':
