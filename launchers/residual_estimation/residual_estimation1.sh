@@ -8,7 +8,7 @@ singularity_3.7.1 exec --nv --bind /storage launchers/turbulence_conda.sif pytho
  --activation tanh\
  --embedding norm\
  --layer 3\
- --lr 1e-5\
+ --lr 1e-6\
  --unit_size 50\
  --max_epochs 10000
 # --load_weights $file
