@@ -10,6 +10,8 @@ class PresenceClassifier(pl.LightningModule):
         parser = parent_parser.add_argument_group("GRUResidual")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
         parser.add_argument('--embedding', default="norm", type=str, help="Type of embedding to use")
+        parser.add_argument('--l1_coef', default=0., type=float, help="L1 loss coefficient")
+        parser.add_argument('--l2_coef', default=0., type=float, help="L2 loss coefficient")
         parser.add_argument('--layer', default=3, type=int, help="Number of layer in the neural network")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
@@ -18,6 +20,8 @@ class PresenceClassifier(pl.LightningModule):
     def __init__(self,
                  activation: str,
                  embedding: str,
+                 l1_coef: float,
+                 l2_coef: float,
                  layer: int,
                  learning_rate: float,
                  motor_size: int,
@@ -30,6 +34,10 @@ class PresenceClassifier(pl.LightningModule):
 
         :param embedding: Type of embedding to use.
 
+        :param l1_coef: Coefficient for l1 regularization.
+
+        :param l2_coef: Coefficient for l2 regularization.
+
         :param layer: Number of layer for the neural network.
 
         :param learning_rate: Learning rate for Adam optimizer.
@@ -37,6 +45,7 @@ class PresenceClassifier(pl.LightningModule):
         :param motor_size: The number of motors.
 
         :param unit_size: The size of one layer.
+
 
         """
         super().__init__()
@@ -55,6 +64,9 @@ class PresenceClassifier(pl.LightningModule):
             assert self.embedding in ["both"]
             self.emb_size = 2 * 128
 
+        self.l1_coef = l1_coef
+        self.l2_coef = l2_coef
+
         layer_test = [2, 3]
         assert layer in layer_test, f"layer parameter must be one of the following values {layer_test}"
         self.layer = layer
@@ -63,26 +75,22 @@ class PresenceClassifier(pl.LightningModule):
         self.motor_size = motor_size
         self.unit_size = unit_size
 
-        self.save_hyperparameters(
-            "activation",
-            "embedding",
-            "layer",
-            "learning_rate",
-            "motor_size",
-            "unit_size"
-        )
+        self.save_hyperparameters()
 
-        self.batch_norm0 = nn.BatchNorm1d(self.emb_size)
-        # self.gru0 = nn.GRU(input_size=self.emb_size,
-        #                    hidden_size=self.unit_size,
-        #                    num_layers=self.layer,
-        #                    bias=True,
-        #                    batch_first=True)
+        self.batch_norm_input = nn.BatchNorm1d(self.emb_size)
+        self.dropout_input = nn.Dropout(p=0.2)
+
         self.linear0 = nn.Linear(in_features=self.emb_size, out_features=self.unit_size, bias=True)
-        self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
+        self.batch_norm0 = nn.BatchNorm1d(self.unit_size)
+        self.dropout0 = nn.Dropout(p=0.5)
+
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
-        self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
+        self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
+        self.dropout1 = nn.Dropout(p=0.5)
+
         self.linear2 = nn.Linear(in_features=self.unit_size, out_features=1, bias=True)
+        self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
+        self.dropout2 = nn.Dropout(p=0.5)
 
         self.example_input_array = [torch.zeros(10, 128),
                                     torch.zeros(10, 128)]
@@ -120,15 +128,10 @@ class PresenceClassifier(pl.LightningModule):
         assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
 
         # 2.1-MLP
-        out = self.batch_norm0(embedding)
-        # out, _ = self.gru0(out.reshape(-1, self.past, self.emb_size))
-        # out = out[:, -1]  # last hidden states, (batch, self.unit_size)
-        out = self.activation(self.linear0(out))
-        # Fully connected
-        out = self.batch_norm1(out)
-        out = self.activation(self.linear1(out))
-        out = self.batch_norm2(out)
-        out = torch.sigmoid(self.linear2(out))
+        out = self.dropout_input(self.batch_norm_input(embedding))  # Input
+        out = self.dropout0(self.activation(self.batch_norm0(self.linear0(out))))  # hidden layer 0
+        out = self.dropout1(self.activation(self.batch_norm1(self.linear1(out))))  # hidden layer 1
+        out = torch.sigmoid(self.linear2(out))  # output layer
 
         out_shape = list(embedding_shape)
         out_shape[-1] = 1
@@ -147,15 +150,22 @@ class PresenceClassifier(pl.LightningModule):
         fa_label_gt = batch["fa_label"]
         fa_label_hat = self.forward(depth_emb=depth_emb, norm_emb=norm_emb)
 
-        weights = fa_label_gt * 0.98 + 0.01
+        # L2 regularization
+        l1_loss, l2_loss = 0, 0
+        for param in self.parameters():
+            l1_loss += param.abs().sum()
+            l2_loss += (param ** 2).sum()
+
+        # Weighted BCE loss
+        weights = fa_label_gt * 0.975 + 0.025
         loss_object = torch.nn.BCELoss(weights)
-        loss = loss_object(fa_label_hat, fa_label_gt)
-        return loss.mean()
+        weighted_bce_loss = loss_object(fa_label_hat, fa_label_gt)
+        return weighted_bce_loss.mean() + self.l1_coef * l1_loss + self.l2_coef * l2_loss
 
     def training_step(self, train_batch, batch_idx):
         training_loss = self.step(train_batch)
         self.log("train_loss", training_loss)
-
+        self.log("learning_rate", self.learning_rate)
         return training_loss
 
     def validation_step(self, val_batch, batch_idx):

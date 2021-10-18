@@ -5,8 +5,10 @@ cd ~/phd/turbulence/
 #file+="checkpoints/epoch=358-step=210373.ckpt"
 singularity_3.7.1 exec --nv --bind /storage launchers/turbulence_conda.sif python3 -m src.learning.train\
  --batch_size 256\
- --activation tanh\
+ --activation relu\
  --embedding norm\
+ --l1_coef 0\
+ --l2_coef 0\
  --layer 3\
  --lr 1e-6\
  --unit_size 50\

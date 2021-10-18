@@ -46,6 +46,8 @@ def main():
                f"{args.activation}_"
                f"bs{args.batch_size}_"
                f"{args.embedding}_"
+               f"l{args.l1_coef}_"
+               f"l{args.l2_coef}_"               
                f"l{args.layer}_"
                f"lr{args.lr}_"
                f"epch{args.max_epochs}_"
@@ -66,9 +68,10 @@ def main():
         run = class_name(
             activation=args.activation,
             embedding=args.embedding,
+            l1_coef=args.l1_coef,
+            l2_coef=args.l2_coef,
             layer=args.layer,
             learning_rate=args.lr,
-            # model=analytic_model,
             motor_size=6,
             unit_size=args.unit_size,
         )
@@ -78,9 +81,10 @@ def main():
             args.load_weights,
             activation=args.activation,
             embedding=args.embedding,
+            l1_coef=args.l1_coef,
+            l2_coef=args.l2_coef,
             layer=args.layer,
             learning_rate=args.lr,
-            # model=analytic_model,
             motor_size=6,
             unit_size=args.unit_size,
         )
