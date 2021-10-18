@@ -74,5 +74,6 @@ def plot_butterworth(quat, den_quat, fc_quat, period):
 def main():
     pass
 
+
 if __name__ == '__main__':
     main()
