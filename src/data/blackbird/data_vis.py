@@ -29,7 +29,6 @@ def plot_butterworth(quat, den_quat, fc_quat, period):
     for n_ind, n in enumerate(n_list):
         for wn_ind, wn in enumerate(wn_list):
             sos = signal.butter(N=n, Wn=wn, btype='lowpass', fs=1 / period, analog=False, output='sos')
-            # sos = signal.butter(N=n, Wn=wn, btype='lowpass', analog=True, output='sos')
             for i in range(4):
                 den_quat_butter[n_ind, wn_ind, :, i] = signal.sosfilt(sos, quat[:, i])
     den_quat_butter = den_quat_butter / np.linalg.norm(den_quat_butter, axis=-1)[..., np.newaxis]  # Normalize
