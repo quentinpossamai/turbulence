@@ -89,8 +89,6 @@ class PresenceClassifier(pl.LightningModule):
         self.dropout1 = nn.Dropout(p=0.5)
 
         self.linear2 = nn.Linear(in_features=self.unit_size, out_features=1, bias=True)
-        self.batch_norm2 = nn.BatchNorm1d(self.unit_size)
-        self.dropout2 = nn.Dropout(p=0.5)
 
         self.example_input_array = [torch.zeros(10, 128),
                                     torch.zeros(10, 128)]
@@ -191,10 +189,12 @@ def _test():
     model = PresenceClassifier(
         activation='tanh',
         embedding="both",
+        l1_coef=0,
+        l2_coef=0,
         layer=3,
         learning_rate=1e-3,
         motor_size=6,
-        unit_size=50, )
+        unit_size=50)
     model.configure_optimizers()
 
     res = model.forward(depth_emb=depth_emb[:, :past], norm_emb=norm_emb[:, :past])
