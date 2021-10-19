@@ -12,9 +12,9 @@ from scipy.spatial.transform import Rotation
 import torch
 from tqdm import tqdm
 
-import src.data.euroc_mav.loading as euroc
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-from src.drone_models.residual.gru_cnn import GRUCNNResidual
+# import src.data.euroc_mav.loading as euroc
+# from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+# from src.drone_models.residual.gru_cnn import GRUCNNResidual
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_DATA_VIS_EUROC_MAV, ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
 
 matplotlib.use('TKAgg')
@@ -69,6 +69,7 @@ def plot_butterworth(quat, den_quat, fc_quat, period):
     n_slider.on_changed(update)
     wn_slider.on_changed(update)
     print()
+    plt.show()
 
 
 def main():

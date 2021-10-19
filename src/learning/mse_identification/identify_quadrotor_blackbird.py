@@ -1,9 +1,12 @@
 """ Identify the non-physical parameters of the model:
-theta1 = KT/m
-theta2 = LKT/[Ixy]
-theta3 = Km/Iz
-theta4 = Iz/Ixy"""
+theta1 = Kt / m
+theta2 = L Kt / Ixy
+theta3 = Km / Iz
+theta4 = Iz / Ixy"""
 
+import itertools
+import matplotlib.pyplot as plt
+import pickle
 import torch
 from tqdm import tqdm
 import itertools
@@ -31,10 +34,28 @@ def identify_model():
     command = torch.cat(command, dim=0)
     batch_size = states.shape[0]
 
-    # Create A matrix
-    # Compute forces and torques:
     best_permutation, best_theta, best_error = None, None, 1000
-    permutations = list(itertools.permutations([1, 0, 3, 2]))
+    permutations = list(itertools.permutations([1, 2, 3, 4]))
+
+    linear_acceleration = (future_states[:, 7:10] - states[:, 7:10]) / DT
+    angular_aceleration = (future_states[:, 10:] - states[:, 10:]) / DT
+
+    plt.subplot(131)
+    plt.plot(linear_acceleration[10000:20000, 0])
+    plt.subplot(132)
+    plt.plot(linear_acceleration[10000:20000, 1])
+    plt.subplot(133)
+    plt.plot(linear_acceleration[10000:20000, 2])
+
+    plt.figure()
+    plt.subplot(131)
+    plt.plot(command[10000:20000, 0])
+    plt.subplot(132)
+    plt.plot(command[10000:20000, 1])
+    plt.subplot(133)
+    plt.plot(command[10000:20000, 2])
+    plt.show()
+
     for p in tqdm(permutations):
         omega = command[:, p] ** 2
         motor_matrix = torch.FloatTensor([[+1, +1, +1, +1],

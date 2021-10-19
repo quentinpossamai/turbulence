@@ -13,7 +13,7 @@ def load_blackbird_flights(mode):
     # Dataset location
     datadir = "/storage/Datasets/BlackBird/"  # Dataset location on cluster
     if not os.path.isdir(datadir):
-        datadir = "/Volumes/Samsung_T5/BlackBird/"  # Dataset location (Steeven)
+        datadir = "/Volumes/Samsung_T5/BlackBird/blackbird/"  # Dataset location (Steeven)
     if not os.path.isdir(datadir):
         datadir = blackbird.DATASET_PATH  # Dataset location (Quentin)
     assert os.path.isdir(datadir)
