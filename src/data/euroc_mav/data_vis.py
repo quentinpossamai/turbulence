@@ -195,12 +195,11 @@ def residual_video(flight: str, double: bool, norm: bool):
         residual_model.eval()
 
         # Presence classifier
-        mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_both/default/' \
-              '20211013_142008_PresenceClassifier_tanh_bs256_both_l3_lr1e-05_epch10000_us50_/checkpoints/' \
-              'epoch=689-step=100049.ckpt'
+        mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_depth/default/' \
+              '20211018_100951_PresenceClassifier_relu_bs256_depth_l0.0_l0.0_l3_lr1e-06_epch10000_us50_/checkpoints/' \
+              'epoch=2063-step=373583.ckpt'
         from src.drone_models.residual.presence_classifier import PresenceClassifier
-        classifier = PresenceClassifier.load_from_checkpoint(mlp, activation='tanh', embedding='both', layer=3,
-                                                             motor_size=6, past=1)
+        classifier = PresenceClassifier.load_from_checkpoint(mlp, motor_size=6)
         classifier.eval()
         with torch.no_grad():
             label_hat = classifier(depth_emb=torch.FloatTensor(data["depth_emb"]),
@@ -311,7 +310,7 @@ def residual_video(flight: str, double: bool, norm: bool):
         if double:
             # Rectangle(0.2)
             # matplotlib.pat = fig.add_axes([0.2, 0.6, 1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
-            color = {1: 'green', 2: 'orange', 3: 'maroon'}
+            color = {1: 'green', 2: 'orange', 3: 'blue'}
             for j in range(-1000, 1000):
                 if data_ind[i] + j < 0 or data_ind[i] + j >= len(pcolor_classification):
                     continue
@@ -392,10 +391,10 @@ def data_cursor(flight, den_motor_dict, den_pose_dict, cam0_dict):
 def main():
     # flight = euroc.FLIGHT_LIST[0]
     # residual_video(flight=flight, double=True, norm=False)
-    flight = euroc.FLIGHT_LIST[1]
-    residual_video(flight=flight, double=True, norm=False)
-    # flight = euroc.FLIGHT_LIST[2]
+    # flight = euroc.FLIGHT_LIST[1]
     # residual_video(flight=flight, double=True, norm=False)
+    flight = euroc.FLIGHT_LIST[2]
+    residual_video(flight=flight, double=True, norm=False)
 
 
 if __name__ == '__main__':

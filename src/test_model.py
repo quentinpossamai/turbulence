@@ -374,29 +374,19 @@ def main():
     # mlp += '20211010_155504_PresenceClassifier_tanh_bs256_norml3_lr1e-05_epch10000_p1_us50_/checkpoints/'
     # mlp += "epoch=2286-step=331614.ckpt"
 
-    mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_both/default/' \
-          '20211013_142008_PresenceClassifier_tanh_bs256_both_l3_lr1e-05_epch10000_us50_/checkpoints/' \
-          'epoch=689-step=100049.ckpt'
+    # mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_both/default/' \
+    #       '20211013_142008_PresenceClassifier_tanh_bs256_both_l3_lr1e-05_epch10000_us50_/checkpoints/' \
+    #       'epoch=689-step=100049.ckpt'
+    mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_depth/default/' \
+          '20211018_100951_PresenceClassifier_relu_bs256_depth_l0.0_l0.0_l3_lr1e-06_epch10000_us50_/checkpoints/' \
+          'epoch=2063-step=373583.ckpt'
     from src.drone_models.residual.presence_classifier import PresenceClassifier
-    residual_model = PresenceClassifier.load_from_checkpoint(
-        mlp,
-        activation='tanh',
-        embedding='both',
-        layer=3,
-        # learning_rate=1e-6,
-        motor_size=6,
-        past=1,
-        # unit_size=50,  # not
-    )
+    residual_model = PresenceClassifier.load_from_checkpoint(mlp, motor_size=6)
 
     residual_model.eval()
     presence_classification_test(classifier=residual_model, dataset='euroc_mav', train_validation_test='train')
     presence_classification_test(classifier=residual_model, dataset='euroc_mav', train_validation_test='validation')
     presence_classification_test(classifier=residual_model, dataset='euroc_mav', train_validation_test='test')
-    # test_model(model=residual_model, past=past, dataset="euroc_mav", train_test_validation="test")
-    # plot_rollout(residual_model, horizon=300, past=past, dataset='euroc_mav', train_test_validation='test',
-    #              plot_range=[0, 300])
-    # plot_residual(residual_model, traj_len=past + 1, dataset='euroc_mav', train_test_validation="validation")
 
 
 if __name__ == '__main__':

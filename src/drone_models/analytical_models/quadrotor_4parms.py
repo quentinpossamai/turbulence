@@ -13,12 +13,13 @@ class DynamicalModel(nn.Module, Run):
         :param dtype: Datatype of the model.
         """
         super().__init__()
-        self.motor_size = 6
+        self.motor_size = 4
         assert dtype in [torch.float32, torch.float64]
         self.dtype = dtype
 
         msg = '''"paper", "identification", or dict["permutation", "theta"]'''
-        assert param in ["paper", "identification"] or list(param.keys()) == ["permutation", "theta"], msg
+        assert param in ["paper", "identification"] or \
+               all([key in ["permutation", "theta"] for key in list(param.keys())]), msg
 
         self.permutation = [1, 0, 3, 2]
         if param == "paper":
