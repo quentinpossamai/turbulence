@@ -71,6 +71,12 @@ def mse_error(model, horizon, past, dataset, split):
         time = torch.FloatTensor(flights[k]['t'])
         depth_emb = torch.FloatTensor(flights[k]['depth_emb'])
         norm_emb = torch.FloatTensor(flights[k]['norm_emb'])
+
+        # Todo
+        sh = list(cropped_states.shape)
+        sh[-1] = 1
+        dt = torch.FloatTensor([[1 / 200]]).repeat(sh)
+
         error_per_flight[k] = _compute_error(
             model=model,
             horizon=horizon,
@@ -94,6 +100,7 @@ def _compute_error(**kwargs):
     state = kwargs['state']
     motor = kwargs['motor']
     time = kwargs['time']
+    dt = kwargs['dt']
     depth_emb = kwargs['depth_emb']
     norm_emb = kwargs['norm_emb']
 
@@ -107,14 +114,11 @@ def _compute_error(**kwargs):
     cropped_motor = motor[:crop_idx * (past + horizon)].view(-1, past + horizon, motor_size)
     cropped_depth_emb = depth_emb[:crop_idx * (past + horizon)].view(-1, past + horizon, 128)
     cropped_norm_emb = norm_emb[:crop_idx * (past + horizon)].view(-1, past + horizon, 128)
-    # cropped_dt = (time[1:] - time[:-1])[:crop_idx * (past + horizon)].view(-1, past + horizon, 1)
-    sh = list(cropped_states.shape)
-    sh[-1] = 1
-    dt = torch.FloatTensor([[1 / 200]]).repeat(sh)
+    cropped_dt = dt[:crop_idx * (past + horizon)].view(-1, past + horizon, 1)
     error, error_rollout, pred = model.rollout(
             motor=cropped_motor,
             state=cropped_states,
-            dt=dt,
+            dt=cropped_dt,
             horizon=horizon,
             depth_emb=cropped_depth_emb,
             norm_emb=cropped_norm_emb,
