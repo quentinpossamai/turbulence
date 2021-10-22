@@ -4,8 +4,8 @@ import pathlib
 import pickle
 import os
 from scipy import interpolate
-from scipy.fft import fft, fftfreq, ifft
-from sklearn.model_selection import train_test_split
+from scipy import signal
+# from sklearn.model_selection import train_test_split
 import torch
 from torch.utils.data import Dataset
 from typing import Union
@@ -107,38 +107,33 @@ def load_clean_data(flight):
     cam0_dict = {"t": time, "timestamp": timestamp}
 
     # 2-DENOISING
-    def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
-        output = fft_coef.copy()
-        output[np.abs(fourier_freq) > freq_cut] = 0
-        return output
-
     # 2.1-Denoising motor speed's timestamp and motor speed
     den_motor_dict = {}
     for key, val in motor_dict.items():
         den_motor_dict[key] = val.copy()
-    # Denoising motor speed with low pass filter on Fourier's coefficients
-    # period = np.mean(motor_dict["t"][1:] - motor_dict["t"][:-1])
+    # Denoising motor timestamp
     period = 1 / 200
-    n = len(motor_dict["t"])
-    frequencies = fftfreq(n, d=period)
     den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
 
-    for i in range(6):
-        # den_motor_dict["motor"][:, i] = motor_dict["motor"][:, i]  # no denoising
-        fc_motor = 5  # Hz
-        # Ideal denoising
-        fourier_motor = fft(motor_dict["motor"][:, i])
-        den_motor_dict["motor"][:, i] = np.real(ifft(low_pass_filter(fourier_motor, frequencies, fc_motor)))
-        # Butterworth
-        # sos = signal.butter(1, fc_motor, 'lowpass', fs=200, output='sos')
-        # den_motor_dict["motor"][:, i] = signal.sosfilt(sos, motor_dict["motor"][:, i])
+    # Butterworth on motor speed
+    sos = signal.butter(N=2, Wn=2.8, btype='lowpass', fs=1/period, output='sos')
+    den_motor_dict["motor"] = signal.sosfiltfilt(sos, motor_dict["motor"], axis=0)
 
     # 2.2-Denoising IMU timestamp
     den_imu_dict = {}
     period = np.mean(imu_dict["t"][1:] - imu_dict["t"][:-1])
     den_imu_dict["t"] = (period * np.array(range(len(imu_dict["t"]))) + imu_dict["t"][0])  # Denoising IMU timestamp
-    den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
     den_imu_dict["timestamp"] = imu_dict["timestamp"]
+    den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
+
+    # Butterworth on imu angular_velocity
+    sos = signal.butter(N=2, Wn=4.04, btype='lowpass', fs=1/period, output='sos')
+    den_imu_dict["ang_acc"][:, :3] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, :3], axis=0)
+    # Butterworth on imu acceleration
+    sos = signal.butter(N=2, Wn=2.8, btype='lowpass', fs=1/period, output='sos')
+    den_imu_dict["ang_acc"][:, 3:5] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, 3:5], axis=0)
+    sos = signal.butter(N=2, Wn=5.14, btype='lowpass', fs=1/period, output='sos')
+    den_imu_dict["ang_acc"][:, 5] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, 5])
 
     # 2.3-Computing a denoised motion capture's translation and quaternion.
     # 2.3.1-Initialization, normalization and centering
@@ -160,19 +155,17 @@ def load_clean_data(flight):
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
     # 2.3.3-Denoising quaternion
-    # Ideal denoising
-    frequencies = fftfreq(n, d=float(period))
-    fc_quat = 5  # Hz
-    fourier_quat = fft(quat, axis=0)
-    den_quat = np.real(ifft(low_pass_filter(fourier_quat, frequencies, fc_quat), axis=0))
+    dt = (den_pose_dict["t"][1:] - den_pose_dict["t"][:-1]).reshape((-1, 1))
+    sos = signal.butter(N=2, Wn=2.92, btype='lowpass', fs=1 / period, analog=False, output='sos')
+    den_quat = signal.sosfiltfilt(sos, quat, axis=0)
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
-    # data_vis.plot_butterworth(quat, den_quat, fc_quat, period)
 
     # 2.3.4-Denoising translation
     # Ideal denoising
-    fc_trans = 5  # Hz
-    fourier_trans = fft(trans, axis=0)
-    den_trans = np.real(ifft(low_pass_filter(fourier_trans, frequencies, fc_trans), axis=0))
+    # data_vis.plot_butterworth_comparison(trans[:, 3].reshape((-1, 1)), ideal_f=5, period=period, do_norm=False, dt=dt)
+    sos = signal.butter(N=2, Wn=2.92, btype='lowpass', fs=1 / period, analog=False, output='sos')
+    den_trans = signal.sosfiltfilt(sos, trans, axis=0)
+
     den_pose_dict["pose"] = np.concatenate([den_trans, den_quat], axis=1)
 
     # 3-CUT: Cut data and keep only when the drone is flying
@@ -527,13 +520,13 @@ def load_flight(flight):
 
 
 def main():
-    # load_clean_data(FLIGHT_LIST[0])
-    # load_clean_data(FLIGHT_LIST[1])
-    # load_clean_data(FLIGHT_LIST[2])
-    # euroc_mav_residual()
-    # merge_embeddings()
-    # label_surface_influence()
-    # splitting()
+    load_clean_data(FLIGHT_LIST[0])
+    load_clean_data(FLIGHT_LIST[1])
+    load_clean_data(FLIGHT_LIST[2])
+    euroc_mav_residual()
+    merge_embeddings()
+    label_surface_influence()
+    splitting()
     # # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
     from torch.utils.data import DataLoader
 
