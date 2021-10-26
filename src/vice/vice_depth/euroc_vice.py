@@ -1,14 +1,11 @@
+import json
 import numpy as np
+import os.path
 import pickle
 import yaml
-# import matplotlib.pyplot as plt
-from tqdm import tqdm
-import cv2
-from cv2 import VideoWriter, VideoWriter_fourcc
-import imageio
 
 import src.data.euroc_mav.loading as euroc
-from src.vice.posture_error_estimation import ErrorEstimation
+from src.vice.vice_depth.posture_error_estimation import ErrorEstimation
 from src.utils.transform import Transform
 
 
@@ -56,13 +53,20 @@ def euroc_mav_pre_processing(flight):
     cut_tf_camera_origin = np.zeros((len(cut_img), 4, 4))
     cut_t = np.zeros((len(cut_img), 1))
 
+    img_path = []
+    depth_path = []
     for i, img_timestamp in enumerate(cut_img):
         ind = np.abs(img_timestamp - data["timestamp"]).argmin()
         cut_tf_camera_origin[i] = tf_camera_origin[ind]
         cut_t[i] = data["t"][ind]
+        img_path.append(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{img_timestamp}.png")
+        depth_path.append(f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}'
+                          f'depth_estimation/{str(data["t"][ind]).replace(".", "_")}.png')
 
-    input_data = {"t": cut_t, "pose": cut_tf_camera_origin, "cam0": cut_img}
+        assert os.path.isfile(depth_path[i])
 
+    # 1.6 Saving preprocessing
+    input_data = {"t": cut_t, "pose": cut_tf_camera_origin, "img": img_path, "depth": depth_path}
     pickle.dump(input_data, open(f"{flight_path}vice_data.pkl", 'wb'))
     pickle.dump(cam_prms, open(f"{flight_path}camera_parameters.pkl", 'wb'))
 
@@ -81,37 +85,39 @@ def error_estimation(flight):
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 distortion_coefficient=cam_prms['D'],
-                                max_distance=5,
                                 width=width,
-                                height=height)
+                                height=height,
+                                depth_coef=7.48)
     # 2-GENERATE P3 POINTS
-    estimator.p3_generator()
+    estimator.p3_generator(saving_path=f'{flight_path}p3_points.pkl')
 
     # 3-GENERATING THE VIDEO
-    # saving_path = f.folders['results'][flight_number] + 'raw_video.mkv'
-    saving_path = flight_path + 'pose_camera_correspondence_video.mkv'
-    codec = VideoWriter_fourcc(*'H264')
-    # name = ABSOLUTE_PATH + 'error_estimation_videos/' + part1 + '_' + part2 + '_error_estimation.mkv'
-    video = VideoWriter(saving_path, codec, float(fps), (width, height), True)
-    print(f'Video will be saved at : {saving_path}')
-    shape = (height, width, 3)
-    for i, image_time in enumerate(tqdm(input_data['cam0'], desc="Creating a video")):
-        image_name = str(image_time)
-        img = np.array(imageio.imread(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{image_name}.png"))
-        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
-        for j in range(3):
-            color_frame[:, :, j] = img
-        img = color_frame
-        p3_img = estimator.p32video_get_frame(i=i, image=img)
-        video.write(p3_img[:, :, ::-1])  # Because VideoWriter.write take BGR images
-    video.release()
-    cv2.destroyAllWindows()
+    estimator.build_video(fps=fps, saving_path=flight_path + 'pose_camera_correspondence_video.mkv')
+
+
+def pixel_error(flight):
+    flight_path = euroc.INTERMEDIATE_DATASET_PATH + flight
+    # p3 = pickle.load(open(f'{flight_path}p3_points.pkl', 'rb'))
+    p3_len = 2719  # = len(p3)
+
+    with open(f'{flight_path}task_v1_01_easy_backup_2021_10_25_14_25_23/annotations.json') as json_file:
+        data = json.load(json_file)
+
+    key_points = np.zeros((len(data[0]['tracks'][0]['shapes']), 3))  # frame_id, pixel_x, pixel_y
+    for i, e in enumerate(data[0]['tracks'][0]['shapes']):
+        key_points[i] = np.array([e['frame']] + e['points'])
+
+    pixel_x = np.round(np.interp(range(p3_len), key_points[:, 0], key_points[:, 1])).astype(int)
+    pixel_y = np.round(np.interp(range(p3_len), key_points[:, 0], key_points[:, 2])).astype(int)
+
+    # Todo compute error
 
 
 def main():
     flight = euroc.FLIGHT_LIST[0]
     euroc_mav_pre_processing(flight=flight)
     error_estimation(flight)
+    # pixel_error(flight)
 
     # for flight in euroc.FLIGHT_LIST:
     #     euroc_mav_pre_processing(flight=flight)
