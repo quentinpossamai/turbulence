@@ -7,11 +7,11 @@ import yaml
 import src.data.euroc_mav.loading as euroc
 from src.vice.vice_depth.posture_error_estimation import ErrorEstimation
 from src.utils.transform import Transform
+from src.utils.paths import mkdir_if_not_exist
 
 
 def euroc_mav_pre_processing(flight):
-    flight_path = euroc.INTERMEDIATE_DATASET_PATH + flight
-    print("Processing: ", flight_path)
+    print("Processing: ", flight)
     # 1-LOADING
     # 1.1-Loading camera parameters
     with open(f"{euroc.DATASET_PATH}raw/{flight}cam0/sensor.yaml", 'r') as stream:
@@ -66,58 +66,58 @@ def euroc_mav_pre_processing(flight):
         assert os.path.isfile(depth_path[i])
 
     # 1.6 Saving preprocessing
+    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+    mkdir_if_not_exist([vice_path])
     input_data = {"t": cut_t, "pose": cut_tf_camera_origin, "img": img_path, "depth": depth_path}
-    pickle.dump(input_data, open(f"{flight_path}vice_data.pkl", 'wb'))
-    pickle.dump(cam_prms, open(f"{flight_path}camera_parameters.pkl", 'wb'))
+    pickle.dump(input_data, open(f"{vice_path}vice_data.pkl", 'wb'))
+    pickle.dump(cam_prms, open(f"{vice_path}camera_parameters.pkl", 'wb'))
 
 
 def error_estimation(flight):
     # 1-INITIALISATION
-    flight_path = euroc.INTERMEDIATE_DATASET_PATH + flight
-    print("VICE for ", flight_path)
+    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+    print("VICE for ", flight)
 
-    input_data = pickle.load(open(f"{flight_path}vice_data.pkl", 'rb'))
-    cam_prms = pickle.load(open(f"{flight_path}camera_parameters.pkl", 'rb'))
-    fps = 20
-    width = 752
-    height = 480
-
+    input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
+    cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 distortion_coefficient=cam_prms['D'],
-                                width=width,
-                                height=height,
+                                width=752,
+                                height=480,
                                 depth_coef=7.48)
     # 2-GENERATE P3 POINTS
-    estimator.p3_generator(saving_path=f'{flight_path}p3_points.pkl')
+    estimator.p3_generator(saving_path=f'{vice_path}/p3_points.pkl')
 
     # 3-GENERATING THE VIDEO
-    estimator.build_video(fps=fps, saving_path=flight_path + 'pose_camera_correspondence_video.mkv')
+    estimator.build_video(fps=20, saving_path=vice_path + 'pose_camera_correspondence_video.mkv')
 
 
-def pixel_error(flight):
-    flight_path = euroc.INTERMEDIATE_DATASET_PATH + flight
-    # p3 = pickle.load(open(f'{flight_path}p3_points.pkl', 'rb'))
-    p3_len = 2719  # = len(p3)
+def position_2d_error(flight):
+    # 1. Loading VICE result
+    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+    vice_point = pickle.load(open(f'{vice_path}p3_points.pkl', 'rb'))
+    vice_point = np.stack(vice_point, axis=0).astype(int)
 
-    with open(f'{flight_path}task_v1_01_easy_backup_2021_10_25_14_25_23/annotations.json') as json_file:
+    # 2. Loading annotations
+    with open(f'{vice_path}task_v1_01_easy_backup_2021_10_25_14_25_23/annotations.json') as json_file:
         data = json.load(json_file)
-
-    key_points = np.zeros((len(data[0]['tracks'][0]['shapes']), 3))  # frame_id, pixel_x, pixel_y
+    key_points = np.zeros((len(data[0]['tracks'][0]['shapes']), 3))  # frame_id, point_x, point_y
     for i, e in enumerate(data[0]['tracks'][0]['shapes']):
         key_points[i] = np.array([e['frame']] + e['points'])
+    point_x = np.round(np.interp(range(len(vice_point)), key_points[:, 0], key_points[:, 1])).astype(int)
+    point_y = np.round(np.interp(range(len(vice_point)), key_points[:, 0], key_points[:, 2])).astype(int)
+    annotation_point = np.stack([point_x, point_y], axis=1)
 
-    pixel_x = np.round(np.interp(range(p3_len), key_points[:, 0], key_points[:, 1])).astype(int)
-    pixel_y = np.round(np.interp(range(p3_len), key_points[:, 0], key_points[:, 2])).astype(int)
-
-    # Todo compute error
+    # 3. Computing error
+    return np.linalg.norm(vice_point - annotation_point)
 
 
 def main():
     flight = euroc.FLIGHT_LIST[0]
     euroc_mav_pre_processing(flight=flight)
     error_estimation(flight)
-    # pixel_error(flight)
+    # position_2d_error(flight)
 
     # for flight in euroc.FLIGHT_LIST:
     #     euroc_mav_pre_processing(flight=flight)

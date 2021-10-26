@@ -148,19 +148,38 @@ class ErrorEstimation(object):
             return np.array([x_prime, y_prime])
 
     def _click_place_point(self, idx):
-        img = np.array(imageio.imread(self.data['img'][idx]))
-        fig, ax = plt.subplots(1, 1)
-        ax.imshow(img)
-        pixel_clicked = [np.zeros(1)]
+        # img = np.array(imageio.imread(self.data['img'][idx]))
+        # fig, ax = plt.subplots(1, 1)
+        # ax.imshow(img)
+        # pixel_clicked = [np.zeros(1)]
+        # print(f'Frame: {idx}')
+        #
+        # def onclick(event):
+        #     pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
+        #     plt.close()
+        #
+        # fig.canvas.mpl_connect('button_press_event', onclick)
+        # plt.show()
+        # print(f'Input pixel: {pixel_clicked[0]}\n')
+        # return pixel_clicked[0]
+        # 2. Loading annotations
+        import src.data.euroc_mav.loading as euroc
+        import json
+        flight = euroc.FLIGHT_LIST[0]
+        vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+        vice_point = pickle.load(open(f'{vice_path}p3_points.pkl', 'rb'))
+        vice_point = np.stack(vice_point, axis=0).astype(int)
 
-        def onclick(event):
-            pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
-            plt.close()
-
-        fig.canvas.mpl_connect('button_press_event', onclick)
-        plt.show()
-        print('you pressed', pixel_clicked[0])
-        return pixel_clicked[0]
+        vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+        with open(f'{vice_path}task_v1_01_easy_backup/annotations.json') as json_file:
+            data = json.load(json_file)
+        key_points = np.zeros((len(data[0]['tracks'][0]['shapes']), 3))  # frame_id, point_x, point_y
+        for i, e in enumerate(data[0]['tracks'][0]['shapes']):
+            key_points[i] = np.array([e['frame']] + e['points'])
+        point_x = np.round(np.interp(range(len(vice_point)), key_points[:, 0], key_points[:, 1])).astype(int)
+        point_y = np.round(np.interp(range(len(vice_point)), key_points[:, 0], key_points[:, 2])).astype(int)
+        annotation_point = np.stack([point_x, point_y], axis=1).astype(float)
+        return annotation_point[idx]
 
     def _is_out_of_image(self, image_point: Union[list, tuple, np.ndarray]):
         if image_point is not None:
