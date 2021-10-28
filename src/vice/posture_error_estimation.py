@@ -19,7 +19,9 @@ class ErrorEstimation(object):
                  distortion_coefficient: np.array,
                  width: int,
                  height: int,
-                 depth_coef: float):
+                 use_depth: bool,
+                 max_distance: float = None,
+                 depth_coef: float = None):
         """
         Create a video to verify with the eye if the position estimation and video flux.
         https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets
@@ -57,6 +59,8 @@ class ErrorEstimation(object):
         self.d = distortion_coefficient
         self.frames_width = width
         self.frames_height = height
+        self.use_depth = use_depth
+        self.max_distance = max_distance
         self.depth_coef = depth_coef
 
         self.p3 = []
@@ -211,20 +215,46 @@ class ErrorEstimation(object):
         x_prime, y_prime = self.distort_func((u, v), distort=False)  # remove distortion, camera reference frame
 
         # 2. Depth estimation
-        # Apply radial camera distortion used in depth_from_pointcloud.py and intrinsic matrix
-        # to get image coordinates
-        rr = x_prime ** 2 + y_prime ** 2
-        k1, k2 = self.d[:2]  # Extracting distortion coefficients to find depth
-        distortion = (1 + k1 * rr + k2 * rr * rr)
-        u_depth = x_prime * distortion * self.k[0, 0] + self.k[0, 2]
-        v_depth = y_prime * distortion * self.k[1, 1] + self.k[1, 2]
-        u_depth = np.floor(0.5 * u_depth).astype(int)
-        v_depth = np.floor(0.5 * v_depth).astype(int)
+        if self.use_depth:
+            # Apply radial camera distortion used in depth_from_pointcloud.py and intrinsic matrix
+            # to get image coordinates
+            rr = x_prime ** 2 + y_prime ** 2
+            k1, k2 = self.d[:2]  # Extracting distortion coefficients to find depth
+            distortion = (1 + k1 * rr + k2 * rr * rr)
+            u_depth = x_prime * distortion * self.k[0, 0] + self.k[0, 2]
+            v_depth = y_prime * distortion * self.k[1, 1] + self.k[1, 2]
+            u_depth = np.floor(0.5 * u_depth).astype(int)
+            v_depth = np.floor(0.5 * v_depth).astype(int)
 
-        depth_map = np.array(imageio.imread(self.data['depth'][idx]))[:, :, :3] / 255 * self.depth_coef
-        z = depth_map[v_depth, u_depth][0]
-        p1_camera_with_depth = np.array([x_prime * z, y_prime * z, z])
-        return p1_camera_with_depth, None
+            depth_map = np.array(imageio.imread(self.data['depth'][idx]))[:, :, :3] / 255 * self.depth_coef
+            z = depth_map[v_depth, u_depth][0]
+            p1_camera_with_depth = np.array([x_prime * z, y_prime * z, z])
+            return p1_camera_with_depth, None
+        else:
+            vect_camera = np.array([x_prime, y_prime, 1])
+
+            tf_origin_camera = Transform.from_matrix(self.data['pose'][idx]).inv().as_matrix()
+            rot_origin_camera = Transform.from_matrix(tf_origin_camera).as_rot_mat()
+            vect_origin = rot_origin_camera @ vect_camera
+            vect_origin /= np.linalg.norm(vect_origin)
+
+            camera_position = Transform.from_matrix(tf_origin_camera).as_trans()
+            h = camera_position[2]  # drone's height
+            floor_normal = np.array([0, 0, 1])
+            # If height is positive and camera sees the floor
+            if (h > 0) and (floor_normal @ vect_origin < 0):
+                t = - camera_position[2] / vect_origin[2]
+                point_floor_origin = t * vect_origin + camera_position
+                p1 = (Transform.from_matrix(tf_origin_camera).inv().as_matrix() @ np.append(point_floor_origin, 1))[:3]
+                if np.linalg.norm(point_floor_origin - camera_position) > self.max_distance:
+                    return p1, 'Point on the floor too far.'
+                else:
+                    return p1, None
+            else:
+                if h <= 0:
+                    return None, 'Camera has negative height.'
+                elif floor_normal @ vect_origin >= 0:
+                    return None, 'Pixel chosen cannot be on the floor.'
 
     def _space2image(self, point3d: Union[list, tuple, np.ndarray]):
         """
@@ -242,7 +272,7 @@ class ErrorEstimation(object):
             x_prime = x / z
             y_prime = y / z
 
-            x_2, y_2 = self.distort_func(point=(x_prime, y_prime), distort=True)
+            x_2, y_2 = self.distort_func(point=(x_prime, y_prime), distort=True)  # Apply distortion
 
             u, v = (self.k @ np.array([x_2, y_2, 1]))[:-1]
             return u, v
