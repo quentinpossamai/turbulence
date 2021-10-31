@@ -54,7 +54,7 @@ class GRUCNNResidual(pl.LightningModule, Run):
         :param unit_size: The size of one layer.
 
         """
-        super(GRUCNNResidual, self).__init__()
+        super().__init__()
         self.activation = None
         assert activation in ['relu', 'tanh']
         if activation == "relu":
@@ -82,45 +82,43 @@ class GRUCNNResidual(pl.LightningModule, Run):
         self.unit_size = unit_size
         self.feature_size = self.motor_size + 13 + 1
 
-        self.save_hyperparameters(
-            "activation",
-            "embedding",
-            "layer",
-            "learning_rate",
-            "motor_size",
-            "past",
-            "unit_size"
-        )
+        # self.save_hyperparameters()
 
-        self.batch_norm_gru0 = nn.BatchNorm1d(self.past)
+        self.batch_norm_input = nn.BatchNorm1d(self.past * self.feature_size)
+        self.dropout_input = nn.Dropout(p=0.2)
         self.gru0 = nn.GRU(input_size=self.feature_size,
                            hidden_size=self.unit_size,
                            num_layers=self.layer,
                            bias=True,
                            batch_first=True)
+        self.batch_norm_gru = nn.BatchNorm1d(self.unit_size)
+        self.dropout_gru = nn.Dropout(p=0.5)
 
         if self.emb_size != 0:
-            self.batch_norm_emb_0 = nn.BatchNorm2d(1)
-            self.conv2d_emb_0 = nn.Conv2d(in_channels=1, out_channels=self.unit_size, kernel_size=(1, self.emb_size),
-                                          stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
-            self.batch_norm_emb_1 = nn.BatchNorm2d(self.unit_size)
-            self.conv2d_emb_1 = nn.Conv2d(in_channels=self.unit_size, out_channels=self.unit_size,
-                                          kernel_size=(self.past, 1),
-                                          stride=1, padding=0, dilation=1, groups=1, bias=True, padding_mode="zeros")
+            self.emb_batch_norm_input = nn.BatchNorm1d(self.emb_size)
+            self.emb_dropout_input = nn.Dropout(p=0.2)
 
-            self.batch_norm0 = nn.BatchNorm1d(2 * self.unit_size)
+            self.emb_linear0 = nn.Linear(in_features=self.emb_size, out_features=self.unit_size, bias=True)
+            self.emb_batch_norm0 = nn.BatchNorm1d(self.unit_size)
+            self.emb_dropout0 = nn.Dropout(p=0.5)
+
+            self.emb_linear1 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
+            self.emb_batch_norm1 = nn.BatchNorm1d(self.unit_size)
+            self.emb_dropout1 = nn.Dropout(p=0.5)
+
             self.linear0 = nn.Linear(in_features=2 * self.unit_size, out_features=self.unit_size, bias=True)
         else:
-            self.batch_norm0 = nn.BatchNorm1d(self.unit_size)
             self.linear0 = nn.Linear(in_features=self.unit_size, out_features=self.unit_size, bias=True)
-        self.batch_norm1 = nn.BatchNorm1d(self.unit_size)
+        self.batch_norm0 = nn.BatchNorm1d(self.unit_size)
+        self.dropout0 = nn.Dropout(p=0.5)
+
         self.linear1 = nn.Linear(in_features=self.unit_size, out_features=6, bias=True)
 
         self.example_input_array = [torch.zeros(10, self.past, self.motor_size),
                                     torch.zeros(10, self.past, 13),
                                     torch.zeros(10, self.past, 1),
-                                    torch.zeros(10, self.past, 128),
-                                    torch.zeros(10, self.past, 128)]
+                                    torch.zeros(10, 128),
+                                    torch.zeros(10, 128)]
 
     def configure_optimizers(self):
         print(f"Lightning.device: {self.device}")
@@ -166,39 +164,36 @@ class GRUCNNResidual(pl.LightningModule, Run):
 
         # 2.1-GRU state-motor-dt
         out = state_motor_dt  # (batch, self.n_past, feature_size)
-        out = self.batch_norm_gru0(out)  # (batch, self.n_past, feature_size)
-        out, _ = self.gru0(out)  # gru output with shape: (step, batch, feature_size)
+        out = self.batch_norm_input(out.reshape(-1, self.past * self.feature_size))
+        out = self.dropout_input(out.reshape(-1, self.past, self.feature_size))
+        out, _ = self.gru0(out)  # gru output with shape: (batch, step, feature_size)
         out = out[:, -1]  # last hidden states, (batch, feature_size)
+        out = self.dropout_gru(self.batch_norm_gru(out))  # (batch, feature_size)
 
         # 2.2-CNN embedding
         if self.embedding is not None:
             if self.embedding in ["depth", "both"]:
                 assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
                 depth_emb_shape = depth_emb.shape
-                depth_emb = depth_emb.reshape(-1, self.past, 128)
-                assert motor_shape[:-1] == depth_emb_shape[:-1]
+                depth_emb = depth_emb.reshape(-1, 128)
+                assert motor_shape[:-2] == depth_emb_shape[:-1]
                 embedding = depth_emb
             if self.embedding in ["norm", "both"]:
                 assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
                 norm_emb_shape = norm_emb.shape
-                norm_emb = norm_emb.reshape(-1, self.past, 128)
-                assert motor_shape[:-1] == norm_emb_shape[:-1]
+                norm_emb = norm_emb.reshape(-1, 128)
+                assert motor_shape[:-2] == norm_emb_shape[:-1]
                 embedding = norm_emb
             if self.embedding in ['both']:
                 embedding = torch.cat([depth_emb, norm_emb], dim=-1)
             assert embedding.shape[-1] == self.emb_size, f"embedding len is not {self.emb_size}"
-            out_emb = self.batch_norm_emb_0(embedding.reshape(-1, 1, self.past, self.emb_size))
-            out_emb = self.activation(self.conv2d_emb_0(out_emb))
-            out_emb = self.batch_norm_emb_1(out_emb)
-            out_emb = self.activation(self.conv2d_emb_1(out_emb)).view(-1, 50)
+            out_emb = self.emb_dropout_input(self.emb_batch_norm_input(embedding))
+            out_emb = self.emb_dropout0(self.activation(self.emb_batch_norm0(self.emb_linear0(out_emb))))
+            out_emb = self.emb_dropout1(self.activation(self.emb_batch_norm1(self.emb_linear1(out_emb))))
 
-            # 2.3-Fully connected merge
-            out = self.batch_norm0(torch.cat([out, out_emb], dim=1))
-        else:
-            out = self.batch_norm0(out)  # Batch size == 1 does not work with batch norm
+            out = torch.cat([out, out_emb], dim=1)
 
-        out = self.activation(self.linear0(out))
-        out = self.batch_norm1(out)
+        out = self.dropout0(self.activation(self.batch_norm0(self.linear0(out))))
         out = self.linear1(out)
 
         residual_shape = list(state_shape)
@@ -217,14 +212,10 @@ class GRUCNNResidual(pl.LightningModule, Run):
         :return: Loss
         """
         motor = batch["motor"][:, 1:self.past + 1]
+        dt = batch["dt"][:, 1:self.past + 1]
         state = batch["state"][:, :self.past]
-        depth_emb = batch["depth_emb"][:, :self.past]
-        norm_emb = batch["norm_emb"][:, :self.past]
-
-        motor_shape = motor.shape
-        dt_shape = list(motor_shape)
-        dt_shape[-1] = 1
-        dt = torch.tensor(1 / 200).type_as(motor).repeat(dt_shape)
+        depth_emb = batch["depth_emb"][:, self.past - 1]
+        norm_emb = batch["norm_emb"][:, self.past - 1]
 
         residual_gt = batch["residual"][:, self.past]
         residual_hat = self.forward(motor=motor, state=state, depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)

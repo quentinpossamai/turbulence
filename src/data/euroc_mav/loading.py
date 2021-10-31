@@ -24,8 +24,8 @@ INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 mkdir_if_not_exist([DATASET_PATH, RAW_PYTHON_DATASET_PATH, INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
-
 # FLIGHT_LIST = ["V2_01_easy/", "V2_02_medium/", "V2_03_difficult/"]
+
 TRANS_MEAN = {"V1_01_easy/": np.array([0.36256679, 0.37336331, 1.52168557]),
               "V1_02_medium/": np.array([0.00806092, 1.18968812, 1.60374988]),
               "V1_03_difficult/": np.array([-0.0128916, 1.04127094, 1.75094365])}
@@ -155,7 +155,7 @@ def load_clean_data(flight):
     den_pose_dict["t"] = (period * np.array(range(n)) + time[0])
 
     # 2.3.3-Denoising quaternion
-    dt = (den_pose_dict["t"][1:] - den_pose_dict["t"][:-1]).reshape((-1, 1))
+    # dt = (den_pose_dict["t"][1:] - den_pose_dict["t"][:-1]).reshape((-1, 1))
     sos = signal.butter(N=2, Wn=2.92, btype='lowpass', fs=1 / period, analog=False, output='sos')
     den_quat = signal.sosfiltfilt(sos, quat, axis=0)
     den_quat = den_quat / np.linalg.norm(den_quat, axis=1).reshape((-1, 1))  # Normalize quaternions
@@ -388,6 +388,9 @@ class EurocMAVDatasetHorizon(Dataset):
         :param traj_len: length of the trajectory to give each index
         :param dtype: Datatype of the model.
         :param batch_dim: If the Dataset will be used with a Dataloader or not.
+
+        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128, fa_label:1,
+        dt: 1
         """
         print(f'loading.py EurocMAVDatasetHorizon __init__ start train_validation_test={train_validation_test}'
               f'traj_len={traj_len} dtype={dtype} batch_dim={batch_dim}')
@@ -418,43 +421,29 @@ class EurocMAVDatasetHorizon(Dataset):
         self.cum_dataset_idx = np.concatenate([np.array([0]), self.cum_dataset_idx])
 
         # Loading data
-        for key, val in loaded_data.items():
-            loaded_data[key] = np.concatenate([val["t"].reshape((-1, 1)),  # len 1
-                                               val["state"],  # len 13
-                                               val["motor"],  # len 6
-                                               val["residual"],  # len 6
-                                               val["imu_ang_acc"],  # len 6
-                                               val["depth_emb"],  # len 128
-                                               val["norm_emb"],  # len 128
-                                               val["fa_label"].reshape((-1, 1))  # len 1
-                                               ], axis=1)
+        for flight, val in loaded_data.items():
+            concatenation = []
+            for data_key, dr in DATASET_RANGE.items():
+                concatenation.append(val[data_key].reshape((-1, 1)) if dr[2] == 1 else val[data_key])
+            loaded_data[flight] = np.concatenate(concatenation, axis=1)
 
         self.data = np.concatenate([loaded_data[flight] for flight in self.flight_list], axis=0)
         self.data = torch.from_numpy(self.data).type(self.dtype)
-        print(f'loading.py EurocMAVDatasetHorizon __init__ end train_validation_test={train_validation_test}'
-              f'traj_len={traj_len} dtype={dtype} batch_dim={batch_dim}')
 
     def __len__(self):
         return self.cum_dataset_idx[-1]
 
     def __getitem__(self, idx):
-        """
-        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128
-
-        """
         flight_idx = np.where(idx <= self.cum_dataset_idx[1:])[0][0]
         local_idx = idx - self.cum_dataset_idx[flight_idx] + self.cum_flight_idx[flight_idx]
         start = local_idx
         stop = local_idx + self.traj_len
         data = self.data[start:stop]
         assert len(data) == self.traj_len
-        print(f'loading.py EurocMAVDatasetHorizon __getitem__ '
-              f'train_validation_test={self.train_validation_test} idx{idx}')
         if self.batch_dim:
-            if self.batch_dim:
-                return {key: data[:, dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
-            else:
-                return {key: data[:, dr[0]:dr[1]] for key, dr in DATASET_RANGE.items()}
+            return {key: data[:, dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
+        else:
+            return {key: data[:, dr[0]:dr[1]] for key, dr in DATASET_RANGE.items()}
 
 
 class EurocMAVDatasetTurbulence(Dataset):
@@ -468,8 +457,8 @@ class EurocMAVDatasetTurbulence(Dataset):
 
         :param batch_dim: If the Dataset will be used with a Dataloader or not.
 
-        Output keys are: dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual', 'depth_emb',
-        'norm_emb', 'fa_label', 'dt'])
+        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128, fa_label:1,
+        dt: 1
         """
         assert dtype in [torch.float32, torch.float64]
         self.batch_dim = batch_dim
@@ -495,11 +484,6 @@ class EurocMAVDatasetTurbulence(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        """
-        One sample is time:1, state:13, motor:6, residual:6, imu_ang_acc:6, depth_emb:128, norm_emb:128, fa_label:1,
-        dt: 1
-
-        """
         data = self.data[idx]
         if self.batch_dim:
             return {key: data[dr[0]:dr[1]].view((1, -1, dr[2])) for key, dr in DATASET_RANGE.items()}
@@ -520,24 +504,29 @@ def load_flight(flight):
 
 
 def main():
-    load_clean_data(FLIGHT_LIST[0])
-    load_clean_data(FLIGHT_LIST[1])
-    load_clean_data(FLIGHT_LIST[2])
-    euroc_mav_residual()
-    merge_embeddings()
-    label_surface_influence()
-    splitting()
-    # # data = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float64,batch_dim=False)
-    from torch.utils.data import DataLoader
+    # load_clean_data(FLIGHT_LIST[0])
+    # load_clean_data(FLIGHT_LIST[1])
+    # load_clean_data(FLIGHT_LIST[2])
+    # euroc_mav_residual()
+    # merge_embeddings()
+    # label_surface_influence()
+    # splitting()
 
-    all_data = {}
-    for key in ['train', 'validation', 'test']:
-        dataset = EurocMAVDatasetTurbulence(train_validation_test=key, dtype=torch.float32, batch_dim=False)
-        all_data[key] = next(iter(DataLoader(dataset, batch_size=len(dataset))))
-    for emb in ['depth_emb', 'norm_emb']:
-        for data_to_test in ['validation', 'test']:
-            for i, sample in enumerate(all_data['train'][emb]):
-                assert len(torch.where((sample == all_data[data_to_test][emb]).all(dim=1))[0]) == 0
+    from torch.utils.data import DataLoader
+    dataset = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float32, batch_dim=False)
+    batch = next(iter(DataLoader(dataset, batch_size=64)))
+    print(len(batch))
+
+    # from torch.utils.data import DataLoader
+    #
+    # all_data = {}
+    # for key in ['train', 'validation', 'test']:
+    #     dataset = EurocMAVDatasetTurbulence(train_validation_test=key, dtype=torch.float32, batch_dim=False)
+    #     all_data[key] = next(iter(DataLoader(dataset, batch_size=len(dataset))))
+    # for emb in ['depth_emb', 'norm_emb']:
+    #     for data_to_test in ['validation', 'test']:
+    #         for i, sample in enumerate(all_data['train'][emb]):
+    #             assert len(torch.where((sample == all_data[data_to_test][emb]).all(dim=1))[0]) == 0
 
 
 if __name__ == '__main__':
