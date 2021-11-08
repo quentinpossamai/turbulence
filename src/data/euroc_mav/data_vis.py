@@ -294,12 +294,22 @@ def residual_video(flight: str, double: bool, norm: bool):
         # 1.2-Predict non-fa residual
         print('\nResidual model GRU CNN no embeddings')
         gru_cnn = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "GRUCNNResidual_None/default/"
-        gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
-        gru_cnn += "epoch=999-step=584999.ckpt"
+        gru_cnn += "20211031_092433_GRUCNNResidual_tanh_bs256_None_l3_lr1e-06_model-" \
+                   "DynamicalModel_motor_size6_epch10000_past60_us50_/checkpoints/"
+        gru_cnn += "epoch=2112-step=304271.ckpt"
 
         model = DynamicalModel(param='identification', dtype=torch.float32)
         past = 60
-        residual_model = GRUCNNResidual.load_from_checkpoint(gru_cnn, model=model, motor_size=6)
+        residual_model = GRUCNNResidual.load_from_checkpoint(
+            gru_cnn,
+            activation='tanh',
+            embedding=None,
+            layer=3,
+            learning_rate=1e06,
+            model=model,
+            motor_size=6,
+            past=past,
+            unit_size=50)
         residual_model.eval()
 
         # Presence classifier
@@ -417,7 +427,8 @@ def residual_video(flight: str, double: bool, norm: bool):
             legend = ax.legend(loc=1, bbox_to_anchor=(0.05, 1.35), frameon=False)
         if double:
             # Rectangle(0.2)
-            # matplotlib.pat = fig.add_axes([0.2, 0.6, 1, 0.5])  # [distance to left, distance to bottom, width, height] on the figure
+            # matplotlib.pat = fig.add_axes([0.2, 0.6, 1, 0.5])  # [distance to left, distance to bottom, width, height]
+            # on the figure
             color = {1: 'green', 2: 'orange', 3: 'blue'}
             for j in range(-1000, 1000):
                 if data_ind[i] + j < 0 or data_ind[i] + j >= len(pcolor_classification):

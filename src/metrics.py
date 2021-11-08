@@ -71,11 +71,7 @@ def mse_error(model, horizon, past, dataset, split):
         time = torch.FloatTensor(flights[k]['t'])
         depth_emb = torch.FloatTensor(flights[k]['depth_emb'])
         norm_emb = torch.FloatTensor(flights[k]['norm_emb'])
-
-        # Todo
-        sh = list(cropped_states.shape)
-        sh[-1] = 1
-        dt = torch.FloatTensor([[1 / 200]]).repeat(sh)
+        dt = torch.FloatTensor(flights[k]['dt'])
 
         error_per_flight[k] = _compute_error(
             model=model,
@@ -86,6 +82,7 @@ def mse_error(model, horizon, past, dataset, split):
             time=time,
             depth_emb=depth_emb,
             norm_emb=norm_emb,
+            dt=dt
         )
 
     # Sum of error for all flights
