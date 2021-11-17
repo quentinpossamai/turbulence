@@ -9,6 +9,7 @@ class DynamicalModel(nn.Module, Run):
     def __init__(self, param, dtype):
         """
         :param param: "paper", "identification", or dict["permutation", "theta"]
+        theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
 
         :param dtype: Datatype of the model.
         """
@@ -36,7 +37,7 @@ class DynamicalModel(nn.Module, Run):
             # km = 1.2864e-7  # [N.m2.rad-1]
             # l = 0.215  # [m]
             # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
-            self.theta =  torch.tensor([[2.08e-6],
+            self.theta = torch.tensor([[2.08e-6],
                                        [2 ** 0.5 * 3.58e-6],
                                        [3.77e-8],
                                        [1.40]], dtype=self.dtype)  # Parameter from blackbird paper
