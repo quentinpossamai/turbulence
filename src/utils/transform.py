@@ -177,14 +177,14 @@ class Transform(object):
 
         B reference frame.
 
-        :param trans: B_D_A = translation from B origin to A origin described in B.
+        :param trans: A_D_B = translation from A origin to B origin described in A.
 
-        :param rot: B_R_A = A 3x3 rotation matrix, orientation of A relative to B.
+        :param rot: A_R_B = A 3x3 rotation matrix, orientation of B relative to A.
 
         P_A point described in A.
 
-        :return: B_T_A = tf = Transform object such as
-        P_B = Transform().from_rot_matrix_trans_vect(trans, quat) @ P_A.
+        :return: A_T_B = tf = Transform object such as
+        P_A = Transform().from_rot_matrix_trans_vect(trans, quat) @ P_B.
 
         Note: only work for 3D points_name, P_A = (x_A, y_A, z_A, 1) while applying '@' operator.
 
@@ -205,7 +205,7 @@ class Transform(object):
             trans = trans.reshape((1, 3))
         n = trans.shape[0]
 
-        new_rot = Rotation.from_quat(rot).as_matrix()
+        new_rot = Rotation.from_matrix(rot).as_matrix()
         tf = np.repeat(np.eye(4).reshape((1, 4, 4)), n, 0)
         tf[:, :3, :3] = new_rot
         tf[:, :3, 3] = trans
