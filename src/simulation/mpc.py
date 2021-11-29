@@ -215,7 +215,7 @@ def main():
 
     motor = []
     mpc_error = []
-    time_end = 980
+    time_end = 10
     for i in tqdm(range(1, time_end)):
         # Using MPC
         motor_horizon, err = mpc_controller(model=mpc_model,

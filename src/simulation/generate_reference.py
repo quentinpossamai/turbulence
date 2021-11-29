@@ -75,6 +75,7 @@ def get_tf_from_trans_ref(x_time, x, point, trans_ref, flight_height):
     x_vect = (future_point - trans_ref)
     x_vect = x_vect / np.linalg.norm(x_vect)
     y_vect = np.cross(np.array([0, 1, 0]), x_vect)
+    y_vect = y_vect / np.linalg.norm(y_vect)
     z_vect = np.cross(x_vect, y_vect)
 
     trans_ref = flight_height * z_vect + trans_ref
@@ -155,7 +156,9 @@ def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
             ref_tf_global_agent.append(Transform.from_rot_mat_trans(rot=rot, trans=interp_ref_time).as_matrix())
         else:
             ref_tf_global_agent.append(get_tf_from_trans_ref(x_time, x, entire_path, interp_ref_time, flight_height))
-    return np.stack(ref_tf_global_agent, axis=0)
+
+    out = np.stack(ref_tf_global_agent, axis=0)
+    return out
 
 
 def main():
