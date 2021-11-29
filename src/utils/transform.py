@@ -280,11 +280,9 @@ class Transform(object):
         C_T_D = C_T_A @ A_T_B @ B_T_D.                T_C_D = C_T_D
         """
         quat = Rotation.from_matrix(self.as_rot_mat()).as_quat()
-        quat = qfix(quat)
-        if self._is_single:
-            return quat[0], self.as_trans()
-        else:
-            return quat, self.as_trans()
+        if not self._is_single:
+            quat = qfix(quat)
+        return quat, self.as_trans()
 
     def as_rot_quat(self) -> np.ndarray:
         """quat = x, y, z, w with scipy Rotation."""

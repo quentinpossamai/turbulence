@@ -10,9 +10,14 @@ from src.utils.transform import Transform
 from src.utils.paths import WD_PATH, DATA_HABITAT_PATH
 
 # habitat agent and global reference frame are oriented with x-left, y-up and z-backward.
-TF_AGENT_FLU = Transform.from_euler_trans(seq='xyz', angles=np.array([-90, 90, 0]), degrees=True,
-                                          trans=np.zeros(3)).as_matrix()
-TF_FLU_AGENT = Transform.from_matrix(TF_AGENT_FLU).inv().as_matrix()
+TF_AGENT__AGENT_FLU = Transform.from_euler_trans(seq='xyz', angles=np.array([-90, 90, 0]), degrees=True,
+                                                 trans=np.zeros(3)).as_matrix()
+TF_AGENT_FLU__AGENT = Transform.from_matrix(TF_AGENT__AGENT_FLU).inv().as_matrix()
+# NOTATION
+# AGENT is the drone body in habitat
+# AGENT_FLU is AGENT but turned in FLU forward left up
+# GLOBAL_FLU is the habitat earth reference frame but turned in flu
+# GLOBAL is the habitat earth reference frame
 
 
 def display_topdown(sim, point, travel_order, entire_path):
@@ -64,7 +69,7 @@ def display_topdown(sim, point, travel_order, entire_path):
     plt.show()
 
 
-def get_tf_from_trans_ref(x_time, x, point, trans_ref):
+def get_tf_from_trans_ref(x_time, x, point, trans_ref, flight_height):
     future_point = point[np.where(x_time < x)[0][0]]
     # In global
     x_vect = (future_point - trans_ref)
@@ -72,22 +77,22 @@ def get_tf_from_trans_ref(x_time, x, point, trans_ref):
     y_vect = np.cross(np.array([0, 1, 0]), x_vect)
     z_vect = np.cross(x_vect, y_vect)
 
-    trans_ref = .2 * z_vect + trans_ref
+    trans_ref = flight_height * z_vect + trans_ref
     tf_global_flu = Transform.from_3_axis_rot_trans(x=x_vect, y=y_vect, z=z_vect, trans=trans_ref).as_matrix()
-    return tf_global_flu @ TF_FLU_AGENT
+    return tf_global_flu @ TF_AGENT_FLU__AGENT
 
 
 def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
                        navmesh_settings: habitat_sim.nav.NavMeshSettings,
-                       plot_topdown: bool = False):
+                       plot_topdown: bool,
+                       flight_height: float):
     # Recomputing the navmesh
     sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
 
     is_navigable = False
     while not is_navigable:
         # point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
-        point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))
-        # point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
+        point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))  # TODO Remove for debug
         # pickle.dump(point, open(f'{DATA_HABITAT_PATH}point.pkl', 'wb'))
         shortest_path = []
         distance_matrix = np.zeros((len(point), len(point)))
@@ -125,7 +130,6 @@ def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
             remove_duplicate.append(e)
     remove_duplicate.append(entire_path[-1])
     entire_path = np.stack(remove_duplicate)
-    entire_path[:, 1] = entire_path[:, 1]
 
     if plot_topdown:
         display_topdown(sim, point, travel_order, entire_path)
@@ -150,7 +154,7 @@ def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
             rot = Transform.from_matrix(ref_tf_global_agent[-1]).as_rot_mat()
             ref_tf_global_agent.append(Transform.from_rot_mat_trans(rot=rot, trans=interp_ref_time).as_matrix())
         else:
-            ref_tf_global_agent.append(get_tf_from_trans_ref(x_time, x, entire_path, interp_ref_time))
+            ref_tf_global_agent.append(get_tf_from_trans_ref(x_time, x, entire_path, interp_ref_time, flight_height))
     return np.stack(ref_tf_global_agent, axis=0)
 
 

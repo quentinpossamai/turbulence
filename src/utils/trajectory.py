@@ -6,7 +6,8 @@ import torch
 from scipy.spatial.transform import Rotation
 
 
-def trace_trajectory3d(position, quaternion: np.ndarray):
+def trace_trajectory3d(position: np.ndarray, quaternion: np.ndarray, pause: float, step: int,
+                       position_ref: np.ndarray = None):
     # transforms = Transform.from_quat_trans(quaternion, position).inv().inv().as_matrix()
     # position = Transform.from_matrix(transforms).as_trans()
     # quaternion = Transform.from_matrix(transforms).as_rot_quat()
@@ -25,9 +26,11 @@ def trace_trajectory3d(position, quaternion: np.ndarray):
     fig = plt.figure(figsize=(6, 6))
     ax = fig.add_subplot(111, projection='3d')
     fig.tight_layout()
-    for t in range(0, state.shape[0], 20):
+    for t in range(0, state.shape[0], step):
         ax.clear()
         ax.plot(state[:, 0], state[:, 1], state[:, 2])
+        if position_ref is not None:
+            ax.plot(position_ref[:, 0], position_ref[:, 1], position_ref[:, 2])
         ax.set_xlim(-3 + state[t, 0], state[t, 0] + 3)
         ax.set_ylim(-3 + state[t, 1], state[t, 1] + 3)
         ax.set_zlim(-3 + state[t, 2], state[t, 2] + 3)
@@ -37,7 +40,7 @@ def trace_trajectory3d(position, quaternion: np.ndarray):
         ax.plot([state[t, 0], p2[0]], [state[t, 1], p2[1]], [state[t, 2], p2[2]], c='green')
         ax.plot([state[t, 0], p3[0]], [state[t, 1], p3[1]], [state[t, 2], p3[2]], c='blue')
         ax.set_title(str(t))
-        plt.pause(0.0001)
+        plt.pause(pause)
     plt.show()
 
 
