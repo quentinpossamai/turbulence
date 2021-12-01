@@ -29,7 +29,8 @@ from src.utils.transform import Transform, Rotation
 
 
 def mpc_controller(model: Callable,
-                   reference_tf: np.ndarray,
+                   ref_tf: np.ndarray,
+                   ref_lin_vel: np.ndarray,
                    state0: np.ndarray,
                    u0: np.ndarray,
                    horizon_cmd: int,
@@ -38,7 +39,8 @@ def mpc_controller(model: Callable,
     """
 
     :param model:
-    :param reference_tf:
+    :param ref_tf:
+    :param ref_lin_vel:
     :param state0:
     :param u0: Shape (horizon, 4)
     :param horizon_cmd:
@@ -47,7 +49,7 @@ def mpc_controller(model: Callable,
     :return:
     """
 
-    def _mpc(_u, _state, _reference_tf, _horizon_cmd, _horizon_pred, _gamma):
+    def _mpc(_u, _state, _ref_tf, _ref_lin_vel, _horizon_cmd, _horizon_pred, _gamma):
         _u = _u.reshape(_horizon_cmd, 4)
         if _horizon_pred - _horizon_cmd > 0:
             _u = np.concatenate([_u, np.stack([_u[-1] for _ in range(_horizon_pred - _horizon_cmd)])])
@@ -56,67 +58,25 @@ def mpc_controller(model: Callable,
             next_state = model(state_hat[-1], _u[t])
             state_hat.append(next_state)
         state_hat = np.stack(state_hat[1:])
-        # position_hat, quat_hat, linear_speed_hat, angular_speed_hat = (state_hat[:, :3], state_hat[:, 3:7],
-        #                                                                state_hat[:, 7:10], state_hat[:, 10:])
-
-        # if value_to_return == 'loss':
-        # if value_to_return == 'position':
-        #     return np.max(np.abs(position_hat))
-        # if value_to_return == 'quaternion':
-        #     return np.max(np.abs(quat_hat))
-        # if value_to_return == 'linear_speed':
-        #     return np.max(np.abs(linear_speed_hat))
-        # if value_to_return == 'angular_speed':
-        #     return np.max(np.abs(angular_speed_hat[:, 2]))
-        # if value_to_return == 'log_loss':
-        #     return loss(tf_ref=_reference_tf, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma, log=True)
-        return loss(tf_ref=_reference_tf, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma)
+        return loss(tf_ref=_ref_tf, ref_lin_vel=_ref_lin_vel, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma)
 
     # Initialize command
     print('MPC starting')
     out: scipy.optimize.OptimizeResult = scipy.optimize.minimize(fun=_mpc, x0=u0.flatten(),
-                                                                 args=(state0, reference_tf, horizon_cmd, horizon_pred,
-                                                                       gamma),
+                                                                 args=(state0, ref_tf, ref_lin_vel, horizon_cmd,
+                                                                       horizon_pred, gamma),
                                                                  method='bfgs',
                                                                  jac=None,
                                                                  tol=None,
                                                                  options={
                                                                      "disp": False,  # True
                                                                      "maxiter": 10000,  # None
-                                                                     "gtol": 1e-2,  # 1e-5
+                                                                     "gtol": 1e-5,  # 1e-5
                                                                      # "norm": 2,  # np.inf
                                                                      "eps": 1e-4,  # 1.4901161193847656e-08
                                                                      "return_all": True,  # False
                                                                      "finite_diff_rel_step": None}  # None
                                                                  )
-    # pos_fun = lambda x: _mpc(x, state0, reference_tf, horizon_cmd, horizon_pred, gamma, 'position')
-    # pos_con = scipy.optimize.NonlinearConstraint(fun=pos_fun, lb=-np.inf, ub=np.inf)
-    # quat_fun = lambda x: _mpc(x, state0, reference_tf, horizon_cmd, horizon_pred, gamma, 'quaternion')
-    # quat_con = scipy.optimize.NonlinearConstraint(fun=quat_fun, lb=-np.inf, ub=5)
-    # lin_vel_fun = lambda x: _mpc(x, state0, reference_tf, horizon_cmd, horizon_pred, gamma, 'linear_speed')
-    # lin_vel_con = scipy.optimize.NonlinearConstraint(fun=lin_vel_fun, lb=0, ub=np.inf)
-    # ang_vel_fun = lambda x: _mpc(x, state0, reference_tf, horizon_cmd, horizon_pred, gamma, 'angular_speed')
-    # ang_vel_con = scipy.optimize.NonlinearConstraint(fun=ang_vel_fun, lb=0, ub=2 * np.pi)
-    # out: scipy.optimize.OptimizeResult = scipy.optimize.minimize(fun=_mpc, x0=u0.flatten(),
-    #                                                              args=(state0, reference_tf, horizon_cmd, horizon_pred,
-    #                                                                    gamma, 'loss'),
-    #                                                              method='trust-constr',
-    #                                                              constraints=[lin_vel_con, ang_vel_con],
-    #                                                              options={
-    #                                                              "gtol": 1e-2,  # 1e-8
-    #                                                              "xtol": 1e-2,  # 1e-8
-    #                                                              "barrier_tol": 1e-2,  # 1e-8
-    #                                                              'sparse_jacobian': None,  # None
-    #                                                              'initial_tr_radius': 1.0,  # 1.0
-    #                                                              'initial_constr_penalty': 1.0,  # 1.0
-    #                                                              'initial_barrier_parameter': 0.1,  # 0.1
-    #                                                              'initial_barrier_tolerance': 0.1,  # 0.1
-    #                                                              'factorization_method': None,  # None
-    #                                                              "finite_diff_rel_step": None,  # None
-    #                                                              'maxiter': 1000,  # 1000
-    #                                                              'verbose': 0,  # 0, 1, 2, or 3
-    #                                                              'disp': True  # True
-    #                                                              })
     u, error_mpc = out.x, out.fun
     u = u.reshape((-1, 4))
     print(f'Finished | mpc_error: {error_mpc} | u: {u} | message: {out.message} \n')
@@ -124,22 +84,22 @@ def mpc_controller(model: Callable,
     return u, error_mpc
 
 
-def loss(tf_ref: np.ndarray, state_hat: np.ndarray, gamma: float, horizon: int) -> float:
+def loss(tf_ref: np.ndarray, ref_lin_vel: np.ndarray, state_hat: np.ndarray, gamma: float, horizon: int) -> float:
     coefs = [1]
     for i in range(horizon - 1):
         coefs.append(gamma * coefs[-1])
     coefs = np.stack(coefs)
 
     tf = Transform.from_matrix(tf_ref)
-    position_hat, quat_hat, linear_speed_hat, angular_speed_hat = (state_hat[:, :3], state_hat[:, 3:7],
-                                                                   state_hat[:, 7:10], state_hat[:, 10:])
+    position_hat, quat_hat, lin_vel_hat, angular_speed_hat = (state_hat[:, :3], state_hat[:, 3:7],
+                                                              state_hat[:, 7:10], state_hat[:, 10:])
 
-    # position loss, shape=(horizon_pred, 3)
+    # Position loss, shape=(horizon_pred, 3)
     position_ref = tf.as_trans()
     position_loss = np.mean((position_ref - position_hat) ** 2, axis=1)
     position_loss = coefs @ position_loss
 
-    # yaw_loss
+    # Yaw loss
     # METHOD 1
     # rot_loss = np.arccos(np.clip(np.sum((rot_ref * rot_hat).reshape(-1, 9), axis=1) / 3, -1, 1))
     # METHOD 2
@@ -158,11 +118,9 @@ def loss(tf_ref: np.ndarray, state_hat: np.ndarray, gamma: float, horizon: int) 
     yaw_loss = -np.sum(vect_ref * vect_hat, axis=1)
     yaw_loss = coefs @ yaw_loss
 
-    # # yaw_speed_loss
-    # angular_speed_loss = np.max(angular_speed_hat ** 2)
-    # if log:
-    #     LOSS_LOGGER.log(position_loss, yaw_loss, angular_speed_loss, None)
-    return 1. * position_loss + 0.05 * yaw_loss
+    # Linear velocity loss
+    lin_vel_loss = coefs @ np.mean((ref_lin_vel - lin_vel_hat) ** 2, axis=1)
+    return 1. * position_loss + 0.05 * yaw_loss + 0. * lin_vel_loss
 
 
 def main():
@@ -219,7 +177,7 @@ def main():
     for i in tqdm(range(1, time_end)):
         # Using MPC
         motor_horizon, err = mpc_controller(model=mpc_model,
-                                            reference_tf=ref_tf[i:i + horizon_pred],
+                                            ref_tf=ref_tf[i:i + horizon_pred],
                                             state0=state[-1],
                                             u0=motor_horizon,
                                             horizon_cmd=horizon_cmd,

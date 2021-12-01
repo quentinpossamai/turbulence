@@ -124,6 +124,7 @@ class Simulation:
         self.agent: habitat_sim.physics.ManagedRigidObject = cube_obj
         self.drone_prms: Dict[str, float] = drone_prms
         self.ref_tf_global_agent = None
+        self.ref_lin_vel_global = None
 
         # 5-simulation initialisation
         # 5.1-Drone model init
@@ -134,12 +135,14 @@ class Simulation:
                                    self.drone_prms['iz'] / self.drone_prms['ix']])
         self.quadrotor = DynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=DTYPE)
 
-    def generate_reference_procedurally(self, uniform_step_number: int, plot_topdown: bool):
+    def generate_reference_procedurally(self, uniform_speed: float, plot_topdown: bool, dt: float):
         """
 
-        :param uniform_step_number: The number of step to cut the trajectory.
+        :param uniform_speed: The number of step to cut the trajectory.
 
         :param plot_topdown: If true will plot topdown view.
+
+        :param dt: dt to use for position derivation.
         """
         # Defining the drone's volume
         navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
@@ -159,19 +162,21 @@ class Simulation:
         navmesh_settings.region_merge_size = 20.0  # 20.0
         navmesh_settings.region_min_size = 20.0  # 20.0
         navmesh_settings.verts_per_poly = 6.0  # 6.0
-        # Todo change fixed traj
-        self.ref_tf_global_agent = generate_reference(self.sim, uniform_step_number, navmesh_settings, plot_topdown,
-                                                      flight_height=0.1)
+        self.ref_tf_global_agent, self.ref_lin_vel_global = generate_reference(self.sim,
+                                                                               uniform_speed,
+                                                                               navmesh_settings,
+                                                                               plot_topdown,
+                                                                               flight_height=0.1,
+                                                                               dt=dt,
+                                                                               seed=0)
 
-    def one_step_sim(self, step: float, state: np.ndarray, motor: np.ndarray) -> Tuple[np.ndarray, Any]:
+    def one_step_sim(self, step: float, state: np.ndarray, motor: np.ndarray) -> Tuple[np.ndarray, Any, bool]:
         assert state.shape == (13,)
         assert motor.shape == (4,)
         # 1. Initializing agent
         # quat: x, y, z, w
         trans, quat, linear_velocity, angular_velocity = state[:3], state[3:7], state[7:10], state[10:]
         tf_global__agent = Transform.from_quat_trans(quat=quat, trans=trans).as_matrix()
-        rot_agent__global = Transform.from_quat_trans(quat=quat, trans=trans).as_rot_mat().T
-        rot_global__global_flu = Transform.from_matrix(TF_HABITAT__HABITAT_FLU).as_rot_mat()
         self.agent.transformation = tf_global__agent
         self.agent.linear_velocity = linear_velocity
         self.agent.angular_velocity = angular_velocity
@@ -184,18 +189,21 @@ class Simulation:
 
         # 3. Motor and Ground Effect (gravity is done by habitat)
         motor_torsor = self.quadrotor.motor_dynamic(motor=torch.tensor(motor, dtype=DTYPE)).numpy()
-        motor_torques = np.array([self.quadrotor.theta[1],
-                                  self.quadrotor.theta[1],
-                                  self.quadrotor.theta[2]]) * motor_torsor[:3]
+        motor_torques = np.array([self.drone_prms['kt'] * self.drone_prms['l'],
+                                  self.drone_prms['kt'] * self.drone_prms['l'],
+                                  self.drone_prms['km']]) * motor_torsor[:3]
 
         motor_forces = np.zeros_like(motor_torques)
-        motor_forces[2] = self.quadrotor.theta[0] * motor_torsor[3]
+        motor_forces[2] = self.drone_prms['kt'] * motor_torsor[3]
 
         ground_forces = np.zeros_like(motor_torques)
         ground_forces[1] = (np.sum(motor) ** 2 * self.drone_prms['kt'] * 1
                             * (self.drone_prms['prop_radius'] / (4 * z)) ** 2)
 
-        self.agent.apply_force(rot_global__agent_flu @ motor_forces + ground_forces, relative_position=np.zeros(3))
+        # gravity = magnum.Vector3([0, -9.8 * self.drone_prms['m'], 0])
+
+        self.agent.apply_force(rot_global__agent_flu @ motor_forces + ground_forces,
+                               relative_position=np.zeros(3))
         self.agent.apply_torque(rot_global__agent_flu @ motor_torques)
 
         # 4-Simulating for step seconds
@@ -203,22 +211,10 @@ class Simulation:
         quat, trans = Transform.from_matrix(np.array(self.agent.transformation)).as_quat_trans()
         next_state = np.concatenate([trans, quat, self.agent.linear_velocity, self.agent.angular_velocity], axis=-1)
         obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+        has_collided = self.agent.contact_test()
+        return next_state, obs, has_collided
 
-        return next_state, obs
-
-    def interactive_sim(self, controller, camera_rgb: bool, camera_depth: bool, step: float):
-        """
-
-        :param controller:
-
-        :param camera_rgb:
-
-        :param camera_depth:
-
-        :param step:
-
-        :return:
-        """
+    def interactive_sim(self, controller, camera_rgb: bool, camera_depth: bool, step: float, tf_follow):
         # 1. Agent init
         rot_agent_flu = Transform.from_matrix(TF_HABITAT__HABITAT_FLU).as_rot_mat()
         simulation_iteration = 0
@@ -311,15 +307,16 @@ class Simulation:
             # 7. Following the reference
             if key_pressed == ord("v"):
                 simulation_iteration += 1
-                self.agent.transformation = self.ref_tf_global_agent[simulation_iteration]
+                # self.agent.transformation = self.ref_tf_global_agent[simulation_iteration]
+                self.agent.transformation = tf_follow[simulation_iteration]
             if key_pressed == ord('c'):
                 simulation_iteration -= 1
-                self.agent.transformation = self.ref_tf_global_agent[simulation_iteration]
+                self.agent.transformation = tf_follow[simulation_iteration]
 
             # 8. Resume the dynamic
             if key_pressed == ord(' '):
-                # self.agent.linear_velocity = saved_velocity[0]
-                # self.agent.angular_velocity = saved_velocity[1]
+                self.agent.linear_velocity = saved_velocity[0]
+                self.agent.angular_velocity = saved_velocity[1]
                 simulation_iteration += 1
 
             if simulation_iteration == len(self.ref_tf_global_agent) - 1:
@@ -334,14 +331,15 @@ class Simulation:
             obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
 
 
-def main():
+def gen_data(scene_id, flight_number, plot_ref: bool):
     # profiler()
-
-    scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb"
+    # Building the environment in habitat
+    scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    # scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb"
     camera_resolution = np.array([720, 1280])
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
-    g = 9.81
+    g = 9.8
     m = volumetric_mass * drone_width ** 2 * drone_height
     drone_prms = {'width': drone_width,  # [m]
                   'height': drone_height,  # [m]
@@ -353,64 +351,46 @@ def main():
                   'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
                   'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
                   'prop_radius': drone_width * 0.1}  # [m]
-    step = 1 / 20
-    horizon_cmd = 1
-    horizon_pred = 20
-    gamma = 1.0
+    dt = 1 / 20
+    horizon_cmd = 5
+    horizon_pred = 40
+    gamma = 0.95
 
+    # Building the simulation
     simulation = Simulation(scene_path=scene_path, camera_resolution=camera_resolution, drone_prms=drone_prms,
                             allow_gravity=True)
-    simulation.generate_reference_procedurally(uniform_step_number=1000, plot_topdown=False)
+    simulation.generate_reference_procedurally(uniform_speed=2, plot_topdown=False, dt=dt)
 
     # simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
-
-    # def mpc_model(_state, _u):
-    #     # Using habitat as a simulator
-    #     # return simulation.one_step_sim(step=step, state=state, motor=u)
-    #     trans, quat, linear_velocity, angular_velocity = _state[:3], _state[3:7], _state[7:10], _state[10:]
-    #     tf_global_agent = Transform.from_quat_trans(quat, trans).as_matrix()
-    #     tf_global_flu__agent_flu = TF_HABITAT_FLU__HABITAT @ tf_global_agent @ TF_HABITAT__HABITAT_FLU
-    #     quat_flu_flu, trans_flu_flu = Transform.from_matrix(tf_global_flu__agent_flu).as_quat_trans()
-    #
-    #     rot_agent_flu__global = Transform.from_matrix(tf_global_agent @ TF_HABITAT__HABITAT_FLU).inv().as_rot_mat()
-    #     rot_habitat_flu__habitat = Transform.from_matrix(TF_HABITAT_FLU__HABITAT).as_rot_mat()
-    #     linear_velocity__flu = rot_habitat_flu__habitat @ linear_velocity  # linear velocity in global_flu
-    #     angular_velocity__flu = rot_agent_flu__global @ angular_velocity  # angular velocity in agent_flu
-    #     _state_flu = np.concatenate([trans_flu_flu, quat_flu_flu, linear_velocity__flu, 
-    #                                  angular_velocity__flu], axis=-1)
-    #     _next_state = simulation.quadrotor.forward(state=torch.tensor(_state_flu, dtype=DTYPE),
-    #                                                motor=torch.tensor(_u, dtype=DTYPE),
-    #                                                dt=torch.tensor([step], dtype=DTYPE)).numpy()
-    #
-    #     trans_flu, quat_flu, linear_velocity_flu, angular_velocity_flu = (_next_state[:3], _next_state[3:7],
-    #                                                                       _next_state[7:10], _next_state[10:])
-    #     tf = TF_HABITAT__HABITAT_FLU @ Transform.from_quat_trans(quat_flu,
-    #                                                              trans_flu).as_matrix() @ TF_HABITAT_FLU__HABITAT
-    #     quat, trans = Transform.from_matrix(tf).as_quat_trans()
-    #     linear_velocity = rot_habitat_flu__habitat.T @ linear_velocity_flu
-    #     angular_velocity = rot_agent_flu__global.T @ angular_velocity_flu
-    #     return np.concatenate([trans, quat, linear_velocity, angular_velocity], axis=-1)
 
     def mpc_model(_state, _u):
         _next_state = simulation.quadrotor.forward(state=torch.tensor(_state),
                                                    motor=torch.tensor(_u),
-                                                   dt=torch.tensor([step])).numpy()
+                                                   dt=torch.tensor([dt])).numpy()
         return _next_state
 
     # Setting the drone at the first reference
     ref_tf_global_flu__agent_flu = TF_HABITAT_FLU__HABITAT @ simulation.ref_tf_global_agent @ TF_HABITAT__HABITAT_FLU
-    # quat, trans = Transform.from_matrix(ref_tf_global_flu__agent_flu).as_quat_trans()
-    # trace_trajectory3d(trans[900:], quat[900:], pause=1e-2, step=1)
+    rot_habitat_flu__habitat = Transform.from_matrix(TF_HABITAT_FLU__HABITAT).as_rot_mat()
+    ref_lin_vel_flu = (rot_habitat_flu__habitat @ simulation.ref_lin_vel_global.T).T
+    if plot_ref:
+        quat, trans = Transform.from_matrix(ref_tf_global_flu__agent_flu).as_quat_trans()
+        trace_trajectory3d(trans, quat, pause=1e-2, step=1)
+
+    # Initializing flight in habitat
     quat0, trans0 = Transform.from_matrix(simulation.ref_tf_global_agent[0]).as_quat_trans()
     state = [np.concatenate([trans0, quat0, np.zeros(6)])]
-    hover_cmd = np.sqrt(drone_prms['m'] * 9.81 / (4 * drone_prms['kt']))
+    hover_cmd = np.sqrt(drone_prms['m'] * g / (4 * drone_prms['kt']))
     motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
     motor = []
     mpc_error = []
-    time_end = 10
+    time_end = len(simulation.ref_tf_global_agent) - 1
+    has_collided = False
+    obs_tab = {'camera': [], 'depth': [], 'surface_dist': [], }
     for i in tqdm(range(1, time_end)):
         motor_horizon, err = mpc_controller(model=mpc_model,
-                                            reference_tf=ref_tf_global_flu__agent_flu[i:i + horizon_pred],
+                                            ref_tf=ref_tf_global_flu__agent_flu[i:i + horizon_pred],
+                                            ref_lin_vel=ref_lin_vel_flu[i:i + horizon_pred],
                                             state0=state_habitat_2_state_mpc(state[-1]),
                                             u0=motor_horizon,
                                             horizon_cmd=horizon_cmd,
@@ -418,18 +398,38 @@ def main():
                                             gamma=gamma)
         motor.append(motor_horizon[0])
         mpc_error.append(err)
-        next_state, obs = simulation.one_step_sim(step=step, state=state[-1], motor=motor[-1])
+        if err > 100:
+            print()
+        next_state, obs, has_collided = simulation.one_step_sim(step=dt, state=state[-1], motor=motor[-1])
+        if has_collided:
+            break
+        obs_tab['camera'].append(obs['left_camera'])
+        obs_tab['depth'].append(obs['left_depth_camera'])
+        obs_tab['surface_dist'].append(obs['surface_dist'])
+
         state.append(next_state)
     state_tab, motor_tab, mpc_error_tab = (np.stack(e) for e in (state, motor, mpc_error))
-    pose_ref = Transform.from_matrix(simulation.ref_tf_global_agent).as_trans()
-    pose_real = np.stack(state_tab[:, :3])
+    position_ref = Transform.from_matrix(simulation.ref_tf_global_agent).as_trans()
+    position_real = np.stack(state_tab[:, :3])
     quat_real = np.stack(state_tab[:, 3:7])
 
     # DEBUG
     state_flu = np.zeros_like(state_tab)
     for i, e in enumerate(state_tab):
         state_flu[i] = state_habitat_2_state_mpc(e)
-    trace_trajectory3d(pose_real, quat_real, pause=0.1, step=1, position_ref=pose_ref[:time_end])
+    pose_real_flu = np.stack(state_flu[:, :3])
+    quat_real_flu = np.stack(state_flu[:, 3:7])
+    position_ref = Transform.from_matrix(ref_tf_global_flu__agent_flu).as_trans()
+    tf_real = Transform.from_quat_trans(quat_real, position_real).as_matrix()
+
+    trace_trajectory3d(pose_real_flu, quat_real_flu, pause=1e-4, step=1, position_ref=position_ref[:time_end])
+    simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_real)
+    pickle.dump({'motor': motor_tab,
+                 'state': state_tab,
+                 'ref': ref_tf_global_flu__agent_flu[:len(state_tab)],
+                 'camera': obs_tab['camera'],
+                 'depth': obs_tab['depth'],
+                 'surface_dist': obs_tab['surface_dist']}, open(f'{DATA_HABITAT_PATH}/{scene_id}_{flight_number}.pkl'))
 
 
 def state_habitat_2_state_mpc(state_habitat):
@@ -448,6 +448,11 @@ def state_habitat_2_state_mpc(state_habitat):
     state_flu = np.concatenate([trans_flu_flu, quat_flu_flu, linear_velocity__flu,
                                 angular_velocity__flu], axis=-1)
     return state_flu
+
+
+def main():
+    scene_id = ['17DRP5sb8fy']
+    gen_data(scene_id=scene_id[0], flight_number=0, plot_ref=False)
 
 
 if __name__ == "__main__":

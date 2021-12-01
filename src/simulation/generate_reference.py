@@ -5,6 +5,7 @@ from matplotlib.widgets import Slider
 import numpy as np
 import pickle
 from scipy.interpolate import splev, splrep
+from typing import Tuple
 
 from src.utils.transform import Transform
 from src.utils.paths import WD_PATH, DATA_HABITAT_PATH
@@ -69,7 +70,7 @@ def display_topdown(sim, point, travel_order, entire_path):
     plt.show()
 
 
-def get_tf_from_trans_ref(x_time, x, point, trans_ref, flight_height):
+def get_orientation_from_position(x_time, x, point, trans_ref, flight_height):
     future_point = point[np.where(x_time < x)[0][0]]
     # In global
     x_vect = (future_point - trans_ref)
@@ -83,39 +84,83 @@ def get_tf_from_trans_ref(x_time, x, point, trans_ref, flight_height):
     return tf_global_flu @ TF_AGENT_FLU__AGENT
 
 
-def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
+def polynomial_interpolation(main_point, num_sample, degree, flight_height):
+    """
+    Sample points between main_point with an polynomial interpolation.
+
+    :param main_point:
+    :param num_sample:
+    :param degree:
+    :param flight_height:
+    :return:
+    """
+
+    traj_time = [0]  # Percentage of advancement of the trajectory
+    for i in range(1, len(main_point)):
+        traj_time.append(np.linalg.norm(main_point[i] - main_point[i - 1]))
+    traj_time = np.cumsum(traj_time)
+    traj_time = traj_time / traj_time[-1]
+
+    trans = np.zeros((num_sample, 3))
+    for i in range(3):
+        rep = splrep(x=traj_time, y=main_point[:, i], k=degree)
+        trans[:, i] = splev(np.linspace(0, 1, num_sample), rep)
+    dist = []
+    for point in main_point:
+        dist.append(np.min(np.linalg.norm(point - trans, axis=1)))
+    print(f'Max reference error {np.max(dist)}')
+
+    # Computing of the orientation from the position
+    ref_tf_global_agent = []
+    for x_time, interp_ref_time in zip(np.linspace(0, 1, num_sample), trans):
+        if x_time == 1.0:
+            rot = Transform.from_matrix(ref_tf_global_agent[-1]).as_rot_mat()
+            ref_tf_global_agent.append(Transform.from_rot_mat_trans(rot=rot, trans=interp_ref_time).as_matrix())
+        else:
+            ref_tf_global_agent.append(get_orientation_from_position(x_time, traj_time, main_point, interp_ref_time,
+                                                                     flight_height))
+    ref_tf_global_agent = np.stack(ref_tf_global_agent, axis=0)
+    return ref_tf_global_agent
+
+
+def generate_reference(sim: habitat_sim.Simulator,
+                       uniform_speed: float,
                        navmesh_settings: habitat_sim.nav.NavMeshSettings,
                        plot_topdown: bool,
-                       flight_height: float):
+                       flight_height: float,
+                       dt: float,
+                       seed: int) -> Tuple[np.ndarray, np.ndarray]:
     # Recomputing the navmesh
+    sim.seed(seed)
     sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
 
-    is_navigable = False
-    while not is_navigable:
-        # point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
-        point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))  # TODO Remove for debug
-        # pickle.dump(point, open(f'{DATA_HABITAT_PATH}point.pkl', 'wb'))
-        shortest_path = []
-        distance_matrix = np.zeros((len(point), len(point)))
-        for i, p1 in enumerate(point):
-            for j, p2 in enumerate(point):
-                if i == j:
-                    continue
-                short_path = habitat_sim.nav.ShortestPath()
-                short_path.requested_start = p1
-                short_path.requested_end = p2
-                sim.pathfinder.find_path(short_path)
-                shortest_path.append((i, j, short_path.geodesic_distance, short_path))
-                if j > i:
-                    distance_matrix[i, j] = short_path.geodesic_distance
-        is_navigable = True
-        for t in shortest_path:
-            if t[2] == np.inf:
-                is_navigable = False
+    # point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
+    point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))
+    # pickle.dump(point, open(f'{DATA_HABITAT_PATH}point.pkl', 'wb'))
+    shortest_path = []
+    distance_matrix = np.zeros((len(point), len(point)))
+    for i, p1 in enumerate(point):
+        for j, p2 in enumerate(point):
+            if i == j:
+                continue
+            short_path = habitat_sim.nav.ShortestPath()
+            short_path.requested_start = p1
+            short_path.requested_end = p2
+            sim.pathfinder.find_path(short_path)
+            shortest_path.append((i, j, short_path.geodesic_distance, short_path))
+            if j > i:
+                distance_matrix[i, j] = short_path.geodesic_distance
+    is_navigable = True
+    for t in shortest_path:
+        if t[2] == np.inf:
+            print('Cannot get to point, change seed')
+            return None
 
     tsp_solution = christofides.compute(distance_matrix)
     travel_order = tsp_solution['Christofides_Solution']
 
+    # Add points to avoid obstacles. At the end the entire_path can be done by navigating in straight lines to the next
+    # point
     entire_path = []
     for i, current_point_idx in enumerate(travel_order[:-1]):
         next_point_idx = travel_order[i + 1]
@@ -125,6 +170,7 @@ def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
     entire_path.append(point[travel_order[-1]])
     entire_path = np.stack(entire_path)
 
+    # Remove duplicates
     remove_duplicate = []
     for i, e in enumerate(entire_path[:-1]):
         if np.any(entire_path[i + 1] != e):
@@ -135,30 +181,17 @@ def generate_reference(sim: habitat_sim.Simulator, uniform_step_number: int,
     if plot_topdown:
         display_topdown(sim, point, travel_order, entire_path)
 
-    # 1-Generating a reference
-    ref = entire_path
+    perimeter = np.linalg.norm(entire_path[1:] - entire_path[:-1], axis=1).sum()
+    num_sample = int(np.round((perimeter / uniform_speed) / dt))
+    # Interpolation
+    ref_tf_global_agent = polynomial_interpolation(main_point=entire_path, num_sample=num_sample, degree=1,
+                                                   flight_height=flight_height)
 
-    # 1.1-Interpolating reference with affine functions
-    x = [0]
-    for i in range(1, len(ref)):
-        x.append(np.linalg.norm(ref[i] - ref[i - 1]))
-    x = np.cumsum(x)
-    x = x / x[-1]
-    interp_ref = np.zeros((uniform_step_number, 3))
-    for i in range(3):
-        rep = splrep(x=x, y=ref[:, i], k=1)
-        interp_ref[:, i] = splev(np.linspace(0, 1, uniform_step_number), rep)
-
-    ref_tf_global_agent = []
-    for x_time, interp_ref_time in zip(np.linspace(0, 1, uniform_step_number), interp_ref):
-        if x_time == 1.0:
-            rot = Transform.from_matrix(ref_tf_global_agent[-1]).as_rot_mat()
-            ref_tf_global_agent.append(Transform.from_rot_mat_trans(rot=rot, trans=interp_ref_time).as_matrix())
-        else:
-            ref_tf_global_agent.append(get_tf_from_trans_ref(x_time, x, entire_path, interp_ref_time, flight_height))
-
-    out = np.stack(ref_tf_global_agent, axis=0)
-    return out
+    # Computing velocity
+    quat, trans = Transform.from_matrix(ref_tf_global_agent).as_quat_trans()
+    lin_vel_global = (trans[1:] - trans[:-1]) / dt
+    lin_vel_global = np.concatenate([np.zeros((1, 3)), lin_vel_global], axis=0)
+    return ref_tf_global_agent, lin_vel_global
 
 
 def main():
@@ -177,8 +210,8 @@ def main():
     agent_config.sensor_specifications = [left_rgb_sensor]
 
     sim = habitat_sim.simulator.Simulator(habitat_sim.Configuration(backend_cfg, [agent_config]))
-    seed = 0
-    sim.seed(seed)
+    # seed = 0
+    # sim.seed(seed)
 
     # Defining the drone's volume
     navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
@@ -199,7 +232,7 @@ def main():
     navmesh_settings.region_min_size = 20.0  # 20.0
     navmesh_settings.verts_per_poly = 6.0  # 6.0
 
-    generate_reference(sim, uniform_step_number=1000, navmesh_settings=navmesh_settings,
+    generate_reference(sim, uniform_speed=1000, navmesh_settings=navmesh_settings,
                        plot_topdown=True)
 
 
