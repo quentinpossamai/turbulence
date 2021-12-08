@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_models.analytical_models.quadrotor_4parms import TorchDynamicalModel
 import src.data.blackbird.loading as blackbird
 from src.utils.quaternion import qrot
 from src.utils.paths import ANALYSIS_PATH, mkdir_if_not_exist
@@ -103,7 +103,7 @@ def rollout():
 
     for i, param in enumerate(tqdm(param_range)):
         permutation, theta = param["permutation"], param["theta"]
-        model = DynamicalModel(param={"permutation": permutation, "theta": theta}, dtype=torch.float64)
+        model = TorchDynamicalModel(param={"permutation": permutation, "theta": theta}, dtype=torch.float64)
         _, rollout_error, _ = model.rollout(motor=motor_roll, state=state_roll, dt=dt, horizon=max_horizon)
         param_range[i]["rollout_error"] = rollout_error.mean(dim=(0, 2))
 
@@ -179,7 +179,7 @@ def plot_rollout():
 
 
 def plot_acceleration():
-    model = DynamicalModel(param="identification", dtype=torch.float64)
+    model = TorchDynamicalModel(param="identification", dtype=torch.float64)
 
     max_horizon = 200
     dataset = blackbird.EurocMAVDatasetHorizon("validation", traj_len=max_horizon + 1, dtype=DTYPE, batch_dim=False)

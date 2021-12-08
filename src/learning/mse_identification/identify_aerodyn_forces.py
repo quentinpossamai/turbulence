@@ -1,10 +1,10 @@
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_models.analytical_models.quadrotor_4parms import TorchDynamicalModel
 from src.metrics import load_blackbird_flights
 import torch
 
 
 def identify_aero():
-    model = DynamicalModel()
+    model = TorchDynamicalModel()
     flights = load_blackbird_flights("train")
 
     ## Load flights in a big vector column
