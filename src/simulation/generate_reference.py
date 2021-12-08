@@ -154,7 +154,7 @@ def generate_reference(sim: habitat_sim.Simulator,
     for t in shortest_path:
         if t[2] == np.inf:
             print('Cannot get to point, change seed')
-            return None
+            raise ValueError('Reference did not generate change seed')
 
     tsp_solution = christofides.compute(distance_matrix)
     travel_order = tsp_solution['Christofides_Solution']

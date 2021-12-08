@@ -5,7 +5,7 @@ import scipy.interpolate
 from typing import Callable
 
 from src.utils.trajectory import trace_trajectory3d
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_models.analytical_models.quadrotor_4parms import TorchDynamicalModel
 from src.utils.paths import DATA_HABITAT_PATH
 from src.utils.transform import Transform, Rotation
 
@@ -48,14 +48,17 @@ def mpc_controller(model: Callable,
     :param gamma:
     :return:
     """
+    assert horizon_pred % horizon_cmd == 0
 
     def _mpc(_u, _state, _ref_tf, _ref_lin_vel, _horizon_cmd, _horizon_pred, _gamma):
+        num_repeat = horizon_pred // horizon_cmd
+        u_tiled = np.zeros((_horizon_pred, 4))
         _u = _u.reshape(_horizon_cmd, 4)
-        if _horizon_pred - _horizon_cmd > 0:
-            _u = np.concatenate([_u, np.stack([_u[-1] for _ in range(_horizon_pred - _horizon_cmd)])])
+        for i, cmd in enumerate(_u):
+            u_tiled[i*num_repeat:(i+1)*num_repeat] = np.tile(cmd, num_repeat).reshape((num_repeat, 4))
         state_hat = [_state]
         for t in range(_horizon_pred):
-            next_state = model(state_hat[-1], _u[t])
+            next_state = model(state_hat[-1], u_tiled[t])
             state_hat.append(next_state)
         state_hat = np.stack(state_hat[1:])
         return loss(tf_ref=_ref_tf, ref_lin_vel=_ref_lin_vel, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma)
@@ -71,7 +74,7 @@ def mpc_controller(model: Callable,
                                                                  options={
                                                                      "disp": False,  # True
                                                                      "maxiter": 10000,  # None
-                                                                     "gtol": 1e-5,  # 1e-5
+                                                                     "gtol": 1e-2,  # 1e-5
                                                                      # "norm": 2,  # np.inf
                                                                      "eps": 1e-4,  # 1.4901161193847656e-08
                                                                      "return_all": True,  # False
@@ -157,7 +160,7 @@ def main():
                           drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                           drone_prms['km'] / drone_prms['iz'],
                           drone_prms['iz'] / drone_prms['ix']], dtype=dtype)
-    quadrotor = DynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=dtype)
+    quadrotor = TorchDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=dtype)
 
     def mpc_model(_state, _u):
         _next_state = quadrotor.forward(state=torch.tensor(_state, dtype=dtype),
