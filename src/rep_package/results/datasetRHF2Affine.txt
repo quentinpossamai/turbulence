@@ -1,0 +1,260 @@
+para ['main.py', '1', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.960472905877997
+NRMSE:  0.9860197966572868
+elapsed time in simulation: 3.9612178802490234
+validationOnMultiHarmonic: True reset every: 1 fit:  0.960472905877997  NRMSE:  0.9860197966572868
+fit:  0.960472905877997
+NRMSE:  0.9860197966572868
+elapsed time in simulation: 2.632598876953125
+validationOnMultiHarmonic: False reset every: 1 fit:  0.960472905877997  NRMSE:  0.9860197966572868
+fit:  0.917878548763023
+NRMSE:  0.9709547435096535
+elapsed time in simulation: 3.197631359100342
+validationOnMultiHarmonic: True reset every: 10 fit:  0.917878548763023  NRMSE:  0.9709547435096535
+fit:  0.917878548763023
+NRMSE:  0.9709547435096535
+elapsed time in simulation: 2.6857807636260986
+validationOnMultiHarmonic: False reset every: 10 fit:  0.917878548763023  NRMSE:  0.9709547435096535
+fit:  0.8612741124837147
+NRMSE:  0.9509345131622908
+elapsed time in simulation: 2.8742380142211914
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8612741124837147  NRMSE:  0.9509345131622908
+fit:  0.8612741124837147
+NRMSE:  0.9509345131622908
+elapsed time in simulation: 2.7228193283081055
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8612741124837147  NRMSE:  0.9509345131622908
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f86c50a6158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '2', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9589795001037136
+NRMSE:  0.9854915990535565
+elapsed time in simulation: 3.6539053916931152
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9589795001037136  NRMSE:  0.9854915990535565
+fit:  0.9589795001037136
+NRMSE:  0.9854915990535565
+elapsed time in simulation: 2.5791804790496826
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9589795001037136  NRMSE:  0.9854915990535565
+fit:  0.9174505407017155
+NRMSE:  0.9708033627956822
+elapsed time in simulation: 3.3595054149627686
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9174505407017155  NRMSE:  0.9708033627956822
+fit:  0.9174505407017155
+NRMSE:  0.9708033627956822
+elapsed time in simulation: 2.5866241455078125
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9174505407017155  NRMSE:  0.9708033627956822
+fit:  0.8701385705006998
+NRMSE:  0.9540697531376325
+elapsed time in simulation: 2.8395743370056152
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8701385705006998  NRMSE:  0.9540697531376325
+fit:  0.8701385705006998
+NRMSE:  0.9540697531376325
+elapsed time in simulation: 2.8182990550994873
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8701385705006998  NRMSE:  0.9540697531376325
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f20767b1158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '3', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9606318167574028
+NRMSE:  0.9860760013051824
+elapsed time in simulation: 3.628783941268921
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9606318167574028  NRMSE:  0.9860760013051824
+fit:  0.9606318167574028
+NRMSE:  0.9860760013051824
+elapsed time in simulation: 2.309563159942627
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9606318167574028  NRMSE:  0.9860760013051824
+fit:  0.9173531069020883
+NRMSE:  0.9707689017668234
+elapsed time in simulation: 3.1126577854156494
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9173531069020883  NRMSE:  0.9707689017668234
+fit:  0.9173531069020883
+NRMSE:  0.9707689017668234
+elapsed time in simulation: 2.3587803840637207
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9173531069020883  NRMSE:  0.9707689017668234
+fit:  0.8637037701118797
+NRMSE:  0.951793850496578
+elapsed time in simulation: 2.4465723037719727
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8637037701118797  NRMSE:  0.951793850496578
+fit:  0.8637037701118797
+NRMSE:  0.951793850496578
+elapsed time in simulation: 2.3421308994293213
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8637037701118797  NRMSE:  0.951793850496578
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f813ec52158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '4', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9600908350346931
+NRMSE:  0.9858846633215494
+elapsed time in simulation: 3.301490545272827
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9600908350346931  NRMSE:  0.9858846633215494
+fit:  0.9600908350346931
+NRMSE:  0.9858846633215494
+elapsed time in simulation: 2.2210941314697266
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9600908350346931  NRMSE:  0.9858846633215494
+fit:  0.9083838643109696
+NRMSE:  0.967596600892215
+elapsed time in simulation: 2.818060874938965
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9083838643109696  NRMSE:  0.967596600892215
+fit:  0.9083838643109696
+NRMSE:  0.967596600892215
+elapsed time in simulation: 2.3033106327056885
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9083838643109696  NRMSE:  0.967596600892215
+fit:  0.7579432521021485
+NRMSE:  0.9143877729629484
+elapsed time in simulation: 2.5485870838165283
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7579432521021485  NRMSE:  0.9143877729629484
+fit:  0.7579432521021485
+NRMSE:  0.9143877729629484
+elapsed time in simulation: 2.386073350906372
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7579432521021485  NRMSE:  0.9143877729629484
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fd1edf7f158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '5', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9614977641170679
+NRMSE:  0.9863822752785445
+elapsed time in simulation: 3.1307425498962402
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9614977641170679  NRMSE:  0.9863822752785445
+fit:  0.9614977641170679
+NRMSE:  0.9863822752785445
+elapsed time in simulation: 2.2196574211120605
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9614977641170679  NRMSE:  0.9863822752785445
+fit:  0.9090461494382629
+NRMSE:  0.9678308422640152
+elapsed time in simulation: 2.8610377311706543
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9090461494382629  NRMSE:  0.9678308422640152
+fit:  0.9090461494382629
+NRMSE:  0.9678308422640152
+elapsed time in simulation: 2.3151655197143555
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9090461494382629  NRMSE:  0.9678308422640152
+fit:  0.7843013264012502
+NRMSE:  0.9237102705208617
+elapsed time in simulation: 2.6308720111846924
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7843013264012502  NRMSE:  0.9237102705208617
+fit:  0.7843013264012502
+NRMSE:  0.9237102705208617
+elapsed time in simulation: 2.446348190307617
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7843013264012502  NRMSE:  0.9237102705208617
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f750510a158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '6', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9609113066139388
+NRMSE:  0.9861748531209658
+elapsed time in simulation: 3.0876271724700928
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9609113066139388  NRMSE:  0.9861748531209658
+fit:  0.9609113066139388
+NRMSE:  0.9861748531209658
+elapsed time in simulation: 2.119966506958008
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9609113066139388  NRMSE:  0.9861748531209658
+fit:  0.908924357815464
+NRMSE:  0.9677877661996095
+elapsed time in simulation: 2.831218957901001
+validationOnMultiHarmonic: True reset every: 10 fit:  0.908924357815464  NRMSE:  0.9677877661996095
+fit:  0.908924357815464
+NRMSE:  0.9677877661996095
+elapsed time in simulation: 2.375215768814087
+validationOnMultiHarmonic: False reset every: 10 fit:  0.908924357815464  NRMSE:  0.9677877661996095
+fit:  0.8019593691936722
+NRMSE:  0.9299556835560429
+elapsed time in simulation: 2.5028772354125977
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8019593691936722  NRMSE:  0.9299556835560429
+fit:  0.8019593691936722
+NRMSE:  0.9299556835560429
+elapsed time in simulation: 2.0917551517486572
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8019593691936722  NRMSE:  0.9299556835560429
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f5613d4e158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '7', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9617324485717411
+NRMSE:  0.9864652800242912
+elapsed time in simulation: 3.157357692718506
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9617324485717411  NRMSE:  0.9864652800242912
+fit:  0.9617324485717411
+NRMSE:  0.9864652800242912
+elapsed time in simulation: 2.2172770500183105
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9617324485717411  NRMSE:  0.9864652800242912
+fit:  0.9208851495247287
+NRMSE:  0.9720181378965331
+elapsed time in simulation: 2.837045907974243
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9208851495247287  NRMSE:  0.9720181378965331
+fit:  0.9208851495247287
+NRMSE:  0.9720181378965331
+elapsed time in simulation: 2.3122658729553223
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9208851495247287  NRMSE:  0.9720181378965331
+fit:  0.8642692717622871
+NRMSE:  0.9519938608499557
+elapsed time in simulation: 2.389700412750244
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8642692717622871  NRMSE:  0.9519938608499557
+fit:  0.8642692717622871
+NRMSE:  0.9519938608499557
+elapsed time in simulation: 2.0630788803100586
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8642692717622871  NRMSE:  0.9519938608499557
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fe96e42c158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '8', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9597058757243304
+NRMSE:  0.9857485083737324
+elapsed time in simulation: 3.1264984607696533
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9597058757243304  NRMSE:  0.9857485083737324
+fit:  0.9597058757243304
+NRMSE:  0.9857485083737324
+elapsed time in simulation: 2.0419399738311768
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9597058757243304  NRMSE:  0.9857485083737324
+fit:  0.912405729099882
+NRMSE:  0.9690190805562233
+elapsed time in simulation: 2.4609386920928955
+validationOnMultiHarmonic: True reset every: 10 fit:  0.912405729099882  NRMSE:  0.9690190805562233
+fit:  0.912405729099882
+NRMSE:  0.9690190805562233
+elapsed time in simulation: 1.9325735569000244
+validationOnMultiHarmonic: False reset every: 10 fit:  0.912405729099882  NRMSE:  0.9690190805562233
+fit:  0.7928981926430797
+NRMSE:  0.9267508668723143
+elapsed time in simulation: 2.229870080947876
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7928981926430797  NRMSE:  0.9267508668723143
+fit:  0.7928981926430797
+NRMSE:  0.9267508668723143
+elapsed time in simulation: 1.912172794342041
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7928981926430797  NRMSE:  0.9267508668723143
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fb652a0f158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '9', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.9627119614372971
+NRMSE:  0.9868117205947772
+elapsed time in simulation: 2.4983789920806885
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9627119614372971  NRMSE:  0.9868117205947772
+fit:  0.9627119614372971
+NRMSE:  0.9868117205947772
+elapsed time in simulation: 1.662370204925537
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9627119614372971  NRMSE:  0.9868117205947772
+fit:  0.8979914479843726
+NRMSE:  0.9639209425445632
+elapsed time in simulation: 2.1491851806640625
+validationOnMultiHarmonic: True reset every: 10 fit:  0.8979914479843726  NRMSE:  0.9639209425445632
+fit:  0.8979914479843726
+NRMSE:  0.9639209425445632
+elapsed time in simulation: 1.7401139736175537
+validationOnMultiHarmonic: False reset every: 10 fit:  0.8979914479843726  NRMSE:  0.9639209425445632
+fit:  0.777017298189819
+NRMSE:  0.9211340073825811
+elapsed time in simulation: 1.8982763290405273
+validationOnMultiHarmonic: True reset every: -1 fit:  0.777017298189819  NRMSE:  0.9211340073825811
+fit:  0.777017298189819
+NRMSE:  0.9211340073825811
+elapsed time in simulation: 1.7206683158874512
+validationOnMultiHarmonic: False reset every: -1 fit:  0.777017298189819  NRMSE:  0.9211340073825811
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f94cb7a3158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '10', '2', '3', '0', '6', '10', '1', '0']
+fit:  0.956878590572876
+NRMSE:  0.9847485355145295
+elapsed time in simulation: 3.8963446617126465
+validationOnMultiHarmonic: True reset every: 1 fit:  0.956878590572876  NRMSE:  0.9847485355145295
+fit:  0.956878590572876
+NRMSE:  0.9847485355145295
+elapsed time in simulation: 2.611380100250244
+validationOnMultiHarmonic: False reset every: 1 fit:  0.956878590572876  NRMSE:  0.9847485355145295
+fit:  0.9024826757827081
+NRMSE:  0.9655094296133412
+elapsed time in simulation: 3.588592052459717
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9024826757827081  NRMSE:  0.9655094296133412
+fit:  0.9024826757827081
+NRMSE:  0.9655094296133412
+elapsed time in simulation: 2.905479669570923
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9024826757827081  NRMSE:  0.9655094296133412
+fit:  0.781294911273561
+NRMSE:  0.9226469417902454
+elapsed time in simulation: 3.070732831954956
+validationOnMultiHarmonic: True reset every: -1 fit:  0.781294911273561  NRMSE:  0.9226469417902454
+fit:  0.781294911273561
+NRMSE:  0.9226469417902454
+elapsed time in simulation: 2.9839460849761963
+validationOnMultiHarmonic: False reset every: -1 fit:  0.781294911273561  NRMSE:  0.9226469417902454
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fdbb2770158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': True, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}

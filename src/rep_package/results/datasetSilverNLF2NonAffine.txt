@@ -1,0 +1,260 @@
+para ['main.py', '1', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9817743451325052
+NRMSE:  0.9980641464204258
+elapsed time in simulation: 2.29300594329834
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9817743451325052  NRMSE:  0.9980641464204258
+fit:  0.9817743451325052
+NRMSE:  0.9980641464204258
+elapsed time in simulation: 1.3005235195159912
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9817743451325052  NRMSE:  0.9980641464204258
+fit:  0.9623473671418381
+NRMSE:  0.9960006932739156
+elapsed time in simulation: 1.7203154563903809
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9623473671418381  NRMSE:  0.9960006932739156
+fit:  0.9623473671418381
+NRMSE:  0.9960006932739156
+elapsed time in simulation: 1.2772302627563477
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9623473671418381  NRMSE:  0.9960006932739156
+fit:  0.9180965917511253
+NRMSE:  0.9913005591738333
+elapsed time in simulation: 1.4510326385498047
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9180965917511253  NRMSE:  0.9913005591738333
+fit:  0.9180965917511253
+NRMSE:  0.9913005591738333
+elapsed time in simulation: 1.2056884765625
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9180965917511253  NRMSE:  0.9913005591738333
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7f925d044268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '2', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.982234762910886
+NRMSE:  0.9981130500900529
+elapsed time in simulation: 1.949554204940796
+validationOnMultiHarmonic: True reset every: 1 fit:  0.982234762910886  NRMSE:  0.9981130500900529
+fit:  0.982234762910886
+NRMSE:  0.9981130500900529
+elapsed time in simulation: 1.0880494117736816
+validationOnMultiHarmonic: False reset every: 1 fit:  0.982234762910886  NRMSE:  0.9981130500900529
+fit:  0.955990583760294
+NRMSE:  0.9953255020693632
+elapsed time in simulation: 1.569652795791626
+validationOnMultiHarmonic: True reset every: 10 fit:  0.955990583760294  NRMSE:  0.9953255020693632
+fit:  0.955990583760294
+NRMSE:  0.9953255020693632
+elapsed time in simulation: 1.1267976760864258
+validationOnMultiHarmonic: False reset every: 10 fit:  0.955990583760294  NRMSE:  0.9953255020693632
+fit:  0.8925411570017462
+NRMSE:  0.988586166731047
+elapsed time in simulation: 1.3417084217071533
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8925411570017462  NRMSE:  0.988586166731047
+fit:  0.8925411570017462
+NRMSE:  0.988586166731047
+elapsed time in simulation: 1.1641275882720947
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8925411570017462  NRMSE:  0.988586166731047
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7f4d0515d268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '3', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9810121363983727
+NRMSE:  0.9979831877653278
+elapsed time in simulation: 2.0899338722229004
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9810121363983727  NRMSE:  0.9979831877653278
+fit:  0.9810121363983727
+NRMSE:  0.9979831877653278
+elapsed time in simulation: 1.1313786506652832
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9810121363983727  NRMSE:  0.9979831877653278
+fit:  0.9648548541162664
+NRMSE:  0.9962670281557332
+elapsed time in simulation: 1.4900858402252197
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9648548541162664  NRMSE:  0.9962670281557332
+fit:  0.9648548541162664
+NRMSE:  0.9962670281557332
+elapsed time in simulation: 1.0989654064178467
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9648548541162664  NRMSE:  0.9962670281557332
+fit:  0.9309864228933391
+NRMSE:  0.9926696636553005
+elapsed time in simulation: 1.2687427997589111
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9309864228933391  NRMSE:  0.9926696636553005
+fit:  0.9309864228933391
+NRMSE:  0.9926696636553005
+elapsed time in simulation: 1.0470762252807617
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9309864228933391  NRMSE:  0.9926696636553005
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7fde61419268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '4', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.983718896681537
+NRMSE:  0.998270688632721
+elapsed time in simulation: 2.0302882194519043
+validationOnMultiHarmonic: True reset every: 1 fit:  0.983718896681537  NRMSE:  0.998270688632721
+fit:  0.983718896681537
+NRMSE:  0.998270688632721
+elapsed time in simulation: 1.1319386959075928
+validationOnMultiHarmonic: False reset every: 1 fit:  0.983718896681537  NRMSE:  0.998270688632721
+fit:  0.9684524442065002
+NRMSE:  0.9966491492759153
+elapsed time in simulation: 1.5606625080108643
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9684524442065002  NRMSE:  0.9966491492759153
+fit:  0.9684524442065002
+NRMSE:  0.9966491492759153
+elapsed time in simulation: 1.1790101528167725
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9684524442065002  NRMSE:  0.9966491492759153
+fit:  0.9096189046229716
+NRMSE:  0.9904000943569111
+elapsed time in simulation: 1.3837850093841553
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9096189046229716  NRMSE:  0.9904000943569111
+fit:  0.9096189046229716
+NRMSE:  0.9904000943569111
+elapsed time in simulation: 1.1246330738067627
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9096189046229716  NRMSE:  0.9904000943569111
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7ffb3cc65268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '5', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9810848164297742
+NRMSE:  0.9979909075372633
+elapsed time in simulation: 2.068286657333374
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9810848164297742  NRMSE:  0.9979909075372633
+fit:  0.9810848164297742
+NRMSE:  0.9979909075372633
+elapsed time in simulation: 1.1484434604644775
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9810848164297742  NRMSE:  0.9979909075372633
+fit:  0.9661212709409103
+NRMSE:  0.996401541706058
+elapsed time in simulation: 1.5638887882232666
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9661212709409103  NRMSE:  0.996401541706058
+fit:  0.9661212709409103
+NRMSE:  0.996401541706058
+elapsed time in simulation: 1.1652016639709473
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9661212709409103  NRMSE:  0.996401541706058
+fit:  0.9122908257713439
+NRMSE:  0.9906838947556909
+elapsed time in simulation: 1.3929479122161865
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9122908257713439  NRMSE:  0.9906838947556909
+fit:  0.9122908257713439
+NRMSE:  0.9906838947556909
+elapsed time in simulation: 1.1894547939300537
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9122908257713439  NRMSE:  0.9906838947556909
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7fa9f1376268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '6', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9837942736085973
+NRMSE:  0.9982786948577443
+elapsed time in simulation: 2.066343307495117
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9837942736085973  NRMSE:  0.9982786948577443
+fit:  0.9837942736085973
+NRMSE:  0.9982786948577443
+elapsed time in simulation: 1.1915183067321777
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9837942736085973  NRMSE:  0.9982786948577443
+fit:  0.9591267436712977
+NRMSE:  0.9956586119868928
+elapsed time in simulation: 1.5767550468444824
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9591267436712977  NRMSE:  0.9956586119868928
+fit:  0.9591267436712977
+NRMSE:  0.9956586119868928
+elapsed time in simulation: 1.1652107238769531
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9591267436712977  NRMSE:  0.9956586119868928
+fit:  0.9099201080033926
+NRMSE:  0.9904320869325638
+elapsed time in simulation: 1.364755392074585
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9099201080033926  NRMSE:  0.9904320869325638
+fit:  0.9099201080033926
+NRMSE:  0.9904320869325638
+elapsed time in simulation: 1.141327142715454
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9099201080033926  NRMSE:  0.9904320869325638
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7f051c717268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '7', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9805255176176791
+NRMSE:  0.9979315011337448
+elapsed time in simulation: 2.067103624343872
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9805255176176791  NRMSE:  0.9979315011337448
+fit:  0.9805255176176791
+NRMSE:  0.9979315011337448
+elapsed time in simulation: 1.093062162399292
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9805255176176791  NRMSE:  0.9979315011337448
+fit:  0.9542356306406522
+NRMSE:  0.9951390982170275
+elapsed time in simulation: 1.4995970726013184
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9542356306406522  NRMSE:  0.9951390982170275
+fit:  0.9542356306406522
+NRMSE:  0.9951390982170275
+elapsed time in simulation: 1.1013929843902588
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9542356306406522  NRMSE:  0.9951390982170275
+fit:  0.8889253852235379
+NRMSE:  0.9882021144272666
+elapsed time in simulation: 1.2743546962738037
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8889253852235379  NRMSE:  0.9882021144272666
+fit:  0.8889253852235379
+NRMSE:  0.9882021144272666
+elapsed time in simulation: 1.0837774276733398
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8889253852235379  NRMSE:  0.9882021144272666
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7fef145e9268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '8', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9818281242742317
+NRMSE:  0.9980698586181369
+elapsed time in simulation: 2.0373048782348633
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9818281242742317  NRMSE:  0.9980698586181369
+fit:  0.9818281242742317
+NRMSE:  0.9980698586181369
+elapsed time in simulation: 1.1506149768829346
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9818281242742317  NRMSE:  0.9980698586181369
+fit:  0.9629398630400532
+NRMSE:  0.996063625734438
+elapsed time in simulation: 1.5731487274169922
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9629398630400532  NRMSE:  0.996063625734438
+fit:  0.9629398630400532
+NRMSE:  0.996063625734438
+elapsed time in simulation: 1.18440580368042
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9629398630400532  NRMSE:  0.996063625734438
+fit:  0.9093898170241729
+NRMSE:  0.9903757616209192
+elapsed time in simulation: 1.3690829277038574
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9093898170241729  NRMSE:  0.9903757616209192
+fit:  0.9093898170241729
+NRMSE:  0.9903757616209192
+elapsed time in simulation: 1.1452794075012207
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9093898170241729  NRMSE:  0.9903757616209192
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7f4e8ea6a268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '9', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9837383979265907
+NRMSE:  0.9982727599742073
+elapsed time in simulation: 1.9877619743347168
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9837383979265907  NRMSE:  0.9982727599742073
+fit:  0.9837383979265907
+NRMSE:  0.9982727599742073
+elapsed time in simulation: 1.1580440998077393
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9837383979265907  NRMSE:  0.9982727599742073
+fit:  0.9622014334094409
+NRMSE:  0.9959851927972362
+elapsed time in simulation: 1.5960888862609863
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9622014334094409  NRMSE:  0.9959851927972362
+fit:  0.9622014334094409
+NRMSE:  0.9959851927972362
+elapsed time in simulation: 1.164846420288086
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9622014334094409  NRMSE:  0.9959851927972362
+fit:  0.9021258641040745
+NRMSE:  0.9896042146249695
+elapsed time in simulation: 1.3779966831207275
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9021258641040745  NRMSE:  0.9896042146249695
+fit:  0.9021258641040745
+NRMSE:  0.9896042146249695
+elapsed time in simulation: 1.173248291015625
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9021258641040745  NRMSE:  0.9896042146249695
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7f389d201268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '10', '2', '5', '0', '6', '10', '0', '0']
+fit:  0.9809074295303581
+NRMSE:  0.9979720662354445
+elapsed time in simulation: 1.8944675922393799
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9809074295303581  NRMSE:  0.9979720662354445
+fit:  0.9809074295303581
+NRMSE:  0.9979720662354445
+elapsed time in simulation: 1.07731032371521
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9809074295303581  NRMSE:  0.9979720662354445
+fit:  0.9558714748334661
+NRMSE:  0.995312850812438
+elapsed time in simulation: 1.4096286296844482
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9558714748334661  NRMSE:  0.995312850812438
+fit:  0.9558714748334661
+NRMSE:  0.995312850812438
+elapsed time in simulation: 1.024916648864746
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9558714748334661  NRMSE:  0.995312850812438
+fit:  0.8794492313147708
+NRMSE:  0.9871955966039976
+elapsed time in simulation: 1.2480332851409912
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8794492313147708  NRMSE:  0.9871955966039976
+fit:  0.8794492313147708
+NRMSE:  0.9871955966039976
+elapsed time in simulation: 1.0874149799346924
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8794492313147708  NRMSE:  0.9871955966039976
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.SILVERBOXdataset at 0x7fb11e46a268>, 'stringDynamicalSystemSelector': 'SILVERBOXdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 2, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}

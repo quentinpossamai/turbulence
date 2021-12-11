@@ -1,0 +1,290 @@
+para ['main.py', '1', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9769386592975154
+NRMSE:  0.9920776124562506
+elapsed time in simulation: 3.776370048522949
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9769386592975154  NRMSE:  0.9920776124562506
+fit:  0.9769386592975154
+NRMSE:  0.9920776124562506
+elapsed time in simulation: 2.1132383346557617
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9769386592975154  NRMSE:  0.9920776124562506
+fit:  0.9611090660994214
+NRMSE:  0.9866395863851258
+elapsed time in simulation: 2.8340561389923096
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9611090660994214  NRMSE:  0.9866395863851258
+fit:  0.9611090660994214
+NRMSE:  0.9866395863851258
+elapsed time in simulation: 1.9030194282531738
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9611090660994214  NRMSE:  0.9866395863851258
+fit:  0.9121423642082077
+NRMSE:  0.969817789503228
+elapsed time in simulation: 2.231074810028076
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9121423642082077  NRMSE:  0.969817789503228
+fit:  0.9121423642082077
+NRMSE:  0.969817789503228
+elapsed time in simulation: 2.062837839126587
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9121423642082077  NRMSE:  0.969817789503228
+evaluating state importance=>False
+[ 0  0  0  0  0  2  6  8 23 30  0  0  0  1  3  2  5 13 28 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f56feff81e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '2', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9741925792231515
+NRMSE:  0.9911342366631453
+elapsed time in simulation: 3.706103563308716
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9741925792231515  NRMSE:  0.9911342366631453
+fit:  0.9741925792231515
+NRMSE:  0.9911342366631453
+elapsed time in simulation: 2.1990246772766113
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9741925792231515  NRMSE:  0.9911342366631453
+fit:  0.9570088781789344
+NRMSE:  0.9852310265738223
+elapsed time in simulation: 2.8211934566497803
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9570088781789344  NRMSE:  0.9852310265738223
+fit:  0.9570088781789344
+NRMSE:  0.9852310265738223
+elapsed time in simulation: 2.1280136108398438
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9570088781789344  NRMSE:  0.9852310265738223
+fit:  0.9177031482270094
+NRMSE:  0.9717281158200013
+elapsed time in simulation: 2.465073823928833
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9177031482270094  NRMSE:  0.9717281158200013
+fit:  0.9177031482270094
+NRMSE:  0.9717281158200013
+elapsed time in simulation: 2.063145875930786
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9177031482270094  NRMSE:  0.9717281158200013
+evaluating state importance=>False
+[ 0  0  0  0  1  3  5  9 24 29  0  0  0  1  3  4  4  7 23 30] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f3b670511e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '3', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.975126740883133
+NRMSE:  0.9914551542886364
+elapsed time in simulation: 3.054656505584717
+validationOnMultiHarmonic: True reset every: 1 fit:  0.975126740883133  NRMSE:  0.9914551542886364
+fit:  0.975126740883133
+NRMSE:  0.9914551542886364
+elapsed time in simulation: 1.5905516147613525
+validationOnMultiHarmonic: False reset every: 1 fit:  0.975126740883133  NRMSE:  0.9914551542886364
+fit:  0.9578999021045256
+NRMSE:  0.9855371248592757
+elapsed time in simulation: 2.402458429336548
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9578999021045256  NRMSE:  0.9855371248592757
+fit:  0.9578999021045256
+NRMSE:  0.9855371248592757
+elapsed time in simulation: 1.6236371994018555
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9578999021045256  NRMSE:  0.9855371248592757
+fit:  0.9268051284447028
+NRMSE:  0.9748549684878663
+elapsed time in simulation: 1.8296747207641602
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9268051284447028  NRMSE:  0.9748549684878663
+fit:  0.9268051284447028
+NRMSE:  0.9748549684878663
+elapsed time in simulation: 1.6722760200500488
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9268051284447028  NRMSE:  0.9748549684878663
+evaluating state importance=>False
+[ 0  0  0  0  0  4  8 12 23 29  0  0  0  1  1  0  5 11 25 30] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f1da922a1e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '4', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9763856981317087
+NRMSE:  0.9918876507056013
+elapsed time in simulation: 2.90181040763855
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9763856981317087  NRMSE:  0.9918876507056013
+fit:  0.9763856981317087
+NRMSE:  0.9918876507056013
+elapsed time in simulation: 1.7137227058410645
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9763856981317087  NRMSE:  0.9918876507056013
+fit:  0.9543579026510547
+NRMSE:  0.9843203225617787
+elapsed time in simulation: 2.4682788848876953
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9543579026510547  NRMSE:  0.9843203225617787
+fit:  0.9543579026510547
+NRMSE:  0.9843203225617787
+elapsed time in simulation: 1.7871830463409424
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9543579026510547  NRMSE:  0.9843203225617787
+fit:  0.9015081216540713
+NRMSE:  0.9661645504381191
+elapsed time in simulation: 1.995596170425415
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9015081216540713  NRMSE:  0.9661645504381191
+fit:  0.9015081216540713
+NRMSE:  0.9661645504381191
+elapsed time in simulation: 1.8431141376495361
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9015081216540713  NRMSE:  0.9661645504381191
+evaluating state importance=>False
+[ 0  0  0  0  1  4  9 13 26 30  0  0  1  1  1  1  7 15 29 28] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f3f2e3cb1e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '5', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9770247576399236
+NRMSE:  0.9921071902871422
+elapsed time in simulation: 2.912421703338623
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9770247576399236  NRMSE:  0.9921071902871422
+fit:  0.9770247576399236
+NRMSE:  0.9921071902871422
+elapsed time in simulation: 1.7049477100372314
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9770247576399236  NRMSE:  0.9921071902871422
+fit:  0.9514101620410556
+NRMSE:  0.9833076692302946
+elapsed time in simulation: 2.4918100833892822
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9514101620410556  NRMSE:  0.9833076692302946
+fit:  0.9514101620410556
+NRMSE:  0.9833076692302946
+elapsed time in simulation: 1.7327022552490234
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9514101620410556  NRMSE:  0.9833076692302946
+fit:  0.9066965983437274
+NRMSE:  0.9679469759973034
+elapsed time in simulation: 1.991546392440796
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9066965983437274  NRMSE:  0.9679469759973034
+fit:  0.9066965983437274
+NRMSE:  0.9679469759973034
+elapsed time in simulation: 1.7074527740478516
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9066965983437274  NRMSE:  0.9679469759973034
+evaluating state importance=>False
+[ 0  0  0  0  0  4  6 11 22 29  0  0  0  1  2  1  3 11 23 27] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f31dbf0c1e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '6', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.975316234224028
+NRMSE:  0.9915202519645651
+elapsed time in simulation: 2.908086061477661
+validationOnMultiHarmonic: True reset every: 1 fit:  0.975316234224028  NRMSE:  0.9915202519645651
+fit:  0.975316234224028
+NRMSE:  0.9915202519645651
+elapsed time in simulation: 1.5750463008880615
+validationOnMultiHarmonic: False reset every: 1 fit:  0.975316234224028  NRMSE:  0.9915202519645651
+fit:  0.9541109164020437
+NRMSE:  0.9842354740350653
+elapsed time in simulation: 2.2812767028808594
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9541109164020437  NRMSE:  0.9842354740350653
+fit:  0.9541109164020437
+NRMSE:  0.9842354740350653
+elapsed time in simulation: 1.5583677291870117
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9541109164020437  NRMSE:  0.9842354740350653
+fit:  0.9083334159827046
+NRMSE:  0.9685092808451314
+elapsed time in simulation: 1.9416074752807617
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9083334159827046  NRMSE:  0.9685092808451314
+fit:  0.9083334159827046
+NRMSE:  0.9685092808451314
+elapsed time in simulation: 1.6216955184936523
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9083334159827046  NRMSE:  0.9685092808451314
+evaluating state importance=>False
+[ 0  0  0  0  1  4  8 11 22 29  0  0  0  1  2  1  4 15 24 27] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f152e4a41e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '7', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9760433369760131
+NRMSE:  0.9917700375195191
+elapsed time in simulation: 2.764357805252075
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9760433369760131  NRMSE:  0.9917700375195191
+fit:  0.9760433369760131
+NRMSE:  0.9917700375195191
+elapsed time in simulation: 1.494694471359253
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9760433369760131  NRMSE:  0.9917700375195191
+fit:  0.9561416289275518
+NRMSE:  0.984933095731244
+elapsed time in simulation: 2.31286358833313
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9561416289275518  NRMSE:  0.984933095731244
+fit:  0.9561416289275518
+NRMSE:  0.984933095731244
+elapsed time in simulation: 1.481971025466919
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9561416289275518  NRMSE:  0.984933095731244
+fit:  0.9012248968860705
+NRMSE:  0.9660672526962819
+elapsed time in simulation: 1.6946089267730713
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9012248968860705  NRMSE:  0.9660672526962819
+fit:  0.9012248968860705
+NRMSE:  0.9660672526962819
+elapsed time in simulation: 1.486802101135254
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9012248968860705  NRMSE:  0.9660672526962819
+evaluating state importance=>False
+[ 0  0  0  0  1  4  6 10 19 29  0  0  0  1  1  1  3 13 25 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7fc4a810f1e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '8', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9768875065310955
+NRMSE:  0.9920600396687557
+elapsed time in simulation: 2.597360849380493
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9768875065310955  NRMSE:  0.9920600396687557
+fit:  0.9768875065310955
+NRMSE:  0.9920600396687557
+elapsed time in simulation: 1.512535572052002
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9768875065310955  NRMSE:  0.9920600396687557
+fit:  0.952521803466934
+NRMSE:  0.9836895574430882
+elapsed time in simulation: 2.171081304550171
+validationOnMultiHarmonic: True reset every: 10 fit:  0.952521803466934  NRMSE:  0.9836895574430882
+fit:  0.952521803466934
+NRMSE:  0.9836895574430882
+elapsed time in simulation: 1.3777554035186768
+validationOnMultiHarmonic: False reset every: 10 fit:  0.952521803466934  NRMSE:  0.9836895574430882
+fit:  0.9051757737659482
+NRMSE:  0.9674245188753752
+elapsed time in simulation: 1.2988574504852295
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9051757737659482  NRMSE:  0.9674245188753752
+fit:  0.9051757737659482
+NRMSE:  0.9674245188753752
+elapsed time in simulation: 1.116058349609375
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9051757737659482  NRMSE:  0.9674245188753752
+evaluating state importance=>False
+[ 0  0  0  0  0  4  6 11 19 30  0  0  0  1  3  0  4 11 22 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7fbe059481e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '9', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9760036588494925
+NRMSE:  0.9917564066773508
+elapsed time in simulation: 2.4260129928588867
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9760036588494925  NRMSE:  0.9917564066773508
+fit:  0.9760036588494925
+NRMSE:  0.9917564066773508
+elapsed time in simulation: 1.1707234382629395
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9760036588494925  NRMSE:  0.9917564066773508
+fit:  0.9584487720142099
+NRMSE:  0.9857256811185028
+elapsed time in simulation: 1.7683234214782715
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9584487720142099  NRMSE:  0.9857256811185028
+fit:  0.9584487720142099
+NRMSE:  0.9857256811185028
+elapsed time in simulation: 1.1401784420013428
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9584487720142099  NRMSE:  0.9857256811185028
+fit:  0.9113631014973125
+NRMSE:  0.9695500851544759
+elapsed time in simulation: 1.3522145748138428
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9113631014973125  NRMSE:  0.9695500851544759
+fit:  0.9113631014973125
+NRMSE:  0.9695500851544759
+elapsed time in simulation: 1.171569585800171
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9113631014973125  NRMSE:  0.9695500851544759
+evaluating state importance=>False
+[ 0  0  0  0  1  3  5  8 24 30  0  0  0  1  1  2  3 13 23 30] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7f647d4e71e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '10', '5', '4', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9763406770796063
+NRMSE:  0.9918721843792075
+elapsed time in simulation: 2.229804754257202
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9763406770796063  NRMSE:  0.9918721843792075
+fit:  0.9763406770796063
+NRMSE:  0.9918721843792075
+elapsed time in simulation: 1.1640000343322754
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9763406770796063  NRMSE:  0.9918721843792075
+fit:  0.9612381390289756
+NRMSE:  0.986683927509197
+elapsed time in simulation: 1.8098649978637695
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9612381390289756  NRMSE:  0.986683927509197
+fit:  0.9612381390289756
+NRMSE:  0.986683927509197
+elapsed time in simulation: 1.1538634300231934
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9612381390289756  NRMSE:  0.986683927509197
+fit:  0.9221623578601721
+NRMSE:  0.9732600123089565
+elapsed time in simulation: 1.3611805438995361
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9221623578601721  NRMSE:  0.9732600123089565
+fit:  0.9221623578601721
+NRMSE:  0.9732600123089565
+elapsed time in simulation: 1.1902258396148682
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9221623578601721  NRMSE:  0.9732600123089565
+evaluating state importance=>False
+[ 0  0  0  0  1  4  7 10 25 29  0  0  0  1  1  1  6 14 24 28] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.TANKSdataset at 0x7fc97373e1e0>, 'stringDynamicalSystemSelector': 'TANKSdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}

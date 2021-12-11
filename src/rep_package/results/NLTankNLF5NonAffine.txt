@@ -1,0 +1,260 @@
+para ['main.py', '1', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9953558521512628
+NRMSE:  0.99840654332417
+elapsed time in simulation: 2.2186548709869385
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9953558521512628  NRMSE:  0.99840654332417
+fit:  0.9867733237823708
+NRMSE:  0.9973318210810017
+elapsed time in simulation: 1.424480676651001
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9867733237823708  NRMSE:  0.9973318210810017
+fit:  0.9912575150762646
+NRMSE:  0.9970003601481257
+elapsed time in simulation: 1.7844631671905518
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9912575150762646  NRMSE:  0.9970003601481257
+fit:  0.9803405592014028
+NRMSE:  0.9960341581940142
+elapsed time in simulation: 1.4212255477905273
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9803405592014028  NRMSE:  0.9960341581940142
+fit:  0.9052212051055311
+NRMSE:  0.9674803842662386
+elapsed time in simulation: 1.4019083976745605
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9052212051055311  NRMSE:  0.9674803842662386
+fit:  0.9345644991963287
+NRMSE:  0.9867998867647684
+elapsed time in simulation: 1.421293020248413
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9345644991963287  NRMSE:  0.9867998867647684
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7f4b8ff202f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '2', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9944509571280304
+NRMSE:  0.9980960641872737
+elapsed time in simulation: 2.2038416862487793
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9944509571280304  NRMSE:  0.9980960641872737
+fit:  0.9870072594402685
+NRMSE:  0.9973790122407863
+elapsed time in simulation: 1.4114031791687012
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9870072594402685  NRMSE:  0.9973790122407863
+fit:  0.9932595659486447
+NRMSE:  0.9976872851625419
+elapsed time in simulation: 1.8201484680175781
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9932595659486447  NRMSE:  0.9976872851625419
+fit:  0.9756792051930538
+NRMSE:  0.9950938368090779
+elapsed time in simulation: 1.4201815128326416
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9756792051930538  NRMSE:  0.9950938368090779
+fit:  0.97337052254703
+NRMSE:  0.9908631421730392
+elapsed time in simulation: 1.4054555892944336
+validationOnMultiHarmonic: True reset every: -1 fit:  0.97337052254703  NRMSE:  0.9908631421730392
+fit:  0.9230775836382179
+NRMSE:  0.9844826647029163
+elapsed time in simulation: 1.422705888748169
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9230775836382179  NRMSE:  0.9844826647029163
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7eff85ff32f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '3', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9939065089135499
+NRMSE:  0.9979092581961071
+elapsed time in simulation: 2.1971216201782227
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9939065089135499  NRMSE:  0.9979092581961071
+fit:  0.9815570111445605
+NRMSE:  0.9962795495060343
+elapsed time in simulation: 1.426006555557251
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9815570111445605  NRMSE:  0.9962795495060343
+fit:  0.9897194197620528
+NRMSE:  0.9964726232357102
+elapsed time in simulation: 1.8178460597991943
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9897194197620528  NRMSE:  0.9964726232357102
+fit:  0.9768203699505726
+NRMSE:  0.995324040656138
+elapsed time in simulation: 1.4268252849578857
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9768203699505726  NRMSE:  0.995324040656138
+fit:  0.9448395807323124
+NRMSE:  0.9810738716366286
+elapsed time in simulation: 1.417586088180542
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9448395807323124  NRMSE:  0.9810738716366286
+fit:  0.9376267577277815
+NRMSE:  0.9874176272706753
+elapsed time in simulation: 1.3949854373931885
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9376267577277815  NRMSE:  0.9874176272706753
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7f64eac022f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '4', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9936698404656816
+NRMSE:  0.9978280547266016
+elapsed time in simulation: 2.2226107120513916
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9936698404656816  NRMSE:  0.9978280547266016
+fit:  0.9868867284792434
+NRMSE:  0.9973546978806249
+elapsed time in simulation: 1.4359025955200195
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9868867284792434  NRMSE:  0.9973546978806249
+fit:  0.9872443957507578
+NRMSE:  0.9956234160911294
+elapsed time in simulation: 1.834272861480713
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9872443957507578  NRMSE:  0.9956234160911294
+fit:  0.9783813006880347
+NRMSE:  0.9956389226732968
+elapsed time in simulation: 1.3640222549438477
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9783813006880347  NRMSE:  0.9956389226732968
+fit:  0.9038073947484491
+NRMSE:  0.9669952908486245
+elapsed time in simulation: 1.4060578346252441
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9038073947484491  NRMSE:  0.9669952908486245
+fit:  0.9477504932664299
+NRMSE:  0.989459858992484
+elapsed time in simulation: 1.406810998916626
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9477504932664299  NRMSE:  0.989459858992484
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7ffb4937d2f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '5', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9946978197731718
+NRMSE:  0.9981807653946266
+elapsed time in simulation: 2.1866464614868164
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9946978197731718  NRMSE:  0.9981807653946266
+fit:  0.9852821000400435
+NRMSE:  0.9970310008532045
+elapsed time in simulation: 1.3240675926208496
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9852821000400435  NRMSE:  0.9970310008532045
+fit:  0.9895334703274887
+NRMSE:  0.9964088220007961
+elapsed time in simulation: 1.7137131690979004
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9895334703274887  NRMSE:  0.9964088220007961
+fit:  0.9798921158503833
+NRMSE:  0.9959436950212663
+elapsed time in simulation: 1.316234827041626
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9798921158503833  NRMSE:  0.9959436950212663
+fit:  0.9443215256189968
+NRMSE:  0.9808961214000627
+elapsed time in simulation: 1.3239567279815674
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9443215256189968  NRMSE:  0.9808961214000627
+fit:  0.9472810992741858
+NRMSE:  0.9893651695078242
+elapsed time in simulation: 1.3528904914855957
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9472810992741858  NRMSE:  0.9893651695078242
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7fc1d36152f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '6', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9956872212688591
+NRMSE:  0.9985202396038312
+elapsed time in simulation: 3.1403634548187256
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9956872212688591  NRMSE:  0.9985202396038312
+fit:  0.985829126239851
+NRMSE:  0.9971413508572758
+elapsed time in simulation: 2.069088935852051
+validationOnMultiHarmonic: False reset every: 1 fit:  0.985829126239851  NRMSE:  0.9971413508572758
+fit:  0.9912910540739939
+NRMSE:  0.9970118677360779
+elapsed time in simulation: 2.6703875064849854
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9912910540739939  NRMSE:  0.9970118677360779
+fit:  0.9812933122101063
+NRMSE:  0.9962263542870468
+elapsed time in simulation: 2.1853017807006836
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9812933122101063  NRMSE:  0.9962263542870468
+fit:  0.9214930172738012
+NRMSE:  0.9730634166269398
+elapsed time in simulation: 2.0026872158050537
+validationOnMultiHarmonic: True reset every: -1 fit:  0.9214930172738012  NRMSE:  0.9730634166269398
+fit:  0.9632001116649086
+NRMSE:  0.9925764655714252
+elapsed time in simulation: 1.8840267658233643
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9632001116649086  NRMSE:  0.9925764655714252
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7f0aeb00b2f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '7', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9938828822460583
+NRMSE:  0.9979011516344152
+elapsed time in simulation: 2.8045523166656494
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9938828822460583  NRMSE:  0.9979011516344152
+fit:  0.9837475981451503
+NRMSE:  0.9967214502495797
+elapsed time in simulation: 1.8344719409942627
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9837475981451503  NRMSE:  0.9967214502495797
+fit:  0.9803322019521096
+NRMSE:  0.9932517686518513
+elapsed time in simulation: 2.247415065765381
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9803322019521096  NRMSE:  0.9932517686518513
+fit:  0.9777828600237705
+NRMSE:  0.9955182009788673
+elapsed time in simulation: 1.8023772239685059
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9777828600237705  NRMSE:  0.9955182009788673
+fit:  0.8733461425623499
+NRMSE:  0.9565437102290976
+elapsed time in simulation: 1.9335498809814453
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8733461425623499  NRMSE:  0.9565437102290976
+fit:  0.9264051147496115
+NRMSE:  0.9851539178747372
+elapsed time in simulation: 1.8461127281188965
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9264051147496115  NRMSE:  0.9851539178747372
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7f769e3242f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '8', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9955722182772824
+NRMSE:  0.9984807808504416
+elapsed time in simulation: 2.704021453857422
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9955722182772824  NRMSE:  0.9984807808504416
+fit:  0.9865692842695702
+NRMSE:  0.9972906607836043
+elapsed time in simulation: 1.8251335620880127
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9865692842695702  NRMSE:  0.9972906607836043
+fit:  0.9800293847215452
+NRMSE:  0.993147868829254
+elapsed time in simulation: 2.277175188064575
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9800293847215452  NRMSE:  0.993147868829254
+fit:  0.979990702224605
+NRMSE:  0.9959635825637654
+elapsed time in simulation: 1.8986027240753174
+validationOnMultiHarmonic: False reset every: 10 fit:  0.979990702224605  NRMSE:  0.9959635825637654
+fit:  0.8440119507697743
+NRMSE:  0.9464788360553209
+elapsed time in simulation: 1.8139965534210205
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8440119507697743  NRMSE:  0.9464788360553209
+fit:  0.9558604969913683
+NRMSE:  0.9910958664531517
+elapsed time in simulation: 1.7919037342071533
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9558604969913683  NRMSE:  0.9910958664531517
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7f497110f2f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '9', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.993874050357532
+NRMSE:  0.9978981213192334
+elapsed time in simulation: 2.783759593963623
+validationOnMultiHarmonic: True reset every: 1 fit:  0.993874050357532  NRMSE:  0.9978981213192334
+fit:  0.9872040912903811
+NRMSE:  0.9974187185573556
+elapsed time in simulation: 1.8745269775390625
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9872040912903811  NRMSE:  0.9974187185573556
+fit:  0.9720461864387502
+NRMSE:  0.9904087483247996
+elapsed time in simulation: 2.3542160987854004
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9720461864387502  NRMSE:  0.9904087483247996
+fit:  0.9808173734941095
+NRMSE:  0.9961303445543019
+elapsed time in simulation: 1.877445936203003
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9808173734941095  NRMSE:  0.9961303445543019
+fit:  0.8163071478693483
+NRMSE:  0.9369730225945715
+elapsed time in simulation: 1.8217525482177734
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8163071478693483  NRMSE:  0.9369730225945715
+fit:  0.9517428532389991
+NRMSE:  0.9902652261565841
+elapsed time in simulation: 1.855086326599121
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9517428532389991  NRMSE:  0.9902652261565841
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7fbfd14ce2f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '10', '5', '1', '1', '6', '10', '0', '0']
+fit:  0.9957653511226454
+NRMSE:  0.9985470467902413
+elapsed time in simulation: 2.7859983444213867
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9957653511226454  NRMSE:  0.9985470467902413
+fit:  0.9855002830362025
+NRMSE:  0.9970750142743586
+elapsed time in simulation: 1.7463815212249756
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9855002830362025  NRMSE:  0.9970750142743586
+fit:  0.9827903600544318
+NRMSE:  0.9940951889231193
+elapsed time in simulation: 2.279240846633911
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9827903600544318  NRMSE:  0.9940951889231193
+fit:  0.9751899322697644
+NRMSE:  0.994995137205483
+elapsed time in simulation: 1.7914776802062988
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9751899322697644  NRMSE:  0.994995137205483
+fit:  0.8643209062657924
+NRMSE:  0.9534470553645022
+elapsed time in simulation: 1.8455619812011719
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8643209062657924  NRMSE:  0.9534470553645022
+fit:  0.9430241012403833
+NRMSE:  0.9885064176774233
+elapsed time in simulation: 1.808889627456665
+validationOnMultiHarmonic: False reset every: -1 fit:  0.9430241012403833  NRMSE:  0.9885064176774233
+{'nonLinearInputChar': True, 'dynamicalSystemSelector': <function systemSelectorEnum.TWOTANKS at 0x7f7a2fcae2f0>, 'stringDynamicalSystemSelector': 'TWOTANKS', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': False, 'stateReduction': True, 'regularizerWeight': 0.0001, 'closedLoopSim': True, 'enablePlot': True, 'stateSize': 6}

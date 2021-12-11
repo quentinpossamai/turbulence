@@ -1,0 +1,290 @@
+para ['main.py', '1', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9534434386614152
+NRMSE:  0.9835335683305745
+elapsed time in simulation: 3.809971809387207
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9534434386614152  NRMSE:  0.9835335683305745
+fit:  0.9534434386614152
+NRMSE:  0.9835335683305745
+elapsed time in simulation: 2.2461037635803223
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9534434386614152  NRMSE:  0.9835335683305745
+fit:  0.9180588985755462
+NRMSE:  0.9710185308208106
+elapsed time in simulation: 3.183117628097534
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9180588985755462  NRMSE:  0.9710185308208106
+fit:  0.9180588985755462
+NRMSE:  0.9710185308208106
+elapsed time in simulation: 2.4585468769073486
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9180588985755462  NRMSE:  0.9710185308208106
+fit:  0.8559794244939668
+NRMSE:  0.9490618529939409
+elapsed time in simulation: 2.65207839012146
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8559794244939668  NRMSE:  0.9490618529939409
+fit:  0.8559794244939668
+NRMSE:  0.9490618529939409
+elapsed time in simulation: 2.479832887649536
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8559794244939668  NRMSE:  0.9490618529939409
+evaluating state importance=>False
+[ 0  0  1  1  1  0  4 10 27 29  0  0  0  0  1  2  4 10 24 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fc4c4138158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '2', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9540763802143142
+NRMSE:  0.9837574312734528
+elapsed time in simulation: 3.4231417179107666
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9540763802143142  NRMSE:  0.9837574312734528
+fit:  0.9540763802143142
+NRMSE:  0.9837574312734528
+elapsed time in simulation: 2.11681866645813
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9540763802143142  NRMSE:  0.9837574312734528
+fit:  0.9056518434873788
+NRMSE:  0.9666303217487889
+elapsed time in simulation: 2.8883516788482666
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9056518434873788  NRMSE:  0.9666303217487889
+fit:  0.9056518434873788
+NRMSE:  0.9666303217487889
+elapsed time in simulation: 2.1869845390319824
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9056518434873788  NRMSE:  0.9666303217487889
+fit:  0.8214007979493723
+NRMSE:  0.9368318563007088
+elapsed time in simulation: 2.4266469478607178
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8214007979493723  NRMSE:  0.9368318563007088
+fit:  0.8214007979493723
+NRMSE:  0.9368318563007088
+elapsed time in simulation: 2.1546874046325684
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8214007979493723  NRMSE:  0.9368318563007088
+evaluating state importance=>False
+[ 0  0  0  1  1  1  7 11 27 29  0  0  0  1  1  1  5 13 28 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f02de59d158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '3', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9615208019894408
+NRMSE:  0.9863904234651873
+elapsed time in simulation: 3.2845447063446045
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9615208019894408  NRMSE:  0.9863904234651873
+fit:  0.9615208019894408
+NRMSE:  0.9863904234651873
+elapsed time in simulation: 2.0190024375915527
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9615208019894408  NRMSE:  0.9863904234651873
+fit:  0.9034589672758979
+NRMSE:  0.9658547308276026
+elapsed time in simulation: 2.825843095779419
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9034589672758979  NRMSE:  0.9658547308276026
+fit:  0.9034589672758979
+NRMSE:  0.9658547308276026
+elapsed time in simulation: 2.1381003856658936
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9034589672758979  NRMSE:  0.9658547308276026
+fit:  0.7286746151273307
+NRMSE:  0.9040358484018096
+elapsed time in simulation: 2.3741888999938965
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7286746151273307  NRMSE:  0.9040358484018096
+fit:  0.7286746151273307
+NRMSE:  0.9040358484018096
+elapsed time in simulation: 2.1229610443115234
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7286746151273307  NRMSE:  0.9040358484018096
+evaluating state importance=>False
+[ 0  0  0  1  1  0  4  8 25 27  0  0  0  0  2  2  2  9 23 28] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f956d019158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '4', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9548808370274904
+NRMSE:  0.9840419568647831
+elapsed time in simulation: 3.4055755138397217
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9548808370274904  NRMSE:  0.9840419568647831
+fit:  0.9548808370274904
+NRMSE:  0.9840419568647831
+elapsed time in simulation: 2.260427236557007
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9548808370274904  NRMSE:  0.9840419568647831
+fit:  0.9065290454873405
+NRMSE:  0.966940576337559
+elapsed time in simulation: 2.8858323097229004
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9065290454873405  NRMSE:  0.966940576337559
+fit:  0.9065290454873405
+NRMSE:  0.966940576337559
+elapsed time in simulation: 2.2168188095092773
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9065290454873405  NRMSE:  0.966940576337559
+fit:  0.8212353623406641
+NRMSE:  0.9367733439435209
+elapsed time in simulation: 2.539990186691284
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8212353623406641  NRMSE:  0.9367733439435209
+fit:  0.8212353623406641
+NRMSE:  0.9367733439435209
+elapsed time in simulation: 2.308257579803467
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8212353623406641  NRMSE:  0.9367733439435209
+evaluating state importance=>False
+[ 0  0  1  1  1  1  6 10 27 29  0  0  0  1  1  3  3 11 25 27] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f1538d83158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '5', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9586963361720132
+NRMSE:  0.9853914477666373
+elapsed time in simulation: 3.495272397994995
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9586963361720132  NRMSE:  0.9853914477666373
+fit:  0.9586963361720132
+NRMSE:  0.9853914477666373
+elapsed time in simulation: 2.16992449760437
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9586963361720132  NRMSE:  0.9853914477666373
+fit:  0.8943535308190009
+NRMSE:  0.9626342600083042
+elapsed time in simulation: 2.954183578491211
+validationOnMultiHarmonic: True reset every: 10 fit:  0.8943535308190009  NRMSE:  0.9626342600083042
+fit:  0.8943535308190009
+NRMSE:  0.9626342600083042
+elapsed time in simulation: 2.0499064922332764
+validationOnMultiHarmonic: False reset every: 10 fit:  0.8943535308190009  NRMSE:  0.9626342600083042
+fit:  0.7485721484564125
+NRMSE:  0.9110733392201426
+elapsed time in simulation: 2.299666404724121
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7485721484564125  NRMSE:  0.9110733392201426
+fit:  0.7485721484564125
+NRMSE:  0.9110733392201426
+elapsed time in simulation: 2.022493362426758
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7485721484564125  NRMSE:  0.9110733392201426
+evaluating state importance=>False
+[ 0  0  0  1  1  1  5  6 25 28  0  0  0  0  1  0  4  8 23 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f2545a78158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '6', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9595327938085149
+NRMSE:  0.985687291620217
+elapsed time in simulation: 3.399251699447632
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9595327938085149  NRMSE:  0.985687291620217
+fit:  0.9595327938085149
+NRMSE:  0.985687291620217
+elapsed time in simulation: 2.088665246963501
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9595327938085149  NRMSE:  0.985687291620217
+fit:  0.914008106676669
+NRMSE:  0.9695858200257664
+elapsed time in simulation: 2.867004632949829
+validationOnMultiHarmonic: True reset every: 10 fit:  0.914008106676669  NRMSE:  0.9695858200257664
+fit:  0.914008106676669
+NRMSE:  0.9695858200257664
+elapsed time in simulation: 2.064424514770508
+validationOnMultiHarmonic: False reset every: 10 fit:  0.914008106676669  NRMSE:  0.9695858200257664
+fit:  0.8117222748112707
+NRMSE:  0.9334086924043146
+elapsed time in simulation: 2.3772006034851074
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8117222748112707  NRMSE:  0.9334086924043146
+fit:  0.8117222748112707
+NRMSE:  0.9334086924043146
+elapsed time in simulation: 2.1458139419555664
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8117222748112707  NRMSE:  0.9334086924043146
+evaluating state importance=>False
+[ 0  0  1  1  1  0  5  7 27 28  0  0  0  0  1  1  3  7 25 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f2ce6230158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '7', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9599026480640701
+NRMSE:  0.9858181041126272
+elapsed time in simulation: 3.3628146648406982
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9599026480640701  NRMSE:  0.9858181041126272
+fit:  0.9599026480640701
+NRMSE:  0.9858181041126272
+elapsed time in simulation: 2.0737433433532715
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9599026480640701  NRMSE:  0.9858181041126272
+fit:  0.90131995808934
+NRMSE:  0.9650981919510612
+elapsed time in simulation: 2.815962076187134
+validationOnMultiHarmonic: True reset every: 10 fit:  0.90131995808934  NRMSE:  0.9650981919510612
+fit:  0.90131995808934
+NRMSE:  0.9650981919510612
+elapsed time in simulation: 2.178342580795288
+validationOnMultiHarmonic: False reset every: 10 fit:  0.90131995808934  NRMSE:  0.9650981919510612
+fit:  0.7852664219372277
+NRMSE:  0.9240516118751355
+elapsed time in simulation: 2.409069538116455
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7852664219372277  NRMSE:  0.9240516118751355
+fit:  0.7852664219372277
+NRMSE:  0.9240516118751355
+elapsed time in simulation: 2.2148566246032715
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7852664219372277  NRMSE:  0.9240516118751355
+evaluating state importance=>False
+[ 0  0  0  1  1  0  4  8 24 28  0  0  0  0  1  3  3  8 22 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fdf50f5b158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '8', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9536401863786906
+NRMSE:  0.9836031553608336
+elapsed time in simulation: 3.1038596630096436
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9536401863786906  NRMSE:  0.9836031553608336
+fit:  0.9536401863786906
+NRMSE:  0.9836031553608336
+elapsed time in simulation: 2.082904577255249
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9536401863786906  NRMSE:  0.9836031553608336
+fit:  0.907495913275683
+NRMSE:  0.9672825445137379
+elapsed time in simulation: 2.796963930130005
+validationOnMultiHarmonic: True reset every: 10 fit:  0.907495913275683  NRMSE:  0.9672825445137379
+fit:  0.907495913275683
+NRMSE:  0.9672825445137379
+elapsed time in simulation: 2.0629820823669434
+validationOnMultiHarmonic: False reset every: 10 fit:  0.907495913275683  NRMSE:  0.9672825445137379
+fit:  0.7935021363353141
+NRMSE:  0.9269644736605828
+elapsed time in simulation: 2.1522653102874756
+validationOnMultiHarmonic: True reset every: -1 fit:  0.7935021363353141  NRMSE:  0.9269644736605828
+fit:  0.7935021363353141
+NRMSE:  0.9269644736605828
+elapsed time in simulation: 1.967682123184204
+validationOnMultiHarmonic: False reset every: -1 fit:  0.7935021363353141  NRMSE:  0.9269644736605828
+evaluating state importance=>False
+[ 0  0  0  1  1  0  6  9 28 29  0  0  0  0  1  1  4 10 25 30] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7f61e3c6d158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '9', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9585423227563666
+NRMSE:  0.9853369752860245
+elapsed time in simulation: 5.6821441650390625
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9585423227563666  NRMSE:  0.9853369752860245
+fit:  0.9585423227563666
+NRMSE:  0.9853369752860245
+elapsed time in simulation: 3.078430652618408
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9585423227563666  NRMSE:  0.9853369752860245
+fit:  0.916312588948144
+NRMSE:  0.9704008845143286
+elapsed time in simulation: 3.670020818710327
+validationOnMultiHarmonic: True reset every: 10 fit:  0.916312588948144  NRMSE:  0.9704008845143286
+fit:  0.916312588948144
+NRMSE:  0.9704008845143286
+elapsed time in simulation: 2.9744231700897217
+validationOnMultiHarmonic: False reset every: 10 fit:  0.916312588948144  NRMSE:  0.9704008845143286
+fit:  0.8447948034182917
+NRMSE:  0.9451060024457951
+elapsed time in simulation: 2.829375982284546
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8447948034182917  NRMSE:  0.9451060024457951
+fit:  0.8447948034182917
+NRMSE:  0.9451060024457951
+elapsed time in simulation: 2.452042579650879
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8447948034182917  NRMSE:  0.9451060024457951
+evaluating state importance=>False
+[ 0  0  0  1  1  1  6  9 26 29  0  0  0  0  1  1  2  9 27 29] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fa715dc4158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
+para ['main.py', '10', '5', '3', '0', '6', '10', '0', '2']
+=>if GroupLasso is used,  l2 regularizer is set to 0.0001 in all bridge, encoder, and decoder
+fit:  0.9573627077526788
+NRMSE:  0.9849197612715874
+elapsed time in simulation: 3.3347833156585693
+validationOnMultiHarmonic: True reset every: 1 fit:  0.9573627077526788  NRMSE:  0.9849197612715874
+fit:  0.9573627077526788
+NRMSE:  0.9849197612715874
+elapsed time in simulation: 2.187894582748413
+validationOnMultiHarmonic: False reset every: 1 fit:  0.9573627077526788  NRMSE:  0.9849197612715874
+fit:  0.9192307205661967
+NRMSE:  0.9714329885509991
+elapsed time in simulation: 2.8957443237304688
+validationOnMultiHarmonic: True reset every: 10 fit:  0.9192307205661967  NRMSE:  0.9714329885509991
+fit:  0.9192307205661967
+NRMSE:  0.9714329885509991
+elapsed time in simulation: 2.174909830093384
+validationOnMultiHarmonic: False reset every: 10 fit:  0.9192307205661967  NRMSE:  0.9714329885509991
+fit:  0.8298259721762673
+NRMSE:  0.9398117274879563
+elapsed time in simulation: 2.532031297683716
+validationOnMultiHarmonic: True reset every: -1 fit:  0.8298259721762673  NRMSE:  0.9398117274879563
+fit:  0.8298259721762673
+NRMSE:  0.9398117274879563
+elapsed time in simulation: 2.1710546016693115
+validationOnMultiHarmonic: False reset every: -1 fit:  0.8298259721762673  NRMSE:  0.9398117274879563
+evaluating state importance=>False
+[ 0  0  0  1  1  0  5  9 27 29  0  0  0  0  1  0  3  8 23 28] encoder=>
+{'nonLinearInputChar': False, 'dynamicalSystemSelector': <function systemSelectorEnum.MAGNETOdataset at 0x7fb835617158>, 'stringDynamicalSystemSelector': 'MAGNETOdataset', 'affineStruct': False, 'openLoopStartingPoint': 15, 'horizon': 5, 'TRsteps': 1, 'fitHorizon': 5, 'n_a': 10, 'useGroupLasso': True, 'stateReduction': False, 'regularizerWeight': 0.0003, 'closedLoopSim': False, 'enablePlot': True, 'stateSize': 6}
