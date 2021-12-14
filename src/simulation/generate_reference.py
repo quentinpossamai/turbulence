@@ -129,13 +129,15 @@ def generate_reference(sim: habitat_sim.Simulator,
                        plot_topdown: bool,
                        flight_height: float,
                        dt: float,
-                       seed: int) -> Tuple[np.ndarray, np.ndarray]:
+                       seed: int,
+                       viz_navmesh: bool) -> Tuple[np.ndarray, np.ndarray]:
     # Recomputing the navmesh
     sim.seed(seed)
     sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+    sim.navmesh_visualization = viz_navmesh
 
-    # point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
-    point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))
+    point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
+    # point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))
     # pickle.dump(point, open(f'{DATA_HABITAT_PATH}point.pkl', 'wb'))
     shortest_path = []
     distance_matrix = np.zeros((len(point), len(point)))

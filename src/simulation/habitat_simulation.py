@@ -17,12 +17,13 @@ from src.utils.transform import Transform
 
 DTYPE = float
 
-
 # NOTATION
 # AGENT is the drone body in habitat convention
 # AGENT_FLU is AGENT but turned from HABITAT to FLU forward left up
 # GLOBAL_FLU is the earth reference frame but turned from HABITAT to FLU
 # GLOBAL is the habitat earth reference frame
+
+MP3_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3_scene_list.pkl', 'rb'))
 
 
 class Simulation:
@@ -91,25 +92,34 @@ class Simulation:
         obj_templates_mgr: habitat_sim.attributes_managers.ObjectAttributesManager = sim.get_object_template_manager()
         rigid_obj_mgr: habitat_sim.physics.RigidObjectManager = sim.get_rigid_object_manager()
         obj_templates_mgr.get_file_template_handles()
-        cube_template_handle = obj_templates_mgr.get_template_handles('cubeSolid')[0]
 
-        # Editing cube properties
+        # OPTION1: Drone has a cube shape
+        cube_template_handle = obj_templates_mgr.get_template_handles('cubeSolid')[0]
         cube_attributes: habitat_sim.attributes.ObjectAttributes
         cube_attributes = obj_templates_mgr.get_template_by_handle(handle=cube_template_handle)
-        drone_dim = [drone_prms['width'], drone_prms['height'], drone_prms['width']]
-        cube_attributes.scale = drone_dim
-        cube_attributes.collision_asset_size = drone_dim
+        cube_dim = [drone_prms['width'], drone_prms['height'], drone_prms['width']]
+        cube_attributes.scale = cube_dim
+        cube_attributes.collision_asset_size = cube_dim
         obj_templates_mgr.register_template(cube_attributes, specified_handle='my_cube')
+        obj: habitat_sim.physics.ManagedRigidObject
+        obj = rigid_obj_mgr.add_object_by_template_handle('my_cube', sim.agents[0].scene_node, light_setup_key='0')
 
-        cube_obj: habitat_sim.physics.ManagedRigidObject
-        cube_obj = rigid_obj_mgr.add_object_by_template_handle('my_cube', sim.agents[0].scene_node, light_setup_key='0')
+        # # OPTION2: Drone has a quadrotor shape
+        # # The loaded drone model is (0.1, 0.02, 0.1) meters of dimension
+        # tmpl_id, = obj_templates_mgr.load_configs(f'{DATA_HABITAT_PATH}drone.object_config.json')
+        # uav_attr: habitat_sim.attributes.ObjectAttributes = obj_templates_mgr.get_template_by_id(tmpl_id)
+        # # uav_dim = [1., 1., 1.]
+        # # uav_attr.scale = uav_dim
+        # # uav_attr.collision_asset_size = uav_dim
+        # obj_templates_mgr.register_template(uav_attr, specified_handle='uav')
+        # obj = rigid_obj_mgr.add_object_by_template_handle('uav', sim.agents[0].scene_node, light_setup_key='0')
 
         # 4-Drone parameters
-        cube_obj.motion_type = habitat_sim.physics.MotionType.DYNAMIC
-        cube_obj.mass = drone_prms['m']
-        cube_obj.intertia_diagonal = [drone_prms['ix'], drone_prms['iy'], drone_prms['iz']]
+        obj.motion_type = habitat_sim.physics.MotionType.DYNAMIC
+        obj.mass = drone_prms['m']
+        obj.intertia_diagonal = [drone_prms['ix'], drone_prms['iy'], drone_prms['iz']]
         self.sim: habitat_sim.simulator.Simulator = sim
-        self.agent: habitat_sim.physics.ManagedRigidObject = cube_obj
+        self.agent: habitat_sim.physics.ManagedRigidObject = obj
         self.drone_prms: Dict[str, float] = drone_prms
         self.ref_tf_global_agent = None
         self.ref_lin_vel_global = None
@@ -123,22 +133,25 @@ class Simulation:
                           self.drone_prms['iz'] / self.drone_prms['ix']], dtype=DTYPE)
         self.quadrotor = NumpyDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=DTYPE)
 
-    def generate_reference_procedurally(self, uniform_speed: float, plot_topdown: bool, dt: float, seed: int):
+    def generate_reference_procedurally(self, uniform_speed: float, plot_topdown: bool, dt: float, seed: int,
+                                        viz_navmesh: bool):
         """
 
-        :param uniform_speed: The number of step to cut the trajectory.
+        param uniform_speed: The number of step to cut the trajectory.
 
-        :param plot_topdown: If true will plot topdown view.
+        param plot_topdown: If true will plot topdown view.
 
-        :param dt: dt to use for position derivation.
+        param dt: dt to use for position derivation.
 
-        :param seed:
+        param seed: Seed of trajectory generation.
+
+        param viz_navmesh: If true rgb camera see the navmesh wireframe.
         """
         # Defining the drone's volume
         navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
         navmesh_settings.agent_height = 0.2  # 1.5
         navmesh_settings.agent_max_climb = 2.0  # 0.2
-        navmesh_settings.agent_max_slope = 88.0  # 45.0
+        navmesh_settings.agent_max_slope = 87.0  # 45.0
         navmesh_settings.agent_radius = 0.2  # 0.1
         navmesh_settings.cell_height = 0.05  # 0.2
         navmesh_settings.cell_size = 0.10  # 0.05
@@ -158,7 +171,8 @@ class Simulation:
                                                                                plot_topdown,
                                                                                flight_height=0.1,
                                                                                dt=dt,
-                                                                               seed=seed)
+                                                                               seed=seed,
+                                                                               viz_navmesh=viz_navmesh)
 
     def one_step_sim(self, dt: float, state: np.ndarray, motor: np.ndarray) -> Tuple[np.ndarray, Any, bool]:
         # 1. Initializing agent
@@ -224,6 +238,8 @@ class Simulation:
             # Plotting sensors
             print(simulation_iteration)
             print(f'Height: {z}')
+            has_collided = self.agent.contact_test()
+            print(f'has_collided: {has_collided}')
 
             # 3-Motor and Ground Effect (gravity is done by habitat)
             motor_torsor = self.quadrotor.motor_dynamic(motor=motor[simulation_iteration])
@@ -288,7 +304,6 @@ class Simulation:
                 self.agent.rotate_y_local(magnum.Rad(+20 / 180 * np.pi))
             if key_pressed == ord("d"):  # Right
                 self.agent.rotate_y_local(magnum.Rad(-20 / 180 * np.pi))
-
             # 7. Following the reference
             if key_pressed == ord("v"):
                 simulation_iteration += 1
@@ -360,8 +375,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     camera_resolution = np.array([720, 1280])
     simulation = Simulation(scene_path=scene_path, camera_resolution=camera_resolution, drone_prms=drone_prms)
-    simulation.generate_reference_procedurally(uniform_speed=2, plot_topdown=plot_topdown, dt=dt,
-                                               seed=seed_to_flight[flight_number])
+    simulation.generate_reference_procedurally(uniform_speed=1, plot_topdown=plot_topdown, dt=dt,
+                                               seed=seed_to_flight[flight_number], viz_navmesh=True)
 
     # simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
 
@@ -389,7 +404,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # First mpc command after it take the previous one for initialisation
     hover_cmd = np.sqrt(drone_prms['m'] * g / (4 * drone_prms['kt']))
     motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
-
+    i = 0
     for i in tqdm(range(1, time_end)):
         # Computing command with the controller
         motor_horizon, err = mpc_controller(model=mpc_model,
@@ -431,21 +446,18 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     position_ref_flu = Transform.from_matrix(ref_tf_global_flu__agent_flu).as_trans()
     pose_sim_flu, quat_sim_flu = log['state'][:, :3], log['state'][:, 3:7]
     trace_trajectory3d(pose_sim_flu, quat_sim_flu, pause=1e-4, step=1, position_ref=position_ref_flu[:time_end])
-    
+
     # Error | MPC model vs Simulation
     state_mpc = [log['state'][0]]
     for i in range(len(log['motor'])):
         state_mpc.append(simulation.quadrotor.forward(dt=dt, motor=log['motor'][i], state=state_mpc[-1]))
     state_mpc = np.stack(state_mpc)
-
     position_error = ((log['state'][:, 0:3] - state_mpc[:, 0:3]) ** 2)
     quat_error = ((log['state'][:, 3:7] - state_mpc[:, 3:7]) ** 2)
     lin_vel_error = ((log['state'][:, 7:10] - state_mpc[:, 7:10]) ** 2)
     ang_vel_error = ((log['state'][:, 10:13] - state_mpc[:, 10:13]) ** 2)
-
     if same_env:
         assert position_error == 0 and quat_error == 0 and lin_vel_error == 0 and ang_vel_error == 0
-
     # MPC model FLU vs FLU reference | Does the mpc has a good model vs simulation environment ?
     trace_trajectory3d(state_mpc[:, 0:3], state_mpc[:, 3:7], 1e-4, step=1, position_ref=position_ref_flu[:time_end])
 
@@ -457,24 +469,30 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     tf_real = np.stack(tf_real)
     simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_real)
 
-    # Motor variation
-    import matplotlib.pyplot as plt
-    time = np.linspace(0, (len(log['motor']) - 1) * 1/20, len(log['motor']))
-    plt.plot(time, log['motor'])
-    plt.grid()
-    # pickle.dump({'motor': motor_tab,
-    #              'state': state_tab,
-    #              'ref': ref_tf_global_flu__agent_flu[:len(state_tab)],
-    #              'camera': obs_tab['camera'],
-    #              'depth': obs_tab['depth'],
-    #              'surface_dist': obs_tab['surface_dist'],
-    #              'ground_force': obs_tab['ground_force']},
-    #              open(f'{DATA_HABITAT_PATH}/{scene_id}_{flight_number}.pkl'))
+    # # Motor variation
+    # import matplotlib.pyplot as plt
+    # time = np.linspace(0, (len(log['motor']) - 1) * 1 / 20, len(log['motor']))
+    # plt.plot(time, log['motor'])
+    # plt.grid()
+
+    # Saving
+    if i > 200:
+        # dict_keys(['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force'])
+        pickle.dump(log, open(f'{DATA_HABITAT_PATH}/{scene_id}_{flight_number}.pkl'))
+        return True
+    else:
+        return False
 
 
 def main():
     scene_id = ['17DRP5sb8fy']
-    gen_data(scene_id=scene_id[0], flight_number=0, same_env=False, plot_ref=False, plot_topdown=False)
+
+    has_worked = gen_data(scene_id=MP3_SCENE_LIST[0],
+                          flight_number=1,
+                          same_env=False,
+                          plot_ref=False,
+                          plot_topdown=False)
+    print()
 
 
 if __name__ == "__main__":

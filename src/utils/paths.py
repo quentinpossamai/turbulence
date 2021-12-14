@@ -16,7 +16,7 @@ MODELS_PATH = WD_PATH + "models/"
 ANALYSIS_PATH = WD_PATH + "analysis/"
 ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = ANALYSIS_PATH + "euroc_mav_residual_training/"  # train.py
 ANALYSIS_DATA_VIS_EUROC_MAV = ANALYSIS_PATH + 'data_vis_euroc_mav/'  # euroc_mav.data_vis.py
-DATA_HABITAT_PATH = f'{WD_PATH}/data/habitat/'
+DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 
 
 def mkdir_if_not_exist(paths: list):

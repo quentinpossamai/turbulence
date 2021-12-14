@@ -214,8 +214,8 @@ class GRUCNNResidual(pl.LightningModule, Run):
         motor = batch["motor"][:, 1:self.past + 1]
         dt = batch["dt"][:, 1:self.past + 1]
         state = batch["state"][:, :self.past]
-        depth_emb = batch["depth_emb"][:, self.past - 1]
-        norm_emb = batch["norm_emb"][:, self.past - 1]
+        depth_emb = batch["depth_emb"][:, self.past]
+        norm_emb = batch["norm_emb"][:, self.past]
 
         residual_gt = batch["residual"][:, self.past]
         residual_hat = self.forward(motor=motor, state=state, depth_emb=depth_emb, norm_emb=norm_emb, dt=dt)
