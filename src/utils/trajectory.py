@@ -6,6 +6,10 @@ import torch
 from scipy.spatial.transform import Rotation
 
 
+#     plt.rcParams.update({"text.usetex": True,
+#                          "font.family": "serif",
+#                          "font.sans-serif": ["Computer Modern Roman"]})
+
 def trace_trajectory3d(position: np.ndarray, quaternion: np.ndarray, pause: float, step: int,
                        position_ref: np.ndarray = None):
     # transforms = Transform.from_quat_trans(quaternion, position).inv().inv().as_matrix()
