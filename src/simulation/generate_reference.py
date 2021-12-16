@@ -130,7 +130,7 @@ def generate_reference(sim: habitat_sim.Simulator,
                        flight_height: float,
                        dt: float,
                        seed: int,
-                       viz_navmesh: bool) -> Tuple[np.ndarray, np.ndarray]:
+                       viz_navmesh: bool) -> np.ndarray:
     # Recomputing the navmesh
     sim.seed(seed)
     sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
@@ -193,50 +193,4 @@ def generate_reference(sim: habitat_sim.Simulator,
     quat, trans = Transform.from_matrix(ref_tf_global_agent).as_quat_trans()
     lin_vel_global = (trans[1:] - trans[:-1]) / dt
     lin_vel_global = np.concatenate([np.zeros((1, 3)), lin_vel_global], axis=0)
-    return ref_tf_global_agent, lin_vel_global
-
-
-def main():
-    backend_cfg = habitat_sim.SimulatorConfiguration()
-    backend_cfg.enable_physics = True
-    backend_cfg.scene_id = f"{WD_PATH}data/habitat/scene_datasets/mp3d/17DRP5sb8fy/17DRP5sb8fy.glb"
-
-    # 2-Adding a stereo RGB-D sensors to the drone
-    # 2.1-left rgb camera
-    left_rgb_sensor = habitat_sim.bindings.CameraSensorSpec()
-    left_rgb_sensor.uuid = "left_camera"  # uuid is used to retrieve the observation
-    left_rgb_sensor.resolution = [1280, 720]
-    left_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0 * habitat_sim.geo.LEFT
-
-    agent_config = habitat_sim.AgentConfiguration()
-    agent_config.sensor_specifications = [left_rgb_sensor]
-
-    sim = habitat_sim.simulator.Simulator(habitat_sim.Configuration(backend_cfg, [agent_config]))
-    # seed = 0
-    # sim.seed(seed)
-
-    # Defining the drone's volume
-    navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
-    navmesh_settings.agent_height = 0.2  # 1.5
-    navmesh_settings.agent_max_climb = 2.0  # 0.2
-    navmesh_settings.agent_max_slope = 88.0  # 45.0
-    navmesh_settings.agent_radius = 0.2  # 0.1
-    navmesh_settings.cell_height = 0.05  # 0.2
-    navmesh_settings.cell_size = 0.08  # 0.05
-    navmesh_settings.detail_sample_dist = 6.0  # 6.0
-    navmesh_settings.detail_sample_max_error = 0.01  # 1.0
-    navmesh_settings.edge_max_error = 0.01  # 1.3
-    navmesh_settings.edge_max_len = 12.0  # 12.0
-    navmesh_settings.filter_ledge_spans = True  # True
-    navmesh_settings.filter_low_hanging_obstacles = False  # True
-    navmesh_settings.filter_walkable_low_height_spans = True  # True
-    navmesh_settings.region_merge_size = 20.0  # 20.0
-    navmesh_settings.region_min_size = 20.0  # 20.0
-    navmesh_settings.verts_per_poly = 6.0  # 6.0
-
-    generate_reference(sim, uniform_speed=1000, navmesh_settings=navmesh_settings,
-                       plot_topdown=True)
-
-
-if __name__ == '__main__':
-    main()
+    return np.concatenate([trans, quat, lin_vel_global, np.zeros((len(lin_vel_global), 3))], axis=1)

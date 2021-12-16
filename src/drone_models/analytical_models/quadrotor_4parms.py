@@ -261,7 +261,7 @@ class TorchDynamicalModel(nn.Module, Run):
 
 
 class NumpyDynamicalModel:
-    def __init__(self, param: Union[str, Dict[str, Any]], dtype):
+    def __init__(self, param: Union[str, Dict[str, Any]], dtype, g: float):
         """
         param: "paper", "identification", or dict["permutation", "theta"]
         theta = np.array([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
@@ -303,7 +303,7 @@ class NumpyDynamicalModel:
         else:
             self.theta = param["theta"]
             self.permutation = param["permutation"]
-        self.g = np.array([0, 0, 9.81], dtype=self.dtype)
+        self.g = np.array([0, 0, g], dtype=self.dtype)
         self.t3_tensor = np.array([1, 1, self.theta[3]], dtype=self.dtype)
         self.t12_tensor = np.array([self.theta[1], self.theta[1], self.theta[2]], dtype=self.dtype)
 
@@ -329,8 +329,13 @@ class NumpyDynamicalModel:
         motor = kwargs['motor']
         state = kwargs['state']
         dt = kwargs['dt']
-        kfa = np.zeros(3)
-        ktaua = np.zeros(3)
+        residual = kwargs['residual'] if 'residual' in kwargs else None
+        if residual is None:
+            kfa = np.zeros(3)
+            ktaua = np.zeros(3)
+        else:
+            kfa = residual[:3]
+            ktaua = residual[3:]
         # Input processing end
         pos, quat, lin_vel, ang_vel = state[:3], state[3:7], state[7:10], state[10:]
 
