@@ -75,7 +75,7 @@ def mpc_controller(model: Callable,
                                                                  options={
                                                                      "disp": False,  # True
                                                                      "maxiter": 10000,  # None
-                                                                     "gtol": 1e-2,  # 1e-5
+                                                                     "gtol": 1e-5,  # 1e-5
                                                                      # "norm": 2,  # np.inf
                                                                      "eps": 1e-4,  # 1.4901161193847656e-08
                                                                      "return_all": True,  # False
