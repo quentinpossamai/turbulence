@@ -218,17 +218,17 @@ def generate_reference(sim: habitat_sim.Simulator,
 
         while has_collided:
             quat, trans = Transform.from_matrix(tf).as_quat_trans()
-            obs = sim.get_sensor_observations(agent_ids=1)  # 1 is the agent_id of the error agent
-            dist = np.array([obs["forward_dist"][0][0],
-                             obs["backward_dist"][0][0],
-                             obs["left_dist"][0][0],
-                             obs["right_dist"][0][0],
-                             obs["up_dist"][0][0],
-                             obs["down_dist"][0][0]])
-            print(f'Has collided: {has_collided} | i: {i} | dist: {dist}')
             # Debug
             looking = False
             while looking:
+                obs = sim.get_sensor_observations(agent_ids=1)  # 1 is the agent_id of the error agent
+                dist = np.array([obs["forward_dist"][0][0],
+                                 obs["backward_dist"][0][0],
+                                 obs["left_dist"][0][0],
+                                 obs["right_dist"][0][0],
+                                 obs["up_dist"][0][0],
+                                 obs["down_dist"][0][0]])
+                print(f'Has collided: {has_collided} | i: {i} | dist: {dist}')
                 import cv2
                 obs = sim.get_sensor_observations(agent_ids=1)  # 1 is the agent_id of the error agent
                 cv2.imshow("rgb", obs["error_camera"])

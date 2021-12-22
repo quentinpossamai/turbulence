@@ -1,3 +1,4 @@
+import argparse
 import cv2
 import habitat_sim
 import magnum
@@ -442,7 +443,7 @@ class Simulation:
 
 
 def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plot_ref: bool, plot_topdown: bool,
-             debug: bool):
+             debug: bool, cluster: bool):
     """
     Generate drone data in habitat with ground effect.
 
@@ -456,6 +457,10 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     as the model use for MPC. Useful for debugging.
 
     param plot_topdown: If true will plot topdown view when generating the trajectory.
+
+    param debug: Activate plot tools to debug data generation.
+
+    param cluster: Change path if executing on cluster.
     """
     # from src.utils.profiler import profiler
     # profiler()
@@ -475,17 +480,20 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                   'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
                   'prop_radius': drone_width * 0.1}  # [m]
     dt = 1 / 20
-    horizon_cmd = 20
+    horizon_cmd = 1
     horizon_pred = 20
     gamma = 1.
 
     # Building the environment in habitat
-    scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    if cluster:
+        scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    else:
+        scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     camera_resolution = np.array([480, 752])
     simulation = Simulation(scene_path=scene_path, camera_resolution=camera_resolution, drone_prms=drone_prms,
                             gravity=g)
     has_worked = simulation.generate_reference_procedurally(uniform_speed=1, plot_topdown=plot_topdown, dt=dt,
-                                                            seed=flight_number, viz_navmesh=True)
+                                                            seed=flight_number, viz_navmesh=False)
     if not has_worked:
         return False
 
@@ -610,12 +618,19 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
 
 
 def main():
-    has_worked = gen_data(scene_id=MP3_SCENE_LIST[0],
-                          flight_number=1,
+    parser = argparse.ArgumentParser(description="Generate drone flight data.")
+    parser.add_argument('--scene_number', default=0, type=int, help='Scene number to generate data from.')
+    parser.add_argument('--flight_number', default=0, type=int, help='Flight number corresponding to a specific '
+                                                                     'trajectory.')
+    parser.add_argument('--cluster', default=False, type=bool, help='Execute on cluster.')
+    args = parser.parse_args()
+    has_worked = gen_data(scene_id=MP3_SCENE_LIST[args.scene_nunber],
+                          flight_number=args.flight_number,
                           same_env=False,
                           plot_ref=False,
                           plot_topdown=False,
-                          debug=False)
+                          debug=False,
+                          cluster=args.cluster)
     print()
 
 
