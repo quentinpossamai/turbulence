@@ -10,7 +10,7 @@ from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalMo
 from src.simulation.generate_reference import generate_reference
 from src.simulation.mpc import mpc_controller
 from src.simulation.hatbitat2flu import Habitat2FLU
-from src.utils.paths import WD_PATH, DATA_HABITAT_PATH
+from src.utils.paths import WD_PATH, DATA_HABITAT_PATH, mkdir_if_not_exist
 from src.utils.trajectory import trace_trajectory3d
 from src.utils.transform import Transform
 
@@ -475,7 +475,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                   'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
                   'prop_radius': drone_width * 0.1}  # [m]
     dt = 1 / 20
-    horizon_cmd = 1
+    horizon_cmd = 20
     horizon_pred = 20
     gamma = 1.
 
@@ -604,12 +604,14 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # Saving
     # dict_keys(['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force'])
     if not debug:
-        pickle.dump(log2, open(f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}.pkl', 'wb'))
+        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
+        mkdir_if_not_exist([folder])
+        pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'))
 
 
 def main():
     has_worked = gen_data(scene_id=MP3_SCENE_LIST[0],
-                          flight_number=0,
+                          flight_number=1,
                           same_env=False,
                           plot_ref=False,
                           plot_topdown=False,

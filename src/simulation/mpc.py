@@ -52,14 +52,22 @@ def mpc_controller(model: Callable,
     assert horizon_pred % horizon_cmd == 0
 
     def _mpc(_u, _state, _state_ref, _horizon_cmd, _horizon_pred, _gamma):
-        num_repeat = horizon_pred // horizon_cmd
-        u_tiled = np.zeros((_horizon_pred, 4))
+        # Option 1
         _u = _u.reshape(_horizon_cmd, 4)
-        for i, cmd in enumerate(_u):
-            u_tiled[i*num_repeat:(i+1)*num_repeat] = np.tile(cmd, num_repeat).reshape((num_repeat, 4))
+        if _horizon_pred - _horizon_cmd > 0:
+            _u = np.concatenate([_u, np.stack([_u[-1] for _ in range(_horizon_pred - _horizon_cmd)])])
+
+        # # Option 2
+        # num_repeat = horizon_pred // horizon_cmd
+        # u_tiled = np.zeros((_horizon_pred, 4))
+        # _u = _u.reshape(_horizon_cmd, 4)
+        # for i, cmd in enumerate(_u):
+        #     u_tiled[i*num_repeat:(i+1)*num_repeat] = np.tile(cmd, num_repeat).reshape((num_repeat, 4))
+        # _u = u_tiled
+
         state_hat = [_state]
         for t in range(_horizon_pred):
-            next_state = model(state_hat[-1], u_tiled[t])
+            next_state = model(state_hat[-1], _u[t])
             state_hat.append(next_state)
         state_hat = np.stack(state_hat[1:])
         return loss(state_ref=_state_ref, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma)

@@ -227,7 +227,7 @@ def generate_reference(sim: habitat_sim.Simulator,
                              obs["down_dist"][0][0]])
             print(f'Has collided: {has_collided} | i: {i} | dist: {dist}')
             # Debug
-            looking = True
+            looking = False
             while looking:
                 import cv2
                 obs = sim.get_sensor_observations(agent_ids=1)  # 1 is the agent_id of the error agent
@@ -273,12 +273,12 @@ def generate_reference(sim: habitat_sim.Simulator,
                     tf = Transform.from_quat_trans(quat, trans).as_matrix()
                     rigid_object.transformation = tf
                     has_collided = rigid_object.contact_test()
-            # if has_collided:
-            #     dtrans = Rotation.from_quat(quat).as_matrix() @ np.array([0, 0.1, 0])
-            #     trans = trans + dtrans
-            #     tf = Transform.from_quat_trans(quat, trans).as_matrix()
-            #     rigid_object.transformation = tf
-            #     has_collided = rigid_object.contact_test()
+            if has_collided and not looking:
+                dtrans = Rotation.from_quat(quat).as_matrix() @ np.array([0, 0.1, 0])
+                trans = trans + dtrans
+                tf = Transform.from_quat_trans(quat, trans).as_matrix()
+                rigid_object.transformation = tf
+                has_collided = rigid_object.contact_test()
         ref_tf_global_agent[i] = tf
 
     # Compute velocity
