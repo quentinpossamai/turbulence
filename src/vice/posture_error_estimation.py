@@ -20,13 +20,14 @@ class ErrorEstimation(object):
                  width: int,
                  height: int,
                  use_depth: bool,
+                 initial_point: np.ndarray,
                  max_distance: float = None,
                  depth_coef: float = None):
         """
         Create a video to verify with the eye if the position estimation and video flux.
         https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets
 
-        input_data: dict with the following keys:
+        param input_data: dict with the following keys:
             'time' : The time of the measured pose and the image.
             'pose' : Each pose correspond to tf_camera_origin, a (4, 4) np.array. The z-axis origin MUST be aligned
             vertical (aligned to -gravity). Unit must be meters.
@@ -34,17 +35,24 @@ class ErrorEstimation(object):
             'depth': path to the depth map.
 
 
-        calibration_matrix: The intrinsic parameters of the camera. The camera matrix = [f_x, 0, c_x,
+        param calibration_matrix: The intrinsic parameters of the camera. The camera matrix = [f_x, 0, c_x,
                                                                                          0, f_y, c_y,
                                                                                          0,   0,   1]
 
-        distortion_coefficient: The distortion coefficient relative to the distortion model.
+        param distortion_coefficient: The distortion coefficient relative to the distortion model.
         cf distortion_model explication. Expressed in this order k1, k2, p1, p2, k3, k4, k5, k6.
         Possible computation can also be done with only k1, k2, p1, p2 or k1, k2, p1, p2, k3, k4.
 
         param width: The width of the image.
 
         param height: The height of the image.
+
+        param use_depth: Use depth-map or ground method to estimate depth.
+
+        param load_initial_point: Path to a .pkl to load, set to None to place points with click.
+
+        param max_distance: Parameter use for ground-depth estimation, if point is too far (in the horizon), the point
+        is not placed.
 
         param depth_coef: To obtain the depth map the first channel of the depth image will be / 255 * depth_coef.
 
@@ -60,6 +68,7 @@ class ErrorEstimation(object):
         self.frames_width = width
         self.frames_height = height
         self.use_depth = use_depth
+        self.initial_point = initial_point
         self.max_distance = max_distance
         self.depth_coef = depth_coef
 
@@ -151,39 +160,48 @@ class ErrorEstimation(object):
                                                    distCoeffs=np.array([k1, k2, p1, p2, k3, k4, k5, k6])).flatten()
             return np.array([x_prime, y_prime])
 
-    def _click_place_point(self, idx):
-        # img = np.array(imageio.imread(self.data['img'][idx]))
-        # fig, ax = plt.subplots(1, 1)
-        # ax.imshow(img)
-        # pixel_clicked = [np.zeros(1)]
-        # print(f'Frame: {idx}')
-        #
-        # def onclick(event):
-        #     pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
-        #     plt.close()
-        #
-        # fig.canvas.mpl_connect('button_press_event', onclick)
-        # plt.show()
-        # print(f'Input pixel: {pixel_clicked[0]}\n')
-        # return pixel_clicked[0]
-        # 2. Loading annotations
-        import src.data.euroc_mav.loading as euroc
-        import json
-        flight = euroc.FLIGHT_LIST[0]
-        vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-        vice_point = pickle.load(open(f'{vice_path}p3_points.pkl', 'rb'))
-        vice_point = np.stack(vice_point, axis=0).astype(int)
+    def _place_point(self, idx):
+        def on_click(event):
+            pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
+            plt.close()
 
-        vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-        with open(f'{vice_path}task_v1_01_easy_backup/annotations.json') as json_file:
-            data = json.load(json_file)
-        key_points = np.zeros((len(data[0]['tracks'][0]['shapes']), 3))  # frame_id, point_x, point_y
-        for i, e in enumerate(data[0]['tracks'][0]['shapes']):
-            key_points[i] = np.array([e['frame']] + e['points'])
-        point_x = np.round(np.interp(range(len(vice_point)), key_points[:, 0], key_points[:, 1])).astype(int)
-        point_y = np.round(np.interp(range(len(vice_point)), key_points[:, 0], key_points[:, 2])).astype(int)
-        annotation_point = np.stack([point_x, point_y], axis=1).astype(float)
-        return annotation_point[idx]
+        def on_key_press(event):
+            if event.key == 'backspace':  # key pressed is backspace
+                pixel_clicked[0] = self.initial_point[idx]
+                plt.close()
+            if event.key == 'e':
+                pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
+                plt.close()
+            if event.key == 'd':
+                pixel_clicked[0] = None
+                plt.close()
+
+        if self.initial_point is None:
+            img = np.array(imageio.imread(self.data['img'][idx]))
+            fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8), dpi=100)
+            ax.set_title(f'Frame: {idx}')
+            ax.imshow(img)
+            pixel_clicked = [np.zeros(1)]
+
+            fig.canvas.mpl_connect('button_press_event', on_click)
+            fig.canvas.mpl_connect('key_press_event', on_key_press)
+            plt.show()
+            print(f'Input pixel: {pixel_clicked[0]}\n')
+            return pixel_clicked[0]
+        else:
+            img = np.array(imageio.imread(self.data['img'][idx]))
+            fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8), dpi=100)
+            ax.set_title(f'Frame: {idx}')
+            ax.imshow(img)
+            ax.scatter(self.initial_point[idx][0], self.initial_point[idx][1], c='r')
+            pixel_clicked = [np.zeros(1)]
+
+            fig.canvas.mpl_connect('button_press_event', on_click)
+            fig.canvas.mpl_connect('key_press_event', on_key_press)
+            plt.show()
+            print(f'Input pixel: {pixel_clicked[0]}\n')
+            return pixel_clicked[0]
+            # return self.initial_point[idx]
 
     def _is_out_of_image(self, image_point: Union[list, tuple, np.ndarray]):
         if image_point is not None:
@@ -208,6 +226,8 @@ class ErrorEstimation(object):
 
         :return: A 3D point in the camera reference frame and a potential error message.
         """
+        if image_point is None:
+            return None, 'Point not placed.'
         # 1. Finding view vector
         # self.df[’pose'] is tf_camera_origin
         u = image_point[0]  # pixel point in image reference frame
@@ -289,7 +309,7 @@ class ErrorEstimation(object):
         """
         # cx, cy = self.k[0, 2], self.k[1, 2]
         # p = np.array([cx, cy + cy / 2])
-        p = self._click_place_point(0)
+        p = self._place_point(0)
         p1, error = self._image23d(0, p)  # Ref camera
         is_reconstructed = error is None
         tf_camera1_origin = self.data['pose'][0]  # Describing drone in reference frame origin
@@ -300,7 +320,8 @@ class ErrorEstimation(object):
                 p2 = (tf_camera_i_camera_1 @ np.append(p1, 1))[:3]
                 p3 = np.int32(np.round(self._space2image(p2)))
                 if self._is_out_of_image(p3):
-                    p = self._click_place_point(i)
+                    print(f'Is out of image')
+                    p = self._place_point(i)
                     p1, error = self._image23d(i, p)  # Ref camera
                     is_reconstructed = error is None
                     tf_camera1_origin = self.data['pose'][i]
@@ -309,7 +330,8 @@ class ErrorEstimation(object):
                     else:
                         p3 = error + '\nP3 out of image.'
             else:
-                p = self._click_place_point(i)
+                print(f'Is not reconstructed')
+                p = self._place_point(i)
                 p1, error = self._image23d(i, p)  # Ref camera
                 is_reconstructed = error is None
                 tf_camera1_origin = self.data['pose'][i]

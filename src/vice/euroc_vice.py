@@ -5,12 +5,13 @@ import pickle
 import yaml
 
 import src.data.euroc_mav.loading as euroc
-from src.vice.vice_depth.posture_error_estimation import ErrorEstimation
+from src.vice.posture_error_estimation import ErrorEstimation
 from src.utils.transform import Transform
 from src.utils.paths import mkdir_if_not_exist
 
 
 def euroc_mav_pre_processing(flight):
+    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
     print("Processing: ", flight)
     # 1-LOADING
     # 1.1-Loading camera parameters
@@ -48,7 +49,7 @@ def euroc_mav_pre_processing(flight):
     tf_origin_vicon0 = Transform.from_quat_trans(quat=data["state"][:, 3:7], trans=trans).as_matrix()
     tf_camera_origin = Transform.from_matrix(tf_origin_vicon0 @ cam_prms["tf_vicon0_cam"]).inv().as_matrix()
 
-    # 1.5-Cutting a the image frequency
+    # 1.5-Cutting at the image frequency
     cut_img = np.unique(data["cam0"])
     cut_tf_camera_origin = np.zeros((len(cut_img), 4, 4))
     cut_t = np.zeros((len(cut_img), 1))
@@ -66,7 +67,6 @@ def euroc_mav_pre_processing(flight):
         assert os.path.isfile(depth_path[i])
 
     # 1.6 Saving preprocessing
-    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
     mkdir_if_not_exist([vice_path])
     input_data = {"t": cut_t, "pose": cut_tf_camera_origin, "img": img_path, "depth": depth_path}
     pickle.dump(input_data, open(f"{vice_path}vice_data.pkl", 'wb'))
@@ -80,17 +80,21 @@ def error_estimation(flight):
 
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
+    # vice_point = np.stack(pickle.load(open(f'{vice_path}p3_points_backup.pkl', 'rb')), axis=0)
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 distortion_coefficient=cam_prms['D'],
                                 width=752,
                                 height=480,
+                                use_depth=False,
+                                initial_point=None,
+                                max_distance=10.,
                                 depth_coef=7.48)
     # 2-GENERATE P3 POINTS
-    estimator.p3_generator(saving_path=f'{vice_path}/p3_points.pkl')
+    estimator.p3_generator(saving_path=f'{vice_path}p3_points.pkl')
 
     # 3-GENERATING THE VIDEO
-    estimator.build_video(fps=20, saving_path=vice_path + 'pose_camera_correspondence_video.mkv')
+    estimator.build_video(fps=20, saving_path=f'{vice_path}ground.mkv')
 
 
 def position_2d_error(flight):
@@ -114,7 +118,7 @@ def position_2d_error(flight):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[0]
+    flight = euroc.FLIGHT_LIST[2]
     euroc_mav_pre_processing(flight=flight)
     error_estimation(flight)
     # position_2d_error(flight)
