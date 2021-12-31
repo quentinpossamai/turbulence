@@ -166,7 +166,7 @@ class ErrorEstimation(object):
             plt.close()
 
         def on_key_press(event):
-            if event.key == 'backspace':  # key pressed is backspace
+            if event.key == 'backspace' and self.initial_point is not None:  # key pressed is backspace
                 pixel_clicked[0] = self.initial_point[idx]
                 plt.close()
             if event.key == 'e':
@@ -189,19 +189,19 @@ class ErrorEstimation(object):
             print(f'Input pixel: {pixel_clicked[0]}\n')
             return pixel_clicked[0]
         else:
-            img = np.array(imageio.imread(self.data['img'][idx]))
-            fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8), dpi=100)
-            ax.set_title(f'Frame: {idx}')
-            ax.imshow(img)
-            ax.scatter(self.initial_point[idx][0], self.initial_point[idx][1], c='r')
-            pixel_clicked = [np.zeros(1)]
-
-            fig.canvas.mpl_connect('button_press_event', on_click)
-            fig.canvas.mpl_connect('key_press_event', on_key_press)
-            plt.show()
-            print(f'Input pixel: {pixel_clicked[0]}\n')
-            return pixel_clicked[0]
-            # return self.initial_point[idx]
+            # img = np.array(imageio.imread(self.data['img'][idx]))
+            # fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8), dpi=100)
+            # ax.set_title(f'Frame: {idx}')
+            # ax.imshow(img)
+            # ax.scatter(self.initial_point[idx][0], self.initial_point[idx][1], c='r')
+            # pixel_clicked = [np.zeros(1)]
+            #
+            # fig.canvas.mpl_connect('button_press_event', on_click)
+            # fig.canvas.mpl_connect('key_press_event', on_key_press)
+            # plt.show()
+            # print(f'Input pixel: {pixel_clicked[0]}\n')
+            # return pixel_clicked[0]
+            return self.initial_point[idx]
 
     def _is_out_of_image(self, image_point: Union[list, tuple, np.ndarray]):
         if image_point is not None:
@@ -361,7 +361,7 @@ class ErrorEstimation(object):
             # Contribution part, comment to get a raw video.
             if isinstance(self.p3[i], np.ndarray):
                 p = self.p3[i]
-                ax.scatter(p[0], p[1], color='r')
+                ax.scatter(p[0], p[1], color='r', alpha=0.1)
             else:
                 ax.annotate(self.p3[i], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
                             ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))

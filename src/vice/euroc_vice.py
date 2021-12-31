@@ -66,7 +66,7 @@ def euroc_mav_pre_processing(flight):
 
         assert os.path.isfile(depth_path[i])
 
-    # 1.6 Saving preprocessing
+    # 1.5 Saving preprocessing
     mkdir_if_not_exist([vice_path])
     input_data = {"t": cut_t, "pose": cut_tf_camera_origin, "img": img_path, "depth": depth_path}
     pickle.dump(input_data, open(f"{vice_path}vice_data.pkl", 'wb'))
@@ -80,14 +80,14 @@ def error_estimation(flight):
 
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
-    # vice_point = np.stack(pickle.load(open(f'{vice_path}p3_points_backup.pkl', 'rb')), axis=0)
+    vice_point = np.stack(pickle.load(open(f'{vice_path}ground.pkl', 'rb')), axis=0)
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 distortion_coefficient=cam_prms['D'],
                                 width=752,
                                 height=480,
                                 use_depth=False,
-                                initial_point=None,
+                                initial_point=vice_point,
                                 max_distance=10.,
                                 depth_coef=7.48)
     # 2-GENERATE P3 POINTS
@@ -118,7 +118,7 @@ def position_2d_error(flight):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[2]
+    flight = euroc.FLIGHT_LIST[0]
     euroc_mav_pre_processing(flight=flight)
     error_estimation(flight)
     # position_2d_error(flight)
