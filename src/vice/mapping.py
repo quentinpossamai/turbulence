@@ -17,15 +17,19 @@ FRAME_NUM = 0
 INVERT = False
 
 
-def make_video(flight):
+def make_video(flight: str, include_label: bool):
     vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
     data = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))
+    if include_label:
+        label = pickle.load(open(f'{vice_path}label.pkl', 'rb'))
+        saving_path = f'{vice_path}labelled.mkv'
+    else:
+        saving_path = f'{vice_path}raw.mkv'
 
     codec = VideoWriter_fourcc(*'H264')
     fps = 20
     width = 752
     height = 480
-    saving_path = f'{vice_path}raw.mkv'
     video = VideoWriter(saving_path, codec, float(fps), (width, height), True)
     print(f'Video destination : {saving_path}')
 
@@ -40,6 +44,13 @@ def make_video(flight):
         fig = plt.figure(figsize=(width / 100., height / 100.))
         ax = plt.axes([0, 0, 1, 1])
         ax.imshow(img)
+        if include_label:
+            try:
+                point, is_keyframe = label[i]
+                ax.scatter(point[0], point[1], c='g' if is_keyframe else 'r')
+            except KeyError:
+                ax.annotate('No label placed.', (width / 2, height / 2), xycoords='data', size=12,
+                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
         ax.axis('off')
         fig.canvas.draw()
         data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)
@@ -75,9 +86,9 @@ def labelize(flight):
     ax.set_title(f'Frame: {FRAME_NUM}')
     img_obj = ax.imshow(img[FRAME_NUM])
     scatter_obj = ax.scatter(width / 2, height / 2, c='r', alpha=0)
-    if len(label) != 0:
+    if 0 in label:
         scatter_obj.set_alpha(1)
-        value = label[list(label.keys())[0]]
+        value = label[0]
         scatter_obj.set_offsets(value[0])
         scatter_obj.set_color('g' if value[1] else 'r')
 
@@ -147,8 +158,8 @@ def labelize(flight):
 
 
 def main():
-    # make_video(euroc.FLIGHT_LIST[2])
-    labelize(euroc.FLIGHT_LIST[0])
+    make_video(euroc.FLIGHT_LIST[2], include_label=True)
+    # labelize(euroc.FLIGHT_LIST[2])
 
 
 if __name__ == '__main__':
