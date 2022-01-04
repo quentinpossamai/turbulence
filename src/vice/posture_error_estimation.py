@@ -20,7 +20,7 @@ class ErrorEstimation(object):
                  width: int,
                  height: int,
                  use_depth: bool,
-                 initial_point: np.ndarray,
+                 label: np.ndarray,
                  max_distance: float = None,
                  depth_coef: float = None):
         """
@@ -49,7 +49,7 @@ class ErrorEstimation(object):
 
         param use_depth: Use depth-map or ground method to estimate depth.
 
-        param load_initial_point: Path to a .pkl to load, set to None to place points with click.
+        param label: [(point, is_keyframe)].
 
         param max_distance: Parameter use for ground-depth estimation, if point is too far (in the horizon), the point
         is not placed.
@@ -68,7 +68,7 @@ class ErrorEstimation(object):
         self.frames_width = width
         self.frames_height = height
         self.use_depth = use_depth
-        self.initial_point = initial_point
+        self.label = label
         self.max_distance = max_distance
         self.depth_coef = depth_coef
 
@@ -161,52 +161,22 @@ class ErrorEstimation(object):
             return np.array([x_prime, y_prime])
 
     def _place_point(self, idx):
-        def on_click(event):
-            pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
-            plt.close()
+        try:
+            return self.label[idx][0]
+        except KeyError:
+            return None
 
-        def on_key_press(event):
-            if event.key == 'backspace' and self.initial_point is not None:  # key pressed is backspace
-                pixel_clicked[0] = self.initial_point[idx]
-                plt.close()
-            if event.key == 'e':
-                pixel_clicked[0] = np.array([np.round(event.xdata), np.round(event.ydata)])
-                plt.close()
-            if event.key == 'd':
-                pixel_clicked[0] = None
-                plt.close()
+    def is_label_usable(self, idx):
+        try:
+            point, is_keyframe = self.label[idx]
+        except KeyError:
+            return False  # Label does not exist
+        return not is_keyframe
 
-        if self.initial_point is None:
-            img = np.array(imageio.imread(self.data['img'][idx]))
-            fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8), dpi=100)
-            ax.set_title(f'Frame: {idx}')
-            ax.imshow(img)
-            pixel_clicked = [np.zeros(1)]
-
-            fig.canvas.mpl_connect('button_press_event', on_click)
-            fig.canvas.mpl_connect('key_press_event', on_key_press)
-            plt.show()
-            print(f'Input pixel: {pixel_clicked[0]}\n')
-            return pixel_clicked[0]
-        else:
-            # img = np.array(imageio.imread(self.data['img'][idx]))
-            # fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8), dpi=100)
-            # ax.set_title(f'Frame: {idx}')
-            # ax.imshow(img)
-            # ax.scatter(self.initial_point[idx][0], self.initial_point[idx][1], c='r')
-            # pixel_clicked = [np.zeros(1)]
-            #
-            # fig.canvas.mpl_connect('button_press_event', on_click)
-            # fig.canvas.mpl_connect('key_press_event', on_key_press)
-            # plt.show()
-            # print(f'Input pixel: {pixel_clicked[0]}\n')
-            # return pixel_clicked[0]
-            return self.initial_point[idx]
-
-    def _is_out_of_image(self, image_point: Union[list, tuple, np.ndarray]):
-        if image_point is not None:
+    def _is_out_of_image(self, image_point: np.ndarray):
+        if isinstance(image_point, np.ndarray):
             assert len(image_point) == 2
-            criterion = 0.1
+            criterion = 0.0
             cond1 = 0 / self.frames_width + criterion < image_point[0] / self.frames_width
             cond2 = image_point[0] / self.frames_width < self.frames_width / self.frames_width - criterion
             cond3 = 0 / self.frames_height + criterion < image_point[1] / self.frames_height
@@ -215,7 +185,7 @@ class ErrorEstimation(object):
         else:
             return True
 
-    def _image23d(self, idx: int, image_point: np.array) -> Tuple[np.array, Union[None, str]]:
+    def image23d(self, idx: int, image_point: np.array) -> Tuple[np.array, Union[None, str]]:
         """
         From pixels coordinates, project a point in 3d on the floor relative to the camera reference frame.
         The floor is defined where the origin reference frame is defined.
@@ -267,16 +237,16 @@ class ErrorEstimation(object):
                 point_floor_origin = t * vect_origin + camera_position
                 p1 = (Transform.from_matrix(tf_origin_camera).inv().as_matrix() @ np.append(point_floor_origin, 1))[:3]
                 if np.linalg.norm(point_floor_origin - camera_position) > self.max_distance:
-                    return p1, 'Point on the floor too far.'
+                    return p1, '2d to 3d error: Point is on the floor but too far.'
                 else:
                     return p1, None
             else:
                 if h <= 0:
-                    return None, 'Camera has negative height.'
+                    return None, '2d to 3d error: Camera has negative height.'
                 elif floor_normal @ vect_origin >= 0:
-                    return None, 'Pixel chosen cannot be on the floor.'
+                    return None, '2d to 3d error: Pixel direct to the horizon.'
 
-    def _space2image(self, point3d: Union[list, tuple, np.ndarray]):
+    def _space2image(self, point3d: Union[list, tuple, np.ndarray]) -> Union[np.ndarray, str]:
         """
         Project a 3D point expressed in the camera reference frame into the image of the camera.
 
@@ -295,9 +265,10 @@ class ErrorEstimation(object):
             x_2, y_2 = self.distort_func(point=(x_prime, y_prime), distort=True)  # Apply distortion
 
             u, v = (self.k @ np.array([x_2, y_2, 1]))[:-1]
-            return u, v
+            p3 = np.int32(np.round([u, v]))
+            return p3
         else:
-            return None
+            return 'Tracking error: Point behind the camera.'
 
     def p3_generator(self, saving_path: str):
         """
@@ -310,19 +281,19 @@ class ErrorEstimation(object):
         # cx, cy = self.k[0, 2], self.k[1, 2]
         # p = np.array([cx, cy + cy / 2])
         p = self._place_point(0)
-        p1, error = self._image23d(0, p)  # Ref camera
+        p1, error = self.image23d(0, p)  # Ref camera
         is_reconstructed = error is None
         tf_camera1_origin = self.data['pose'][0]  # Describing drone in reference frame origin
-        for i in tqdm(range(len(self.data["pose"])), desc='Computing p3 points'):
-            if is_reconstructed:
+        for i in tqdm(range(0, len(self.data["pose"])), desc='Computing p3 points'):
+            if is_reconstructed and self.is_label_usable(i):
                 tf_camera_i_origin = self.data['pose'][i]
                 tf_camera_i_camera_1 = tf_camera_i_origin @ Transform.from_matrix(tf_camera1_origin).inv().as_matrix()
                 p2 = (tf_camera_i_camera_1 @ np.append(p1, 1))[:3]
-                p3 = np.int32(np.round(self._space2image(p2)))
+                p3 = self._space2image(p2)
                 if self._is_out_of_image(p3):
-                    print(f'Is out of image')
+                    print(f'{i} out of image')
                     p = self._place_point(i)
-                    p1, error = self._image23d(i, p)  # Ref camera
+                    p1, error = self.image23d(i, p)  # Ref camera
                     is_reconstructed = error is None
                     tf_camera1_origin = self.data['pose'][i]
                     if is_reconstructed:
@@ -330,9 +301,9 @@ class ErrorEstimation(object):
                     else:
                         p3 = error + '\nP3 out of image.'
             else:
-                print(f'Is not reconstructed')
+                print(f'{i - 1} not reconstructed or {i} label is not usable')
                 p = self._place_point(i)
-                p1, error = self._image23d(i, p)  # Ref camera
+                p1, error = self.image23d(i, p)  # Ref camera
                 is_reconstructed = error is None
                 tf_camera1_origin = self.data['pose'][i]
                 if is_reconstructed:
@@ -359,12 +330,20 @@ class ErrorEstimation(object):
             ax.imshow(img)
             shape = img.shape
             # Contribution part, comment to get a raw video.
+            try:
+                label_point, is_keyframe = self.label[i]
+                ax.scatter(label_point[0], label_point[1], color='c', alpha=1)
+            except KeyError:
+                ax.annotate(f'No label',
+                            (self.frames_width / 2, self.frames_height / 4), xycoords='data', size=12,
+                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
             if isinstance(self.p3[i], np.ndarray):
                 p = self.p3[i]
-                ax.scatter(p[0], p[1], color='r', alpha=0.1)
+                ax.scatter(p[0], p[1], color='r', alpha=1)
             else:
                 ax.annotate(self.p3[i], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
                             ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
+
             tf_origin_camera = Transform.from_matrix(self.data['pose'][i]).inv()
             trans = tf_origin_camera.as_trans()
             angles = tf_origin_camera.as_rot_euler(seq='zyx', degrees=True)[::-1]
