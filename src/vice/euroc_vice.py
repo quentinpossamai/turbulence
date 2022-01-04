@@ -228,9 +228,10 @@ def evaluation(flight: str, ground: bool, imu: bool):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[0]
-    euroc_mav_pre_processing(flight, use_imu=True)
-    error_estimation(flight, ground=False, imu=True)
+    flight = euroc.FLIGHT_LIST[1]
+    imu = False
+    euroc_mav_pre_processing(flight, use_imu=imu)
+    error_estimation(flight, ground=True, imu=imu)
 
     # # Evaluating
     # sum_ground_mse = 0

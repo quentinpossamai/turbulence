@@ -164,7 +164,7 @@ class ErrorEstimation(object):
         try:
             return self.label[idx][0]
         except KeyError:
-            return None
+            return 'No label.'
 
     def is_label_usable(self, idx):
         try:
@@ -185,7 +185,7 @@ class ErrorEstimation(object):
         else:
             return True
 
-    def image23d(self, idx: int, image_point: np.array) -> Tuple[np.array, Union[None, str]]:
+    def image23d(self, idx: int, image_point: np.array) -> Union[np.ndarray, str]:
         """
         From pixels coordinates, project a point in 3d on the floor relative to the camera reference frame.
         The floor is defined where the origin reference frame is defined.
@@ -196,8 +196,6 @@ class ErrorEstimation(object):
 
         :return: A 3D point in the camera reference frame and a potential error message.
         """
-        if image_point is None:
-            return None, 'Point not placed.'
         # 1. Finding view vector
         # self.df[’pose'] is tf_camera_origin
         u = image_point[0]  # pixel point in image reference frame
@@ -219,7 +217,7 @@ class ErrorEstimation(object):
             depth_map = np.array(imageio.imread(self.data['depth'][idx]))[:, :, :3] / 255 * self.depth_coef
             z = depth_map[v_depth, u_depth][0]
             p1_camera_with_depth = np.array([x_prime * z, y_prime * z, z])
-            return p1_camera_with_depth, None
+            return p1_camera_with_depth
         else:
             vect_camera = np.array([x_prime, y_prime, 1])
 
@@ -237,16 +235,16 @@ class ErrorEstimation(object):
                 point_floor_origin = t * vect_origin + camera_position
                 p1 = (Transform.from_matrix(tf_origin_camera).inv().as_matrix() @ np.append(point_floor_origin, 1))[:3]
                 if np.linalg.norm(point_floor_origin - camera_position) > self.max_distance:
-                    return p1, '2d to 3d error: Point is on the floor but too far.'
+                    return '2d to 3d error: Point is on the floor but too far.'
                 else:
-                    return p1, None
+                    return p1
             else:
                 if h <= 0:
-                    return None, '2d to 3d error: Camera has negative height.'
+                    return '2d to 3d error: Camera has negative height.'
                 elif floor_normal @ vect_origin >= 0:
-                    return None, '2d to 3d error: Pixel direct to the horizon.'
+                    return '2d to 3d error: Pixel direct to the horizon.'
 
-    def _space2image(self, point3d: Union[list, tuple, np.ndarray]) -> Union[np.ndarray, str]:
+    def _space2image(self, point3d: Union[list, tuple, np.ndarray]) -> Union[str]:
         """
         Project a 3D point expressed in the camera reference frame into the image of the camera.
 
@@ -266,9 +264,28 @@ class ErrorEstimation(object):
 
             u, v = (self.k @ np.array([x_2, y_2, 1]))[:-1]
             p3 = np.int32(np.round([u, v]))
-            return p3
+            if self._is_out_of_image(p3):
+                return 'Tracking error: P3 out of image.'
+            else:
+                return p3
         else:
             return 'Tracking error: Point behind the camera.'
+
+    def construction(self, idx):
+        is_reconstructed = False
+        p0 = self._place_point(idx)
+        if isinstance(p0, np.ndarray):  # working0
+            p1 = self.image23d(idx, p0)
+            tf_camera1_origin = self.data['pose'][idx]
+            if isinstance(p1, np.ndarray):  # working1
+                self.p3.append((p0, True))
+                is_reconstructed = True
+                return is_reconstructed, p1, tf_camera1_origin
+            else:  # error1
+                self.p3.append((p1, True))
+        else:  # error0
+            self.p3.append((p0, True))
+        return is_reconstructed, None, None
 
     def p3_generator(self, saving_path: str):
         """
@@ -280,37 +297,48 @@ class ErrorEstimation(object):
         """
         # cx, cy = self.k[0, 2], self.k[1, 2]
         # p = np.array([cx, cy + cy / 2])
-        p = self._place_point(0)
-        p1, error = self.image23d(0, p)  # Ref camera
-        is_reconstructed = error is None
+        p0 = self._place_point(0)
+        p1 = self.image23d(0, p0)  # Ref camera
         tf_camera1_origin = self.data['pose'][0]  # Describing drone in reference frame origin
-        for i in tqdm(range(0, len(self.data["pose"])), desc='Computing p3 points'):
+        is_reconstructed = isinstance(p0, np.ndarray) and isinstance(p1, np.ndarray)
+        self.p3.append((p0, True))  # True for p3 is == to label
+        for i in tqdm(range(1, len(self.data["pose"])), desc='Computing p3 points'):
             if is_reconstructed and self.is_label_usable(i):
                 tf_camera_i_origin = self.data['pose'][i]
                 tf_camera_i_camera_1 = tf_camera_i_origin @ Transform.from_matrix(tf_camera1_origin).inv().as_matrix()
                 p2 = (tf_camera_i_camera_1 @ np.append(p1, 1))[:3]
                 p3 = self._space2image(p2)
-                if self._is_out_of_image(p3):
-                    print(f'{i} out of image')
-                    p = self._place_point(i)
-                    p1, error = self.image23d(i, p)  # Ref camera
-                    is_reconstructed = error is None
-                    tf_camera1_origin = self.data['pose'][i]
-                    if is_reconstructed:
-                        p3 = p
-                    else:
-                        p3 = error + '\nP3 out of image.'
-            else:
-                print(f'{i - 1} not reconstructed or {i} label is not usable')
-                p = self._place_point(i)
-                p1, error = self.image23d(i, p)  # Ref camera
-                is_reconstructed = error is None
-                tf_camera1_origin = self.data['pose'][i]
-                if is_reconstructed:
-                    p3 = p
+                if isinstance(p3, str):
+                    # Replacing the point
+                    p0 = self._place_point(i)
+                    if isinstance(p0, np.ndarray):  # working0
+                        p1 = self.image23d(i, p0)
+                        tf_camera1_origin = self.data['pose'][i]
+                        if isinstance(p1, np.ndarray):  # working1
+                            self.p3.append((p0, True))
+                            is_reconstructed = True
+                        else:  # error1
+                            self.p3.append((f'{p3}\n{p1}', True))
+                            is_reconstructed = False
+                    else:  # error0
+                        self.p3.append((f'{p3}\n{p0}', True))
+                        is_reconstructed = False
                 else:
-                    p3 = error  # Send the message of failure
-            self.p3.append(p3)
+                    self.p3.append((p3, False))
+            else:
+                p0 = self._place_point(i)
+                if isinstance(p0, np.ndarray):  # working0
+                    p1 = self.image23d(i, p0)
+                    tf_camera1_origin = self.data['pose'][i]
+                    if isinstance(p1, np.ndarray):  # working1
+                        self.p3.append((p0, True))
+                        is_reconstructed = True
+                    else:  # error1
+                        self.p3.append((p1, True))
+                        is_reconstructed = False
+                else:  # error0
+                    self.p3.append((p0, True))
+                    is_reconstructed = False
         pickle.dump(self.p3, open(saving_path, 'wb'))
 
     def build_video(self, fps, saving_path):
@@ -334,14 +362,16 @@ class ErrorEstimation(object):
                 label_point, is_keyframe = self.label[i]
                 ax.scatter(label_point[0], label_point[1], color='c', alpha=1)
             except KeyError:
-                ax.annotate(f'No label',
-                            (self.frames_width / 2, self.frames_height / 4), xycoords='data', size=12,
-                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
-            if isinstance(self.p3[i], np.ndarray):
-                p = self.p3[i]
+                pass
+            if isinstance(self.p3[i][0], np.ndarray):  # place p3 point
+                p = self.p3[i][0]
                 ax.scatter(p[0], p[1], color='r', alpha=1)
-            else:
-                ax.annotate(self.p3[i], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
+                if self.p3[i][1]:  # indicate if resetting the p3 point
+                    ax.annotate(f'Reset frame.',
+                                (self.frames_width - 40, 210), xycoords='data', size=12,
+                                ha='right', va='top', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
+            else:  # annotate erroe message
+                ax.annotate(self.p3[i][0], (self.frames_width / 2, self.frames_height / 2), xycoords='data', size=12,
                             ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
 
             tf_origin_camera = Transform.from_matrix(self.data['pose'][i]).inv()
@@ -362,6 +392,7 @@ class ErrorEstimation(object):
             ax.axis('off')
             fig.canvas.draw()
             data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)
+            # plt.show()
             plt.close('all')
             video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
         video.release()
