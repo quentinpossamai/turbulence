@@ -228,81 +228,85 @@ def evaluation(flight: str, ground: bool, imu: bool):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[1]
-    imu = False
-    euroc_mav_pre_processing(flight, use_imu=imu)
-    error_estimation(flight, ground=True, imu=imu)
+    # flight = euroc.FLIGHT_LIST[0]
+    # case = {0: (True, False),
+    #         1: (False, False),
+    #         2: (True, True),
+    #         3: (False, True)}
+    # ground, imu = case[3]
+    # euroc_mav_pre_processing(flight, use_imu=imu)
+    # error_estimation(flight, ground=ground, imu=imu)
 
-    # # Evaluating
-    # sum_ground_mse = 0
-    # sum_depth_mse = 0
-    # sum_ground_ang = 0
-    # sum_depth_ang = 0
-    #
-    # flight = euroc.FLIGHT_LIST[0]
-    # mse, ang = evaluation(flight, ground=True, imu=False)
-    # sum_ground_mse += mse
-    # sum_ground_ang += ang
-    #
-    # mse, ang = evaluation(flight, ground=False, imu=False)
-    # sum_depth_mse += mse
-    # sum_depth_ang += ang
-    #
-    # flight = euroc.FLIGHT_LIST[1]
-    # mse, ang = evaluation(flight, ground=True, imu=False)
-    # sum_ground_mse += mse
-    # sum_ground_ang += ang
-    #
-    # mse, ang = evaluation(flight, ground=False, imu=False)
-    # sum_depth_mse += mse
-    # sum_depth_ang += ang
-    #
-    # flight = euroc.FLIGHT_LIST[2]
-    # mse, ang = evaluation(flight, ground=True, imu=False)
-    # sum_ground_mse += mse
-    # sum_ground_ang += ang
-    #
-    # mse, ang = evaluation(flight, ground=False, imu=False)
-    # sum_depth_mse += mse
-    # sum_depth_ang += ang
-    #
-    # print(f'Total mse ground: {sum_ground_mse} | Total ang ground: {sum_ground_ang}')
-    # print(f'Total mse depth: {sum_depth_mse} | Total ang depth: {sum_depth_ang}')
-    #
-    # sum_ground_imu_mse = 0
-    # sum_depth_imu_mse = 0
-    # sum_ground_imu_ang = 0
-    # sum_depth_imu_ang = 0
-    #
-    # flight = euroc.FLIGHT_LIST[0]
-    # mse, ang = evaluation(flight, ground=True, imu=True)
-    # sum_ground_imu_mse += mse
-    # sum_ground_imu_ang += ang
-    #
-    # mse, ang = evaluation(flight, ground=False, imu=True)
-    # sum_depth_imu_mse += mse
-    # sum_depth_imu_ang += ang
-    #
-    # flight = euroc.FLIGHT_LIST[1]
-    # mse, ang = evaluation(flight, ground=True, imu=True)
-    # sum_ground_imu_mse += mse
-    # sum_ground_imu_ang += ang
-    #
-    # mse, ang = evaluation(flight, ground=False, imu=True)
-    # sum_depth_imu_mse += mse
-    # sum_depth_imu_ang += ang
-    #
-    # flight = euroc.FLIGHT_LIST[2]
-    # mse, ang = evaluation(flight, ground=True, imu=True)
-    # sum_ground_imu_mse += mse
-    # sum_ground_imu_ang += ang
-    #
-    # mse, ang = evaluation(flight, ground=False, imu=True)
-    # sum_depth_imu_mse += mse
-    # sum_depth_imu_ang += ang
-    #
-    # print(f'Total mse ground imu: {sum_ground_imu_mse} | Total ang ground imu: {sum_ground_imu_ang}')
-    # print(f'Total mse depth imu: {sum_depth_imu_mse} | Total ang depth imu: {sum_depth_imu_ang}')
+    # Evaluating
+    sum_ground_mse = 0
+    sum_depth_mse = 0
+    sum_ground_ang = 0
+    sum_depth_ang = 0
+
+    flight = euroc.FLIGHT_LIST[0]
+    mse, ang = evaluation(flight, ground=True, imu=False)
+    sum_ground_mse += mse
+    sum_ground_ang += ang
+
+    mse, ang = evaluation(flight, ground=False, imu=False)
+    sum_depth_mse += mse
+    sum_depth_ang += ang
+
+    flight = euroc.FLIGHT_LIST[1]
+    mse, ang = evaluation(flight, ground=True, imu=False)
+    sum_ground_mse += mse
+    sum_ground_ang += ang
+
+    mse, ang = evaluation(flight, ground=False, imu=False)
+    sum_depth_mse += mse
+    sum_depth_ang += ang
+
+    flight = euroc.FLIGHT_LIST[2]
+    mse, ang = evaluation(flight, ground=True, imu=False)
+    sum_ground_mse += mse
+    sum_ground_ang += ang
+
+    mse, ang = evaluation(flight, ground=False, imu=False)
+    sum_depth_mse += mse
+    sum_depth_ang += ang
+
+    print(f'Total mse ground: {sum_ground_mse} | Total ang ground: {sum_ground_ang}')
+    print(f'Total mse depth: {sum_depth_mse} | Total ang depth: {sum_depth_ang}')
+
+    sum_ground_imu_mse = 0
+    sum_depth_imu_mse = 0
+    sum_ground_imu_ang = 0
+    sum_depth_imu_ang = 0
+
+    flight = euroc.FLIGHT_LIST[0]
+    mse, ang = evaluation(flight, ground=True, imu=True)
+    sum_ground_imu_mse += mse
+    sum_ground_imu_ang += ang
+
+    mse, ang = evaluation(flight, ground=False, imu=True)
+    sum_depth_imu_mse += mse
+    sum_depth_imu_ang += ang
+
+    flight = euroc.FLIGHT_LIST[1]
+    mse, ang = evaluation(flight, ground=True, imu=True)
+    sum_ground_imu_mse += mse
+    sum_ground_imu_ang += ang
+
+    mse, ang = evaluation(flight, ground=False, imu=True)
+    sum_depth_imu_mse += mse
+    sum_depth_imu_ang += ang
+
+    flight = euroc.FLIGHT_LIST[2]
+    mse, ang = evaluation(flight, ground=True, imu=True)
+    sum_ground_imu_mse += mse
+    sum_ground_imu_ang += ang
+
+    mse, ang = evaluation(flight, ground=False, imu=True)
+    sum_depth_imu_mse += mse
+    sum_depth_imu_ang += ang
+
+    print(f'Total mse ground imu: {sum_ground_imu_mse} | Total ang ground imu: {sum_ground_imu_ang}')
+    print(f'Total mse depth imu: {sum_depth_imu_mse} | Total ang depth imu: {sum_depth_imu_ang}')
 
 
 if __name__ == '__main__':

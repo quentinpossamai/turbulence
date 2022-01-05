@@ -271,7 +271,7 @@ class ErrorEstimation(object):
         else:
             return 'Tracking error: Point behind the camera.'
 
-    def construction(self, idx):
+    def construction(self, idx, p3):
         is_reconstructed = False
         p0 = self._place_point(idx)
         if isinstance(p0, np.ndarray):  # working0
@@ -282,9 +282,15 @@ class ErrorEstimation(object):
                 is_reconstructed = True
                 return is_reconstructed, p1, tf_camera1_origin
             else:  # error1
-                self.p3.append((p1, True))
+                if p3 is None:
+                    self.p3.append((p1, True))
+                else:
+                    self.p3.append((f'{p3}\n{p1}', True))
         else:  # error0
-            self.p3.append((p0, True))
+            if p3 is None:
+                self.p3.append((p0, True))
+            else:
+                self.p3.append((f'{p3}\n{p0}', True))
         return is_reconstructed, None, None
 
     def p3_generator(self, saving_path: str):
@@ -297,11 +303,7 @@ class ErrorEstimation(object):
         """
         # cx, cy = self.k[0, 2], self.k[1, 2]
         # p = np.array([cx, cy + cy / 2])
-        p0 = self._place_point(0)
-        p1 = self.image23d(0, p0)  # Ref camera
-        tf_camera1_origin = self.data['pose'][0]  # Describing drone in reference frame origin
-        is_reconstructed = isinstance(p0, np.ndarray) and isinstance(p1, np.ndarray)
-        self.p3.append((p0, True))  # True for p3 is == to label
+        is_reconstructed, p1, tf_camera1_origin = self.construction(0, None)
         for i in tqdm(range(1, len(self.data["pose"])), desc='Computing p3 points'):
             if is_reconstructed and self.is_label_usable(i):
                 tf_camera_i_origin = self.data['pose'][i]
@@ -309,36 +311,11 @@ class ErrorEstimation(object):
                 p2 = (tf_camera_i_camera_1 @ np.append(p1, 1))[:3]
                 p3 = self._space2image(p2)
                 if isinstance(p3, str):
-                    # Replacing the point
-                    p0 = self._place_point(i)
-                    if isinstance(p0, np.ndarray):  # working0
-                        p1 = self.image23d(i, p0)
-                        tf_camera1_origin = self.data['pose'][i]
-                        if isinstance(p1, np.ndarray):  # working1
-                            self.p3.append((p0, True))
-                            is_reconstructed = True
-                        else:  # error1
-                            self.p3.append((f'{p3}\n{p1}', True))
-                            is_reconstructed = False
-                    else:  # error0
-                        self.p3.append((f'{p3}\n{p0}', True))
-                        is_reconstructed = False
+                    is_reconstructed, p1, tf_camera1_origin = self.construction(i, p3)
                 else:
                     self.p3.append((p3, False))
             else:
-                p0 = self._place_point(i)
-                if isinstance(p0, np.ndarray):  # working0
-                    p1 = self.image23d(i, p0)
-                    tf_camera1_origin = self.data['pose'][i]
-                    if isinstance(p1, np.ndarray):  # working1
-                        self.p3.append((p0, True))
-                        is_reconstructed = True
-                    else:  # error1
-                        self.p3.append((p1, True))
-                        is_reconstructed = False
-                else:  # error0
-                    self.p3.append((p0, True))
-                    is_reconstructed = False
+                is_reconstructed, p1, tf_camera1_origin = self.construction(i, None)
         pickle.dump(self.p3, open(saving_path, 'wb'))
 
     def build_video(self, fps, saving_path):
