@@ -11,7 +11,7 @@ from src.utils.quaternion import qmul_np
 from src.utils.paths import mkdir_if_not_exist
 
 
-def euroc_mav_pre_processing(flight: str, use_imu: bool):
+def euroc_mav_pre_processing(flight: str):
     vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
     print("Processing: ", flight)
     # 1-LOADING
@@ -52,7 +52,7 @@ def euroc_mav_pre_processing(flight: str, use_imu: bool):
 
     # 1.5-Cutting at the image frequency
     cut_img = np.unique(data["cam0"])
-    cut_tf_camera_origin = np.zeros((len(cut_img), 4, 4))
+    tfpose_camera_origin = np.zeros((len(cut_img), 4, 4))
     cut_t = np.zeros((len(cut_img), 1))
     cut_imu = np.zeros((len(cut_img), 6))
 
@@ -60,7 +60,7 @@ def euroc_mav_pre_processing(flight: str, use_imu: bool):
     depth_path = []
     for i, img_timestamp in enumerate(cut_img):
         ind = np.abs(img_timestamp - data["timestamp"]).argmin()
-        cut_tf_camera_origin[i] = tf_camera_origin[ind]
+        tfpose_camera_origin[i] = tf_camera_origin[ind]
         cut_t[i] = data["t"][ind]
         cut_imu[i] = data['imu_ang_acc'][ind]
         img_path.append(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{img_timestamp}.png")
@@ -79,7 +79,7 @@ def euroc_mav_pre_processing(flight: str, use_imu: bool):
     acc = (rot_flu_imu @ acc.T).T
 
     # Integration
-    quat, trans = Transform.from_matrix(cut_tf_camera_origin).as_quat_trans()
+    quat, trans = Transform.from_matrix(tfpose_camera_origin).as_quat_trans()
     imu_quat = [quat[0]]
     for i in range(1, len(quat)):
         dquat_dt = 1 / 2 * qmul_np(imu_quat[-1], np.concatenate([ang_vel[i], np.zeros(1)]))
@@ -90,29 +90,14 @@ def euroc_mav_pre_processing(flight: str, use_imu: bool):
     imu_lin_vel = np.concatenate([np.zeros((1, 3)), np.cumsum(acc[:-1] * dt, axis=0)], axis=0)
     imu_trans = np.concatenate([trans[0].reshape((1, 3)), np.cumsum(imu_lin_vel[:-1] * dt, axis=0)], axis=0)
     tf2_origin_cam = Transform.from_quat_trans(imu_quat, imu_trans).as_matrix() @ tf_body_cam
-    tf2_cam_origin = Transform.from_matrix(tf2_origin_cam).inv().as_matrix()
+    tfimu_cam_origin = Transform.from_matrix(tf2_origin_cam).inv().as_matrix()
     # tf_vicon0_body
-
-    # import matplotlib.pyplot as plt
-    # fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8))
-    # i, start, stop = 2, 0, len(quat)
-    # quat, trans = Transform.from_matrix(cut_tf_camera_origin).as_quat_trans()
-    # ax.plot(trans[start:stop, i], label='gt')
-    # quat, trans = Transform.from_matrix(tf2_cam_origin).as_quat_trans()
-    # ax.plot(trans[start:stop, i], label='imu')
-    # plt.grid()
-    # plt.legend()
-
 
     # - Saving preprocessing
     mkdir_if_not_exist([vice_path])
-    if use_imu:
-        pose = tf2_cam_origin
-    else:
-        pose = cut_tf_camera_origin
-
     input_data = {"t": cut_t,
-                  "pose": pose,
+                  "pose": tfpose_camera_origin,
+                  "imu": tfimu_cam_origin,
                   "img": img_path,
                   "depth": depth_path}
     pickle.dump(input_data, open(f"{vice_path}vice_data.pkl", 'wb'))
@@ -127,6 +112,11 @@ def error_estimation(flight: str, ground: bool, imu: bool):
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
     label = pickle.load(open(f"{vice_path}label.pkl", 'rb'))
+    if imu:
+        input_data["pose"] = input_data["imu"]
+        del input_data["imu"]
+    else:
+        del input_data["imu"]
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 distortion_coefficient=cam_prms['D'],
@@ -172,25 +162,50 @@ def angle(position3d_label: np.ndarray, position3d_pred: np.ndarray) -> float:
     return np.arccos(np.clip(v1 @ v2, -1, 1))
 
 
-def roe(label: np.ndarray, pred: np.ndarray) -> float:
-    return 0
+def roe(tf_gt: np.ndarray, tf_pred: np.ndarray, k: int) -> np.ndarray:
+    n = len(tf_gt)
+    assert tf_gt.shape == (n, 4, 4) and tf_pred.shape == (n, 4, 4)
+    r_gt = Transform.from_matrix(tf_gt).as_rot_mat()
+    r_pred = Transform.from_matrix(tf_pred).as_rot_mat()
+
+    res = np.zeros(k)
+    for k_ind, i in enumerate(np.round(np.linspace(0, n - 2, k)).astype(int)):
+        dr = r_gt[i] @ r_gt[i + 1].T
+        dr_hat = r_pred[i] @ r_pred[i + 1].T
+        prod = dr @ dr_hat
+        a = 1 / 2 * (prod - prod.T)
+        norm_a = np.sqrt(-1 / 2 * np.trace(a @ a))
+        log_r = (np.arcsin(norm_a) / norm_a).reshape((-1, 1, 1)) * a
+        res[k_ind] = np.linalg.norm(log_r)
+    return res
 
 
-def aoe(label: np.ndarray, pred: np.ndarray) -> float:
-    return 0
+def aoe(tf_gt: np.ndarray, tf_pred: np.ndarray) -> float:
+    n = len(tf_gt)
+    assert tf_gt.shape == (n, 4, 4) and tf_pred.shape == (n, 4, 4)
+    r_gt = Transform.from_matrix(tf_gt).as_rot_mat()
+    r_pred = Transform.from_matrix(tf_pred).as_rot_mat()
+
+    dr = r_gt @ r_pred.transpose((0, 2, 1))
+    a = 1 / 2 * (dr - dr.transpose((0, 2, 1)))
+    norm_a = np.sqrt(-1 / 2 * np.trace(a @ a, axis1=1, axis2=2))
+    log_r = (np.arcsin(norm_a) / norm_a).reshape((-1, 1, 1)) * a
+    return np.sqrt(np.linalg.norm(log_r.reshape(-1, 9), axis=0)[1:].mean())  # first element is initialised with gt
 
 
-def evaluation(flight: str, ground: bool, imu: bool):
-    if imu:
-        raise NotImplementedError
+def vice_evaluation(flight: str, ground: bool, imu: bool):
     vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-    if ground:
-        prediction = pickle.load(open(f'{vice_path}ground.pkl', 'rb'))
-    else:
-        prediction = pickle.load(open(f'{vice_path}depth.pkl', 'rb'))
     label = pickle.load(open(f'{vice_path}label.pkl', 'rb'))
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
+    name = 'ground' if ground else 'depth'
+    name = f'{name}imu' if imu else name
+    if imu:
+        input_data["pose"] = input_data["imu"]
+        del input_data["imu"]
+    else:
+        del input_data["imu"]
+    prediction = pickle.load(open(f'{vice_path}{name}.pkl', 'rb'))
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 distortion_coefficient=cam_prms['D'],
@@ -205,26 +220,62 @@ def evaluation(flight: str, ground: bool, imu: bool):
     for i in range(len(prediction)):
         try:
             point, is_keyframe = label[i]
+            not_label = is_keyframe
         except KeyError:
-            continue
-        if isinstance(prediction[i], np.ndarray) and not is_keyframe:
-            label_3d, _ = estimator.image23d(i, point)
-            prediction_3d, _ = estimator.image23d(i, prediction[i].astype(float))
+            not_label = False
+            # continue
+        p3, not_prediction = prediction[i]
+        if not not_prediction:
+            assert not not_label
+            label_3d = estimator.image23d(i, point)
+            prediction_3d = estimator.image23d(i, p3.astype(float))
 
             # mse_error
-            error1 = ((label_3d - prediction_3d) ** 2).mean()
-            mse_error.append(error1)
+            if isinstance(prediction_3d, np.ndarray):
+                error1 = ((label_3d - prediction_3d) ** 2).mean()
+                mse_error.append(error1)
 
-            # angle error
-            error2 = angle(label_3d, prediction_3d)
-            angle_error.append(error2)
-            # print(f'i: {i} | mse_error: {error1} | angle error: {error2}')
-            
+                # angle error
+                error2 = angle(label_3d, prediction_3d)
+                angle_error.append(error2)
+                # print(f'i: {i} | mse_error: {error1} | angle error: {error2}')
+
     err1, err2 = np.mean(mse_error), np.mean(angle_error)
     print(f'Flight: {flight} | ground: {ground} | imu: {imu}')
-    # print(f'Error length: {len(mse_error)}')
+    print(f'Error length: {len(mse_error)}')
     print(f'mse_error: {err1:1.4e} | angle_error: {err2:1.4e}\n\n')
     return err1, err2
+
+
+def evaluation():
+    # for imu in [False, True]:
+    #     for ground in [True, False]:
+    #         sum_mse = 0
+    #         sum_ang = 0
+    #         for i in range(3):
+    #             mse, ang = vice_evaluation(euroc.FLIGHT_LIST[i], ground=ground, imu=imu)
+    #             sum_mse += mse
+    #             sum_ang += ang
+    #         print(f'Total mse ground: {sum_mse:1.4e} | Total ang ground: {sum_ang:1.4e}\n')
+
+    mse_sum = 0
+    aoe_sum = 0
+    _sum = 0
+    for i in range(3):
+        vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{euroc.FLIGHT_LIST[i]}vice/'
+        input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
+
+        trans_gt = Transform.from_matrix(input_data['pose']).as_trans()
+        trans_pred = Transform.from_matrix(input_data['imu']).as_trans()
+        mse_error = ((trans_gt - trans_pred) ** 2).mean()
+
+        aoe_error = aoe(input_data['pose'], input_data['imu'])
+
+        roe_error = roe(input_data['pose'], input_data['imu'], 100)
+        roe_error = roe_error.mean()
+
+        print(f'flight: {euroc.FLIGHT_LIST[i]} | mse error: {mse_error:1.4e} | aoe error: {aoe_error:1.4e} | '
+              f'roe error: {roe_error:1.4e} ')
 
 
 def main():
@@ -234,79 +285,10 @@ def main():
     #         2: (True, True),
     #         3: (False, True)}
     # ground, imu = case[3]
-    # euroc_mav_pre_processing(flight, use_imu=imu)
+    # euroc_mav_pre_processing(flight)
     # error_estimation(flight, ground=ground, imu=imu)
 
-    # Evaluating
-    sum_ground_mse = 0
-    sum_depth_mse = 0
-    sum_ground_ang = 0
-    sum_depth_ang = 0
-
-    flight = euroc.FLIGHT_LIST[0]
-    mse, ang = evaluation(flight, ground=True, imu=False)
-    sum_ground_mse += mse
-    sum_ground_ang += ang
-
-    mse, ang = evaluation(flight, ground=False, imu=False)
-    sum_depth_mse += mse
-    sum_depth_ang += ang
-
-    flight = euroc.FLIGHT_LIST[1]
-    mse, ang = evaluation(flight, ground=True, imu=False)
-    sum_ground_mse += mse
-    sum_ground_ang += ang
-
-    mse, ang = evaluation(flight, ground=False, imu=False)
-    sum_depth_mse += mse
-    sum_depth_ang += ang
-
-    flight = euroc.FLIGHT_LIST[2]
-    mse, ang = evaluation(flight, ground=True, imu=False)
-    sum_ground_mse += mse
-    sum_ground_ang += ang
-
-    mse, ang = evaluation(flight, ground=False, imu=False)
-    sum_depth_mse += mse
-    sum_depth_ang += ang
-
-    print(f'Total mse ground: {sum_ground_mse} | Total ang ground: {sum_ground_ang}')
-    print(f'Total mse depth: {sum_depth_mse} | Total ang depth: {sum_depth_ang}')
-
-    sum_ground_imu_mse = 0
-    sum_depth_imu_mse = 0
-    sum_ground_imu_ang = 0
-    sum_depth_imu_ang = 0
-
-    flight = euroc.FLIGHT_LIST[0]
-    mse, ang = evaluation(flight, ground=True, imu=True)
-    sum_ground_imu_mse += mse
-    sum_ground_imu_ang += ang
-
-    mse, ang = evaluation(flight, ground=False, imu=True)
-    sum_depth_imu_mse += mse
-    sum_depth_imu_ang += ang
-
-    flight = euroc.FLIGHT_LIST[1]
-    mse, ang = evaluation(flight, ground=True, imu=True)
-    sum_ground_imu_mse += mse
-    sum_ground_imu_ang += ang
-
-    mse, ang = evaluation(flight, ground=False, imu=True)
-    sum_depth_imu_mse += mse
-    sum_depth_imu_ang += ang
-
-    flight = euroc.FLIGHT_LIST[2]
-    mse, ang = evaluation(flight, ground=True, imu=True)
-    sum_ground_imu_mse += mse
-    sum_ground_imu_ang += ang
-
-    mse, ang = evaluation(flight, ground=False, imu=True)
-    sum_depth_imu_mse += mse
-    sum_depth_imu_ang += ang
-
-    print(f'Total mse ground imu: {sum_ground_imu_mse} | Total ang ground imu: {sum_ground_imu_ang}')
-    print(f'Total mse depth imu: {sum_depth_imu_mse} | Total ang depth imu: {sum_depth_imu_ang}')
+    evaluation()
 
 
 if __name__ == '__main__':

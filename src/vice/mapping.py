@@ -1,80 +1,40 @@
 import cv2
-from cv2 import VideoWriter, VideoWriter_fourcc
-import imageio
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 import pickle
 import datetime
-from tqdm import tqdm
 
 import src.data.euroc_mav.loading as euroc
 
 matplotlib.use('TKAgg')
 
-
 FRAME_NUM = 0
 INVERT = False
 
 
-def make_video(flight: str, include_label: bool):
-    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-    data = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))
-    if include_label:
-        label = pickle.load(open(f'{vice_path}label.pkl', 'rb'))
-        saving_path = f'{vice_path}labelled.mkv'
-    else:
-        saving_path = f'{vice_path}raw.mkv'
+def label_data(video_path: str, label_path: str):
+    """
+    Label the frame of a video file with using matplotlib and cursor position.
 
-    codec = VideoWriter_fourcc(*'H264')
-    fps = 20
-    width = 752
-    height = 480
-    video = VideoWriter(saving_path, codec, float(fps), (width, height), True)
-    print(f'Video destination : {saving_path}')
-
-    shape = (height, width, 3)
-    for i, image_path in enumerate(tqdm(data['img'], desc="Creating a video")):
-        img = np.array(imageio.imread(image_path))
-        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
-        for j in range(3):
-            color_frame[:, :, j] = img
-        img = color_frame
-
-        fig = plt.figure(figsize=(width / 100., height / 100.))
-        ax = plt.axes([0, 0, 1, 1])
-        ax.imshow(img)
-        if include_label:
-            try:
-                point, is_keyframe = label[i]
-                ax.scatter(point[0], point[1], c='g' if is_keyframe else 'r')
-            except KeyError:
-                ax.annotate('No label placed.', (width / 2, height / 2), xycoords='data', size=12,
-                            ha='center', va='center', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
-        ax.axis('off')
-        fig.canvas.draw()
-        data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='').reshape(shape)
-        plt.close('all')
-        video.write(data[:, :, ::-1])  # Because VideoWriter.write take BGR images
-    video.release()
-    cv2.destroyAllWindows()
-
-
-def labelize(flight):
+    param video_path: The path to load the video from.
+    param label_path: The path to save the label from.
+    :return:
+    """
     global FRAME_NUM
-    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-    video = cv2.VideoCapture(f'{vice_path}/raw.mkv')
+    video = cv2.VideoCapture(video_path)
     img = []
     is_reading, frame = video.read()
     while is_reading:
+        # read video is in bgr.
         img.append(frame[:, :, ::-1])
         is_reading, frame = video.read()
     img = np.stack(img[:-1])
     _, height, width, _ = img.shape
 
     try:
-        msg = f'Previous label found at: {vice_path}label.pkl'
-        label = pickle.load(open(f'{vice_path}label.pkl', 'rb'))
+        msg = f'Previous label found at: {label_path}'
+        label = pickle.load(open(f'{label_path}', 'rb'))
     except FileNotFoundError:
         msg = f'No previous label found.'
         label = {}
@@ -116,6 +76,7 @@ def labelize(flight):
             scatter_obj.set_alpha(0)
         fig.canvas.draw()
 
+    # If the labelling is done with the click.
     # def on_click(event):
     #     if event.button.name == 'LEFT':
     #         label[FRAME_NUM] = np.array([np.round(event.xdata), np.round(event.ydata)])
@@ -149,17 +110,18 @@ def labelize(flight):
             display_other_frame(0)
         if event.key == 'w':
             h = datetime.datetime.now()
-            print(f'{h.ctime()}: Saving at: {vice_path}label.pkl')
-            pickle.dump(label, open(f'{vice_path}label.pkl', 'wb'))
+            print(f'{h.ctime()}: Saving at: {label_path}')
+            pickle.dump(label, open(f'{label_path}', 'wb'))
+
     # fig.canvas.mpl_connect('button_press_event', on_click)
     fig.canvas.mpl_connect('key_press_event', on_key)
-
     plt.show()
 
 
 def main():
-    make_video(euroc.FLIGHT_LIST[2], include_label=True)
-    # labelize(euroc.FLIGHT_LIST[2])
+    flight = euroc.FLIGHT_LIST[0]
+    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+    label_data(video_path=f'{vice_path}/raw.mkv', label_path=f'{vice_path}label.pkl')
 
 
 if __name__ == '__main__':
