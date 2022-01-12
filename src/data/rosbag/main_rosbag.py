@@ -361,9 +361,23 @@ def main_hilti():
     extractor.get_freq()
     # extractor.extract()
 
+def main_debug():
+    # Data to extract parameters
+    load_path = f'/Users/quentin/Downloads/V1_01_easy.bag'
+    save_path = f'/Users/quentin/Downloads/V1_01_easy.pkl'
+
+    # Extract data
+    e = Extractor(load_path)
+    # e.show_topics()
+    data_extracted = e.extract()
+
+    # Saving file
+    print("Saving at : {}".format(save_path))
+    pickle.dump(data_extracted, open(save_path, "wb"))
+
 
 if __name__ == "__main__":
     # main_data_drones()
     # main_euroc_mav()
     # main_blackbird()
-    main_hilti()
+    main_debug()

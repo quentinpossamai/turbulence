@@ -1,7 +1,7 @@
 from __future__ import print_function
 import numpy as np
 import re
-from rosbags.rosbag1 import Reader
+from rosbags.rosbag1 import Reader  # Install rosbags for python3 with pip
 from rosbags.serde import deserialize_cdr, ros1_to_cdr
 from tqdm import tqdm
 
@@ -71,7 +71,7 @@ class Extractor(object):
                     processing_func = _process_sensor_msgs_image
                 elif msg_type == "sensor_msgs/CameraInfo":
                     processing_func = _process_sensor_msgs_camera_info
-                elif msg_type == "geometry_msgs/TransformStamped":
+                elif msg_type == "geometry_msgs/TransformStamped" or msg_type == "geometry_msgs/msg/TransformStamped":
                     processing_func = _process_geometry_msgs_transform_stamped
                 elif msg_type == "asctec_hl_comm/MotorSpeed":
                     processing_func = _process_asctec_hl_comm_motor_speed
