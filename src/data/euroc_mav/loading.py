@@ -62,6 +62,14 @@ def load_clean_data(flight):
     assert (timestamp == sorted(timestamp)).all()
     imu_dict = {"t": time, "ang_acc": np.concatenate([ang_vel, lin_acc], axis=1), "timestamp": timestamp}
 
+    # # timestamp, x, y, z, qw, qx, qy, qz
+    # imu_open_vins = np.loadtxt(f'{DATASET_PATH}OpenVINS/{flight[:-1]}.csv', delimiter=',', skiprows=1)
+    # time, trans = imu_open_vins[:, 0], imu_open_vins[:, 1:4]
+    # quat = np.stack([imu_open_vins[:, 5], imu_open_vins[:, 6], imu_open_vins[:, 7], imu_open_vins[:, 4]], axis=1)
+    # imu_dict = {'t': time,
+    #             'pose': np.concatenate([trans, quat], axis=1),
+    #             'timestamp': (time * 1e9).astype(int)}
+
     # 1.2-MOTOR SPEED Loading
     # dict_keys(['frame_id', 'secs', 'motor_speed', 'nsecs'])
     ms_key = '/fcu/motor_speed__asctec_hl_comm/MotorSpeed'
@@ -104,7 +112,7 @@ def load_clean_data(flight):
     assert (width == 752).all()  # width not use
     is_bigendian = np.array([raw[cam0_key][i]["is_bigendian"] for i in range(len(raw[cam0_key]))])
     assert is_bigendian.sum() == 0  # is_bigendian not use
-    cam0_dict = {"t": time, "timestamp": timestamp}
+    cam0_dict = {"timestamp": timestamp}
 
     # 2-DENOISING
     # 2.1-Denoising motor speed's timestamp and motor speed
@@ -116,7 +124,7 @@ def load_clean_data(flight):
     den_motor_dict["t"] = (period * np.array(range(len(motor_dict["t"]))) + motor_dict["t"][0])
 
     # Butterworth on motor speed
-    sos = signal.butter(N=2, Wn=2.8, btype='lowpass', fs=1/period, output='sos')
+    sos = signal.butter(N=2, Wn=2.8, btype='lowpass', fs=1 / period, output='sos')
     den_motor_dict["motor"] = signal.sosfiltfilt(sos, motor_dict["motor"], axis=0)
 
     # 2.2-Denoising IMU timestamp
@@ -126,14 +134,15 @@ def load_clean_data(flight):
     den_imu_dict["timestamp"] = imu_dict["timestamp"]
     den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
 
-    # Butterworth on imu angular_velocity
-    sos = signal.butter(N=2, Wn=4.04, btype='lowpass', fs=1/period, output='sos')
-    den_imu_dict["ang_acc"][:, :3] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, :3], axis=0)
-    # Butterworth on imu acceleration
-    sos = signal.butter(N=2, Wn=2.8, btype='lowpass', fs=1/period, output='sos')
-    den_imu_dict["ang_acc"][:, 3:5] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, 3:5], axis=0)
-    sos = signal.butter(N=2, Wn=5.14, btype='lowpass', fs=1/period, output='sos')
-    den_imu_dict["ang_acc"][:, 5] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, 5])
+    # den_imu_dict["ang_acc"] = imu_dict["ang_acc"]  # No denoising for IMU data
+    # # Butterworth on imu angular_velocity
+    # sos = signal.butter(N=2, Wn=4.04, btype='lowpass', fs=1/period, output='sos')
+    # den_imu_dict["ang_acc"][:, :3] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, :3], axis=0)
+    # # Butterworth on imu acceleration
+    # sos = signal.butter(N=2, Wn=2.8, btype='lowpass', fs=1/period, output='sos')
+    # den_imu_dict["ang_acc"][:, 3:5] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, 3:5], axis=0)
+    # sos = signal.butter(N=2, Wn=5.14, btype='lowpass', fs=1/period, output='sos')
+    # den_imu_dict["ang_acc"][:, 5] = signal.sosfiltfilt(sos,  imu_dict["ang_acc"][:, 5])
 
     # 2.3-Computing a denoised motion capture's translation and quaternion.
     # 2.3.1-Initialization, normalization and centering
@@ -504,18 +513,18 @@ def load_flight(flight):
 
 
 def main():
-    # load_clean_data(FLIGHT_LIST[0])
-    # load_clean_data(FLIGHT_LIST[1])
-    # load_clean_data(FLIGHT_LIST[2])
-    # euroc_mav_residual()
-    # merge_embeddings()
-    # label_surface_influence()
-    # splitting()
+    load_clean_data(FLIGHT_LIST[0])
+    load_clean_data(FLIGHT_LIST[1])
+    load_clean_data(FLIGHT_LIST[2])
+    euroc_mav_residual()
+    merge_embeddings()
+    label_surface_influence()
+    splitting()
 
-    from torch.utils.data import DataLoader
-    dataset = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float32, batch_dim=False)
-    batch = next(iter(DataLoader(dataset, batch_size=64)))
-    print(len(batch))
+    # from torch.utils.data import DataLoader
+    # dataset = EurocMAVDatasetHorizon(train_validation_test="train", traj_len=201, dtype=torch.float32, batch_dim=False)
+    # batch = next(iter(DataLoader(dataset, batch_size=64)))
+    # print(len(batch))
 
     # from torch.utils.data import DataLoader
     #

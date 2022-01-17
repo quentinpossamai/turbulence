@@ -293,7 +293,7 @@ class ErrorEstimation(object):
                 self.p3.append((f'{p3}\n{p0}', True))
         return is_reconstructed, None, None
 
-    def p3_generator(self, saving_path: str):
+    def p3_generator(self, saving_path: Union[str, None]):
         """
         p3 are points expressed in an image with a coordinate system expressed by ROS.
         cf. http://docs.ros.org/melodic/api/sensor_msgs/html/msg/Image.html
@@ -316,7 +316,9 @@ class ErrorEstimation(object):
                     self.p3.append((p3, False))
             else:
                 is_reconstructed, p1, tf_camera1_origin = self.construction(i, None)
-        pickle.dump(self.p3, open(saving_path, 'wb'))
+        if saving_path is not None:
+            pickle.dump(self.p3, open(saving_path, 'wb'))
+        return self.p3
 
     def build_video(self, fps, saving_path):
         codec = VideoWriter_fourcc(*'H264')
