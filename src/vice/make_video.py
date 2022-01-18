@@ -9,12 +9,14 @@ from tqdm import tqdm
 
 import src.data.euroc_mav.loading as euroc
 import src.data.locobot.loading as locobot
+import src.data.blackbird.loading as blackbird
 
 matplotlib.use('TKAgg')
 
 
-def make_video(number: int, include_label: bool, for_locobot: bool):
-    if not for_locobot:
+def make_video(number: int, include_label: bool, dataset: str):
+    assert dataset in ['blackbird', 'euroc_mav', 'locobot']
+    if dataset == 'euroc_mav':
         vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{euroc.FLIGHT_LIST[number]}vice/'
         data = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))
         height, width = data['img'][0].shape
@@ -25,19 +27,28 @@ def make_video(number: int, include_label: bool, for_locobot: bool):
             for j in range(3):
                 color_frame[:, :, j] = tmp_img
             img[i] = color_frame
-    else:
+        fps = 20
+        width = 752
+        height = 480
+    elif dataset == 'locobot':
         vice_path = f'{locobot.LOCOBOT_DATA_PATH}{locobot.TRAJ_LIST[number]}'
-        tmp_data = locobot.loading_traj(traj=f'{locobot.TRAJ_LIST[number]}')
-        img = np.stack([e['rgb'] for e in tmp_data])
+        img = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))['img']
+        fps = 30
+        print(img.shape)
+        _, height, width, _ = img.shape
+        # width = 640
+        # height = 480
+    else:
+        assert dataset == 'blackbird'
+        blackbird.VICE_PATH
+
     if include_label:
         label = pickle.load(open(f'{vice_path}label.pkl', 'rb'))
         saving_path = f'{vice_path}labelled.mkv'
     else:
         saving_path = f'{vice_path}raw.mkv'
     codec = VideoWriter_fourcc(*'H264')
-    fps = 20
-    width = 752
-    height = 480
+
     video = VideoWriter(saving_path, codec, float(fps), (width, height), True)
     print(f'Video destination : {saving_path}')
 
@@ -116,24 +127,9 @@ def main():
     # for i in range(3):
     #     for depth in [False, True]:
     #         make_video_all(euroc.FLIGHT_LIST[i], depth)
-    print(len(locobot.TRAJ_LIST))
-    for i in range(10, len(locobot.TRAJ_LIST)):
-        make_video(i, include_label=False, for_locobot=True)
 
-    # for i in range(3):
-    #     for depth in [False, True]:
-    #         make_video_all(euroc.FLIGHT_LIST[i], depth)
+    make_video(1, include_label=True, for_locobot=True)
 
 
 if __name__ == '__main__':
-    # import os
-    # os.system(f'mkdir {locobot.LOCOBOT_DATA_PATH}video_raw/')
-    # for traj in locobot.TRAJ_LIST:
-    #     cmd = f'cp {locobot.LOCOBOT_DATA_PATH}{traj}raw.mkv {locobot.LOCOBOT_DATA_PATH}{traj}{traj[:-1]}.mkv'
-    #     print(cmd)
-    #     os.system(cmd)
-    #
-    #     cmd = f'mv {locobot.LOCOBOT_DATA_PATH}{traj}{traj[:-1]}.mkv {locobot.LOCOBOT_DATA_PATH}video_raw/'
-    #     print(cmd)
-    #     os.system(cmd)
     main()

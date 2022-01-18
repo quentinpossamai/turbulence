@@ -10,9 +10,11 @@ from scipy.spatial.transform import Rotation
 from scipy import interpolate
 import pickle
 
+from src.utils.paths import WD_PATH
 plt.style.use('seaborn')
 
 DATASET_PATH = "/Volumes/Samsung_T5/BlackBird/blackbird/raw/"
+VICE_PATH = f'{WD_PATH}data/blackbird/raw/patrick/yawConstant/maxSpeed3p0/csv/'
 
 
 def get_flight_list():

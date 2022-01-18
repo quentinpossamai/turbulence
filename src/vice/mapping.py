@@ -6,6 +6,8 @@ import pickle
 import datetime
 
 import src.data.euroc_mav.loading as euroc
+import src.data.locobot.loading as locobot
+import src.data.blackbird.loading as blackbird
 
 matplotlib.use('TKAgg')
 
@@ -25,6 +27,7 @@ def label_data(video_path: str, label_path: str):
     video = cv2.VideoCapture(video_path)
     img = []
     is_reading, frame = video.read()
+    height, width, _, = frame.shape
     while is_reading:
         # read video is in bgr.
         img.append(frame[:, :, ::-1])
@@ -42,7 +45,7 @@ def label_data(video_path: str, label_path: str):
 
     FRAME_NUM = 0
     # fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8))
-    fig, ax = plt.subplots(1, 1, figsize=(2 * 6.4, 1.5 * 4.8))
+    fig, ax = plt.subplots(1, 1, figsize=(2 * width / 100, 1.5 * height / 100))
     ax.set_title(f'Frame: {FRAME_NUM}')
     img_obj = ax.imshow(img[FRAME_NUM])
     scatter_obj = ax.scatter(width / 2, height / 2, c='r', alpha=0)
@@ -119,9 +122,15 @@ def label_data(video_path: str, label_path: str):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[0]
-    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-    label_data(video_path=f'{vice_path}/raw.mkv', label_path=f'{vice_path}label.pkl')
+    # flight = euroc.FLIGHT_LIST[0]
+    # vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+
+    # traj = locobot.TRAJ_LIST[1]
+    # vice_path = f'{locobot.LOCOBOT_DATA_PATH}{traj}'
+    # label_data(video_path=f'{vice_path}raw.mkv', label_path=f'{vice_path}label.pkl')
+
+    label_data(video_path=f'{blackbird.VICE_PATH}rgb/lossless.mov',
+               label_path=f'{blackbird.VICE_PATH}label.pkl')
 
 
 if __name__ == '__main__':

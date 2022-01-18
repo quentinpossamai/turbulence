@@ -88,7 +88,7 @@ def euroc_mav_pre_processing(flight: str):
 
         depth_path.append(f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}'
                           f'depth_estimation/{str(data["t"][ind]).replace(".", "_")}.png')
-        depth_array[i] = np.array(imageio.imread(depth_path[i]))
+        depth_array[i] = np.array(imageio.imread(depth_path[i]))[:, :, :3] / 255 * 7.48
         assert os.path.isfile(depth_path[i])
         # imu synchronisation
         open_vins_ind = np.abs(img_timestamp - open_vins_dict["timestamp"]).argmin()
@@ -150,15 +150,30 @@ def error_estimation(flight: str, ground: bool, imu: bool):
         del input_data["imu"]
     else:
         del input_data["imu"]
+
+    def depth_func(x_prime, y_prime, idx):
+        rr = x_prime ** 2 + y_prime ** 2
+        k1, k2 = cam_prms['D'][0], cam_prms['D'][1]  # Extracting distortion coefficients to find depth
+        distortion = (1 + k1 * rr + k2 * rr * rr)
+        u_depth = x_prime * distortion * cam_prms['K'][0, 0] + cam_prms['K'][0, 2]
+        v_depth = y_prime * distortion * cam_prms['K'][1, 1] + cam_prms['K'][1, 2]
+        u_depth = np.floor(0.5 * u_depth).astype(int)  # reduce value by 0.5 because in euroc mav depth are two
+        # time smaller than rgb in height and width.
+        v_depth = np.floor(0.5 * v_depth).astype(int)
+
+        depth_map = input_data['depth'][idx]
+        return depth_map[v_depth, u_depth][0]
+
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
+                                depth_func=depth_func,
                                 distortion_coefficient=cam_prms['D'],
                                 width=752,
                                 height=480,
                                 use_depth=not ground,
                                 label=label,
-                                max_distance=10.,
-                                depth_coef=7.48)
+                                max_distance=10.)
+
     # 2-GENERATE P3 POINTS
     name = 'ground' if ground else 'depth'
     name = f'{name}imu' if imu else name

@@ -6,7 +6,7 @@ import matplotlib
 import numpy as np
 import pickle
 from tqdm import tqdm
-from typing import Union, Tuple
+from typing import Union, Tuple, Callable
 
 from src.utils.transform import Transform
 
@@ -16,14 +16,13 @@ matplotlib.use('TKAgg')
 class ErrorEstimation(object):
     def __init__(self, input_data: dict,
                  calibration_matrix: np.array,
-                 calibration_matrix_depth: np.array,
+                 depth_func: Callable,
                  distortion_coefficient: np.array,
                  width: int,
                  height: int,
                  use_depth: bool,
                  label: np.ndarray,
-                 max_distance: float = None,
-                 depth_coef: float = None):
+                 max_distance: float = None):
         """
         Create a video to verify with the eye if the position estimation and video flux.
         https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets
@@ -57,8 +56,6 @@ class ErrorEstimation(object):
         param max_distance: Parameter use for ground-depth estimation, if point is too far (in the horizon), the point
         is not placed.
 
-        param depth_coef: To obtain the depth map the first channel of the depth image will be / 255 * depth_coef.
-
         cf.
         https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html?highlight=
         solvepnpran
@@ -67,14 +64,13 @@ class ErrorEstimation(object):
         """
         self.data = input_data
         self.k = calibration_matrix
-        self.k_depth = calibration_matrix_depth
+        self.depth_func = depth_func
         self.d = distortion_coefficient
         self.frames_width = width
         self.frames_height = height
         self.use_depth = use_depth
         self.label = label
         self.max_distance = max_distance
-        self.depth_coef = depth_coef
 
         self.p3 = []
 
@@ -208,18 +204,7 @@ class ErrorEstimation(object):
 
         # 2. Depth estimation
         if self.use_depth:
-            # Apply radial camera distortion used in depth_from_pointcloud.py and intrinsic matrix
-            # to get image coordinates
-            rr = x_prime ** 2 + y_prime ** 2
-            k1, k2 = self.d[:2]  # Extracting distortion coefficients to find depth
-            distortion = (1 + k1 * rr + k2 * rr * rr)
-            u_depth = x_prime * distortion * self.k_depth[0, 0] + self.k_depth[0, 2]
-            v_depth = y_prime * distortion * self.k_depth[1, 1] + self.k_depth[1, 2]
-            u_depth = np.floor(0.5 * u_depth).astype(int)
-            v_depth = np.floor(0.5 * v_depth).astype(int)
-
-            depth_map = np.array(imageio.imread(self.data['depth'][idx]))[:, :, :3] / 255 * self.depth_coef
-            z = depth_map[v_depth, u_depth][0]
+            z = self.depth_func(x_prime, y_prime, idx)
             p1_camera_with_depth = np.array([x_prime * z, y_prime * z, z])
             return p1_camera_with_depth
         else:
