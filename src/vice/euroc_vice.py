@@ -1,4 +1,5 @@
 import csv
+import imageio
 import numpy as np
 import os.path
 import pickle
@@ -8,7 +9,7 @@ from typing import Union
 import yaml
 
 import src.data.euroc_mav.loading as euroc
-from src.vice.posture_error_estimation import ErrorEstimation
+from src.vice.vice import ErrorEstimation
 from src.utils.transform import Transform, Rotation
 from src.utils.quaternion import qmul_np
 from src.utils.paths import mkdir_if_not_exist
@@ -70,14 +71,24 @@ def euroc_mav_pre_processing(flight: str):
 
     img_path = []
     depth_path = []
+    shape = (480, 752)
+    img_array = np.zeros(len(cut_img), shape[0], shape[1], 3)
+    depth_array = np.zeros(len(cut_img), shape[0], shape[1])
     for i, img_timestamp in enumerate(cut_img):
         ind = np.abs(img_timestamp - data["timestamp"]).argmin()
         cut_camera_origin[i] = tf_camera_origin[ind]
         cut_t[i] = data["t"][ind]
         # cut_imu[i] = data['imu_ang_acc'][ind]
         img_path.append(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{img_timestamp}.png")
+        img = np.array(imageio.imread(img_path[i]))
+        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
+        for j in range(3):
+            color_frame[:, :, j] = img
+        img_array[i] = color_frame
+
         depth_path.append(f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}'
                           f'depth_estimation/{str(data["t"][ind]).replace(".", "_")}.png')
+        depth_array[i] = np.array(imageio.imread(depth_path[i]))
         assert os.path.isfile(depth_path[i])
         # imu synchronisation
         open_vins_ind = np.abs(img_timestamp - open_vins_dict["timestamp"]).argmin()
@@ -86,7 +97,6 @@ def euroc_mav_pre_processing(flight: str):
         cut_openvins[i] = Transform.from_matrix(tmp).inv().as_matrix()
 
     quat, trans = Transform.from_matrix(cut_openvins).as_quat_trans()
-    cut_openvins = Transform.from_quat_trans(-quat, trans).as_matrix()
     cut_openvins = Transform.from_quat_trans(-quat, trans).as_matrix()
     # quat_gt, trans_gt = Transform.from_matrix(cut_camera_origin).as_quat_trans()
 
@@ -119,8 +129,8 @@ def euroc_mav_pre_processing(flight: str):
     input_data = {"t": cut_t,
                   "pose": cut_camera_origin,
                   "imu": cut_openvins,
-                  "img": img_path,
-                  "depth": depth_path}
+                  "img": img_array,
+                  "depth": depth_array}
     name = f'vice_data'
     pickle.dump(input_data, open(f"{vice_path}{name}.pkl", 'wb'))
     pickle.dump(cam_prms, open(f"{vice_path}camera_parameters.pkl", 'wb'))

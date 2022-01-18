@@ -5,7 +5,7 @@ import pickle
 import yaml
 
 import src.data.euroc_mav.loading as euroc
-from src.vice.posture_error_estimation import ErrorEstimation
+from src.vice.vice import ErrorEstimation
 from src.utils.transform import Transform, Rotation
 from src.utils.quaternion import qmul_np
 from src.utils.paths import mkdir_if_not_exist

@@ -16,6 +16,7 @@ matplotlib.use('TKAgg')
 class ErrorEstimation(object):
     def __init__(self, input_data: dict,
                  calibration_matrix: np.array,
+                 calibration_matrix_depth: np.array,
                  distortion_coefficient: np.array,
                  width: int,
                  height: int,
@@ -38,6 +39,8 @@ class ErrorEstimation(object):
         param calibration_matrix: The intrinsic parameters of the camera. The camera matrix = [f_x, 0, c_x,
                                                                                          0, f_y, c_y,
                                                                                          0,   0,   1]
+        param calibration_matrix_depth: The intrinsic parameters of the depth camera. Has the same shape of the calibra-
+        tion_matrix.
 
         param distortion_coefficient: The distortion coefficient relative to the distortion model.
         cf distortion_model explication. Expressed in this order k1, k2, p1, p2, k3, k4, k5, k6.
@@ -64,6 +67,7 @@ class ErrorEstimation(object):
         """
         self.data = input_data
         self.k = calibration_matrix
+        self.k_depth = calibration_matrix_depth
         self.d = distortion_coefficient
         self.frames_width = width
         self.frames_height = height
@@ -209,8 +213,8 @@ class ErrorEstimation(object):
             rr = x_prime ** 2 + y_prime ** 2
             k1, k2 = self.d[:2]  # Extracting distortion coefficients to find depth
             distortion = (1 + k1 * rr + k2 * rr * rr)
-            u_depth = x_prime * distortion * self.k[0, 0] + self.k[0, 2]
-            v_depth = y_prime * distortion * self.k[1, 1] + self.k[1, 2]
+            u_depth = x_prime * distortion * self.k_depth[0, 0] + self.k_depth[0, 2]
+            v_depth = y_prime * distortion * self.k_depth[1, 1] + self.k_depth[1, 2]
             u_depth = np.floor(0.5 * u_depth).astype(int)
             v_depth = np.floor(0.5 * v_depth).astype(int)
 
@@ -325,17 +329,10 @@ class ErrorEstimation(object):
         video = VideoWriter(saving_path, codec, float(fps), (self.frames_width, self.frames_height), True)
         print(f'Video will be saved at : {saving_path}')
         shape = (self.frames_height, self.frames_width, 3)
-        for i, image_path in enumerate(tqdm(self.data['img'], desc="Creating a video")):
-            img = np.array(imageio.imread(image_path))
-            color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
-            for j in range(3):
-                color_frame[:, :, j] = img
-            img = color_frame
-
+        for i, img in enumerate(tqdm(self.data['img'], desc="Creating a video")):
             fig = plt.figure(figsize=(self.frames_width / 100., self.frames_height / 100.))
             ax = plt.axes([0, 0, 1, 1])
             ax.imshow(img)
-            shape = img.shape
             # Contribution part, comment to get a raw video.
             try:
                 label_point, is_keyframe = self.label[i]
