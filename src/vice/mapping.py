@@ -129,7 +129,7 @@ def main():
     # vice_path = f'{locobot.LOCOBOT_DATA_PATH}{traj}'
     # label_data(video_path=f'{vice_path}raw.mkv', label_path=f'{vice_path}label.pkl')
 
-    label_data(video_path=f'{blackbird.VICE_PATH}rgb/lossless.mov',
+    label_data(video_path=f'{blackbird.VICE_PATH}rgb/compressed.m4v',
                label_path=f'{blackbird.VICE_PATH}label.pkl')
 
 

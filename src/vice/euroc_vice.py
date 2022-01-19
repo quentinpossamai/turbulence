@@ -10,8 +10,8 @@ import yaml
 
 import src.data.euroc_mav.loading as euroc
 from src.vice.vice import ErrorEstimation
-from src.utils.transform import Transform, Rotation
-from src.utils.quaternion import qmul_np
+from src.utils.transform import Transform as Tf, Rotation
+import src.utils.quaternion as quaternion
 from src.utils.paths import mkdir_if_not_exist
 
 
@@ -44,15 +44,17 @@ def euroc_mav_pre_processing(flight: str):
             yaml_file = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
-    tf_vicon0_body = Transform.from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4))).inv().as_matrix()
-    cam_prms['tf_vicon0_cam'] = Transform.from_matrix(tf_vicon0_body @ cam_prms['tf_body_cam']).as_matrix()
+    tf_vicon0_body = Tf.from_matrix(np.array(yaml_file['T_BS']['data']).reshape((4, 4))).inv().as_matrix()
+    cam_prms['tf_vicon0_cam'] = tf_vicon0_body @ cam_prms['tf_body_cam']
     del cam_prms['tf_body_cam']
 
     # 1.3-Loading camera trajectory
     data = euroc.load_flight(flight)  # dict_keys(['t', 'imu_ang_acc', 'motor', 'img', 'state', 'residual'])
     trans = data["state"][:, :3] + euroc.TRANS_MEAN[flight].reshape((1, 3))
-    tf_origin_vicon0 = Transform.from_quat_trans(quat=data["state"][:, 3:7], trans=trans).as_matrix()
-    tf_camera_origin = Transform.from_matrix(tf_origin_vicon0 @ cam_prms["tf_vicon0_cam"]).inv().as_matrix()
+    tf_global_vicon0 = Tf.from_quat_trans(quat=data["state"][:, 3:7], trans=trans).as_matrix()
+    quat_vicon0, trans_vicon0 = Tf.from_matrix(tf_global_vicon0).as_quat_trans()
+    tf_camera_origin = Tf.from_matrix(tf_global_vicon0 @ cam_prms["tf_vicon0_cam"]).inv().as_matrix()
+    tf_global_body = tf_global_vicon0 @ tf_vicon0_body
 
     # 1.5-Cutting at the image frequency
     cut_img = np.unique(data["cam0"])
@@ -62,43 +64,58 @@ def euroc_mav_pre_processing(flight: str):
     cut_openvins = np.zeros((len(cut_img), 4, 4))
 
     # timestamp, x, y, z, qw, qx, qy, qz
-    imu_open_vins = np.loadtxt(f'{euroc.DATASET_PATH}OpenVINS/{flight[:-1]}.csv', delimiter=',', skiprows=1)
-    time, trans = imu_open_vins[:, 0], imu_open_vins[:, 1:4]
-    quat = np.stack([imu_open_vins[:, 5], imu_open_vins[:, 6], imu_open_vins[:, 7], imu_open_vins[:, 4]], axis=1)
-    open_vins_dict = {'t': time,
-                      'pose': np.concatenate([trans, quat], axis=1),
-                      'timestamp': (time * 1e9).astype(int)}
+    imu_open_vins = np.loadtxt(f'{euroc.DATASET_PATH}OpenVINS/{flight[:-1]}_state_estimate.txt', delimiter=',', skiprows=1, usecols=[0, 1, 2, 3, 4, 5, 6, 7])
+    time, trans = (imu_open_vins[:, 0] * 1e9).astype(int), imu_open_vins[:, 5:8]
+    quat = imu_open_vins[:, 1:5]
+    open_vins_dict = {'pose': np.concatenate([trans, quat], axis=1),
+                      'timestamp': time}
+    quat = quaternion.qfix(quat)
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(4, 2)
+    for i in range(3):
+        axs[i, 0].plot(trans[:, i], label='imu')
+    for i in range(4):
+        axs[i, 1].plot(quat[:, i], label='imu')
 
     img_path = []
     depth_path = []
     shape = (480, 752)
-    img_array = np.zeros(len(cut_img), shape[0], shape[1], 3)
-    depth_array = np.zeros(len(cut_img), shape[0], shape[1])
+    img_array = np.zeros((len(cut_img), shape[0], shape[1], 3))
+    depth_array = np.zeros((len(cut_img), shape[0] // 2, shape[1] // 2))
     for i, img_timestamp in enumerate(cut_img):
         ind = np.abs(img_timestamp - data["timestamp"]).argmin()
         cut_camera_origin[i] = tf_camera_origin[ind]
         cut_t[i] = data["t"][ind]
-        # cut_imu[i] = data['imu_ang_acc'][ind]
-        img_path.append(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{img_timestamp}.png")
-        img = np.array(imageio.imread(img_path[i]))
-        color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
-        for j in range(3):
-            color_frame[:, :, j] = img
-        img_array[i] = color_frame
+
+        # TODo img_path.append(f"{euroc.DATASET_PATH}raw/{flight}cam0/data/{img_timestamp}.png")
+        # img = np.array(imageio.imread(img_path[i]))
+        # color_frame = np.uint8(np.zeros((shape[0], shape[1], 3)))
+        # for j in range(3):
+        #     color_frame[:, :, j] = img
+        # img_array[i] = color_frame
 
         depth_path.append(f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}'
                           f'depth_estimation/{str(data["t"][ind]).replace(".", "_")}.png')
-        depth_array[i] = np.array(imageio.imread(depth_path[i]))[:, :, :3] / 255 * 7.48
+        # TODO depth_array[i] = np.array(imageio.imread(depth_path[i]))[:, :, :3] / 255 * 7.48
         assert os.path.isfile(depth_path[i])
+
         # imu synchronisation
         open_vins_ind = np.abs(img_timestamp - open_vins_dict["timestamp"]).argmin()
         trans_quat = open_vins_dict['pose'][open_vins_ind]
-        tmp = Transform.from_quat_trans(trans_quat[3:], trans_quat[:3]).as_matrix() @ tf_body_cam
-        cut_openvins[i] = Transform.from_matrix(tmp).inv().as_matrix()
+        tmp = Tf.from_quat_trans(trans_quat[3:], trans_quat[:3]).as_matrix() @ tf_body_cam
+        cut_openvins[i] = Tf.from_matrix(tmp).inv().as_matrix()
 
-    quat, trans = Transform.from_matrix(cut_openvins).as_quat_trans()
-    cut_openvins = Transform.from_quat_trans(-quat, trans).as_matrix()
-    # quat_gt, trans_gt = Transform.from_matrix(cut_camera_origin).as_quat_trans()
+    quat_imu, trans_imu = Tf.from_matrix(cut_openvins).as_quat_trans()
+    quat_gt, trans_gt = Tf.from_matrix(cut_camera_origin).as_quat_trans()
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(4, 2)
+    for i in range(3):
+        axs[i, 0].plot(trans_gt[:, i], label='gt')
+        axs[i, 0].plot(trans_imu[:, i], label='imu')
+    for i in range(4):
+        axs[i, 1].plot(quat_gt[:, i], label='gt')
+        axs[i, 1].plot(-quat_imu[:, i], label='imu')
+
 
     # # - Computing pose from IMU
     # dt = cut_t[1:] - cut_t[:-1]
@@ -110,7 +127,7 @@ def euroc_mav_pre_processing(flight: str):
     # acc = (rot_flu_imu @ acc.T).T
 
     # # Integration
-    # quat, trans = Transform.from_matrix(tfpose_camera_origin).as_quat_trans()
+    # quat, trans = Tf.from_matrix(tfpose_camera_origin).as_quat_trans()
     # imu_quat = [quat[0]]
     # for i in range(1, len(quat)):
     #     dquat_dt = 1 / 2 * qmul_np(imu_quat[-1], np.concatenate([ang_vel[i], np.zeros(1)]))
@@ -120,12 +137,23 @@ def euroc_mav_pre_processing(flight: str):
     # imu_quat = np.stack(imu_quat)
     # imu_lin_vel = np.concatenate([np.zeros((1, 3)), np.cumsum(acc[:-1] * dt, axis=0)], axis=0)
     # imu_trans = np.concatenate([trans[0].reshape((1, 3)), np.cumsum(imu_lin_vel[:-1] * dt, axis=0)], axis=0)
-    # tf2_origin_cam = Transform.from_quat_trans(imu_quat, imu_trans).as_matrix() @ tf_body_cam
-    # tfimu_cam_origin = Transform.from_matrix(tf2_origin_cam).inv().as_matrix()
+    # tf2_origin_cam = Tf.from_quat_trans(imu_quat, imu_trans).as_matrix() @ tf_body_cam
+    # tfimu_cam_origin = Tf.from_matrix(tf2_origin_cam).inv().as_matrix()
     # # tf_vicon0_body
 
     # - Saving preprocessing
     mkdir_if_not_exist([vice_path])
+
+    quat_imu, trans_imu = Tf.from_matrix(cut_openvins).as_quat_trans()
+    quat_gt, trans_gt = Tf.from_matrix(cut_camera_origin).as_quat_trans()
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(4, 2)
+    for i in range(3):
+        axs[i, 0].plot(trans_gt[:, i], label='gt')
+        axs[i, 0].plot(trans_imu[:, i], label='imu')
+    for i in range(4):
+        axs[i, 1].plot(quat_gt[:, i], label='gt')
+        axs[i, 1].plot(quat_imu[:, i], label='imu')
     input_data = {"t": cut_t,
                   "pose": cut_camera_origin,
                   "imu": cut_openvins,
@@ -260,14 +288,14 @@ def synchronisation_sensibility(flight: str, ground: bool, imu: bool):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[1]
+    flight = euroc.FLIGHT_LIST[0]
     euroc_mav_pre_processing(flight)
-    case = {0: (True, False),
-            1: (False, False),
-            2: (True, True),
-            3: (False, True)}
-    ground, imu = case[3]
-    error_estimation(flight, ground=ground, imu=imu)
+    # case = {0: (True, False),
+    #         1: (False, False),
+    #         2: (True, True),
+    #         3: (False, True)}
+    # ground, imu = case[3]
+    # error_estimation(flight, ground=ground, imu=imu)
     # flight = euroc.FLIGHT_LIST[0]
     # synchronisation_sensibility(flight, ground=True, imu=False)
 
