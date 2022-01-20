@@ -7,7 +7,6 @@ import src.vice.euroc_vice as euroc_vice
 import src.data.locobot.loading as locobot
 import src.vice.locobot_vice as locobot_vice
 
-from src.vice.vice import ErrorEstimation
 from src.utils.transform import Transform
 
 
