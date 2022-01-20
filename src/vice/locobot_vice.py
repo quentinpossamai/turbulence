@@ -2,7 +2,6 @@ import numpy as np
 import pickle
 from scipy import interpolate
 from tqdm import tqdm
-from typing import Union
 
 import src.data.locobot.loading as locobot
 from src.vice.vice import ErrorEstimation
@@ -63,12 +62,10 @@ def locobot_pre_processing(traj: str):
     pickle.dump(cam_prms, open(f"{vice_path}camera_parameters.pkl", 'wb'))
 
 
-def error_estimation(flight: str, ground: bool, pose: str):
+def build_estimator(flight: str, ground: bool, pose: str):
     assert pose in ['odom', 'slam']
-    # 1-INITIALISATION
-    vice_path = f'{locobot.LOCOBOT_DATA_PATH}{flight}'
-    print("VICE for ", flight)
 
+    vice_path = f'{locobot.LOCOBOT_DATA_PATH}{flight}'
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
     label = pickle.load(open(f"{vice_path}label.pkl", 'rb'))
@@ -80,6 +77,9 @@ def error_estimation(flight: str, ground: bool, pose: str):
     del input_data["odom"]
     del input_data["slam"]
 
+    def load_img(idx):
+        return input_data['img'][idx]
+
     def depth_func(x_prime, y_prime, idx):
         u_depth = x_prime * cam_prms['K_depth'][0, 0] + cam_prms['K_depth'][0, 2]
         v_depth = y_prime * cam_prms['K_depth'][1, 1] + cam_prms['K_depth'][1, 2]
@@ -90,12 +90,23 @@ def error_estimation(flight: str, ground: bool, pose: str):
     estimator = ErrorEstimation(input_data=input_data,
                                 calibration_matrix=cam_prms['K'],
                                 depth_func=depth_func,
+                                load_img=load_img,
                                 distortion_coefficient=cam_prms['D'],
                                 width=640,
                                 height=480,
                                 use_depth=not ground,
                                 label=label,
                                 max_distance=10.)
+    return estimator
+
+
+def error_estimation(flight: str, ground: bool, pose: str):
+    assert pose in ['odom', 'slam']
+    # 1-INITIALISATION
+    vice_path = f'{locobot.LOCOBOT_DATA_PATH}{flight}'
+    print("VICE for ", flight)
+
+    estimator = build_estimator(flight, ground, pose)
     # 2-GENERATE P3 POINTS
     name = f'ground_{pose}' if ground else f'depth_{pose}'
     estimator.p3_generator(saving_path=f'{vice_path}{name}.pkl')

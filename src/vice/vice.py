@@ -17,6 +17,7 @@ class ErrorEstimation(object):
     def __init__(self, input_data: dict,
                  calibration_matrix: np.array,
                  depth_func: Callable,
+                 load_img: Callable,
                  distortion_coefficient: np.array,
                  width: int,
                  height: int,
@@ -31,15 +32,17 @@ class ErrorEstimation(object):
             'time' : The time of the measured pose and the image.
             'pose' : Each pose correspond to tf_camera_origin, a (4, 4) np.array. The z-axis origin MUST be aligned
             vertical (aligned to -gravity). Unit must be meters.
-            'img' : path to the image.
-            'depth': path to the depth map.
+            'img_path' : path to the image.
+            'depth_path': path to the depth map.
 
 
         param calibration_matrix: The intrinsic parameters of the camera. The camera matrix = [f_x, 0, c_x,
                                                                                          0, f_y, c_y,
                                                                                          0,   0,   1]
-        param calibration_matrix_depth: The intrinsic parameters of the depth camera. Has the same shape of the calibra-
-        tion_matrix.
+        param depth_func: A callable (x_prime, y_prime, idx)->depth that take (x_prime, y_prime) and an index and return
+        the current depth.
+
+        param load_img: A callable (idx)->(height, width, 3) that take an index and returns the image.
 
         param distortion_coefficient: The distortion coefficient relative to the distortion model.
         cf distortion_model explication. Expressed in this order k1, k2, p1, p2, k3, k4, k5, k6.
@@ -65,6 +68,7 @@ class ErrorEstimation(object):
         self.data = input_data
         self.k = calibration_matrix
         self.depth_func = depth_func
+        self.load_img = load_img
         self.d = distortion_coefficient
         self.frames_width = width
         self.frames_height = height
@@ -314,10 +318,10 @@ class ErrorEstimation(object):
         video = VideoWriter(saving_path, codec, float(fps), (self.frames_width, self.frames_height), True)
         print(f'Video will be saved at : {saving_path}')
         shape = (self.frames_height, self.frames_width, 3)
-        for i, img in enumerate(tqdm(self.data['img'], desc="Creating a video")):
+        for i, _ in enumerate(tqdm(self.data['img_path'], desc="Creating a video")):
             fig = plt.figure(figsize=(self.frames_width / 100., self.frames_height / 100.))
             ax = plt.axes([0, 0, 1, 1])
-            ax.imshow(img)
+            ax.imshow(self.load_img(i))
             # Contribution part, comment to get a raw video.
             try:
                 label_point, is_keyframe = self.label[i]
