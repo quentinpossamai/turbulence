@@ -30,9 +30,9 @@ def label_data(video_path: str, label_path: str):
     height, width, _, = frame.shape
     while is_reading:
         # read video is in bgr.
-        img.append(frame[:, :, ::-1])
+        img.append(np.array(frame[:, :, ::-1]))
         is_reading, frame = video.read()
-    img = np.stack(img[:-1])
+    img = np.stack(img)
     _, height, width, _ = img.shape
 
     try:
@@ -45,9 +45,10 @@ def label_data(video_path: str, label_path: str):
 
     FRAME_NUM = 0
     # fig, ax = plt.subplots(1, 1, figsize=(2.5 * 6.4, 2 * 4.8))
-    fig, ax = plt.subplots(1, 1, figsize=(2 * width / 100, 1.5 * height / 100))
+    fig, ax = plt.subplots(1, 1, figsize=(1.2 * width / 100, 1.2 * height / 100))
     ax.set_title(f'Frame: {FRAME_NUM}')
     img_obj = ax.imshow(img[FRAME_NUM])
+    ax.grid(None)
     scatter_obj = ax.scatter(width / 2, height / 2, c='r', alpha=0)
     if 0 in label:
         scatter_obj.set_alpha(1)
@@ -129,7 +130,7 @@ def main():
     # vice_path = f'{locobot.LOCOBOT_DATA_PATH}{traj}'
     # label_data(video_path=f'{vice_path}raw.mkv', label_path=f'{vice_path}label.pkl')
 
-    label_data(video_path=f'{blackbird.VICE_PATH}rgb/compressed.m4v',
+    label_data(video_path=f'{blackbird.VICE_PATH}raw.mkv',
                label_path=f'{blackbird.VICE_PATH}label.pkl')
 
 

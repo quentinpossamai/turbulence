@@ -117,7 +117,7 @@ def error_estimation(flight: str, ground: bool, pose: str):
 
 def main():
     traj = locobot.TRAJ_LIST[1]
-    locobot_pre_processing(traj)
+    # locobot_pre_processing(traj)
 
     case = {
         # 0: True,

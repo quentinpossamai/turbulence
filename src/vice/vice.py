@@ -318,7 +318,7 @@ class ErrorEstimation(object):
         video = VideoWriter(saving_path, codec, float(fps), (self.frames_width, self.frames_height), True)
         print(f'Video will be saved at : {saving_path}')
         shape = (self.frames_height, self.frames_width, 3)
-        for i, _ in enumerate(tqdm(self.data['img_path'], desc="Creating a video")):
+        for i, _ in enumerate(tqdm(self.data['pose'], desc="Creating a video")):
             fig = plt.figure(figsize=(self.frames_width / 100., self.frames_height / 100.))
             ax = plt.axes([0, 0, 1, 1])
             ax.imshow(self.load_img(i))

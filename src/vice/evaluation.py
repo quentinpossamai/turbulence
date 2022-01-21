@@ -7,6 +7,9 @@ import src.vice.euroc_vice as euroc_vice
 import src.data.locobot.loading as locobot
 import src.vice.locobot_vice as locobot_vice
 
+import src.data.blackbird.loading as blackbird
+import src.vice.blackbird_vice as blackbird_vice
+
 from src.utils.transform import Transform
 
 
@@ -176,6 +179,45 @@ def locobot_evaluation():
     for pose in ['odom', 'slam']:
         for ground in [True, False]:
             specific_locobot_evaluation(locobot.TRAJ_LIST[1], ground=ground, pose=pose)
+
+
+def specific_blackbird_evaluation(ground: bool, imu: bool):
+    vice_path = f'{blackbird.VICE_PATH}'
+    label = pickle.load(open(f'{vice_path}label.pkl', 'rb'))
+    name = 'ground' if ground else 'depth'
+    name = f'{name}imu' if imu else name
+
+    prediction = pickle.load(open(f'{vice_path}{name}.pkl', 'rb'))
+    estimator = blackbird_vice.build_estimator(ground, imu)
+
+    print(f'Flight: {vice_path} | ground: {ground} | imu: {imu}')
+    mrse_error, angle_error = vice_error(estimator, label, prediction)
+    return mrse_error, angle_error
+
+
+def blackbird_evaluation():
+    for imu in [False, True]:  # True not implemented yet
+        for ground in [True, False]:
+            specific_blackbird_evaluation(ground=ground, imu=imu)
+
+    # MSE IMU MOCAP
+    vice_path = blackbird.VICE_PATH
+    input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
+
+    trans_mc = Transform.from_matrix(input_data['pose']).as_trans()
+    trans_imu = Transform.from_matrix(input_data['imu']).as_trans()
+    rot_mc = Transform.from_matrix(input_data['pose']).as_rot_mat()
+    rot_imu = Transform.from_matrix(input_data['imu']).as_rot_mat()
+
+    mrse_error = np.linalg.norm(trans_mc - trans_imu, axis=1).mean()
+
+    aoe_error = aoe(rot_mc, rot_imu)
+
+    roe_error = roe(rot_mc, rot_imu, 100)
+    roe_error = roe_error.mean()
+
+    print(f'flight: {vice_path} | mse error: {mrse_error:.3f} | aoe error: {aoe_error:.2f} | '
+          f'roe error: {roe_error:.3f} ')
 
 
 def main():
