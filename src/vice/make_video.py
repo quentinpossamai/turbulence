@@ -132,9 +132,14 @@ def make_video_all(number: int, depth: bool, dataset: str):
     fig = plt.figure(figsize=(width / 100., height / 100.))
     ax = plt.axes([0, 0, 1, 1])
     param = {'s': 100, 'edgecolors': 'w', 'linewidths': 2}
-    ax.scatter(0, 0, c='r', alpha=1, label='MoCap', **param)
-    ax.scatter(0, 0, c='g', alpha=1, label='IMU', **param)
-    ax.scatter(0, 0, c='c', alpha=1, label='Label', **param)
+    if dataset == 'locobot':
+        ax.scatter(0, 0, c='r', alpha=1, label='Odom', **param)
+        ax.scatter(0, 0, c='g', alpha=1, label='SLAM', **param)
+        ax.scatter(0, 0, c='c', alpha=1, label='Label', **param)
+    else:
+        ax.scatter(0, 0, c='r', alpha=1, label='MoCap', **param)
+        ax.scatter(0, 0, c='g', alpha=1, label='IMU', **param)
+        ax.scatter(0, 0, c='c', alpha=1, label='Label', **param)
     ax.legend(loc=2, labelcolor='black', fontsize='medium', frameon=True)
     handles, labels = ax.get_legend_handles_labels()
 
@@ -174,13 +179,13 @@ def main():
 
     # make_video_all(0, False, dataset='blackbird')
     # make_video_all(0, True, dataset='blackbird')
-    # make_video_all(1, False, dataset='locobot')
-    # make_video_all(1, True, dataset='locobot')
+    make_video_all(1, False, dataset='locobot')
+    make_video_all(1, True, dataset='locobot')
 
-    make_video_all(0, False, dataset='euroc_mav')
-    make_video_all(1, False, dataset='euroc_mav')
-    make_video_all(2, False, dataset='euroc_mav')
-    make_video_all(0, True, dataset='euroc_mav')
+    # make_video_all(0, False, dataset='euroc_mav')
+    # make_video_all(1, False, dataset='euroc_mav')
+    # make_video_all(2, False, dataset='euroc_mav')
+    # make_video_all(0, True, dataset='euroc_mav')
     make_video_all(1, True, dataset='euroc_mav')
     make_video_all(2, True, dataset='euroc_mav')
 
