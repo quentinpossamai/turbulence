@@ -24,7 +24,7 @@ def locobot_pre_processing(traj: str):
     cam_prms = {'K': rgb_prms,
                 'K_depth': depth_prms,
                 'D': [0, 0, 0, 0, 0, 0, 0, 0],
-                'fps': 30}  # wrt. the body-frame
+                'fps': 10}  # 10 # wrt. the body-frame
 
     # Loading camera trajectory
     data = locobot.loading_traj(traj)
@@ -42,7 +42,7 @@ def locobot_pre_processing(traj: str):
     # Subsampling at 4 speed
     less_input_data = {}
     for key in input_data:
-        less_input_data[key] = np.stack([e for i, e in enumerate(input_data[key]) if i % 4 == 0])
+        less_input_data[key] = np.stack([e for i, e in enumerate(input_data[key]) if i % 6 == 0])
 
     # Complete holes in depth_map
     filled_depth = np.zeros_like(less_input_data['depth'])
@@ -62,13 +62,13 @@ def locobot_pre_processing(traj: str):
     pickle.dump(cam_prms, open(f"{vice_path}camera_parameters.pkl", 'wb'))
 
 
-def build_estimator(flight: str, ground: bool, pose: str):
+def build_estimator(flight: str, ground: bool, pose: str, label_number: int):
     assert pose in ['odom', 'slam']
 
     vice_path = f'{locobot.LOCOBOT_DATA_PATH}{flight}'
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
-    label = pickle.load(open(f"{vice_path}label.pkl", 'rb'))
+    labels = pickle.load(open(f"{vice_path}labels.pkl", 'rb'))
     if pose == 'odom':
         input_data["pose"] = input_data["odom"]
     else:
@@ -95,37 +95,36 @@ def build_estimator(flight: str, ground: bool, pose: str):
                                 width=640,
                                 height=480,
                                 use_depth=not ground,
-                                label=label,
+                                label=labels[label_number],
                                 max_distance=10.)
     return estimator
 
 
-def error_estimation(flight: str, ground: bool, pose: str):
+def error_estimation(flight: str, ground: bool, pose: str, label_number: int):
     assert pose in ['odom', 'slam']
     # 1-INITIALISATION
     vice_path = f'{locobot.LOCOBOT_DATA_PATH}{flight}'
     print("VICE for ", flight)
 
-    estimator = build_estimator(flight, ground, pose)
+    estimator = build_estimator(flight, ground, pose, label_number)
     # 2-GENERATE P3 POINTS
     name = f'ground_{pose}' if ground else f'depth_{pose}'
+    name = f'{name}{label_number}'
     estimator.p3_generator(saving_path=f'{vice_path}{name}.pkl')
 
     # 3-GENERATING THE VIDEO
-    estimator.build_video(fps=30, saving_path=f'{vice_path}{name}.mkv')
+    # estimator.build_video(fps=10, saving_path=f'{vice_path}{name}.mkv')
 
 
 def main():
     traj = locobot.TRAJ_LIST[1]
     # locobot_pre_processing(traj)
 
-    case = {
-        # 0: True,
-        1: False
-    }
-    for pose in ['odom', 'slam']:
-        for ground in case.values():
-            error_estimation(traj, ground=ground, pose=pose)
+    case = {0: True, 1: False}
+    for lab_num in range(4):
+        for pose in ['odom', 'slam']:
+            for ground in case.values():
+                error_estimation(traj, ground=ground, pose=pose, label_number=lab_num)
 
 
 if __name__ == '__main__':

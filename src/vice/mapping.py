@@ -126,13 +126,13 @@ def label_data(video_path: str, labels_path: str):
 
 
 def main():
-    flight = euroc.FLIGHT_LIST[0]
-    vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
-    label_data(f'{vice_path}raw.mkv', labels_path=f'{vice_path}labels.pkl')
+    # flight = euroc.FLIGHT_LIST[2]
+    # vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
+    # label_data(f'{vice_path}raw.mkv', labels_path=f'{vice_path}labels.pkl')
 
-    # traj = locobot.TRAJ_LIST[1]
-    # vice_path = f'{locobot.LOCOBOT_DATA_PATH}{traj}'
-    # label_data(video_path=f'{vice_path}raw.mkv', labels_path=f'{vice_path}labels.pkl')
+    traj = locobot.TRAJ_LIST[1]
+    vice_path = f'{locobot.LOCOBOT_DATA_PATH}{traj}'
+    label_data(video_path=f'{vice_path}raw.mkv', labels_path=f'{vice_path}labels.pkl')
 
     # label_data(video_path=f'{blackbird.VICE_PATH}raw.mkv', labels_path=f'{blackbird.VICE_PATH}labels.pkl')
 

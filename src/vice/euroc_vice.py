@@ -30,7 +30,7 @@ def euroc_mav_pre_processing(flight: str):
     tf_body_cam0 = np.array(yaml_file['T_BS']['data']).reshape((4, 4))
     cam_prms = {'K': k,
                 'D': np.array([e for e in yaml_file['distortion_coefficients']]),
-                'fps': yaml_file['rate_hz']}
+                'fps': 10}  # 20 = yaml_file['rate_hz']
 
     # - Loading motion capture transform to body
     with open(f"{euroc.DATASET_PATH}raw/{flight}vicon0/sensor.yaml", 'r') as stream:
@@ -102,12 +102,12 @@ def euroc_mav_pre_processing(flight: str):
     return input_data, cam_prms
 
 
-def build_estimator(flight: str, ground: bool, imu: bool):
+def build_estimator(flight: str, ground: bool, imu: bool, label_number: int):
     vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
-    label = pickle.load(open(f"{vice_path}label.pkl", 'rb'))
-    # label = {i: label[i] for i in label if i % 2 == 0}
+    labels = pickle.load(open(f"{vice_path}labels.pkl", 'rb'))
+
     if imu:
         input_data["pose"] = input_data["imu"]
         del input_data["imu"]
@@ -149,13 +149,13 @@ def build_estimator(flight: str, ground: bool, imu: bool):
                                 width=752,
                                 height=480,
                                 use_depth=not ground,
-                                label=label,
+                                label=labels[label_number],
                                 max_distance=10.)
     return estimator
 
 
-def error_estimation(flight: str, ground: bool, imu: bool):
-    estimator = build_estimator(flight, ground, imu)
+def error_estimation(flight: str, ground: bool, imu: bool, label_number: int):
+    estimator = build_estimator(flight, ground, imu, label_number)
     # 1-INITIALISATION
     vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{flight}vice/'
     print("VICE for ", flight)
@@ -163,23 +163,26 @@ def error_estimation(flight: str, ground: bool, imu: bool):
     # 2-GENERATE P3 POINTS
     name = 'ground' if ground else 'depth'
     name = f'{name}imu' if imu else name
+    name = f'{name}{label_number}'
     estimator.p3_generator(saving_path=f'{vice_path}{name}.pkl')
 
     # 3-GENERATING THE VIDEO
-    estimator.build_video(fps=10, saving_path=f'{vice_path}{name}.mkv')
+    # estimator.build_video(fps=10, saving_path=f'{vice_path}{name}.mkv')
 
 
 def main():
-    for i in range(3):
-        flight = euroc.FLIGHT_LIST[i]
-        euroc_mav_pre_processing(flight)
-    # flight = euroc.FLIGHT_LIST[0]
-    # case = {0: (True, False),
-    #         1: (False, False),
-    #         2: (True, True),
-    #         3: (False, True)}
-    # ground, imu = case[0]
-    # error_estimation(flight, ground=ground, imu=imu)
+    # for i in range(3):
+    #     flight = euroc.FLIGHT_LIST[i]
+    #     euroc_mav_pre_processing(flight)
+
+    case = {0: (True, False),
+            1: (False, False),
+            2: (True, True),
+            3: (False, True)}
+    for flight in euroc.FLIGHT_LIST:
+        for label_number in range(4):
+            for ground, imu in case.values():
+                error_estimation(flight, ground=ground, imu=imu, label_number=label_number)
 
 
 if __name__ == '__main__':

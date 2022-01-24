@@ -15,7 +15,7 @@ coef_multiplicator_depth = 50
 
 START, STOP = 15556 // (4 * 60 + 19) * (2 * 60 + 40), 15556 // (4 * 60 + 19) * (3 * 60)
 SHAPE = [768, 1024]
-FPS = 30
+FPS = 10
 
 
 def video_to_png():
@@ -114,15 +114,21 @@ def blackbird_pre_processing():
                   "img_path": img_path,
                   "depth_path": depth_path}
 
-    pickle.dump(input_data, open(f"{blackbird.VICE_PATH}vice_data.pkl", 'wb'))
+    # Subsampling at half speed and cutting 30s
+    less_input_data = {}
+    for key in input_data:
+        less_input_data[key] = np.stack([e for i, e in enumerate(input_data[key]) if i % 3 == 0])
+        less_input_data[key] = less_input_data[key][:300]
+
+    pickle.dump(less_input_data, open(f"{blackbird.VICE_PATH}vice_data.pkl", 'wb'))
     pickle.dump(cam_prms, open(f"{blackbird.VICE_PATH}camera_parameters.pkl", 'wb'))
 
 
-def build_estimator(ground: bool, imu: bool):
+def build_estimator(ground: bool, imu: bool, label_number: int):
     vice_path = f'{blackbird.VICE_PATH}'
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
-    label = pickle.load(open(f"{vice_path}label.pkl", 'rb'))
+    labels = pickle.load(open(f"{vice_path}labels.pkl", 'rb'))
     # label_point = np.array([np.array(SHAPE) // 2] * len(input_data['pose'])).astype(float)
     # label = {i: (label_point[i], False) for i in range(len(input_data['pose']))}
     # label[0] = (label_point[0], True)
@@ -153,37 +159,37 @@ def build_estimator(ground: bool, imu: bool):
                                 width=SHAPE[1],
                                 height=SHAPE[0],
                                 use_depth=not ground,
-                                label=label,
+                                label=labels[label_number],
                                 max_distance=10.)
     return estimator
 
 
-def error_estimation(ground: bool, imu: bool):
+def error_estimation(ground: bool, imu: bool, label_number: int):
     # 1-INITIALISATION
     vice_path = f'{blackbird.VICE_PATH}'
     print("VICE for ", vice_path)
-    estimator = build_estimator(ground, imu)
+    estimator = build_estimator(ground, imu, label_number)
 
     # 2-GENERATE P3 POINTS
     name = 'ground' if ground else 'depth'
     name = f'{name}imu' if imu else name
+    name = f'{name}{label_number}'
     estimator.p3_generator(saving_path=f'{vice_path}{name}.pkl')
 
     # 3-GENERATING THE VIDEO
-    estimator.build_video(fps=FPS, saving_path=f'{vice_path}{name}.mkv')
+    # estimator.build_video(fps=FPS, saving_path=f'{vice_path}{name}.mkv')
 
 
 def main():
     # video_to_png()
-    # blackbird_pre_processing()
-    case = {
-            0: (True, False),
+    blackbird_pre_processing()
+    case = {0: (True, False),
             1: (False, False),
             2: (True, True),
-            3: (False, True),
-            }
-    for ground, imu in case.values():
-        error_estimation(ground=ground, imu=imu)
+            3: (False, True)}
+    for lab_num in range(4):
+        for ground, imu in case.values():
+            error_estimation(ground=ground, imu=imu, label_number=lab_num)
 
 
 if __name__ == '__main__':
