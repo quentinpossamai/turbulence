@@ -423,7 +423,9 @@ class PlotAngle:
 
             ax_twin: plt.Axes = axs_twin[i]
             ax_twin.grid()
-        plt.subplots_adjust(left=0.07, bottom=0.1, right=0.7, top=0.98, wspace=0, hspace=0.3)
+        plt.subplots_adjust(left=0.07, bottom=0.1, right=0.8, top=0.98, wspace=0, hspace=0.3)
+        plt.show()
+        plt.savefig(f'{vice_path}fig_curve.pdf')
 
 
 plot_angle = PlotAngle()
@@ -431,9 +433,9 @@ plot_angle = PlotAngle()
 
 def main():
     euroc_mav_evaluation()
-    # locobot_evaluation()
-    # blackbird_evaluation()
-    plot_angle.plot()
+    locobot_evaluation()
+    blackbird_evaluation()
+    # plot_angle.plot()
 
 
 if __name__ == '__main__':

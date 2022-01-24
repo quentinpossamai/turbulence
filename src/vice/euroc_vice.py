@@ -89,8 +89,15 @@ def euroc_mav_pre_processing(flight: str):
                   "imu": cut_ov,
                   "img_path": img_path,
                   "depth_path": depth_path}
+
+    # Subsampling at half speed and cutting 30s
+    less_input_data = {}
+    for key in input_data:
+        less_input_data[key] = np.stack([e for i, e in enumerate(input_data[key]) if i % 2 == 0])
+        less_input_data[key] = less_input_data[key][:300]
+
     name = f'vice_data'
-    pickle.dump(input_data, open(f"{vice_path}{name}.pkl", 'wb'))
+    pickle.dump(less_input_data, open(f"{vice_path}{name}.pkl", 'wb'))
     pickle.dump(cam_prms, open(f"{vice_path}camera_parameters.pkl", 'wb'))
     return input_data, cam_prms
 
@@ -100,6 +107,7 @@ def build_estimator(flight: str, ground: bool, imu: bool):
     input_data = pickle.load(open(f"{vice_path}vice_data.pkl", 'rb'))
     cam_prms = pickle.load(open(f"{vice_path}camera_parameters.pkl", 'rb'))
     label = pickle.load(open(f"{vice_path}label.pkl", 'rb'))
+    # label = {i: label[i] for i in label if i % 2 == 0}
     if imu:
         input_data["pose"] = input_data["imu"]
         del input_data["imu"]
@@ -158,20 +166,20 @@ def error_estimation(flight: str, ground: bool, imu: bool):
     estimator.p3_generator(saving_path=f'{vice_path}{name}.pkl')
 
     # 3-GENERATING THE VIDEO
-    estimator.build_video(fps=20, saving_path=f'{vice_path}{name}.mkv')
+    estimator.build_video(fps=10, saving_path=f'{vice_path}{name}.mkv')
 
 
 def main():
-    # for i in range(3):
-    #     flight = euroc.FLIGHT_LIST[i]
-    #     euroc_mav_pre_processing(flight)
-    flight = euroc.FLIGHT_LIST[2]
-    case = {0: (True, False),
-            1: (False, False),
-            2: (True, True),
-            3: (False, True)}
-    ground, imu = case[3]
-    error_estimation(flight, ground=ground, imu=imu)
+    for i in range(3):
+        flight = euroc.FLIGHT_LIST[i]
+        euroc_mav_pre_processing(flight)
+    # flight = euroc.FLIGHT_LIST[0]
+    # case = {0: (True, False),
+    #         1: (False, False),
+    #         2: (True, True),
+    #         3: (False, True)}
+    # ground, imu = case[0]
+    # error_estimation(flight, ground=ground, imu=imu)
 
 
 if __name__ == '__main__':

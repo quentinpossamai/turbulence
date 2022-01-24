@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 import pickle
-from tqdm import tqdm
+# from tqdm import tqdm
 
 import src.data.euroc_mav.loading as euroc
 import src.data.locobot.loading as locobot
@@ -19,21 +19,20 @@ def make_video(number: int, include_label: bool, dataset: str):
     if dataset == 'euroc_mav':
         vice_path = f'{euroc.INTERMEDIATE_DATASET_PATH}{euroc.FLIGHT_LIST[number]}vice/'
         data = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))
-        height, width = data['img'][0].shape
-        img = np.zeros_like((len(data), height, width, 3))
-        for i, image_path in enumerate(tqdm(data['img'], desc='Loading img')):
+        width = 752
+        height = 480
+        img = np.zeros((len(data['img_path']), height, width, 3), dtype=int)
+        for i, image_path in enumerate(data['img_path']):
             tmp_img = np.array(imageio.imread(image_path))
             color_frame = np.uint8(np.zeros((height, width, 3)))
             for j in range(3):
                 color_frame[:, :, j] = tmp_img
             img[i] = color_frame
-        fps = 20
-        width = 752
-        height = 480
+        fps = 10
     elif dataset == 'locobot':
         vice_path = f'{locobot.LOCOBOT_DATA_PATH}{locobot.TRAJ_LIST[number]}'
         img = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))['img']
-        fps = 30
+        fps = 10
         print(img.shape)
         _, height, width, _ = img.shape
         # width = 640
@@ -41,7 +40,7 @@ def make_video(number: int, include_label: bool, dataset: str):
     else:
         assert dataset == 'blackbird'
         vice_path = blackbird.VICE_PATH
-        fps = 30
+        fps = 10
         width = 1024
         height = 768
         img_path = pickle.load(open(f'{vice_path}vice_data.pkl', 'rb'))['img_path']
@@ -60,7 +59,7 @@ def make_video(number: int, include_label: bool, dataset: str):
     print(f'Video destination : {saving_path}')
 
     shape = (height, width, 3)
-    for i, single_img in enumerate(tqdm(img, desc="Creating a video")):
+    for i, single_img in enumerate(img):
         fig = plt.figure(figsize=(width / 100., height / 100.))
         ax = plt.axes([0, 0, 1, 1])
         ax.imshow(single_img)
@@ -171,23 +170,29 @@ def make_video_all(number: int, depth: bool, dataset: str):
 
 
 def main():
-    # make_video(euroc.FLIGHT_LIST[2], include_label=True)
+    make_video(0, include_label=False, dataset='euroc_mav')
+    # make_video(1, include_label=False, dataset='euroc_mav')
+    # make_video(2, include_label=False, dataset='euroc_mav')
     #
+    # make_video(1, include_label=True, dataset='locobot')
+    #
+    # make_video(0, include_label=True, dataset='blackbird')
+
     # for i in range(3):
     #     for depth in [False, True]:
     #         make_video_all(euroc.FLIGHT_LIST[i], depth)
 
     # make_video_all(0, False, dataset='blackbird')
     # make_video_all(0, True, dataset='blackbird')
-    make_video_all(1, False, dataset='locobot')
-    make_video_all(1, True, dataset='locobot')
+    # make_video_all(1, False, dataset='locobot')
+    # make_video_all(1, True, dataset='locobot')
 
     # make_video_all(0, False, dataset='euroc_mav')
     # make_video_all(1, False, dataset='euroc_mav')
     # make_video_all(2, False, dataset='euroc_mav')
     # make_video_all(0, True, dataset='euroc_mav')
-    make_video_all(1, True, dataset='euroc_mav')
-    make_video_all(2, True, dataset='euroc_mav')
+    # make_video_all(1, True, dataset='euroc_mav')
+    # make_video_all(2, True, dataset='euroc_mav')
 
     # make_video(0, include_label=True, dataset='blackbird')
 
