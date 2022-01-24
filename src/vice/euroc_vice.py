@@ -171,18 +171,17 @@ def error_estimation(flight: str, ground: bool, imu: bool, label_number: int):
 
 
 def main():
-    # for i in range(3):
-    #     flight = euroc.FLIGHT_LIST[i]
-    #     euroc_mav_pre_processing(flight)
-
-    case = {0: (True, False),
-            1: (False, False),
-            2: (True, True),
-            3: (False, True)}
     for flight in euroc.FLIGHT_LIST:
-        for label_number in range(4):
-            for ground, imu in case.values():
-                error_estimation(flight, ground=ground, imu=imu, label_number=label_number)
+        euroc_mav_pre_processing(flight)
+
+    # case = {0: (True, False),
+    #         1: (False, False),
+    #         2: (True, True),
+    #         3: (False, True)}
+    # for flight in euroc.FLIGHT_LIST:
+    #     for label_number in range(4):
+    #         for ground, imu in case.values():
+    #             error_estimation(flight, ground=ground, imu=imu, label_number=label_number)
 
 
 if __name__ == '__main__':

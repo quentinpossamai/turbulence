@@ -192,8 +192,25 @@ def euroc_mav_evaluation():
         roe_error = roe(rot_mc, rot_imu, 100)
         roe_error = roe_error.mean()
 
-        print(f'flight: {euroc.FLIGHT_LIST[i]} | mse error: {rmse_error:.3f} | aoe error: {aoe_error:.2f} | '
-              f'roe error: {roe_error:.3f} \n\n')
+        # print(f'flight: {euroc.FLIGHT_LIST[i]} | mse error: {rmse_error:.3f} | aoe error: {aoe_error:.2f} | '
+        #       f'roe error: {roe_error:.3f}')
+
+        mc_bt1_bt = input_data['pose'][1:]  @ Tf.from_matrix(input_data['pose'][:-1]).inv().as_matrix()
+        imu_bt1_bt = input_data['imu'][1:] @ Tf.from_matrix(input_data['imu'][:-1]).inv().as_matrix()
+        trans_mc2 = Tf.from_matrix(mc_bt1_bt).as_trans()
+        trans_imu2 = Tf.from_matrix(imu_bt1_bt).as_trans()
+        rot_mc2 = Tf.from_matrix(mc_bt1_bt).as_rot_mat()
+        rot_imu2 = Tf.from_matrix(imu_bt1_bt).as_rot_mat()
+        aoe_error2 = aoe(rot_mc2, rot_imu2, no_mean=False)
+
+        roe_error2 = roe(rot_mc2, rot_imu2, 100)
+        roe_error2 = roe_error2.mean()
+
+        rmse_error2 = np.sqrt(np.mean(np.sum((trans_mc2 - trans_imu2) ** 2, axis=1), axis=0))
+        print(f'flight: {euroc.FLIGHT_LIST[i]} | mse error: {rmse_error2:.3f} | aoe error: {aoe_error2:.2f} | '
+              f'roe error: {roe_error2:.3f}')
+
+    print('\n\n')
 
 
 def specific_locobot_evaluation(flight: str, ground: bool, pose: str, label_number: int):
@@ -323,8 +340,22 @@ def blackbird_evaluation():
     roe_error = roe(rot_mc, rot_imu, 100)
     roe_error = roe_error.mean()
 
-    print(f'flight: {vice_path} | mse error: {rmse:.3f} | aoe error: {aoe_error:.2f} | '
-          f'roe error: {roe_error:.3f} \n\n')
+    # print(f'flight: {vice_path} | mse error: {rmse:.3f} | aoe error: {aoe_error:.2f} | '
+    #       f'roe error: {roe_error:.3f} \n\n')
+    mc_bt1_bt = input_data['pose'][1:] @ Tf.from_matrix(input_data['pose'][:-1]).inv().as_matrix()
+    imu_bt1_bt = input_data['imu'][1:] @ Tf.from_matrix(input_data['imu'][:-1]).inv().as_matrix()
+    trans_mc2 = Tf.from_matrix(mc_bt1_bt).as_trans()
+    trans_imu2 = Tf.from_matrix(imu_bt1_bt).as_trans()
+    rot_mc2 = Tf.from_matrix(mc_bt1_bt).as_rot_mat()
+    rot_imu2 = Tf.from_matrix(imu_bt1_bt).as_rot_mat()
+    aoe_error2 = aoe(rot_mc2, rot_imu2, no_mean=False)
+
+    roe_error2 = roe(rot_mc2, rot_imu2, 100)
+    roe_error2 = roe_error2.mean()
+
+    rmse_error2 = np.sqrt(np.mean(np.sum((trans_mc2 - trans_imu2) ** 2, axis=1), axis=0))
+    print(f'flight: blackbird | mse error: {rmse_error2:.3f} | aoe error: {aoe_error2:.2f} | '
+          f'roe error: {roe_error2:.3f}')
 
 
 class PlotAngle:
@@ -511,7 +542,7 @@ def main():
     euroc_mav_evaluation()
     locobot_evaluation()
     blackbird_evaluation()
-    # plot_angle.plot()
+    plot_angle.plot()
 
 
 if __name__ == '__main__':

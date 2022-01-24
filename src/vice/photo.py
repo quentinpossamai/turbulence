@@ -29,17 +29,23 @@ def make_mpl_photo():
         euroc_data['img'][i] = color_frame
     suffix1, suffix2 = '', 'imu'
     prefix = 'ground'
-    euroc_data['p_gt'] = pickle.load(open(f'{vice_path_euroc}label.pkl', 'rb'))
-    euroc_data['p_mocap'] = pickle.load(open(f'{vice_path_euroc}{prefix}{suffix1}.pkl', 'rb'))
-    euroc_data['p_imu'] = pickle.load(open(f'{vice_path_euroc}{prefix}{suffix2}.pkl', 'rb'))
+    euroc_data['p_gt'] = pickle.load(open(f'{vice_path_euroc}labels.pkl', 'rb'))
+    euroc_data['p_mocap']  = {}
+    euroc_data['p_imu'] = {}
+    for lab_num in range(4):
+        euroc_data['p_mocap'][lab_num] = pickle.load(open(f'{vice_path_euroc}{prefix}{suffix1}{lab_num}.pkl', 'rb'))
+        euroc_data['p_imu'][lab_num] = pickle.load(open(f'{vice_path_euroc}{prefix}{suffix2}{lab_num}.pkl', 'rb'))
 
     locobot_data = {}
     locobot_data['img'] = pickle.load(open(f'{vice_path_locobot}vice_data.pkl', 'rb'))['img']
     _, locobot_data['height'], locobot_data['width'], _ = locobot_data['img'].shape
     suffix1, suffix2 = '_odom', '_slam'
-    locobot_data['p_gt'] = pickle.load(open(f'{vice_path_locobot}label.pkl', 'rb'))
-    locobot_data['p_mocap'] = pickle.load(open(f'{vice_path_locobot}{prefix}{suffix1}.pkl', 'rb'))
-    locobot_data['p_imu'] = pickle.load(open(f'{vice_path_locobot}{prefix}{suffix2}.pkl', 'rb'))
+    locobot_data['p_gt'] = pickle.load(open(f'{vice_path_locobot}labels.pkl', 'rb'))
+    locobot_data['p_mocap'] = {}
+    locobot_data['p_imu'] = {}
+    for lab_num in range(4):
+        locobot_data['p_mocap'][lab_num] = pickle.load(open(f'{vice_path_locobot}{prefix}{suffix1}{lab_num}.pkl', 'rb'))
+        locobot_data['p_imu'][lab_num] = pickle.load(open(f'{vice_path_locobot}{prefix}{suffix2}{lab_num}.pkl', 'rb'))
 
     blackbird_data = {}
     blackbird_data['width'] = 1024
@@ -50,9 +56,16 @@ def make_mpl_photo():
     for i, image_path in enumerate(img_path):
         img[i] = np.array(imageio.imread(image_path))
     suffix1, suffix2 = '', 'imu'
-    blackbird_data['p_gt'] = pickle.load(open(f'{vice_path_blackbird}label.pkl', 'rb'))
-    blackbird_data['p_mocap'] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix1}.pkl', 'rb'))
-    blackbird_data['p_imu'] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix2}.pkl', 'rb'))
+    blackbird_data['p_gt'] = pickle.load(open(f'{vice_path_blackbird}labels.pkl', 'rb'))
+    blackbird_data['p_mocap'] = {}
+    blackbird_data['p_imu'] = {}
+    for lab_num in range(4):
+        blackbird_data['p_mocap'][lab_num] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix1}.pkl', 'rb'))
+        blackbird_data['p_imu'][lab_num] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix2}.pkl', 'rb'))
+
+    pickle.dump(euroc_data, open(f'/Volumes/NO NAME/vice_figure/euroc_data.pkl', 'wb'))
+    pickle.dump(locobot_data, open(f'/Volumes/NO NAME/vice_figure/locobot_data.pkl', 'wb'))
+    pickle.dump(blackbird_data, open(f'/Volumes/NO NAME/vice_figure/blackbird_data.pkl', 'wb'))
 
     param = {'edgecolors': 'w', 'linewidths': 2}
 
@@ -70,19 +83,22 @@ def make_mpl_photo():
             p_gt = blackbird_data['p_gt']
             p_mocap = blackbird_data['p_mocap']
             p_imu = blackbird_data['p_imu']
-        if isinstance(p_mocap[ind][0], np.ndarray):
-            ax_to_plot.scatter(p_mocap[ind][0][0], p_mocap[ind][0][1], s=50, c='r', alpha=1, marker='o')
-        else:
-            return False
-        if isinstance(p_imu[ind][0], np.ndarray):
-            ax_to_plot.scatter(p_imu[ind][0][0], p_imu[ind][0][1], s=100, c='lime', alpha=1, marker='x')
-        else:
-            return False
-        try:
-            _point, _is_keyframe = p_gt[ind]
-            ax_to_plot.scatter(_point[0], _point[1], s=100, c='c', alpha=1, marker='.')
-        except KeyError:
-            return False
+        for _lab_num in range(3):
+            point = p_mocap[_lab_num][ind][0]
+            if isinstance(point, np.ndarray):
+                ax_to_plot.scatter(point[0], point[1], s=50, c='r', alpha=1, marker='o')
+            else:
+                return False
+            point = p_imu[_lab_num][ind][0]
+            if isinstance(point, np.ndarray):
+                ax_to_plot.scatter(point[0], point[1], s=100, c='lime', alpha=1, marker='x')
+            else:
+                return False
+            try:
+                _point, _is_keyframe = p_gt[_lab_num][ind]
+                ax_to_plot.scatter(_point[0], _point[1], s=100, c='c', alpha=1, marker='.')
+            except KeyError:
+                return False
         return True
 
     euroc_ind = np.array([0, 10, 20, 30, 40, 50, 60]) + 185

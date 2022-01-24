@@ -121,7 +121,7 @@ def make_video_all(number: int, depth: bool, dataset: str):
     p_gt = pickle.load(open(f'{vice_path}labels.pkl', 'rb'))
     p_mocap = {}
     p_imu = {}
-    for lab_num in range(3):
+    for lab_num in range(4):
         p_mocap[lab_num] = pickle.load(open(f'{vice_path}{prefix}{suffix1}{lab_num}.pkl', 'rb'))
         p_imu[lab_num] = pickle.load(open(f'{vice_path}{prefix}{suffix2}{lab_num}.pkl', 'rb'))
 
@@ -151,7 +151,7 @@ def make_video_all(number: int, depth: bool, dataset: str):
         fig = plt.figure(figsize=(width / 100., height / 100.))
         ax = plt.axes([0, 0, 1, 1])
         ax.imshow(single_img)
-        for lab_num in range(3):
+        for lab_num in range(4):
             if isinstance(p_mocap[lab_num][i][0], np.ndarray):
                 ax.scatter(p_mocap[lab_num][i][0][0], p_mocap[lab_num][i][0][1], c='r', alpha=1, **param)
             if isinstance(p_imu[lab_num][i][0], np.ndarray):
@@ -189,11 +189,11 @@ def main():
     #         make_video_all(euroc.FLIGHT_LIST[i], depth)
 
     # make_video_all(0, False, dataset='euroc_mav')
-    make_video_all(0, True, dataset='euroc_mav')
-    # make_video_all(1, False, dataset='euroc_mav')
-    # make_video_all(1, True, dataset='euroc_mav')
-    # make_video_all(2, False, dataset='euroc_mav')
-    # make_video_all(2, True, dataset='euroc_mav')
+    # make_video_all(0, True, dataset='euroc_mav')
+    make_video_all(1, False, dataset='euroc_mav')
+    make_video_all(1, True, dataset='euroc_mav')
+    make_video_all(2, False, dataset='euroc_mav')
+    make_video_all(2, True, dataset='euroc_mav')
 
     # make_video_all(0, False, dataset='blackbird')
     # make_video_all(0, True, dataset='blackbird')
