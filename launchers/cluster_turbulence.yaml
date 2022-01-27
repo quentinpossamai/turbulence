@@ -1,0 +1,49 @@
+# Comment are for Mac installation
+name: turbulence
+channels:
+  - anaconda
+  - conda-forge
+  - aihabitat
+  - open3d-admin
+  - pytorch-lts  # comment and choose pytorch for the Mac
+#  - pytorch
+  - nvidia
+dependencies:
+  - python=3.7
+  - pytorch-lts::pytorch=1.8.2  # comment and choose pytorch::pytorch for the Mac
+  - pytorch-lts::torchvision  # comment and choose pytorch::torchvision for the Mac
+  - pytorch-lts::torchaudio  # comment and choose pytorch::torchaudio for the Mac
+  - nvidia::cudatoolkit=11.1  # comment and choose pytorch::cpuonly for the Mac
+  #  - pytorch::pytorch
+  #  - pytorch::torchvision
+  #  - pytorch::torchaudio
+  #  - pytorch::cpuonly
+  - conda-forge::pytorch-lightning=1.4.9
+  - aihabitat::habitat-sim 
+  - aihabitat::withbullet 
+  - aihabitat::headless  # comment for the Mac
+  - torchdiffeq
+  - tensorboard
+  - pickleshare
+  - scipy 
+  - imageio
+  - pandas
+  - ffmpeg
+  - fire
+  - open3d
+  - pillow
+  - scikit-learn
+  - tqdm
+  - wget
+  - yaml
+  - matplotlib
+  - numpy
+  - quaternion
+  - gitpython
+  - imageio-ffmpeg
+  - pip
+  - yappi
+  - pip:
+    - christofides==1.0.1  # In it christofides is in python 2, take the correct one from mac:~ or remsto:~
+    - opencv-python-headless  # comment and choose opencv-python for the Mac
+#    - opencv-python
