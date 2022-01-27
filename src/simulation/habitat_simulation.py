@@ -563,6 +563,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         else:
             next_state = simulation.quadrotor.forward(dt=dt, state=log['state'][-1], motor=log['motor'][-1])
             log['state'].append(next_state)
+    simulation.sim.close(True)
     log2 = {}
     for key, val in log.items():
         if len(val) != 0:
