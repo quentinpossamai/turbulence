@@ -1,0 +1,26 @@
+# Only used locally
+name: rosbag
+channels:
+  - defaults
+  - anaconda
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - pickleshare
+  - scipy 
+  - imageio
+  - pandas
+  - pillow
+  - tqdm
+  - wget
+  - yaml
+  - matplotlib
+  - numpy
+  - quaternion
+  - gitpython
+  - pip
+  - yappi
+  - pip:
+    - opencv-python
+    - rosbags

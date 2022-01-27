@@ -14,10 +14,10 @@ dependencies:
   - pytorch-lts::torchvision  # comment and choose pytorch::torchvision for the Mac
   - pytorch-lts::torchaudio  # comment and choose pytorch::torchaudio for the Mac
   - nvidia::cudatoolkit=11.1  # comment and choose pytorch::cpuonly for the Mac
-  #  - pytorch::pytorch
-  #  - pytorch::torchvision
-  #  - pytorch::torchaudio
-  #  - pytorch::cpuonly
+#  - pytorch::pytorch
+#  - pytorch::torchvision
+#  - pytorch::torchaudio
+#  - pytorch::cpuonly
   - conda-forge::pytorch-lightning=1.4.9
   - aihabitat::habitat-sim 
   - aihabitat::withbullet 

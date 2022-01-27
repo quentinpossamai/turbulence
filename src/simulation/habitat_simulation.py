@@ -615,6 +615,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
         pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'))
+        print(f'Done {i} | Len {len(time_end)} | has_collided {has_collided}')
 
 
 def main():
@@ -631,7 +632,7 @@ def main():
                           plot_topdown=False,
                           debug=False,
                           cluster=args.cluster)
-    print()
+    print(f'Has worked: {has_worked}')
 
 
 if __name__ == "__main__":
