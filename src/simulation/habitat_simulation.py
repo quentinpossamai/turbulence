@@ -617,7 +617,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
         pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'))
-        print(f'Done {i} | Len {len(time_end)} | has_collided {has_collided}')
+        print(f'Done {i} | Len {time_end} | has_collided {has_collided}')
 
 
 def main():
