@@ -25,7 +25,9 @@ def mkdir_if_not_exist(paths: list):
         pass
     else:
         assert isinstance(paths, list), "Path given must be a list."
-        assert WD_PATH in ["/Users/quentin/phd/turbulence/", "/home/qpossamai/phd/turbulence/"]
+        assert WD_PATH in ["/Users/quentin/phd/turbulence/",
+                           "/home/qpossamai/phd/turbulence/",
+                           "/storage/home/qpossamai/phd/turbulence/"]
         for path in paths:
             pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
