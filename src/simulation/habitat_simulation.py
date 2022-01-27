@@ -559,8 +559,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
 
             if has_collided:
                 print('Drone has collided')
-                print(f'Done {i} | Len {len(time_end)} | has_collided {has_collided}')
-
                 break
         else:
             next_state = simulation.quadrotor.forward(dt=dt, state=log['state'][-1], motor=log['motor'][-1])
