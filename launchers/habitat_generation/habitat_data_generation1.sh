@@ -1,3 +1,3 @@
 #!/bin/bash
-cd ~/phd/turbulence/
-~/anaconda3/envs/turbulence/bin/python -m src.simulation.habitat_simulation --scene_number 0 --flight_number 1 --cluster True
+cd /home/qpossamai/phd/turbulence/
+/home/qpossamai/anaconda3/envs/turbulence/bin/python -m src.simulation.habitat_simulation --scene_number 0 --flight_number 1 --cluster True
