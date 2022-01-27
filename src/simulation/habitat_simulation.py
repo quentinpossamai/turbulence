@@ -565,7 +565,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         else:
             next_state = simulation.quadrotor.forward(dt=dt, state=log['state'][-1], motor=log['motor'][-1])
             log['state'].append(next_state)
-    print(f'Done {i} | Len {len(time_end)} | has_collided {has_collided}')
     log2 = {}
     for key, val in log.items():
         if len(val) != 0:
@@ -617,6 +616,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
         pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'))
+        pickle.dump({'done': i, 'length': time_end, 'has_collided': has_collided},
+                    open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         print(f'Done {i} | Len {time_end} | has_collided {has_collided}')
 
 
@@ -627,14 +628,16 @@ def main():
                                                                      'trajectory.')
     parser.add_argument('--cluster', default=False, type=bool, help='Execute on cluster.')
     args = parser.parse_args()
-    has_worked = gen_data(scene_id=MP3_SCENE_LIST[args.scene_number],
-                          flight_number=args.flight_number,
-                          same_env=False,
-                          plot_ref=False,
-                          plot_topdown=False,
-                          debug=False,
-                          cluster=args.cluster)
-    print(f'Has worked: {has_worked}')
+    for scene_number in range(len(MP3_SCENE_LIST)):
+        for flight_number in range(10):
+            has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
+                                  flight_number=flight_number,
+                                  same_env=False,
+                                  plot_ref=False,
+                                  plot_topdown=False,
+                                  debug=False,
+                                  cluster=args.cluster)
+            print(f'Has worked: {has_worked}')
 
 
 if __name__ == "__main__":
