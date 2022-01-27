@@ -624,7 +624,7 @@ def main():
                                                                      'trajectory.')
     parser.add_argument('--cluster', default=False, type=bool, help='Execute on cluster.')
     args = parser.parse_args()
-    has_worked = gen_data(scene_id=MP3_SCENE_LIST[args.scene_nunber],
+    has_worked = gen_data(scene_id=MP3_SCENE_LIST[args.scene_number],
                           flight_number=args.flight_number,
                           same_env=False,
                           plot_ref=False,

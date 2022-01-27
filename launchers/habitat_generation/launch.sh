@@ -2,6 +2,7 @@
 echo "rsync from macbook to homedir done"  &&
 git push github main &&
 echo "Git: push from homedir to github done"  &&
+rsync -rtv --exclude=.DS_Store --delete ~/phd/turbulence/data/habitat remsto:~/phd/turbulence/data/ &&
 ssh remsto /bin/bash << EOF
   cd ~/phd/turbulence/launchers/habitat_generation/ &&
   git pull github main &&
