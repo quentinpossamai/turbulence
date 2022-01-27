@@ -188,17 +188,17 @@ def main():
     #     for depth in [False, True]:
     #         make_video_all(euroc.FLIGHT_LIST[i], depth)
 
-    # make_video_all(0, False, dataset='euroc_mav')
-    # make_video_all(0, True, dataset='euroc_mav')
-    make_video_all(1, False, dataset='euroc_mav')
-    make_video_all(1, True, dataset='euroc_mav')
-    make_video_all(2, False, dataset='euroc_mav')
-    make_video_all(2, True, dataset='euroc_mav')
+    make_video_all(0, False, dataset='euroc_mav')
+    make_video_all(0, True, dataset='euroc_mav')
+    # make_video_all(1, False, dataset='euroc_mav')
+    # make_video_all(1, True, dataset='euroc_mav')
+    # make_video_all(2, False, dataset='euroc_mav')
+    # make_video_all(2, True, dataset='euroc_mav')
 
-    # make_video_all(0, False, dataset='blackbird')
-    # make_video_all(0, True, dataset='blackbird')
     # make_video_all(1, False, dataset='locobot')
     # make_video_all(1, True, dataset='locobot')
+    # make_video_all(0, False, dataset='blackbird')
+    # make_video_all(0, True, dataset='blackbird')
 
 
     # make_video(0, include_label=True, dataset='blackbird')

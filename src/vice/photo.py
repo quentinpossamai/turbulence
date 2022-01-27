@@ -30,7 +30,7 @@ def make_mpl_photo():
     suffix1, suffix2 = '', 'imu'
     prefix = 'ground'
     euroc_data['p_gt'] = pickle.load(open(f'{vice_path_euroc}labels.pkl', 'rb'))
-    euroc_data['p_mocap']  = {}
+    euroc_data['p_mocap'] = {}
     euroc_data['p_imu'] = {}
     for lab_num in range(4):
         euroc_data['p_mocap'][lab_num] = pickle.load(open(f'{vice_path_euroc}{prefix}{suffix1}{lab_num}.pkl', 'rb'))
@@ -60,12 +60,12 @@ def make_mpl_photo():
     blackbird_data['p_mocap'] = {}
     blackbird_data['p_imu'] = {}
     for lab_num in range(4):
-        blackbird_data['p_mocap'][lab_num] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix1}.pkl', 'rb'))
-        blackbird_data['p_imu'][lab_num] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix2}.pkl', 'rb'))
+        blackbird_data['p_mocap'][lab_num] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix1}{lab_num}.pkl', 'rb'))
+        blackbird_data['p_imu'][lab_num] = pickle.load(open(f'{vice_path_blackbird}{prefix}{suffix2}{lab_num}.pkl', 'rb'))
 
-    pickle.dump(euroc_data, open(f'/Volumes/NO NAME/vice_figure/euroc_data.pkl', 'wb'))
-    pickle.dump(locobot_data, open(f'/Volumes/NO NAME/vice_figure/locobot_data.pkl', 'wb'))
-    pickle.dump(blackbird_data, open(f'/Volumes/NO NAME/vice_figure/blackbird_data.pkl', 'wb'))
+    # pickle.dump(euroc_data, open(f'/Volumes/NO NAME/vice_figure/euroc_data.pkl', 'wb'))
+    # pickle.dump(locobot_data, open(f'/Volumes/NO NAME/vice_figure/locobot_data.pkl', 'wb'))
+    pickle.dump(blackbird_data, open(f'/Users/quentin/phd/turbulence/data/blackbird/blackbird_data.pkl', 'wb'), protocol=4)
 
     param = {'edgecolors': 'w', 'linewidths': 2}
 

@@ -532,7 +532,7 @@ class PlotAngle:
         ax_twin.grid()
         plt.subplots_adjust(left=0.03, bottom=0.1, right=0.87, top=0.98, wspace=0, hspace=0.3)
         plt.show()
-        plt.savefig(f'{vice_path}fig_curve.pdf')
+        plt.savefig(f'{vice_path}fig_curve.png')
 
 
 plot_angle = PlotAngle()
