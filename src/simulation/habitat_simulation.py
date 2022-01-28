@@ -537,15 +537,16 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
     for i in tqdm(range(1, time_end)):
         # Computing command with the controller
-        motor_horizon, err = mpc_controller(model=mpc_model,
-                                            state_ref=state_ref_flu[i:i + horizon_pred],
-                                            state0=log['state'][-1],
-                                            u0=motor_horizon,
-                                            horizon_cmd=horizon_cmd,
-                                            horizon_pred=horizon_pred,
-                                            gamma=gamma,
-                                            verbose=False)
-        if not np.isfinite(motor_horizon).all() or not np.isfinite(err).all():
+        try:
+            motor_horizon, err = mpc_controller(model=mpc_model,
+                                                state_ref=state_ref_flu[i:i + horizon_pred],
+                                                state0=log['state'][-1],
+                                                u0=motor_horizon,
+                                                horizon_cmd=horizon_cmd,
+                                                horizon_pred=horizon_pred,
+                                                gamma=gamma,
+                                                verbose=False)
+        except ValueError:
             simulation.sim.close(True)
             folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
             mkdir_if_not_exist([folder])
