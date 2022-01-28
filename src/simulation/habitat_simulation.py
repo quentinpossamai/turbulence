@@ -619,7 +619,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         pickle.dump({'done': i, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         print(f'Done {i} | Len {time_end} | has_collided {has_collided}', flush=True)
-        print(f'\n'*20, flush=True)
 
 
 def main():
@@ -631,6 +630,7 @@ def main():
     args = parser.parse_args()
     for scene_number in range(len(MP3_SCENE_LIST)):
         for flight_number in range(10):
+            print(f'scene_number={scene_number} | flight_number={flight_number}')
             has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
                                   flight_number=flight_number,
                                   same_env=False,
@@ -639,6 +639,7 @@ def main():
                                   debug=False,
                                   cluster=args.cluster)
             print(f'Has worked: {has_worked}', flush=True)
+            print(f'\n' * 20, flush=True)
 
 
 if __name__ == "__main__":
