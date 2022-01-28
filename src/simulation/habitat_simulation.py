@@ -651,7 +651,7 @@ def main():
     args = parser.parse_args()
 
     for scene_number in range(args.scene_start, args.scene_stop):
-        for flight_number in range(args.scene_start, args.scene_stop):
+        for flight_number in range(args.fn_start, args.fn_stop):
             print(f'SCENE_NUMBER={scene_number} | FLIGHT_NUMBER={flight_number}', flush=True)
             has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
                                   flight_number=flight_number,
