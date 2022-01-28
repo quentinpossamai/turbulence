@@ -174,7 +174,8 @@ class Simulation:
         cube_attributes = self.obj_templates_mgr.get_template_by_handle(handle=cube_template_handle)
         cube_dim = [self.drone_prms['width'] / 2, self.drone_prms['height'] / 2, self.drone_prms['width'] / 2]
         cube_attributes.scale = cube_dim
-        cube_attributes.collision_asset_size = [self.drone_prms['width'] / 4, self.drone_prms['height'] / 4, self.drone_prms['width'] / 4]
+        cube_attributes.collision_asset_size = [self.drone_prms['width'] / 4, self.drone_prms['height'] / 4,
+                                                self.drone_prms['width'] / 4]
         # cube_attributes.bounding_box_collisions = True
         cube_attributes.linear_damping = 0  # drag
         cube_attributes.angular_damping = 0  # drag
@@ -496,6 +497,9 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                                                             seed=flight_number, viz_navmesh=False)
     if not has_worked:
         simulation.sim.close(True)
+        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
+        mkdir_if_not_exist([folder])
+        pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         return False
 
     # simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
@@ -541,6 +545,12 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                                             horizon_pred=horizon_pred,
                                             gamma=gamma,
                                             verbose=False)
+        if not np.isfinite(motor_horizon).all() or not np.isfinite(err).all():
+            simulation.sim.close(True)
+            folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
+            mkdir_if_not_exist([folder])
+            pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
+            return False
         log['motor'].append(motor_horizon[0])  # t to compute t+1
         log['mpc_error'].append(err)  # t to compute t+1
         if err > 100:
@@ -551,8 +561,15 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             out = simulation.one_step_sim(dt=dt, state=log['state'][-1], motor=log['motor'][-1],
                                           z=log['surface_dist'][-1])
             next_state_flu, obs, has_collided, ground_effect = out
-            log['ground_force'].append(ground_effect)  # t used to compute t+1
+            if (not np.isfinite(next_state_flu).all() or not np.isfinite(ground_effect).all() or
+                    not np.isfinite(obs['surface_dist']).all()):
+                simulation.sim.close(True)
+                folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
+                mkdir_if_not_exist([folder])
+                pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
+                return False
 
+            log['ground_force'].append(ground_effect)  # t used to compute t+1
             # t+1
             log['camera'].append(obs['left_camera'])  # t+1
             log['depth'].append(obs['left_depth_camera'])  # t+1
@@ -593,7 +610,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         if same_env:
             assert position_error == 0 and quat_error == 0 and lin_vel_error == 0 and ang_vel_error == 0
         # MPC model FLU vs FLU reference | Does the mpc has a good model vs simulation environment ?
-        trace_trajectory3d(state_mpc[:, 0:3], state_mpc[:, 3:7], 1e-4, step=1, position_ref=state_ref_flu[:time_end, :3])
+        trace_trajectory3d(state_mpc[:, 0:3], state_mpc[:, 3:7], 1e-4, step=1,
+                           position_ref=state_ref_flu[:time_end, :3])
 
         # View camera's simulated trajectory
         state_habitat = Habitat2FLU.state_flu_2_state_habitat(log2['state'])
@@ -624,13 +642,16 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
 
 def main():
     parser = argparse.ArgumentParser(description="Generate drone flight data.")
-    parser.add_argument('--scene_number', default=0, type=int, help='Scene number to generate data from.')
-    parser.add_argument('--flight_number', default=0, type=int, help='Flight number corresponding to a specific '
-                                                                     'trajectory.')
+    parser.add_argument('--scene_start', default=0, type=int, help='Scene number range start [0, 89]')
+    parser.add_argument('--scene_stop', default=1, type=int, help='Scene number range stop [1, 90]')
+    # fn = flight_number correspond to a specific trajectory.
+    parser.add_argument('--fn_start', default=0, type=int, help='Flight number range start')
+    parser.add_argument('--fn_stop', default=1, type=int, help='Flight number range stop')
     parser.add_argument('--cluster', default=False, type=bool, help='Execute on cluster.')
     args = parser.parse_args()
-    for scene_number in range(1, len(MP3_SCENE_LIST)):
-        for flight_number in range(10):
+
+    for scene_number in range(args.scene_start, args.scene_stop):
+        for flight_number in range(args.scene_start, args.scene_stop):
             print(f'SCENE_NUMBER={scene_number} | FLIGHT_NUMBER={flight_number}', flush=True)
             has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
                                   flight_number=flight_number,
