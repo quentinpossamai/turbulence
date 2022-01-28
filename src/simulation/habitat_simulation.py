@@ -538,7 +538,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                                             u0=motor_horizon,
                                             horizon_cmd=horizon_cmd,
                                             horizon_pred=horizon_pred,
-                                            gamma=gamma)
+                                            gamma=gamma,
+                                            verbose=False)
         log['motor'].append(motor_horizon[0])  # t to compute t+1
         log['mpc_error'].append(err)  # t to compute t+1
         if err > 100:
@@ -617,7 +618,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'))
         pickle.dump({'done': i, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
-        print(f'Done {i} | Len {time_end} | has_collided {has_collided}')
+        print(f'Done {i} | Len {time_end} | has_collided {has_collided}', flush=True)
 
 
 def main():
@@ -636,7 +637,7 @@ def main():
                                   plot_topdown=False,
                                   debug=False,
                                   cluster=args.cluster)
-            print(f'Has worked: {has_worked}')
+            print(f'Has worked: {has_worked}', flush=True)
 
 
 if __name__ == "__main__":

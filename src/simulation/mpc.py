@@ -29,7 +29,8 @@ def mpc_controller(model: Callable,
                    u0: np.ndarray,
                    horizon_cmd: int,
                    horizon_pred: int,
-                   gamma: float):
+                   gamma: float,
+                   verbose: bool):
     """
 
     param model:
@@ -45,6 +46,8 @@ def mpc_controller(model: Callable,
     param horizon_pred:
 
     param gamma:
+
+    param verbose:
 
     return:
 
@@ -73,7 +76,8 @@ def mpc_controller(model: Callable,
         return loss(state_ref=_state_ref, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma)
 
     # Initialize command
-    print('MPC starting')
+    if verbose:
+        print('MPC starting')
     out: scipy.optimize.OptimizeResult = scipy.optimize.minimize(fun=_mpc, x0=u0.flatten(),
                                                                  args=(state0, state_ref, horizon_cmd,
                                                                        horizon_pred, gamma),
@@ -91,7 +95,8 @@ def mpc_controller(model: Callable,
                                                                  )
     u, error_mpc = out.x, out.fun
     u = u.reshape((-1, 4))
-    print(f'Finished | mpc_error: {error_mpc} | u: {u} | message: {out.message} \n')
+    if verbose:
+        print(f'Finished | mpc_error: {error_mpc} | u: {u} | message: {out.message} \n')
     # u = np.abs(u)
     return u, error_mpc
 
