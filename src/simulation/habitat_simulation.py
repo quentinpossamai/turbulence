@@ -619,6 +619,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         pickle.dump({'done': i, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         print(f'Done {i} | Len {time_end} | has_collided {has_collided}', flush=True)
+        print(f'\n'*20, flush=True)
 
 
 def main():
