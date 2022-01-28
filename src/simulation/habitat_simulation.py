@@ -630,7 +630,7 @@ def main():
     args = parser.parse_args()
     for scene_number in range(len(MP3_SCENE_LIST)):
         for flight_number in range(10):
-            print(f'scene_number={scene_number} | flight_number={flight_number}')
+            print(f'scene_number={scene_number} | flight_number={flight_number}', flush=True)
             has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
                                   flight_number=flight_number,
                                   same_env=False,

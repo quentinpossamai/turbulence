@@ -115,7 +115,7 @@ def polynomial_interpolation(main_point, num_sample, degree, flight_height):
     dist = []
     for point in main_point:
         dist.append(np.min(np.linalg.norm(point - trans, axis=1)))
-    print(f'Max reference error {np.max(dist)}')
+    print(f'Max reference error {np.max(dist)}', flush=True)
 
     # Computing of the orientation from the position
     ref_tf_global_agent = []
@@ -168,7 +168,7 @@ def generate_reference(sim: habitat_sim.Simulator,
     # Check if every point is reachable
     for t in shortest_path:
         if t[2] == np.inf:
-            print('Generated points non reachable, change seed')
+            print('Generated points non reachable, change seed', flush=True)
             return False
 
     # Compute the order to navigate between those points
@@ -181,7 +181,7 @@ def generate_reference(sim: habitat_sim.Simulator,
     for i, current_point_idx in enumerate(travel_order[:-1]):
         next_point_idx = travel_order[i + 1]
         dist = [dist for dist in shortest_path if current_point_idx == dist[0] and next_point_idx == dist[1]][0]
-        print(f'current_point_idx: {current_point_idx} | next_point_idx: {next_point_idx} | dist: {dist}')
+        print(f'current_point_idx: {current_point_idx} | next_point_idx: {next_point_idx} | dist: {dist}', flush=True)
         entire_path = entire_path + dist[3].points
     entire_path.append(point[travel_order[-1]])
     entire_path = np.stack(entire_path)
