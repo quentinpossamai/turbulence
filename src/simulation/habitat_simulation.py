@@ -616,9 +616,9 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
         pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'))
-        pickle.dump({'done': i, 'length': time_end, 'has_collided': has_collided},
+        pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
-        print(f'Done {i} | Len {time_end} | has_collided {has_collided}', flush=True)
+        print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', flush=True)
 
 
 def main():
@@ -628,9 +628,9 @@ def main():
                                                                      'trajectory.')
     parser.add_argument('--cluster', default=False, type=bool, help='Execute on cluster.')
     args = parser.parse_args()
-    for scene_number in range(len(MP3_SCENE_LIST)):
+    for scene_number in range(1, len(MP3_SCENE_LIST)):
         for flight_number in range(10):
-            print(f'scene_number={scene_number} | flight_number={flight_number}', flush=True)
+            print(f'SCENE_NUMBER={scene_number} | FLIGHT_NUMBER={flight_number}', flush=True)
             has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
                                   flight_number=flight_number,
                                   same_env=False,
@@ -638,7 +638,6 @@ def main():
                                   plot_topdown=False,
                                   debug=False,
                                   cluster=args.cluster)
-            print(f'Has worked: {has_worked}', flush=True)
             print(f'\n' * 20, flush=True)
 
 
