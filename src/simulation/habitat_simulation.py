@@ -495,6 +495,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     has_worked = simulation.generate_reference_procedurally(uniform_speed=1, plot_topdown=plot_topdown, dt=dt,
                                                             seed=flight_number, viz_navmesh=False)
     if not has_worked:
+        simulation.sim.close(True)
         return False
 
     # simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)

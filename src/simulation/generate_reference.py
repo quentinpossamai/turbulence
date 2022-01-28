@@ -169,7 +169,6 @@ def generate_reference(sim: habitat_sim.Simulator,
     for t in shortest_path:
         if t[2] == np.inf:
             print('Generated points non reachable, change seed', flush=True)
-            sim.close(True)
             return False
 
     # Compute the order to navigate between those points
