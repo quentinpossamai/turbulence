@@ -9,7 +9,7 @@ ssh remsto /bin/bash << EOF
   sbatch --mem 10G --gres=gpu:1 -p part2 -J hab_gen0 -o log-hab_gen0-%A.out habitat_data_generation0.sh
   sbatch --mem 10G --gres=gpu:1 -p part2 -J hab_gen1 -o log-hab_gen1-%A.out habitat_data_generation1.sh
   sbatch --mem 10G --gres=gpu:1 -p part2 -J hab_gen2 -o log-hab_gen2-%A.out habitat_data_generation2.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen3 -o log-hab_gen3-%A.out habitat_data_generation3.sh
+  sbatch --mem 10G --gres=gpu:1 -p part2 -J hab_gen3 -o log-hab_gen3-%A.out habitat_data_generation3.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen4 -o log-hab_gen4-%A.out habitat_data_generation4.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen5 -o log-hab_gen5-%A.out habitat_data_generation5.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen6 -o log-hab_gen6-%A.out habitat_data_generation6.sh
