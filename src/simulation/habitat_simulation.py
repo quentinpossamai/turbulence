@@ -545,7 +545,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # Initializing flight in habitat
     # Sensing
     obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
-    log = {'state': [state_ref_flu[0]],  # flu
+    data_collected = {'state': [state_ref_flu[0]],  # flu
            'motor': [],
            'mpc_error': [],
            'camera': [obs['left_camera']],
@@ -559,12 +559,13 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     hover_cmd = np.sqrt(drone_prms['m'] * g / (4 * drone_prms['kt']))
     motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
     has_collided = False
+    i = 0
     for i in tqdm(range(1, time_end)):
         # Computing command with the controller
         try:
             motor_horizon, err = mpc_controller(model=mpc_model,
                                                 state_ref=state_ref_flu[i:i + horizon_pred],
-                                                state0=log['state'][-1],
+                                                state0=data_collected['state'][-1],
                                                 u0=motor_horizon,
                                                 horizon_cmd=horizon_cmd,
                                                 horizon_pred=horizon_pred,
@@ -577,13 +578,13 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             mkdir_if_not_exist([folder])
             pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
             return False
-        log['motor'].append(motor_horizon[0])  # t to compute t+1
-        log['mpc_error'].append(err)  # t to compute t+1
+        data_collected['motor'].append(motor_horizon[0])  # t to compute t+1
+        data_collected['mpc_error'].append(err)  # t to compute t+1
 
         # Simulating result
         if not same_env:
-            out = simulation.one_step_sim(dt=dt, state=log['state'][-1], motor=log['motor'][-1],
-                                          z=log['surface_dist'][-1])
+            out = simulation.one_step_sim(dt=dt, state=data_collected['state'][-1], motor=data_collected['motor'][-1],
+                                          z=data_collected['surface_dist'][-1])
             next_state_flu, obs, has_collided, ground_effect = out
             if (not np.isfinite(next_state_flu).all() or not np.isfinite(ground_effect).all() or
                     not np.isfinite(obs['surface_dist']).all()):
@@ -594,28 +595,28 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                 pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
                 return False
 
-            log['ground_force'].append(ground_effect)  # t used to compute t+1
+            data_collected['ground_force'].append(ground_effect)  # t used to compute t+1
             # t+1
-            log['camera'].append(obs['left_camera'])  # t+1
-            log['depth'].append(obs['left_depth_camera'])  # t+1
-            log['surface_dist'].append(obs['surface_dist'][0])  # t+1
-            log['state'].append(next_state_flu)  # t+1
+            data_collected['camera'].append(obs['left_camera'])  # t+1
+            data_collected['depth'].append(obs['left_depth_camera'])  # t+1
+            data_collected['surface_dist'].append(obs['surface_dist'][0])  # t+1
+            data_collected['state'].append(next_state_flu)  # t+1
 
             if has_collided:
                 print('Drone has collided', file=sys.stderr, flush=True)
                 break
         else:
-            next_state = simulation.quadrotor.forward(dt=dt, state=log['state'][-1], motor=log['motor'][-1])
-            log['state'].append(next_state)
+            next_state = simulation.quadrotor.forward(dt=dt, state=data_collected['state'][-1], motor=data_collected['motor'][-1])
+            data_collected['state'].append(next_state)
     simulation.sim.close(True)
-    log2 = {}
-    for key, val in log.items():
+    data_generated = {}
+    for key, val in data_collected.items():
         if len(val) != 0:
-            log2[key] = np.stack(val, axis=0)
+            data_generated[key] = np.stack(val, axis=0)
 
     if debug:
         # Simulation vs reference in FLU for pose.
-        pose_sim_flu, quat_sim_flu = log2['state'][:, :3], log2['state'][:, 3:7]
+        pose_sim_flu, quat_sim_flu = data_generated['state'][:, :3], data_generated['state'][:, 3:7]
         # import matplotlib.pyplot as plt
         # plt.plot(state_ref_flu[:, 2])
         # plt.plot(pose_sim_flu[:, 2])
@@ -624,14 +625,14 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_ref_hab)
 
         # Error | MPC model vs Simulation
-        state_mpc = [log2['state'][0]]
-        for i in range(len(log2['motor'])):
-            state_mpc.append(simulation.quadrotor.forward(dt=dt, motor=log2['motor'][i], state=state_mpc[-1]))
+        state_mpc = [data_generated['state'][0]]
+        for i in range(len(data_generated['motor'])):
+            state_mpc.append(simulation.quadrotor.forward(dt=dt, motor=data_generated['motor'][i], state=state_mpc[-1]))
         state_mpc = np.stack(state_mpc)
-        position_error = ((log2['state'][:, 0:3] - state_mpc[:, 0:3]) ** 2)
-        quat_error = ((log2['state'][:, 3:7] - state_mpc[:, 3:7]) ** 2)
-        lin_vel_error = ((log2['state'][:, 7:10] - state_mpc[:, 7:10]) ** 2)
-        ang_vel_error = ((log2['state'][:, 10:13] - state_mpc[:, 10:13]) ** 2)
+        position_error = ((data_generated['state'][:, 0:3] - state_mpc[:, 0:3]) ** 2)
+        quat_error = ((data_generated['state'][:, 3:7] - state_mpc[:, 3:7]) ** 2)
+        lin_vel_error = ((data_generated['state'][:, 7:10] - state_mpc[:, 7:10]) ** 2)
+        ang_vel_error = ((data_generated['state'][:, 10:13] - state_mpc[:, 10:13]) ** 2)
         if same_env:
             assert position_error == 0 and quat_error == 0 and lin_vel_error == 0 and ang_vel_error == 0
         # MPC model FLU vs FLU reference | Does the mpc has a good model vs simulation environment ?
@@ -639,7 +640,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                            position_ref=state_ref_flu[:time_end, :3])
 
         # View camera's simulated trajectory
-        state_habitat = Habitat2FLU.state_flu_2_state_habitat(log2['state'])
+        state_habitat = Habitat2FLU.state_flu_2_state_habitat(data_generated['state'])
         tf_real = Transform.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
         simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_real)
 
@@ -650,8 +651,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         # plt.grid()
 
         import matplotlib.pyplot as plt
-        time = np.linspace(0, (len(log2['motor']) - 1) * 1 / 20, len(log2['motor']))
-        plt.plot(time, log2['mpc_error'])
+        time = np.linspace(0, (len(data_generated['motor']) - 1) * 1 / 20, len(data_generated['motor']))
+        plt.plot(time, data_generated['mpc_error'])
         plt.grid()
 
     # Saving
@@ -661,8 +662,15 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
 
-        with lzma.open(f'{folder}{flight_number}.xz', 'wb') as file:
-            pickle.dump(log2, file, protocol=4)
+        state = data_generated['state']
+        motor = data_generated['motor']
+        mpc_error = data_generated['mpc_error']
+        camera = data_generated['camera']
+        depth = data_generated['depth']
+        surface_dist = data_generated['surface_dist']
+        ground_force = data_generated['ground_force']
+        np.savez_compressed(f'{folder}{flight_number}.npz', state, motor, mpc_error, camera, depth, surface_dist,
+                            ground_force)
         pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
