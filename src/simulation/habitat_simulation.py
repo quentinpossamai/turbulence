@@ -662,19 +662,11 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         import time
         tic = time.time()
         print(f'Saving', file=sys.stderr, flush=True)
-        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
+        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}'
         mkdir_if_not_exist([folder])
-
-        state = data_generated['state'].astype(np.float32)
-        motor = data_generated['motor'].astype(np.float32)
-        mpc_error = data_generated['mpc_error'].astype(np.float32)
-        camera = data_generated['camera'].astype(np.float32)
-        depth = data_generated['depth'].astype(np.float32)
-        surface_dist = data_generated['surface_dist'].astype(np.float32)
-        ground_force = data_generated['ground_force'].astype(np.float32)
-        np.savez(f'{folder}{flight_number}.npz', state, motor, mpc_error, camera, depth, surface_dist, ground_force)
-        pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided},
-                    open(f'{folder}{flight_number}_stats.pkl', 'wb'))
+        for name, array in data_generated.items():
+            np.savey(f'{folder}{name}.npy', array.astype(np.float32))
+        pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided}, open(f'{folder}stats.pkl', 'wb'))
         print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
         print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
         return True
