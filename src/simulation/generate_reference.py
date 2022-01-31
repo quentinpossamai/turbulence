@@ -5,6 +5,7 @@ from matplotlib.widgets import Slider
 import magnum
 import numpy as np
 from scipy.interpolate import splev, splrep
+import sys
 from tqdm import tqdm
 from typing import Union
 
@@ -168,7 +169,7 @@ def generate_reference(sim: habitat_sim.Simulator,
     # Check if every point is reachable
     for t in shortest_path:
         if t[2] == np.inf:
-            print('Generated points non reachable, change seed', flush=True)
+            print('Generated points non reachable, change seed', file=sys.stderr, flush=True)
             return False
 
     # Compute the order to navigate between those points

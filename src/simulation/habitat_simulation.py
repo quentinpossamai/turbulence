@@ -5,6 +5,7 @@ import lzma
 import magnum
 import numpy as np
 import pickle
+import sys
 from tqdm import tqdm
 from typing import Dict, Tuple, Any, Union
 
@@ -297,6 +298,27 @@ class Simulation:
 
     def one_step_sim(self, dt: float, state: np.ndarray, motor: np.ndarray,
                      z: float) -> Tuple[np.ndarray, Any, bool, np.ndarray]:
+        """
+        Take a drone state and a motor command at time 't_i' and return the new state and drone sensors' output at time
+        't_i+1'.
+        All inputs and outputs are in FLU.
+
+        param dt: t_i+1 - t_i. The duration where all state and motor output will be considered constant (Euler
+        integration scheme).
+
+        param state: The initial state of the drone at time t_i.
+
+        param motor: The command to apply on the drone at time t_i.
+
+        param z: The distance of the drone to a surface below him at time t_i. Used to compute vertical ground effect
+        force.
+
+        return: next state at time t_i+1 (np.ndarray 13),
+         obs a collection of sensors observations at time t_i+1 (dict[str, val]),
+         if the drone has collided (bool),
+         ground_effect the external perturbation (float).
+
+        """
         # 1. Motor and Ground Effect (gravity is done by habitat)
         ground_effect = self.compute_ground_effect(motor, z, mu=1, cap=0.1)
         next_state = self.quadrotor.forward(state=state, motor=motor, dt=dt, residual=ground_effect)
@@ -536,6 +558,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # First mpc command after it take the previous one for initialisation
     hover_cmd = np.sqrt(drone_prms['m'] * g / (4 * drone_prms['kt']))
     motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
+    has_collided = False
     for i in tqdm(range(1, time_end)):
         # Computing command with the controller
         try:
@@ -548,6 +571,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                                                 gamma=gamma,
                                                 verbose=False)
         except ValueError:
+            print(f'Drone diverged', file=sys.stderr, flush=True)
             simulation.sim.close(True)
             folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
             mkdir_if_not_exist([folder])
@@ -555,8 +579,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             return False
         log['motor'].append(motor_horizon[0])  # t to compute t+1
         log['mpc_error'].append(err)  # t to compute t+1
-        if err > 100:
-            print()
 
         # Simulating result
         if not same_env:
@@ -565,6 +587,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             next_state_flu, obs, has_collided, ground_effect = out
             if (not np.isfinite(next_state_flu).all() or not np.isfinite(ground_effect).all() or
                     not np.isfinite(obs['surface_dist']).all()):
+                print(f'Incorrect values from simulation', file=sys.stderr, flush=True)
                 simulation.sim.close(True)
                 folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
                 mkdir_if_not_exist([folder])
@@ -579,7 +602,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             log['state'].append(next_state_flu)  # t+1
 
             if has_collided:
-                print('Drone has collided')
+                print('Drone has collided', file=sys.stderr, flush=True)
                 break
         else:
             next_state = simulation.quadrotor.forward(dt=dt, state=log['state'][-1], motor=log['motor'][-1])
@@ -641,7 +664,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             pickle.dump(log2, file, protocol=4)
         pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
-        print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', flush=True)
+        print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
+        return True
 
 
 def main():
@@ -656,7 +680,7 @@ def main():
 
     for scene_number in range(args.scene_start, args.scene_stop):
         for flight_number in range(args.fn_start, args.fn_stop):
-            print(f'SCENE_NUMBER={scene_number} | FLIGHT_NUMBER={flight_number}', flush=True)
+            print(f'SCENE_NUMBER={scene_number} | FLIGHT_NUMBER={flight_number}', file=sys.stderr, flush=True)
             has_worked = gen_data(scene_id=MP3_SCENE_LIST[scene_number],
                                   flight_number=flight_number,
                                   same_env=False,
@@ -664,7 +688,7 @@ def main():
                                   plot_topdown=False,
                                   debug=False,
                                   cluster=args.cluster)
-            print(f'\n' * 20, flush=True)
+            print(f'\n' * 20, file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":
