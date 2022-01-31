@@ -19,8 +19,8 @@ dependencies:
 #  - pytorch::torchaudio
 #  - pytorch::cpuonly
   - conda-forge::pytorch-lightning=1.4.9
-  - aihabitat::habitat-sim 
-  - aihabitat::withbullet 
+  - aihabitat::habitat-sim=0.2.0
+  - aihabitat::withbullet
   - aihabitat::headless  # comment for the Mac
   - torchdiffeq
   - tensorboard
