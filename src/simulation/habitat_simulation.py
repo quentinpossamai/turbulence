@@ -665,7 +665,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}'
         mkdir_if_not_exist([folder])
         for name, array in data_generated.items():
-            np.savey(f'{folder}{name}.npy', array.astype(np.float32))
+            np.save(f'{folder}{name}.npy', array.astype(np.float32))
         pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided}, open(f'{folder}stats.pkl', 'wb'))
         print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
         print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
