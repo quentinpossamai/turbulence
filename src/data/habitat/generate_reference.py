@@ -9,7 +9,7 @@ import sys
 from tqdm import tqdm
 from typing import Union
 
-from src.simulation.hatbitat2flu import Habitat2FLU
+from src.data.habitat.hatbitat2flu import Habitat2FLU
 from src.utils.transform import Transform, Rotation
 
 # habitat agent and global reference frame are oriented with x-left, y-up and z-backward.

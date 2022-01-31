@@ -315,7 +315,7 @@ def openLoopValidation(validationOnMultiHarmonic=True, reset=-1,YTrue=None,U_Vn=
     print('NRMSE: ',NRMSE)
     if Option.enablePlot:
         plt.figure()
-        plt.title('open loop simulation from k='+str(openLoopStartingPoint)+" fit="+str(fit))
+        plt.title('open loop habitat from k='+str(openLoopStartingPoint)+" fit="+str(fit))
         y,=plt.plot(logY)
         yr,=plt.plot(logYR)
         et,=plt.plot(np.array(logY)-np.array(logYR))
@@ -334,7 +334,7 @@ for r in reset:
             YtrueToPass=Y_Vn.copy()
         fit,NRMSE,logY,logYR=openLoopValidation(validationOnMultiHarmonic=voM,reset=r,YTrue=YtrueToPass,U_Vn=U_Vn.copy())
         end= time.time()
-        print('elapsed time in simulation:',end-start)
+        print('elapsed time in habitat:',end-start)
         print("validationOnMultiHarmonic:",voM,end=' ')
         print("reset every:",r,end=' ')
         print('fit: ',fit,' NRMSE: ',NRMSE)

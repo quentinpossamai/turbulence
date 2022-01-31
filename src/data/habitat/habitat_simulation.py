@@ -1,7 +1,6 @@
 import argparse
 import cv2
 import habitat_sim
-import lzma
 import magnum
 import numpy as np
 import pickle
@@ -10,10 +9,10 @@ from tqdm import tqdm
 from typing import Dict, Tuple, Any, Union
 
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
-from src.simulation.generate_reference import generate_reference
-from src.simulation.mpc import mpc_controller
-from src.simulation.hatbitat2flu import Habitat2FLU
-from src.utils.paths import WD_PATH, DATA_HABITAT_PATH, mkdir_if_not_exist
+from src.data.habitat.generate_reference import generate_reference
+from src.data.habitat.mpc import mpc_controller
+from src.data.habitat.hatbitat2flu import Habitat2FLU
+from src.utils.paths import WD_PATH, mkdir_if_not_exist
 from src.utils.trajectory import trace_trajectory3d
 from src.utils.transform import Transform
 
@@ -25,8 +24,9 @@ DTYPE = np.float32
 # GLOBAL_FLU is the earth reference frame but turned from HABITAT to FLU
 # GLOBAL is the habitat earth reference frame
 
+DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 MP3_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3_scene_list.pkl', 'rb'))
-SENSORS = []
+GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
 
 
 class Simulation:
@@ -35,7 +35,7 @@ class Simulation:
                  drone_prms: Dict[str, float],
                  gravity: float):
         """
-        Habitat simulation of a quadrotor with ground effect.
+        Habitat habitat of a quadrotor with ground effect.
         
         param scene_path: The path to the .glb scene to load.
 
@@ -43,13 +43,13 @@ class Simulation:
 
         param drone_prms: Parameters of the drone.
 
-        param gravity: Value of the gravity for the simulation.
+        param gravity: Value of the gravity for the habitat.
         """
         self.error_agent = None
         self.g = gravity
         self.drone_prms: Dict[str, float] = drone_prms
 
-        # 1-Initializing the simulation and loading the scene
+        # 1-Initializing the habitat and loading the scene
         backend_cfg = habitat_sim.SimulatorConfiguration()
         backend_cfg.enable_physics = True
         backend_cfg.scene_id = scene_path
@@ -158,7 +158,7 @@ class Simulation:
         error_agent_config.sensor_specifications = [error_rgb_sensor, forward_dist, backward_dist, left_dist,
                                                     right_dist, up_dist, down_dist]
 
-        # Adding the drone to the simulation
+        # Adding the drone to the habitat
         sim = habitat_sim.Simulator(habitat_sim.Configuration(backend_cfg, [agent_config, error_agent_config]))
         sim.set_gravity(np.array([0, -gravity, 0]))
 
@@ -205,7 +205,7 @@ class Simulation:
 
         self.state_ref = None
 
-        # 5-simulation initialisation
+        # 5-habitat initialisation
         # 5.1-Drone model init
         assert self.drone_prms['ix'] == self.drone_prms['iy']
         theta = np.array([self.drone_prms['kt'] / self.drone_prms['m'],
@@ -471,13 +471,13 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     """
     Generate drone data in habitat with ground effect.
 
-    param scene_id: path to a habitat scene. If None simulation.quadrotor will be used as a simulator.
+    param scene_id: path to a habitat scene. If None habitat.quadrotor will be used as a simulator.
 
     param flight_number: The seed to generate the trajectory.
 
     param plot_ref: Boolean to plot the reference for debugging.
 
-    param same_env: Boolean if False use habitat sim for simulation. If True uses the quadrotor model which is the same
+    param same_env: Boolean if False use habitat sim for habitat. If True uses the quadrotor model which is the same
     as the model use for MPC. Useful for debugging.
 
     param plot_topdown: If true will plot topdown view when generating the trajectory.
@@ -525,7 +525,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         return False
 
-    # simulation.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
+    # habitat.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
 
     def mpc_model(_state, _u):
         _next_state = simulation.quadrotor.forward(state=_state, motor=_u, dt=dt)
@@ -588,7 +588,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             next_state_flu, obs, has_collided, ground_effect = out
             if (not np.isfinite(next_state_flu).all() or not np.isfinite(ground_effect).all() or
                     not np.isfinite(obs['surface_dist']).all()):
-                print(f'Incorrect values from simulation', file=sys.stderr, flush=True)
+                print(f'Incorrect values from habitat', file=sys.stderr, flush=True)
                 simulation.sim.close(True)
                 folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
                 mkdir_if_not_exist([folder])
@@ -636,7 +636,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         ang_vel_error = ((data_generated['state'][:, 10:13] - state_mpc[:, 10:13]) ** 2)
         if same_env:
             assert position_error == 0 and quat_error == 0 and lin_vel_error == 0 and ang_vel_error == 0
-        # MPC model FLU vs FLU reference | Does the mpc has a good model vs simulation environment ?
+        # MPC model FLU vs FLU reference | Does the mpc has a good model vs habitat environment ?
         trace_trajectory3d(state_mpc[:, 0:3], state_mpc[:, 3:7], 1e-4, step=1,
                            position_ref=state_ref_flu[:time_end, :3])
 
@@ -662,7 +662,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         import time
         tic = time.time()
         print(f'Saving', file=sys.stderr, flush=True)
-        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}'
+        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}/'
         mkdir_if_not_exist([folder])
         for name, array in data_generated.items():
             np.save(f'{folder}{name}.npy', array.astype(np.float32))
