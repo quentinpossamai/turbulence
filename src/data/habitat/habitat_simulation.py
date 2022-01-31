@@ -489,6 +489,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # from src.utils.profiler import profiler
     # profiler()
     # Initialise drone
+    folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}/'
+
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
     g = 9.81
@@ -522,7 +524,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         simulation.sim.close(True)
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
-        pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
+        pickle.dump({'done': None}, open(f'{folder}stats.pkl', 'wb'))
         return False
 
     # habitat.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
@@ -548,7 +550,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     data_collected = {'state': [state_ref_flu[0]],  # flu
                       'motor': [],
                       'mpc_error': [],
-                      'camera': [obs['left_camera']],
+                      'rgb': [obs['left_camera']],
                       'depth': [obs['left_depth_camera']],
                       'surface_dist': [obs["surface_dist"][0]],
                       'ground_force': []}
@@ -574,9 +576,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         except ValueError:
             print(f'Drone diverged', file=sys.stderr, flush=True)
             simulation.sim.close(True)
-            folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
             mkdir_if_not_exist([folder])
-            pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
+            pickle.dump({'done': None}, open(f'{folder}stats.pkl', 'wb'))
             return False
         data_collected['motor'].append(motor_horizon[0])  # t to compute t+1
         data_collected['mpc_error'].append(err)  # t to compute t+1
@@ -590,14 +591,13 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                     not np.isfinite(obs['surface_dist']).all()):
                 print(f'Incorrect values from habitat', file=sys.stderr, flush=True)
                 simulation.sim.close(True)
-                folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
                 mkdir_if_not_exist([folder])
-                pickle.dump({'done': None}, open(f'{folder}{flight_number}_stats.pkl', 'wb'))
+                pickle.dump({'done': None}, open(f'{folder}stats.pkl', 'wb'))
                 return False
 
             data_collected['ground_force'].append(ground_effect)  # t used to compute t+1
             # t+1
-            data_collected['camera'].append(obs['left_camera'])  # t+1
+            data_collected['rgb'].append(obs['left_camera'])  # t+1
             data_collected['depth'].append(obs['left_depth_camera'])  # t+1
             data_collected['surface_dist'].append(obs['surface_dist'][0])  # t+1
             data_collected['state'].append(next_state_flu)  # t+1
@@ -662,7 +662,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         import time
         tic = time.time()
         print(f'Saving', file=sys.stderr, flush=True)
-        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}/'
         mkdir_if_not_exist([folder])
         for name, array in data_generated.items():
             np.save(f'{folder}{name}.npy', array.astype(np.float32))
