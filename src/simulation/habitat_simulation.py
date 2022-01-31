@@ -661,8 +661,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
 
-        # with lzma.open(f'{folder}{flight_number}.xz', 'wb') as file:
-        pickle.dump(log2, open(f'{folder}{flight_number}.pkl', 'wb'), protocol=4)
+        with lzma.open(f'{folder}{flight_number}.xz', 'wb') as file:
+            pickle.dump(log2, file, protocol=4)
         pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided},
                     open(f'{folder}{flight_number}_stats.pkl', 'wb'))
         print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
