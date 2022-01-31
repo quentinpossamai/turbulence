@@ -657,6 +657,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # Saving
     # dict_keys(['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force'])
     if not debug:
+        print(f'Saving', file=sys.stderr, flush=True)
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
 
