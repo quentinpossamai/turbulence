@@ -513,7 +513,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     else:
         scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
-    camera_resolution = np.array([480, 752])
+    camera_resolution = np.array([480, 640])
     simulation = Simulation(scene_path=scene_path, camera_resolution=camera_resolution, drone_prms=drone_prms,
                             gravity=g)
     has_worked = simulation.generate_reference_procedurally(uniform_speed=1, plot_topdown=plot_topdown, dt=dt,
