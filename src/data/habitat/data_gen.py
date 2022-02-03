@@ -443,7 +443,7 @@ class Simulation:
         else:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
             ground_force[2] = np.clip(np.sum(motor) ** 2 * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
-                                      a_min=0, a_max=0.1 * self.drone_prms['m'] * self.g)
+                                      a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
         # # Debug plot
         # motor = np.array([150, 150, 150, 150])
         # z = np.linspace(1e-8, 0.1, 1000)
@@ -524,7 +524,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         simulation.sim.close(True)
         folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
-        pickle.dump({'done': None}, open(f'{folder}stats.pkl', 'wb'))
+        pickle.dump({'done': None, 'info': 'no_trajectory'}, open(f'{folder}stats.pkl', 'wb'))
         return False
 
     # habitat.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
@@ -547,13 +547,13 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # Initializing flight in habitat
     # Sensing
     obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
-    data_collected = {'state': [state_ref_flu[0]],  # flu
-                      'motor': [],
-                      'mpc_error': [],
-                      'rgb': [obs['left_camera']],
-                      'depth': [obs['left_depth_camera']],
-                      'surface_dist': [obs["surface_dist"][0]],
-                      'ground_force': []}
+    data_collection = {'state': [state_ref_flu[0]],  # flu
+                       'motor': [],
+                       'mpc_error': [],
+                       'rgb': [obs['left_camera']],
+                       'depth': [obs['left_depth_camera']],
+                       'surface_dist': [obs["surface_dist"][0]],
+                       'ground_force': []}
 
     time_end = len(simulation.state_ref) - horizon_pred + 1
 
@@ -567,7 +567,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         try:
             motor_horizon, err = mpc_controller(model=mpc_model,
                                                 state_ref=state_ref_flu[i:i + horizon_pred],
-                                                state0=data_collected['state'][-1],
+                                                state0=data_collection['state'][-1],
                                                 u0=motor_horizon,
                                                 horizon_cmd=horizon_cmd,
                                                 horizon_pred=horizon_pred,
@@ -577,41 +577,40 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             print(f'Drone diverged', file=sys.stderr, flush=True)
             simulation.sim.close(True)
             mkdir_if_not_exist([folder])
-            pickle.dump({'done': None}, open(f'{folder}stats.pkl', 'wb'))
+            pickle.dump({'done': None, 'info': 'diverged'}, open(f'{folder}stats.pkl', 'wb'))
             return False
-        data_collected['motor'].append(motor_horizon[0])  # t to compute t+1
-        data_collected['mpc_error'].append(err)  # t to compute t+1
+        data_collection['motor'].append(motor_horizon[0])  # t to compute t+1
+        data_collection['mpc_error'].append(err)  # t to compute t+1
 
         # Simulating result
         if not same_env:
-            out = simulation.one_step_sim(dt=dt, state=data_collected['state'][-1], motor=data_collected['motor'][-1],
-                                          z=data_collected['surface_dist'][-1])
+            out = simulation.one_step_sim(dt=dt, state=data_collection['state'][-1], motor=data_collection['motor'][-1],
+                                          z=data_collection['surface_dist'][-1])
             next_state_flu, obs, has_collided, ground_effect = out
             if (not np.isfinite(next_state_flu).all() or not np.isfinite(ground_effect).all() or
                     not np.isfinite(obs['surface_dist']).all()):
                 print(f'Incorrect values from habitat', file=sys.stderr, flush=True)
                 simulation.sim.close(True)
                 mkdir_if_not_exist([folder])
-                pickle.dump({'done': None}, open(f'{folder}stats.pkl', 'wb'))
+                pickle.dump({'done': None, 'info': 'nan'}, open(f'{folder}stats.pkl', 'wb'))
                 return False
 
-            data_collected['ground_force'].append(ground_effect)  # t used to compute t+1
-            # t+1
-            data_collected['rgb'].append(obs['left_camera'])  # t+1
-            data_collected['depth'].append(obs['left_depth_camera'])  # t+1
-            data_collected['surface_dist'].append(obs['surface_dist'][0])  # t+1
-            data_collected['state'].append(next_state_flu)  # t+1
+            data_collection['ground_force'].append(ground_effect)  # t used to compute t+1
+            data_collection['rgb'].append(obs['left_camera'])  # t+1
+            data_collection['depth'].append(obs['left_depth_camera'])  # t+1
+            data_collection['surface_dist'].append(obs['surface_dist'][0])  # t+1
+            data_collection['state'].append(next_state_flu)  # t+1
 
             if has_collided:
                 print('Drone has collided', file=sys.stderr, flush=True)
                 break
         else:
-            next_state = simulation.quadrotor.forward(dt=dt, state=data_collected['state'][-1],
-                                                      motor=data_collected['motor'][-1])
-            data_collected['state'].append(next_state)
+            next_state = simulation.quadrotor.forward(dt=dt, state=data_collection['state'][-1],
+                                                      motor=data_collection['motor'][-1])
+            data_collection['state'].append(next_state)
     simulation.sim.close(True)
     data_generated = {}
-    for key, val in data_collected.items():
+    for key, val in data_collection.items():
         if len(val) != 0:
             data_generated[key] = np.stack(val, axis=0)
 
@@ -665,7 +664,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         mkdir_if_not_exist([folder])
         for name, array in data_generated.items():
             np.save(f'{folder}{name}.npy', array.astype(np.float32))
-        pickle.dump({'done': i + 1, 'length': time_end, 'has_collided': has_collided}, open(f'{folder}stats.pkl', 'wb'))
+        info = 'collided' if has_collided else None
+        pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{folder}stats.pkl', 'wb'))
         print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
         print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
         return True
@@ -689,7 +689,7 @@ def main():
                                   same_env=False,
                                   plot_ref=False,
                                   plot_topdown=False,
-                                  debug=False,
+                                  debug=True,
                                   cluster=args.cluster)
             print(f'\n' * 20, file=sys.stderr, flush=True)
 
