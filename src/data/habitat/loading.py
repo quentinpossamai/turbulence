@@ -4,6 +4,9 @@ import pickle
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+import torchvision.transforms as transforms
+import torchvision.transforms.functional as f
+
 from typing import Dict, Tuple, Any, Union, List
 
 from src.utils.paths import WD_PATH
@@ -36,7 +39,7 @@ def build_index_valid_flight():
         try:
             folders = next(os.walk(f'{SCENE_PATH}{scene_name}/flight/'))[1]
         except StopIteration:
-            index[scene_number] = None
+            index[scene_number] = {}
             continue
         index[scene_number] = {}
         flight_list = np.sort(np.array(folders).astype(int))
@@ -52,7 +55,7 @@ def build_index_valid_flight():
     pickle.dump(index, open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'wb'))
 
 
-class HabitatDataset(Dataset):
+class ResidualDataset(Dataset):
     def __init__(self, train_valid_test: str, past: int):
         build_index_valid_flight()
         assert train_valid_test in ['train', 'valid', 'test']
@@ -61,7 +64,7 @@ class HabitatDataset(Dataset):
         assert isinstance(past, int)
         self.past = past
 
-        self.valid_index: Dict[Dict, List[int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
+        self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
 
         if self.train_valid_test == 'train':
             include = TRAIN
@@ -72,7 +75,7 @@ class HabitatDataset(Dataset):
             include = TEST
         self.index = {}
         for i in include:
-            if self.valid_index[i] is not None:
+            if self.valid_index[i] != {}:
                 self.index[i] = self.valid_index[i]
         self.index: Dict[int, Dict[int, int]]
 
@@ -96,6 +99,30 @@ class HabitatDataset(Dataset):
                 'ground_force': torch.from_numpy(load_file('ground_force', scene_number, flight_number)[stop - 1])}
 
 
+class EmbeddingDataset(Dataset):
+    def __init__(self):
+        build_index_valid_flight()
+        self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
+
+        self.len = np.sum([1 for scene_traj in self.valid_index.values() for _ in scene_traj.values()])
+        self.path = []
+        i = 0
+        for scene_number, scene_trajectories in self.valid_index.items():
+            for flight_number, traj_len in scene_trajectories.items():
+                self.path.append([scene_number, flight_number])
+                i += 1
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, i):
+        scene_number, flight_number = self.path[i]
+        depth = torch.from_numpy(load_file('depth', scene_number, flight_number))
+        depth_dim = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
+        print(f'scene_number: {scene_number} - flight_number: {flight_number} - max_depth: {torch.max(depth)}')
+        return {'depth': depth_dim}
+
+
 def main():
     # build_index_valid_flight()
     # dataset = HabitatDataset('train', 40)
@@ -105,28 +132,9 @@ def main():
     #     a = dataset[i]['state'] * dataset[i+1]['state']
     # print(f'train {time.time() - tic}')
 
-    dataset = HabitatDataset('valid', 40)
-    import time
-    tic = time.time()
-    for i in range(len(dataset) - 1):
-        a = dataset[i]['state'] * dataset[i + 1]['state']
-    print(f'valid {time.time() - tic}')
-
-    # dataset = HabitatDataset('test', 40)
-    # import time
-    # tic = time.time()
-    # for i in range(len(dataset) - 1):
-    #     a = dataset[i]['state'] * dataset[i + 1]['state']
-    # print(f'test {time.time() - tic}')
-    # print()
-    # ground_effect = load_trajectory('ground_force', 0, 0)
-    # import matplotlib.pyplot as plt
-    # plt.plot(ground_effect[:, 2])
-    # pose = load_trajectory('state', 0, 0)
-    #
-    # trace_trajectory3d(pose[:, :3], pose[:, 3:7], 1e-4, 1)
-    # plt.grid()
-    # print()
+    dataset = EmbeddingDataset()
+    for i in range(len(dataset)):
+        dataset[i]
 
 
 if __name__ == '__main__':
