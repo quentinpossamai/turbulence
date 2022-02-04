@@ -11,10 +11,7 @@ from src.utils.paths import WD_PATH
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
 GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
-if torch.cuda.is_available():
-    SCENE_PATH = f'/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/'
-else:
-    SCENE_PATH = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
+SCENE_PATH = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
 
 SPLIT = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_split.pkl', 'rb'))
 
