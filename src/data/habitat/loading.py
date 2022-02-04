@@ -119,7 +119,8 @@ class EmbeddingDataset(Dataset):
         scene_number, flight_number = self.path[i]
         depth = torch.from_numpy(load_file('depth', scene_number, flight_number))
         depth_dim = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
-        print(f'scene_number: {scene_number} - flight_number: {flight_number} - max_depth: {torch.max(depth)}')
+        print(f'scene_number: {scene_number} - flight_number: {flight_number} - max_depth: {torch.max(depth)}',
+              flush=True)
         return {'depth': depth_dim}
 
 
@@ -131,10 +132,12 @@ def main():
     # for i in range(len(dataset)-1):
     #     a = dataset[i]['state'] * dataset[i+1]['state']
     # print(f'train {time.time() - tic}')
-
+    from tqdm import tqdm
+    print('Instanciating dataset', flush=True)
     dataset = EmbeddingDataset()
-    for i in range(len(dataset)):
-        dataset[i]
+    print('Computing max depth', flush=True)
+    for i in tqdm(range(len(dataset))):
+        a = dataset[i]
 
 
 if __name__ == '__main__':
