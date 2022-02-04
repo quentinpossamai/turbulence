@@ -32,7 +32,7 @@ print(f'GPU_COUNT={GPU_COUNT}')
 def main():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
-    parser.add_argument('--batch_size', default=64, type=int, help='Size of a batch')
+    parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch')
     parser.add_argument('--load_weights', default=None, type=str, help='Path to previous weights')
     residual_model_class = VariantA
     parser = residual_model_class.add_model_specific_args(parser)  # Module args
@@ -52,7 +52,7 @@ def main():
               'past': args.past,
               'unit_size': args.unit_size}
     version = f'{now}'
-    training_path = SAVING_PATH + f'{residual_model_class.__name__}/'
+    training_path = f'{SAVING_PATH}{residual_model_class.__name__}/{version}/'
     mkdir_if_not_exist([training_path])
     pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
     print(f'training_path={training_path}')
@@ -87,7 +87,7 @@ def main():
         run = residual_model_class(activation=args.activation,
                                    learning_rate=args.lr,
                                    model=quadrotor,
-                                   motor_size=6,
+                                   motor_size=motor_size,
                                    past=args.past,
                                    unit_size=args.unit_size)
     else:
@@ -96,7 +96,7 @@ def main():
                                                         activation=args.activation,
                                                         learning_rate=args.lr,
                                                         model=quadrotor,
-                                                        motor_size=6,
+                                                        motor_size=motor_size,
                                                         past=args.past,
                                                         unit_size=args.unit_size)
 
@@ -106,14 +106,14 @@ def main():
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
-                            pin_memory=True,
+                            pin_memory=False,
                             drop_last=True)
 
-    validation_data = DataLoader(HabitatDataset('validation', past=args.past),
+    validation_data = DataLoader(HabitatDataset('valid', past=args.past),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
-                                 pin_memory=True,
+                                 pin_memory=False,
                                  drop_last=True)
 
     trainer = pl.Trainer(gpus=GPU_COUNT,
@@ -129,4 +129,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # TODO LAUNCH IN LOCAL
     main()

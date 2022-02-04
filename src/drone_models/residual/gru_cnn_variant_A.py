@@ -1,18 +1,22 @@
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
-from typing import Optional, Callable, Tuple
+from typing import Union, Callable, Tuple
 
 from src.drone_models.model_structure import Run
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 
 
 class FullyConnected(nn.Module):
-    def __init__(self, activation: Callable, dropout_p: float, in_features: int, out_features: int, bias: bool = True):
+    def __init__(self, activation: Union[Callable, None], dropout_p: float, in_features: int, out_features: int,
+                 bias: bool = True):
         super().__init__()
         self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=bias)
         self.batch_norm = nn.BatchNorm1d(out_features)
-        self.activation = activation
+        if activation is None:
+            self.activation = lambda x: x
+        else:
+            self.activation = activation
         self.dropout = nn.Dropout(p=dropout_p)
 
     def forward(self, x):
@@ -44,7 +48,7 @@ class VariantA(pl.LightningModule, Run):
         parser = parent_parser.add_argument_group("VariantA")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
-        parser.add_argument('--past', default=60, type=int, help="Number of past information to take in the model")
+        parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
         return parent_parser
 
@@ -87,7 +91,7 @@ class VariantA(pl.LightningModule, Run):
         self.unit_size = unit_size
 
         self.depth_input_size = [1, 480, 640]
-        self.feature_size = self.motor_size + 13 + 1
+        self.feature_size = self.motor_size + 13
 
         # self.save_hyperparameters()  # TODO ?
 
@@ -102,12 +106,18 @@ class VariantA(pl.LightningModule, Run):
         # self.depth_input_drop = nn.Dropout2d(0.2)
 
         self.depth_conv2d_0 = Conv2D(self.activation, 0.5, True, 1, 16, (7, 7), 1, 3)
+        self.depth_pool_0 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_1 = Conv2D(self.activation, 0.5, True, 16, 32, (3, 3), 1)
+        self.depth_pool_1 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_2 = Conv2D(self.activation, 0.5, True, 32, 64, (3, 3), 2)
+        self.depth_pool_2 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_3 = Conv2D(self.activation, 0.5, True, 64, 64, (3, 3), 1)
+        self.depth_pool_3 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_4 = Conv2D(self.activation, 0.5, True, 64, 32, (3, 3), 2)
+        self.depth_pool_4 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_5 = Conv2D(self.activation, 0.5, True, 32, 4, (3, 3), 1)
-        self.depth_emb_linear = FullyConnected(nn.Identity, dropout_p=0.5, in_features=9999999, out_features=128)
+        self.depth_pool_5 = nn.MaxPool2d((2, 2))
+        self.depth_emb_linear = FullyConnected(None, dropout_p=0.5, in_features=4 * 13 * 18, out_features=128)
         # Time reduction
         self.depth_gru = nn.GRU(input_size=128, hidden_size=128, num_layers=3, batch_first=True)
         self.depth_gru_norm = nn.BatchNorm1d(128)
@@ -116,11 +126,11 @@ class VariantA(pl.LightningModule, Run):
         # - reg (regression) branch
         self.reg_fc_0 = FullyConnected(self.activation, 0.5, 128, 50)
         self.reg_fc_1 = FullyConnected(self.activation, 0.5, 50, 50)
-        self.reg_linear_out = FullyConnected(nn.Identity, 0, 50, 1)
+        self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
-        self.example_input_array = [torch.zeros(10, self.past, self.motor_size),
-                                    torch.zeros(10, self.past, 13),
-                                    torch.zeros(10, self.past, 480, 640)]
+        self.example_input_array = [torch.zeros(2, self.motor_size),
+                                    torch.zeros(2, 13),
+                                    torch.zeros(2, self.past, 480, 640)]
 
     def configure_optimizers(self):
         print(f"Lightning.device: {self.device}", flush=True)
@@ -154,15 +164,22 @@ class VariantA(pl.LightningModule, Run):
         sm_out = self.sm_fc_out(out)
 
         # - depth branch
-        out = self.depth_input_norm(depth.unsqueeze(-3))
+        star_shape = list(depth.shape[:-3])
+        out = self.depth_input_norm(depth.reshape((-1, 1, 480, 640)))
         out = self.depth_conv2d_0(out)
+        out = self.depth_pool_0(out)
         out = self.depth_conv2d_1(out)
+        out = self.depth_pool_1(out)
         out = self.depth_conv2d_2(out)
+        # out = self.depth_pool_2(out)
         out = self.depth_conv2d_3(out)
+        # out = self.depth_pool_3(out)
         out = self.depth_conv2d_4(out)
+        # out = self.depth_pool_4(out)
         out = self.depth_conv2d_5(out)
-        out = self.depth_emb_linear(out)
-        out, _ = self.depth_gru(out)  # gru output with shape: (*, step, feature_size)
+        out = self.depth_pool_5(out)
+        out = self.depth_emb_linear(out.reshape((out.shape[0], -1)))
+        out, _ = self.depth_gru(out.reshape((-1, self.past, 128)))  # gru output with shape: (*, step, feature_size)
         out = out[..., -1, :]  # last hidden states, (*, feature_size)
         depth_out = self.depth_gru_dropout(self.depth_gru_norm(out))  # (batch, feature_size)
 
