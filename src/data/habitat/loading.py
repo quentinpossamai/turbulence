@@ -46,9 +46,9 @@ def build_index_valid_flight():
                 mpc_error = load_file('mpc_error', scene_number, flight_number)
                 if (mpc_error < 5).all() and len(mpc_error) >= 200:
                     index[scene_number][flight_number] = len(mpc_error)
-    print(f'MP3D_SCENE_LIST: {MP3D_SCENE_LIST}')
-    print(f'SCENE_PATH: {SCENE_PATH}')
-    print(f'index: {index}')
+    # print(f'MP3D_SCENE_LIST: {MP3D_SCENE_LIST}')
+    # print(f'SCENE_PATH: {SCENE_PATH}')
+    # print(f'index: {index}')
     pickle.dump(index, open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'wb'))
 
 
