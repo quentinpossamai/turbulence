@@ -199,7 +199,7 @@ class VariantA(pl.LightningModule, Run):
         return: Loss
         """
         residual_hat = self.forward(motor=batch['motor'], state=batch['state'], depth=batch['depth'])
-        residual_gt = batch["residual"]
+        residual_gt = batch["ground_force"]
 
         loss = (residual_gt - residual_hat) ** 2
         return loss.mean()
