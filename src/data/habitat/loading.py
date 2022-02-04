@@ -88,7 +88,7 @@ class HabitatDataset(Dataset):
 
     def __getitem__(self, i):
         scene_number, flight_number, start, stop = self.path[i]
-        return {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1], ),
+        return {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1]),
                 'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1]),
                 'depth': torch.from_numpy(load_file('depth', scene_number, flight_number)[start:stop]),
                 'ground_force': torch.from_numpy(load_file('ground_force', scene_number, flight_number)[stop - 1])}
