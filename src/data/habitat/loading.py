@@ -4,7 +4,7 @@ import pickle
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
-from typing import Dict, Tuple, Any, Union
+from typing import Dict, Tuple, Any, Union, List
 
 from src.data.habitat.data_gen import GEN_DATA_KEY, DATA_HABITAT_PATH, MP3_SCENE_LIST
 from src.utils.trajectory import trace_trajectory3d
@@ -59,7 +59,7 @@ class HabitatDataset(Dataset):
         assert isinstance(past, int)
         self.past = past
 
-        valid_index = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
+        self.valid_index: Dict[Dict, List[int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
 
         if self.train_valid_test == 'train':
             include = TRAIN
@@ -70,8 +70,8 @@ class HabitatDataset(Dataset):
             include = TEST
         self.index = {}
         for i in include:
-            if valid_index[i] is not None:
-                self.index[i] = valid_index[i]
+            if self.valid_index[i] is not None:
+                self.index[i] = self.valid_index[i]
         self.index: Dict[int, Dict[int, int]]
 
         self.len = np.sum([e - self.past for val in self.index.values() for e in val.values()])
@@ -95,15 +95,28 @@ class HabitatDataset(Dataset):
 
 
 def main():
-    build_index_valid_flight()
-    dataset = HabitatDataset('train', 20)
+    # build_index_valid_flight()
+    # dataset = HabitatDataset('train', 40)
+    # import time
+    # tic = time.time()
+    # for i in range(len(dataset)-1):
+    #     a = dataset[i]['state'] * dataset[i+1]['state']
+    # print(f'train {time.time() - tic}')
+
+    dataset = HabitatDataset('valid', 40)
     import time
     tic = time.time()
-    for i in range(len(dataset)-1):
-        a = dataset[i]['state'] * dataset[i+1]['state']
-    print(f'{time.time() - tic}')
+    for i in range(len(dataset) - 1):
+        a = dataset[i]['state'] * dataset[i + 1]['state']
+    print(f'valid {time.time() - tic}')
 
-    print()
+    # dataset = HabitatDataset('test', 40)
+    # import time
+    # tic = time.time()
+    # for i in range(len(dataset) - 1):
+    #     a = dataset[i]['state'] * dataset[i + 1]['state']
+    # print(f'test {time.time() - tic}')
+    # print()
     # ground_effect = load_trajectory('ground_force', 0, 0)
     # import matplotlib.pyplot as plt
     # plt.plot(ground_effect[:, 2])

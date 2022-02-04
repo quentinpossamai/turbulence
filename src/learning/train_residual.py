@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
-from src.data.habitat.loading import HabitatDataset
+from src.data.habitat.loading import HabitatDataset, MP3_SCENE_LIST
 from src.drone_models.residual.gru_cnn_variant_A import VariantA
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
@@ -39,8 +39,14 @@ def main():
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 
+    for name in ['train', 'valid', 'test']:
+        dataset_stats = HabitatDataset(name, args.past)
+        print(name)
+        for scene_number, scene_traj in dataset_stats.index.items():
+            print(f'{scene_number} - {MP3_SCENE_LIST[scene_number]}: {scene_traj}')
+        print('\n\n')
+
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-    # TODO Create a yaml to save hyperparameters and loss ? pkl ?
     motor_size = 4
     h_prms = {'time_start': now,  # hyperparameters
               'name': residual_model_class.__name__,
@@ -100,7 +106,7 @@ def main():
                                                         past=args.past,
                                                         unit_size=args.unit_size)
 
-    num_workers = 12 if GPU_COUNT else 0
+    num_workers = 12 if GPU_COUNT else 8
     # Datasets
     train_data = DataLoader(HabitatDataset('train', past=args.past),
                             batch_size=args.batch_size,
