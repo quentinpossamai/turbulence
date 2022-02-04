@@ -9,7 +9,7 @@ from typing import Dict, Tuple, Any, Union, List
 from src.utils.paths import WD_PATH
 
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
-MP3_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
+MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
 GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
 if torch.cuda.is_available():
     SCENE_PATH = f'/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/'
@@ -24,7 +24,7 @@ TEST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_test.pkl', 'rb'))
 
 
 def load_file(name: str, scene_number: int, flight_number: int):
-    scene_id = MP3_SCENE_LIST[scene_number]
+    scene_id = MP3D_SCENE_LIST[scene_number]
     folder = f'{SCENE_PATH}{scene_id}/flight/{flight_number}/'
     assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force']
     if name == 'stats':
@@ -34,8 +34,8 @@ def load_file(name: str, scene_number: int, flight_number: int):
 
 
 def build_index_valid_flight():
-    index = {i: None for i in range(len(MP3_SCENE_LIST))}
-    for scene_number, scene_name in enumerate(MP3_SCENE_LIST):
+    index = {i: None for i in range(len(MP3D_SCENE_LIST))}
+    for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
         try:
             folders = next(os.walk(f'{SCENE_PATH}{scene_name}/flight/'))[1]
         except StopIteration:
@@ -49,6 +49,9 @@ def build_index_valid_flight():
                 mpc_error = load_file('mpc_error', scene_number, flight_number)
                 if (mpc_error < 5).all() and len(mpc_error) >= 200:
                     index[scene_number][flight_number] = len(mpc_error)
+    print(f'MP3D_SCENE_LIST: {MP3D_SCENE_LIST}')
+    print(f'SCENE_PATH: {SCENE_PATH}')
+    print(f'index: {index}')
     pickle.dump(index, open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'wb'))
 
 

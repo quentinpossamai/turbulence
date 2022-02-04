@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
-from src.data.habitat.loading import HabitatDataset, MP3_SCENE_LIST
+from src.data.habitat.loading import HabitatDataset, MP3D_SCENE_LIST
 from src.drone_models.residual.gru_cnn_variant_A import VariantA
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
@@ -43,7 +43,7 @@ def main():
         dataset_stats = HabitatDataset(name, args.past)
         print(name)
         for scene_number, scene_traj in dataset_stats.index.items():
-            print(f'{scene_number} - {MP3_SCENE_LIST[scene_number]}: {scene_traj}')
+            print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
         print('\n\n')
 
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
