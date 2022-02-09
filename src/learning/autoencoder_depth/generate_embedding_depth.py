@@ -119,7 +119,7 @@ def main_habitat():
 
     dataloader = DataLoader(habitat.HabitatEmbeddingDataset(), batch_size=1,
                             shuffle=False,
-                            num_workers=0 if torch.cuda.is_available() else 0,
+                            num_workers=12 if torch.cuda.is_available() else 0,
                             pin_memory=False)
 
     with torch.no_grad():
