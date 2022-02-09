@@ -122,23 +122,23 @@ def main_habitat():
                             num_workers=12 if torch.cuda.is_available() else 8,
                             pin_memory=False)
 
-    model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
-    try:
-        state_dict = torch.load(
-            # f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
-            # f"/home/qpossamai/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
-            f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/{args.name}.nn",
-            map_location=device)
-    except FileNotFoundError:
-        state_dict = torch.load(
-            # f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
-            f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
-            map_location=device)
-
-    model.load_state_dict(state_dict)
-    model.eval()
-
     with torch.no_grad():
+        model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
+        try:
+            state_dict = torch.load(
+                # f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
+                # f"/home/qpossamai/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
+                f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/{args.name}.nn",
+                map_location=device)
+        except FileNotFoundError:
+            state_dict = torch.load(
+                # f"/Users/steevenjanny/Desktop/turbulence/src/autoencoder_depth/trained_models/CoPhy_Like/{args.name}.nn",
+                f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/{args.name}.nn",
+                map_location=device)
+
+        model.load_state_dict(state_dict)
+        model.eval()
+
         for i, trajectory in enumerate(tqdm(dataloader)):
             depthmap_gt = trajectory['depth'].to(device)[0].unsqueeze(1)
 
