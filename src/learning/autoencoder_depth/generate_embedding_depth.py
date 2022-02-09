@@ -140,14 +140,15 @@ def main_habitat():
         model.eval()
 
         for i, trajectory in enumerate(tqdm(dataloader)):
-            depthmap_gt = trajectory['depth'].to(device)[0].unsqueeze(1)
+            depthmap = trajectory['depth'].to(device)[0].unsqueeze(1)
 
-            depth_emb = np.empty((len(depthmap_gt), 128), dtype=np.float32) * np.nan
-            depth_mse = np.empty((len(depthmap_gt)), dtype=np.float32) * np.nan
-            depth_gradmse = np.empty((len(depthmap_gt)), dtype=np.float32) * np.nan
+            depth_emb = np.empty((len(depthmap), 128), dtype=np.float32) * np.nan
+            depth_mse = np.empty((len(depthmap)), dtype=np.float32) * np.nan
+            depth_gradmse = np.empty((len(depthmap)), dtype=np.float32) * np.nan
 
-            for j, _ in enumerate(depthmap_gt):
-                out = model(depthmap_gt[j:j+1])  # feature, output
+            for j, depthmap_gt in enumerate(depthmap):
+                depthmap_gt = depthmap_gt.unsqueeze(0)
+                out = model(depthmap_gt)  # feature, output
                 embedding, depthmap_hat = out['feature'], out['output']
                 sce_num, flight_number = trajectory['name']
                 sce_num = sce_num.item()
@@ -155,8 +156,8 @@ def main_habitat():
                 folder = f'{habitat.MP3D_DATA}{habitat.MP3D_SCENE_LIST[sce_num]}/flight/{flight_number}/depth_emb/'
                 paths.mkdir_if_not_exist([folder])
 
-                mse_normal = MSE(depthmap_gt[j:j+1], depthmap_hat[j:j+1])
-                mse_grad = MSE(compute_grad(depthmap_gt[j:j+1]), compute_grad(depthmap_hat[j:j+1]))
+                mse_normal = MSE(depthmap_gt, depthmap_hat)
+                mse_grad = MSE(compute_grad(depthmap_gt), compute_grad(depthmap_hat))
 
                 # store
                 depth_emb[j] = embedding[j].cpu().detach().numpy().astype(np.float32)
