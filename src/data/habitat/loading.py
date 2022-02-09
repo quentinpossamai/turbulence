@@ -26,9 +26,12 @@ TEST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_test.pkl', 'rb'))
 def load_file(name: str, scene_number: int, flight_number: int):
     scene_id = MP3D_SCENE_LIST[scene_number]
     folder = f'{MP3D_DATA}{scene_id}/flight/{flight_number}/'
-    assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force']
+    assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
+                    'depth_emb', 'norm_emb']
     if name == 'stats':
         return pickle.load(open(f'{folder}stats.pkl', 'rb'))
+    elif name in ['depth_emb', 'norm_emb']:
+        return np.load(f'{folder}{name}/{name}.npy', mmap_mode='r', allow_pickle=False)
     else:
         return np.load(f'{folder}{name}.npy', mmap_mode='r', allow_pickle=False)
 
@@ -56,7 +59,7 @@ def build_index_valid_flight():
 
 
 class ResidualDataset(Dataset):
-    def __init__(self, train_valid_test: str, past: int):
+    def __init__(self, train_valid_test: str, past: int, load_depth: bool, load_depth_emb: bool, load_norm_emb: bool):
         build_index_valid_flight()
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -88,15 +91,28 @@ class ResidualDataset(Dataset):
                     self.path.append([scene_number, flight_number, j - self.past, j])
                     i += 1
 
+        self.load_depth = load_depth
+        self.load_depth_emb = load_depth_emb
+        self.load_norm_emb = load_norm_emb
+        self.depth_list = []
+        if self.load_depth:
+            self.depth_list.append('depth')
+        if self.load_depth_emb:
+            self.depth_list.append('depth_emb')
+        if self.load_norm_emb:
+            self.depth_list.append('norm_emb')
+
     def __len__(self):
         return self.len
 
-    def __getitem__(self, i):
+    def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
         scene_number, flight_number, start, stop = self.path[i]
-        return {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1]),
-                'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1]),
-                'depth': torch.from_numpy(load_file('depth', scene_number, flight_number)[start:stop]),
-                'ground_force': torch.from_numpy(load_file('ground_force', scene_number, flight_number)[stop - 1])}
+        to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1]),
+                     'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1]),
+                     'ground_force': torch.from_numpy(load_file('ground_force', scene_number, flight_number)[stop - 1])}
+        for key in self.depth_list:
+            to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop]),
+        return to_return
 
 
 class HabitatEmbeddingDataset(Dataset):
