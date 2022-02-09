@@ -149,7 +149,7 @@ def main_habitat():
             for j, depthmap_gt in enumerate(depthmap):
                 depthmap_gt = depthmap_gt.unsqueeze(0)
                 out = model(depthmap_gt)  # feature, output
-                embedding, depthmap_hat = out['feature'], out['output']
+                embedding, depthmap_hat = out['feature'][0], out['output']
                 sce_num, flight_number = trajectory['name']
                 sce_num = sce_num.item()
                 flight_number = flight_number.item()
@@ -160,7 +160,7 @@ def main_habitat():
                 mse_grad = MSE(compute_grad(depthmap_gt), compute_grad(depthmap_hat))
 
                 # store
-                depth_emb[j] = embedding[j].cpu().detach().numpy().astype(np.float32)
+                depth_emb[j] = embedding.cpu().detach().numpy().astype(np.float32)
                 depth_mse[j] = mse_normal.cpu().detach().numpy().astype(np.float32)
                 depth_gradmse[j] = mse_grad.cpu().detach().numpy().astype(np.float32)
 
