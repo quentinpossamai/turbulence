@@ -40,7 +40,7 @@ def main():
     args = parser.parse_args()
 
     for name in ['train', 'valid', 'test']:
-        dataset_stats = ResidualDataset(name, args.past)
+        dataset_stats = ResidualDataset(name, args.past, load_depth=True, load_depth_emb=True, load_norm_emb=True)
         print(name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
@@ -108,14 +108,16 @@ def main():
 
     num_workers = 12 if GPU_COUNT else 8
     # Datasets
-    train_data = DataLoader(ResidualDataset('train', past=args.past),
+    train_data = DataLoader(ResidualDataset('train', past=args.past, load_depth=True, load_depth_emb=True,
+                                            load_norm_emb=True),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
                             pin_memory=False,
                             drop_last=True)
 
-    validation_data = DataLoader(ResidualDataset('valid', past=args.past),
+    validation_data = DataLoader(ResidualDataset('valid', past=args.past, load_depth=True, load_depth_emb=True,
+                                                 load_norm_emb=True),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
