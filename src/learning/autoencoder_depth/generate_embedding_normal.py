@@ -113,7 +113,7 @@ def main_habitat():
 
     dataloader = DataLoader(habitat.HabitatEmbeddingDataset(), batch_size=1,
                             shuffle=False,
-                            num_workers=12 if torch.cuda.is_available() else 8,
+                            num_workers=12 if torch.cuda.is_available() else 0,
                             pin_memory=False)
 
     with torch.no_grad():
@@ -134,20 +134,22 @@ def main_habitat():
         model.eval()
 
         for i, trajectory in enumerate(tqdm(dataloader)):
-            depthmap_gt = trajectory['depth'].to(device)[0].unsqueeze(1)
+            depthmap = trajectory['depth'].to(device)[0].unsqueeze(1)
 
-            norm_emb = np.empty((len(depthmap_gt), 128), dtype=np.float32) * np.nan
-            norm_mse = np.empty((len(depthmap_gt)), dtype=np.float32) * np.nan
-            norm_cross_product = np.empty((len(depthmap_gt)), dtype=np.float32) * np.nan
-            out = model(depthmap_gt)  # feature, output
-            embedding, normal_hat = out['feature'], out['output']
-            sce_num, flight_number = trajectory['name']
-            sce_num = sce_num.item()
-            flight_number = flight_number.item()
-            folder = f'{habitat.MP3D_DATA}{habitat.MP3D_SCENE_LIST[sce_num]}/flight/{flight_number}/norm_emb/'
-            paths.mkdir_if_not_exist([folder])
+            norm_emb = np.empty((len(depthmap), 128), dtype=np.float32) * np.nan
+            norm_mse = np.empty((len(depthmap)), dtype=np.float32) * np.nan
+            norm_cross_product = np.empty((len(depthmap)), dtype=np.float32) * np.nan
 
-            for j, _ in enumerate(depthmap_gt):
+            for j, _ in enumerate(depthmap):
+                depthmap_gt = depthmap_gt.unsqueeze(0)
+                out = model(depthmap_gt)  # feature, output
+                embedding, normal_hat = out['feature'][0], out['output']
+                sce_num, flight_number = trajectory['name']
+                sce_num = sce_num.item()
+                flight_number = flight_number.item()
+                folder = f'{habitat.MP3D_DATA}{habitat.MP3D_SCENE_LIST[sce_num]}/flight/{flight_number}/norm_emb/'
+                paths.mkdir_if_not_exist([folder])
+
                 # mse_normal = MSE(gt, normal_hat) Habitat data does not have normal GT
                 # gt_transpose = gt.permute(0, 2, 3, 1).reshape(-1, 3)
                 # prediction_transpose = normal_hat.permute(0, 2, 3, 1).reshape(-1, 3)
@@ -155,7 +157,7 @@ def main_habitat():
                 #     (torch.cross(gt_transpose, prediction_transpose, dim=-1) ** 2).sum(-1)).mean()
 
                 # store
-                norm_emb[j] = embedding[j].cpu().detach().numpy().astype(np.float32)
+                norm_emb[j] = embedding.cpu().detach().numpy().astype(np.float32)
                 # norm_mse[j] = mse_normal.cpu().detach().numpy().astype(np.float32)
                 # norm_cross_product[j] = cross_product_loss.cpu().detach().numpy().astype(np.float32)
 
