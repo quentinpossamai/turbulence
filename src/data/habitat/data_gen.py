@@ -657,18 +657,18 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
 
     # Saving
     # dict_keys(['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force'])
-    # if not debug:
-    #     import time
-    #     tic = time.time()
-    #     print(f'Saving', file=sys.stderr, flush=True)
-    #     mkdir_if_not_exist([folder])
-    #     for name, array in data_generated.items():
-    #         np.save(f'{folder}{name}.npy', array.astype(np.float32))
-    #     info = 'collided' if has_collided else None
-    #     pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{folder}stats.pkl', 'wb'))
-    #     print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
-    #     print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
-    #     return True
+    if not debug:
+        import time
+        tic = time.time()
+        print(f'Saving', file=sys.stderr, flush=True)
+        mkdir_if_not_exist([folder])
+        for name, array in data_generated.items():
+            np.save(f'{folder}{name}.npy', array.astype(np.float32))
+        info = 'collided' if has_collided else None
+        pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{folder}stats.pkl', 'wb'))
+        print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
+        print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
+        return True
 
 
 def main():

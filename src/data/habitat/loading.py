@@ -14,7 +14,7 @@ from src.utils.paths import WD_PATH
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
 GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
-SCENE_PATH = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
+MP3D_DATA = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
 
 SPLIT = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_split.pkl', 'rb'))
 
@@ -25,7 +25,7 @@ TEST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_test.pkl', 'rb'))
 
 def load_file(name: str, scene_number: int, flight_number: int):
     scene_id = MP3D_SCENE_LIST[scene_number]
-    folder = f'{SCENE_PATH}{scene_id}/flight/{flight_number}/'
+    folder = f'{MP3D_DATA}{scene_id}/flight/{flight_number}/'
     assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force']
     if name == 'stats':
         return pickle.load(open(f'{folder}stats.pkl', 'rb'))
@@ -37,7 +37,7 @@ def build_index_valid_flight():
     index = {i: None for i in range(len(MP3D_SCENE_LIST))}
     for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
         try:
-            folders = next(os.walk(f'{SCENE_PATH}{scene_name}/flight/'))[1]
+            folders = next(os.walk(f'{MP3D_DATA}{scene_name}/flight/'))[1]
         except StopIteration:
             index[scene_number] = {}
             continue
@@ -99,8 +99,16 @@ class ResidualDataset(Dataset):
                 'ground_force': torch.from_numpy(load_file('ground_force', scene_number, flight_number)[stop - 1])}
 
 
-class EmbeddingDataset(Dataset):
+class HabitatEmbeddingDataset(Dataset):
     def __init__(self):
+        """
+        Len is all the trajectories for all scenes.
+
+        Getitem returns: {
+             'depth': (n, 240, 376), all the depth for the entire trajectory
+
+             'name': scene_number, flight_number}
+        """
         build_index_valid_flight()
         self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
 
@@ -119,9 +127,10 @@ class EmbeddingDataset(Dataset):
         scene_number, flight_number = self.path[i]
         depth = torch.from_numpy(load_file('depth', scene_number, flight_number))
         depth_dim = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
-        print(f'scene_number: {scene_number} - flight_number: {flight_number} - max_depth: {torch.max(depth)}',
-              flush=True)
-        return {'depth': depth_dim}
+
+        # Divide by 20 because 20 is the ZMAX of CophyLike autoencoder trained on IRS
+        depth_norm = np.clip(depth_dim / 20, 0, 1) * 2 - 1
+        return {'depth': depth_norm, 'name': self.path[i]}
 
 
 def main():
@@ -134,7 +143,7 @@ def main():
     # print(f'train {time.time() - tic}')
     from tqdm import tqdm
     print('Instanciating dataset', flush=True)
-    dataset = EmbeddingDataset()
+    dataset = HabitatEmbeddingDataset()
     print('Computing max depth', flush=True)
     for i in tqdm(range(len(dataset))):
         a = dataset[i]

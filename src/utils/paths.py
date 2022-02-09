@@ -17,6 +17,11 @@ MODELS_PATH = WD_PATH + "models/"
 ANALYSIS_PATH = WD_PATH + "analysis/"
 ANALYSIS_DATA_VIS_EUROC_MAV = ANALYSIS_PATH + 'data_vis_euroc_mav/'  # euroc_mav.data_vis.py
 
+# HABITAT
+DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
+SCENE_PATH = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
+
+
 
 def mkdir_if_not_exist(paths: list):
     if "steeven" in os.getcwd():
