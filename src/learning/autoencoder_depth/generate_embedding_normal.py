@@ -140,7 +140,7 @@ def main_habitat():
             norm_mse = np.empty((len(depthmap)), dtype=np.float32) * np.nan
             norm_cross_product = np.empty((len(depthmap)), dtype=np.float32) * np.nan
 
-            for j, _ in enumerate(depthmap):
+            for j, depthmap_gt in enumerate(depthmap):
                 depthmap_gt = depthmap_gt.unsqueeze(0)
                 out = model(depthmap_gt)  # feature, output
                 embedding, normal_hat = out['feature'][0], out['output']
