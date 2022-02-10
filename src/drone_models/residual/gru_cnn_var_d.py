@@ -42,11 +42,12 @@ class Conv2D(nn.Module):
         return self.dropout(self.activation(self.batch_norm(self.conv2d(x))))
 
 
-class VariantA(pl.LightningModule, Run):
+class VariantD(pl.LightningModule, Run):
     @staticmethod
     def add_model_specific_args(parent_parser):
         parser = parent_parser.add_argument_group("VariantA")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
+        parser.add_argument('--embedding', default='depth', type=str, help='Embedding to use.')
         parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
         parser.add_argument('--unit_size', default=50, type=int, help="Number of unit for the hidden layers")
@@ -54,6 +55,7 @@ class VariantA(pl.LightningModule, Run):
 
     def __init__(self,
                  activation: str,
+                 embedding: str,
                  learning_rate: float,
                  model,
                  motor_size: int,
@@ -64,6 +66,8 @@ class VariantA(pl.LightningModule, Run):
         Model to predict residual f_a = f_aero. Takes motor, state and image from past timesteps.
 
         param activation: The activation function to use.
+
+        param embedding: 'depth', 'norm' or 'both' to specify which embedding to use.
 
         param learning_rate: Learning rate for Adam optimizer.
 
@@ -83,60 +87,48 @@ class VariantA(pl.LightningModule, Run):
             self.activation = torch.relu  # torch.tanh or f.relu
         elif activation == "tanh":
             self.activation = torch.tanh  # torch.tanh or f.relu
-
+        assert embedding in ['depth', 'norm', 'both']
+        self.embedding = embedding
         self.learning_rate = learning_rate
         self.model = model
         self.motor_size = motor_size
         self.past = past
         self.unit_size = unit_size
 
-        self.depth_input_size = [1, 480, 640]
+        self.emb_input_size = 128 if self.embedding in ['depth', 'norm'] else 256
         self.feature_size = self.motor_size + 13
-
-        # self.save_hyperparameters()  # TODO ?
 
         # - sm (state, motor) branch
         # For the simulation past motor and state is useless
         self.sm_input_norm = nn.BatchNorm1d(self.feature_size)
         self.sm_input_drop = nn.Dropout(p=0.2)
-        self.sm_fc_out = FullyConnected(self.activation, dropout_p=0.5, in_features=self.feature_size, out_features=128)
+        self.sm_fc_out = FullyConnected(self.activation, dropout_p=0.5, in_features=self.feature_size, out_features=50)
 
-        # - depth (encoding depth) branch
-        self.depth_input_norm = nn.BatchNorm2d(1)  # Nbatch, Channel, Height, Width
-        # self.depth_input_drop = nn.Dropout2d(0.2)
+        # - emb (embedding) branch
+        self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
+        self.emb_input_drop = nn.Dropout(0.2)
+        self.emb_fc_0 = FullyConnected(torch.tanh, 0.5, self.emb_input_size, 50)
 
-        self.depth_conv2d_0 = Conv2D(self.activation, 0.5, True, 1, 16, (7, 7), 1, 3)
-        self.depth_pool_0 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_1 = Conv2D(self.activation, 0.5, True, 16, 32, (3, 3), 1)
-        self.depth_pool_1 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_2 = Conv2D(self.activation, 0.5, True, 32, 64, (3, 3), 2)
-        self.depth_pool_2 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_3 = Conv2D(self.activation, 0.5, True, 64, 64, (3, 3), 1)
-        self.depth_pool_3 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_4 = Conv2D(self.activation, 0.5, True, 64, 32, (3, 3), 2)
-        self.depth_pool_4 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_5 = Conv2D(self.activation, 0.5, True, 32, 4, (3, 3), 1)
-        self.depth_pool_5 = nn.MaxPool2d((2, 2))
-        self.depth_emb_linear = FullyConnected(None, dropout_p=0.5, in_features=4 * 13 * 18, out_features=128)
         # Time reduction
-        self.depth_gru = nn.GRU(input_size=128, hidden_size=128, num_layers=3, batch_first=True)
-        self.depth_gru_norm = nn.BatchNorm1d(128)
-        self.depth_gru_dropout = nn.Dropout(p=0.5)
+        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
+        self.emb_gru_norm = nn.BatchNorm1d(50)
+        self.emb_gru_dropout = nn.Dropout(p=0.5)
 
         # - reg (regression) branch
-        self.reg_fc_0 = FullyConnected(self.activation, 0.5, 128, 50)
+        self.reg_fc_0 = FullyConnected(self.activation, 0.5, 50, 50)
         self.reg_fc_1 = FullyConnected(self.activation, 0.5, 50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
         self.example_input_array = [torch.zeros(2, self.motor_size),
                                     torch.zeros(2, 13),
-                                    torch.zeros(2, self.past, 480, 640)]
+                                    torch.zeros(2, self.past, 128) if self.embedding in ['depth', 'norm']
+                                    else torch.zeros(2, self.past, 256)]
 
     def configure_optimizers(self):
         print(f"Lightning.device: {self.device}", flush=True)
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
-    def forward(self, motor: torch.Tensor, state: torch.Tensor, depth: torch.Tensor):
+    def forward(self, motor: torch.Tensor, state: torch.Tensor, emb: torch.Tensor):
         r"""
         Estimate the residual
 
@@ -144,7 +136,7 @@ class VariantA(pl.LightningModule, Run):
 
         param state: (*, 13)
 
-        param depth: (*, self.past, 480, 640)
+        param depth: (*, past, 128 or 256)
 
         Generally * means batch dimension or more but must exist during training to compute batch_norm.
 
@@ -153,9 +145,8 @@ class VariantA(pl.LightningModule, Run):
         # - Input processing
         assert motor.shape[-1] == self.motor_size
         assert state.shape[-1] == 13
-        assert depth.shape[-3:] == (self.past, 480, 640)
-        assert motor.shape[:-1] == state.shape[:-1] == depth.shape[:-3]
-        depth_shape = depth.shape
+        assert emb.shape[-1] in [128, 256] and emb.shape[-2] == self.past
+        assert motor.shape[:-1] == state.shape[:-1] == emb.shape[:-2]
 
         # - sm branch
         out = torch.cat([motor, state], dim=-1)
@@ -163,28 +154,16 @@ class VariantA(pl.LightningModule, Run):
         out = self.sm_input_drop(out)
         sm_out = self.sm_fc_out(out)
 
-        # - depth branch
-        star_shape = list(depth.shape[:-3])
-        out = self.depth_input_norm(depth.reshape((-1, 1, 480, 640)))
-        out = self.depth_conv2d_0(out)
-        out = self.depth_pool_0(out)
-        out = self.depth_conv2d_1(out)
-        out = self.depth_pool_1(out)
-        out = self.depth_conv2d_2(out)
-        # out = self.depth_pool_2(out)
-        out = self.depth_conv2d_3(out)
-        # out = self.depth_pool_3(out)
-        out = self.depth_conv2d_4(out)
-        # out = self.depth_pool_4(out)
-        out = self.depth_conv2d_5(out)
-        out = self.depth_pool_5(out)
-        out = self.depth_emb_linear(out.reshape((out.shape[0], -1)))
-        out, _ = self.depth_gru(out.reshape((-1, self.past, 128)))  # gru output with shape: (*, step, feature_size)
+        # - emb branch
+        star_shape = list(emb.shape[:-1])
+        out = self.emb_input_drop(self.emb_input_norm(emb.reshape((-1, 128))))
+        out = self.emb_fc_0(out)
+        out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         out = out[..., -1, :]  # last hidden states, (*, feature_size)
-        depth_out = self.depth_gru_dropout(self.depth_gru_norm(out))  # (batch, feature_size)
+        emb_out = self.emb_gru_dropout(self.emb_gru_norm(out))  # (batch, feature_size)
 
         # - reg branch
-        out = self.reg_fc_0(sm_out + depth_out)
+        out = self.reg_fc_0(sm_out + emb_out)
         out = self.reg_fc_1(out)
         out = self.reg_linear_out(out)
         return out
@@ -198,7 +177,14 @@ class VariantA(pl.LightningModule, Run):
 
         return: Loss
         """
-        residual_hat = self.forward(motor=batch['motor'], state=batch['state'], depth=batch['depth'])
+        if self.embedding == 'depth':
+            emb = batch['depth']
+        elif self.embedding == 'norm':
+            emb = batch['norm']
+        else:  # == 'both'
+            emb = torch.cat([batch['depth'], batch['norm']], dim=-1)
+
+        residual_hat = self.forward(motor=batch['motor'], state=batch['state'], emb=emb)
         residual_gt = batch["ground_force"]
 
         loss = (residual_gt - residual_hat) ** 2

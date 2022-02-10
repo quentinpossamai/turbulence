@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.data.habitat.loading import ResidualDataset, MP3D_SCENE_LIST
-from src.drone_models.residual.gru_cnn_variant_A import VariantA
+from src.drone_models.residual.gru_cnn_var_a import VariantA
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
 ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_training/'
