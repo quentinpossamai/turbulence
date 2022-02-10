@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.data.habitat.loading import ResidualDataset, MP3D_SCENE_LIST
-from src.drone_models.residual.gru_cnn_var_d import VariantC
+from src.drone_models.residual.gru_cnn_var_d import VariantD
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
 ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_training/'
@@ -34,7 +34,7 @@ def main():
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch')
     parser.add_argument('--load_weights', default=None, type=str, help='Path to previous weights')
-    residual_model_class = VariantC
+    residual_model_class = VariantD
     parser = residual_model_class.add_model_specific_args(parser)  # Module args
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
