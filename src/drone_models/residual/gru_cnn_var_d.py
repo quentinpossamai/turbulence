@@ -159,7 +159,7 @@ class VariantD(pl.LightningModule, Run):
         out = self.emb_input_drop(self.emb_input_norm(emb.reshape((-1, 128))))
         out = self.emb_fc_0(out)
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
-        out = out[..., -1, :]  # last hidden states, (*, feature_size)
+        out = out[:, -1, :]  # last hidden states, (*, feature_size)
         emb_out = self.emb_gru_dropout(self.emb_gru_norm(out))  # (batch, feature_size)
 
         # - reg branch
@@ -178,14 +178,14 @@ class VariantD(pl.LightningModule, Run):
         return: Loss
         """
         if self.embedding == 'depth':
-            emb = batch['depth']
+            emb = batch['depth_emb']
         elif self.embedding == 'norm':
-            emb = batch['norm']
+            emb = batch['norm_emb']
         else:  # == 'both'
-            emb = torch.cat([batch['depth'], batch['norm']], dim=-1)
+            emb = torch.cat([batch['depth_emb'], batch['norm_emb']], dim=-1)
 
         residual_hat = self.forward(motor=batch['motor'], state=batch['state'], emb=emb)
-        residual_gt = batch["ground_force"]
+        residual_gt = batch["ground_force"][:, 2]
 
         loss = (residual_gt - residual_hat) ** 2
         return loss.mean()
@@ -296,15 +296,14 @@ def _test():
 
     batch = {"motor": motor, "state": state, "residual": residual, "depth_emb": depth_emb, "norm_emb": norm_emb}
 
-    model = VariantA(
+    model = VariantD(
         activation='tanh',
         embedding="both",
-        layer=3,
         learning_rate=1e-3,
         model=DynamicalModel(param="identification", dtype=torch.float32),
         motor_size=6,
-        past=60,
-        unit_size=50, )
+        past=40,
+        unit_size=50)
     model.configure_optimizers()
 
     res = model.forward(motor=motor[:, :past], state=state[:, :past], depth_emb=depth_emb[:, :past],

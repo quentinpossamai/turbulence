@@ -63,12 +63,9 @@ class ResidualDataset(Dataset):
         build_index_valid_flight()
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
-
         assert isinstance(past, int)
         self.past = past
-
         self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
-
         if self.train_valid_test == 'train':
             include = TRAIN
         elif self.train_valid_test == 'valid':
@@ -81,7 +78,6 @@ class ResidualDataset(Dataset):
             if self.valid_index[i] != {}:
                 self.index[i] = self.valid_index[i]
         self.index: Dict[int, Dict[int, int]]
-
         self.len = np.sum([e - self.past for val in self.index.values() for e in val.values()])
         self.path = []
         i = 0
@@ -90,7 +86,6 @@ class ResidualDataset(Dataset):
                 for j in range(past, traj_len):
                     self.path.append([scene_number, flight_number, j - self.past, j])
                     i += 1
-
         self.load_depth = load_depth
         self.load_depth_emb = load_depth_emb
         self.load_norm_emb = load_norm_emb
@@ -101,17 +96,18 @@ class ResidualDataset(Dataset):
             self.depth_list.append('depth_emb')
         if self.load_norm_emb:
             self.depth_list.append('norm_emb')
-
     def __len__(self):
         return self.len
-
     def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
         scene_number, flight_number, start, stop = self.path[i]
-        to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1]),
-                     'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1]),
-                     'ground_force': torch.from_numpy(load_file('ground_force', scene_number, flight_number)[stop - 1])}
+        to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1].copy()),
+                     'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1].copy()),
+                     'ground_force': torch.from_numpy(load_file('ground_force',
+                                                                scene_number,
+                                                                flight_number)[stop - 1].copy())}
         for key in self.depth_list:
-            to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop]),
+            to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop].copy())
+            assert not torch.isnan(to_return[key]).any()
         return to_return
 
 

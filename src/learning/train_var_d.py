@@ -114,7 +114,7 @@ def main():
                                                         past=args.past,
                                                         unit_size=args.unit_size)
 
-    num_workers = 12 if GPU_COUNT else 8
+    num_workers = 12 if GPU_COUNT else 0
     # Datasets
     load_depth_emb = True if args.embedding in ['depth', 'both'] else False
     load_norm_emb = True if args.embedding in ['norm', 'both'] else False
@@ -127,7 +127,12 @@ def main():
                             pin_memory=False,
                             drop_last=True)
 
-    validation_data = DataLoader(ResidualDataset('valid', past=args.past, load_depth=True,
+    i = 0
+    for i, batch in enumerate(train_data):
+        assert not torch.isnan(batch['depth_emb']).any()
+        i += 1
+
+    validation_data = DataLoader(ResidualDataset('valid', past=args.past, load_depth=False,
                                                  load_depth_emb=load_depth_emb,
                                                  load_norm_emb=load_norm_emb),
                                  batch_size=args.batch_size,
