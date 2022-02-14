@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
-from src.data.habitat.loading import ResidualDataset, MP3D_SCENE_LIST
+from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
 from src.drone_models.residual.gru_cnn_var_a import VariantA
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
@@ -40,7 +40,7 @@ def main():
     args = parser.parse_args()
 
     for name in ['train', 'valid', 'test']:
-        dataset_stats = ResidualDataset(name, args.past, load_depth=True, load_depth_emb=True, load_norm_emb=True)
+        dataset_stats = HabitatResidualDataset(name, args.past, load_depth=True, load_depth_emb=True, load_norm_emb=True)
         print(name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
@@ -108,16 +108,16 @@ def main():
 
     num_workers = 12 if GPU_COUNT else 8
     # Datasets
-    train_data = DataLoader(ResidualDataset('train', past=args.past, load_depth=True, load_depth_emb=True,
-                                            load_norm_emb=True),
+    train_data = DataLoader(HabitatResidualDataset('train', past=args.past, load_depth=True, load_depth_emb=True,
+                                                   load_norm_emb=True),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
                             pin_memory=False,
                             drop_last=True)
 
-    validation_data = DataLoader(ResidualDataset('valid', past=args.past, load_depth=True, load_depth_emb=True,
-                                                 load_norm_emb=True),
+    validation_data = DataLoader(HabitatResidualDataset('valid', past=args.past, load_depth=True, load_depth_emb=True,
+                                                        load_norm_emb=True),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,

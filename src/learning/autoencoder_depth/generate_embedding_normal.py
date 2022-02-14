@@ -111,7 +111,7 @@ def main_habitat():
     random.seed(0)
     np.random.seed(0)
 
-    dataloader = DataLoader(habitat.HabitatEmbeddingDataset(), batch_size=1,
+    dataloader = DataLoader(habitat.HabitatNormedDepthDataset(), batch_size=1,
                             shuffle=False,
                             num_workers=12 if torch.cuda.is_available() else 0,
                             pin_memory=False)

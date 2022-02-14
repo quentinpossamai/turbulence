@@ -2,7 +2,7 @@ import numpy as np
 import os
 import pickle
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as f
@@ -38,33 +38,41 @@ def load_file(name: str, scene_number: int, flight_number: int):
 
 def build_index_valid_flight():
     index = {i: None for i in range(len(MP3D_SCENE_LIST))}
+    to_test = ['depth.npy', 'depth_emb/depth_emb.npy', 'ground_force.npy', 'motor.npy', 'mpc_error.npy',
+               'norm_emb/norm_emb.npy', 'state.npy', 'stats.pkl', 'surface_dist.npy']
+
     for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
-        try:
-            folders = next(os.walk(f'{MP3D_DATA}{scene_name}/flight/'))[1]
-        except StopIteration:
-            index[scene_number] = {}
-            continue
         index[scene_number] = {}
-        flight_list = np.sort(np.array(folders).astype(int))
-        for flight_number in flight_list:
-            stats = load_file('stats', scene_number, flight_number)
-            if stats['done'] is not None:
-                mpc_error = load_file('mpc_error', scene_number, flight_number)
-                if (mpc_error < 5).all() and len(mpc_error) >= 200:
-                    index[scene_number][flight_number] = len(mpc_error)
-    # print(f'MP3D_SCENE_LIST: {MP3D_SCENE_LIST}')
-    # print(f'SCENE_PATH: {SCENE_PATH}')
-    # print(f'index: {index}')
+        try:  # Try finding flight folder
+            flights = [int(e) for e in next(os.walk(f'{MP3D_DATA}{scene_name}/flight/'))[1]]
+            for number in flights:
+                is_valid = all([os.path.isfile(f'{MP3D_DATA}{scene_name}/flight/{number}/{test}') for test in to_test])
+                if is_valid:  # if every needed files are present
+                    stats = load_file('stats', scene_number, number)
+                    if stats['done'] is not None:  # If the drone has flight at least one step
+                        mpc_error = load_file('mpc_error', scene_number, number)
+                        if (mpc_error < 5).all() and len(mpc_error) >= 200:  # If controller is not wrong and traj long
+                            # enough
+                            index[scene_number][number] = len(mpc_error)
+        except StopIteration:
+            continue
     pickle.dump(index, open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'wb'))
 
 
-class ResidualDataset(Dataset):
-    def __init__(self, train_valid_test: str, past: int, load_depth: bool, load_depth_emb: bool, load_norm_emb: bool):
+class HabitatResidualDataset(Dataset):
+    def __init__(self, train_valid_test: str,
+                 past: int,
+                 load_depth: bool,
+                 load_depth_emb: bool,
+                 load_norm_emb: bool):
         build_index_valid_flight()
+
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
+
         assert isinstance(past, int)
         self.past = past
+
         self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
         if self.train_valid_test == 'train':
             include = TRAIN
@@ -78,7 +86,9 @@ class ResidualDataset(Dataset):
             if self.valid_index[i] != {}:
                 self.index[i] = self.valid_index[i]
         self.index: Dict[int, Dict[int, int]]
+
         self.len = np.sum([e - self.past for val in self.index.values() for e in val.values()])
+
         self.path = []
         i = 0
         for scene_number, scene_trajectories in self.index.items():
@@ -86,6 +96,7 @@ class ResidualDataset(Dataset):
                 for j in range(past, traj_len):
                     self.path.append([scene_number, flight_number, j - self.past, j])
                     i += 1
+
         self.load_depth = load_depth
         self.load_depth_emb = load_depth_emb
         self.load_norm_emb = load_norm_emb
@@ -96,8 +107,10 @@ class ResidualDataset(Dataset):
             self.depth_list.append('depth_emb')
         if self.load_norm_emb:
             self.depth_list.append('norm_emb')
+
     def __len__(self):
         return self.len
+
     def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
         scene_number, flight_number, start, stop = self.path[i]
         to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1].copy()),
@@ -111,7 +124,7 @@ class ResidualDataset(Dataset):
         return to_return
 
 
-class HabitatEmbeddingDataset(Dataset):
+class HabitatNormedDepthDataset(Dataset):
     def __init__(self):
         """
         Len is all the trajectories for all scenes.
@@ -146,19 +159,23 @@ class HabitatEmbeddingDataset(Dataset):
 
 
 def main():
-    # build_index_valid_flight()
-    # dataset = HabitatDataset('train', 40)
-    # import time
-    # tic = time.time()
-    # for i in range(len(dataset)-1):
-    #     a = dataset[i]['state'] * dataset[i+1]['state']
-    # print(f'train {time.time() - tic}')
+    dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=True, load_norm_emb=False)
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
+
+    import time
     from tqdm import tqdm
-    print('Instanciating dataset', flush=True)
-    dataset = HabitatEmbeddingDataset()
-    print('Computing max depth', flush=True)
-    for i in tqdm(range(len(dataset))):
-        a = dataset[i]
+    tic = time.time()
+    for batch in tqdm(dataloader):
+        a = batch['depth_emb'] * batch['depth_emb']
+    print(f'train {time.time() - tic}')
+    print()
+
+    # from tqdm import tqdm
+    # print('Instanciating dataset', flush=True)
+    # dataset = HabitatNormedDepthDataset()
+    # print('Computing max depth', flush=True)
+    # for i in tqdm(range(len(dataset))):
+    #     a = dataset[i]
 
 
 if __name__ == '__main__':

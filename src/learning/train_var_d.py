@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
-from src.data.habitat.loading import ResidualDataset, MP3D_SCENE_LIST
+from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
 from src.drone_models.residual.gru_cnn_var_d import VariantD
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
@@ -41,11 +41,12 @@ def main():
 
     # Display entire dataset
     for name in ['train', 'valid', 'test']:
-        dataset_stats = ResidualDataset(name, args.past, load_depth=False, load_depth_emb=False, load_norm_emb=False)
+        dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False, load_norm_emb=False)
         print(name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
         print('\n\n')
+    print(f'Data length: | {len(dataset_stats)}')
 
     # Analysis parameters
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -116,29 +117,26 @@ def main():
 
     num_workers = 12 if GPU_COUNT else 0
     # Datasets
+    load_depth = False
     load_depth_emb = True if args.embedding in ['depth', 'both'] else False
     load_norm_emb = True if args.embedding in ['norm', 'both'] else False
-    train_data = DataLoader(ResidualDataset('train', past=args.past, load_depth=False,
-                                            load_depth_emb=load_depth_emb,
-                                            load_norm_emb=load_norm_emb),
+    print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}')
+    train_data = DataLoader(HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
+                                                   load_depth_emb=load_depth_emb,
+                                                   load_norm_emb=load_norm_emb),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
-                            pin_memory=False,
+                            pin_memory=True,
                             drop_last=True)
 
-    i = 0
-    for i, batch in enumerate(train_data):
-        assert not torch.isnan(batch['depth_emb']).any()
-        i += 1
-
-    validation_data = DataLoader(ResidualDataset('valid', past=args.past, load_depth=False,
-                                                 load_depth_emb=load_depth_emb,
-                                                 load_norm_emb=load_norm_emb),
+    validation_data = DataLoader(HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
+                                                        load_depth_emb=load_depth_emb,
+                                                        load_norm_emb=load_norm_emb),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
-                                 pin_memory=False,
+                                 pin_memory=True,
                                  drop_last=True)
 
     trainer = pl.Trainer(gpus=GPU_COUNT,
