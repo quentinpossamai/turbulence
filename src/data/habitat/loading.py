@@ -68,6 +68,9 @@ def build_index_valid_flight():
 
 
 class HabitatResidualDataset(Dataset):
+    fa_mean = 0.0025
+    fa_std = 0.0091
+
     def __init__(self, train_valid_test: str,
                  past: int,
                  load_depth: bool,
@@ -116,14 +119,13 @@ class HabitatResidualDataset(Dataset):
         if self.load_norm_emb:
             self.depth_list.append('norm_emb')
 
-        self.fa_mean = 0.0025
-        self.fa_std = 0.0091
-
     def __len__(self):
         return self.len
 
     def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
-        i = 0  # TODO change for overfit
+        if self.train_valid_test == 'train':
+            i = 0
+        print(self.path[i])
         scene_number, flight_number, start, stop = self.path[i]
         to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1].copy()),
                      'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1].copy()),
@@ -175,13 +177,7 @@ def main():
     dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=True, load_norm_emb=False)
     dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
 
-    import time
-    from tqdm import tqdm
-    tic = time.time()
-    for batch in tqdm(dataloader):
-        a = batch['depth_emb'] * batch['depth_emb']
-    print(f'train {time.time() - tic}')
-    print()
+    dataset[0]
 
     # from tqdm import tqdm
     # print('Instanciating dataset', flush=True)

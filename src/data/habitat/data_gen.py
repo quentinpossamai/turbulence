@@ -556,8 +556,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             mkdir_if_not_exist([folder])
             pickle.dump({'done': None, 'info': 'diverged'}, open(f'{folder}stats.pkl', 'wb'))
             return False
-        data_collection['motor'].append(motor_horizon[0])  # t to compute t+1
-        data_collection['mpc_error'].append(err)  # t to compute t+1
 
         # Simulating result
         if not same_env:
@@ -571,7 +569,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                 mkdir_if_not_exist([folder])
                 pickle.dump({'done': None, 'info': 'nan'}, open(f'{folder}stats.pkl', 'wb'))
                 return False
-
+            data_collection['motor'].append(motor_horizon[0])  # t to compute t+1
+            data_collection['mpc_error'].append(err)  # t to compute t+1
             data_collection['ground_force'].append(ground_effect)  # t used to compute t+1
             data_collection['rgb'].append(obs['left_camera'])  # t+1
             data_collection['depth'].append(obs['left_depth_camera'])  # t+1

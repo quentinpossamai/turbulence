@@ -65,7 +65,7 @@ class VariantD(pl.LightningModule, Run):
 
         self.uav_model = uav_model
         self.save_hyperparameters('activation', 'embedding', 'learning_rate', 'motor_size', 'past',
-                                  ignore=['uav_model'])
+                                  ignore=['uav_model'], logger=True)
         self.emb_input_size = 128 if self.embedding in ['depth', 'norm'] else 256
         self.feature_size = self.motor_size + 13
 
@@ -271,7 +271,6 @@ def main():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
-    # parser.add_argument('--load_weights', default=None, type=str, help='Path to previous weights')
     residual_model_class = VariantD
     parser = residual_model_class.add_model_specific_args(parser)  # Module args
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
@@ -308,8 +307,8 @@ def main():
     print(f'training_path={training_path}')
     print(f'name={name} | version={version}')
     tb_logger = pl_loggers.TensorBoardLogger(save_dir=SAVING_PATH, name=name, version=version, log_graph=True,
-                                             default_hp_metric=True)
-    tb_logger.experiment.add_hparams(h_prms, {})
+                                             default_hp_metric=False)
+    # tb_logger.experiment.add_hparams(h_prms, {})
 
     # Reproducibility
     seed = 0
@@ -335,23 +334,15 @@ def main():
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']], dtype=np.float32)
     quadrotor = NumpyDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
-    # if args.load_weights is None:
+
     run = residual_model_class(activation=args.activation,
                                embedding=args.embedding,
                                learning_rate=args.lr,
                                motor_size=motor_size,
                                past=args.past,
                                uav_model=quadrotor)
-    # else:
-        # print(f'\nReloading weights from: {args.load_weights}')
-        # run = residual_model_class.load_from_checkpoint(args.load_weights,
-        #                                                 activation=args.activation,
-        #                                                 embedding=args.embedding,
-        #                                                 learning_rate=args.lr,
-        #                                                 motor_size=motor_size,
-        #                                                 past=args.past,
-        #                                                 uav_model=quadrotor)
-
+    args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
+                                  f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if GPU_COUNT else 0
     # Datasets
     load_depth = False
@@ -367,7 +358,7 @@ def main():
                             pin_memory=True,
                             drop_last=True)
 
-    validation_data = DataLoader(HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
+    validation_data = DataLoader(HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
                                                         load_depth_emb=load_depth_emb,
                                                         load_norm_emb=load_norm_emb),
                                  batch_size=args.batch_size,
@@ -375,7 +366,6 @@ def main():
                                  num_workers=num_workers,
                                  pin_memory=True,
                                  drop_last=True)
-
     trainer = pl.Trainer(gpus=GPU_COUNT,
                          logger=tb_logger,
                          deterministic=True,
@@ -383,11 +373,13 @@ def main():
                          # fast_dev_run=False,
                          # track_grad_norm=2,
                          # accelerator=None,
-                         # log_every_n_steps=50,  # default  50
+                         log_every_n_steps=50,  # default  50
                          accelerator='ddp' if GPU_COUNT else None,
                          log_gpu_memory='True',
                          resume_from_checkpoint=args.resume_from_checkpoint)
-    trainer.validate(run, dataloaders=validation_data)
+
+    if args.resume_from_checkpoint is None:
+        trainer.validate(run, dataloaders=validation_data)
     trainer.fit(run, train_data, validation_data)
 
 
