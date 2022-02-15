@@ -123,9 +123,6 @@ class HabitatResidualDataset(Dataset):
         return self.len
 
     def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
-        if self.train_valid_test == 'train':
-            i = 0
-        print(self.path[i])
         scene_number, flight_number, start, stop = self.path[i]
         to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1].copy()),
                      'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1].copy()),
