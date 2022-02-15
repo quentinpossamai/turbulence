@@ -24,6 +24,15 @@ TEST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_test.pkl', 'rb'))
 
 
 def load_file(name: str, scene_number: int, flight_number: int):
+    """
+    param name: {'stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force', 'depth_emb',
+                 'norm_emb'}
+    param scene_number: In [0, 90]
+
+    param flight_number: in Z
+
+    return:
+    """
     scene_id = MP3D_SCENE_LIST[scene_number]
     folder = f'{MP3D_DATA}{scene_id}/flight/{flight_number}/'
     assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
@@ -57,6 +66,7 @@ def build_index_valid_flight():
         except StopIteration:
             continue
     pickle.dump(index, open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'wb'))
+    return index
 
 
 class HabitatResidualDataset(Dataset):

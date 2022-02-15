@@ -434,35 +434,12 @@ class Simulation:
 
     def compute_ground_effect(self, motor: np.ndarray, z: float, mu: float, cap: float) -> np.ndarray:
         ground_force = np.zeros(3)
-
-        # ground_force[2] = np.clip((np.sum(motor) ** 2 * self.drone_prms['kt'] * 1
-        #                            * (self.drone_prms['prop_radius'] / (4 * z)) ** 2), 0,
-        #                           0.1 * self.drone_prms['m'] * self.g)
         if z < np.sqrt(mu) * self.drone_prms['prop_radius'] / 4:
             ground_force[2] = cap * self.drone_prms['m'] * self.g
         else:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
             ground_force[2] = np.clip(np.sum(motor) ** 2 * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                       a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
-        # # Debug plot
-        # motor = np.array([150, 150, 150, 150])
-        # z = np.linspace(1e-8, 0.1, 1000)
-        # import matplotlib.pyplot as plt
-        # plt.rcParams.update({"text.usetex": False,
-        #                      "font.family": "serif",
-        #                      "font.sans-serif": ["Computer Modern Roman"]})
-        # for mu in [1, 2, 3, 4, 5]:
-        #     mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
-        #     to_plot = np.sum(motor) ** 2 * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z)
-        #     to_plot[np.where(z < np.sqrt(mu) * self.drone_prms['prop_radius'] / 4)[0]] = 0.1 * self.drone_prms[
-        #         'm'] * self.g
-        #     to_plot = np.clip(to_plot, 0, 0.1 * self.drone_prms['m'] * self.g)
-        #     plt.plot(z, to_plot, label=f'mu={mu}')
-        # plt.title('Ground effect')
-        # plt.grid()
-        # plt.ylabel('Force [N]')
-        # plt.xlabel('z (m)')
-        # plt.legend()
         return np.concatenate([ground_force, np.zeros(3)])
 
 
