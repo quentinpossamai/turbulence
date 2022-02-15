@@ -341,8 +341,8 @@ def main():
                                motor_size=motor_size,
                                past=args.past,
                                uav_model=quadrotor)
-    args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
-                                  f'checkpoints/epoch=16-step=832.ckpt'
+    # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
+    #                               f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if GPU_COUNT else 0
     # Datasets
     load_depth = False
