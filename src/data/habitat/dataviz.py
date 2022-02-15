@@ -4,10 +4,13 @@ import os
 import pickle
 import pytorch_lightning as pl
 import torch
+from tqdm import tqdm
 
 import src.data.habitat.loading as habitat
 from src.drone_models.residual.gru_cnn_var_d import VariantD
+from src.drone_models.residual.gru_cnn_var_a import VariantA
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
+from src.utils.profiler import profiler
 
 
 def plot_fa_generator():
@@ -85,6 +88,7 @@ def plot_fa():
             z.append(habitat.load_file('surface_dist', scene_number, flight_number))
     z = np.concatenate(z, axis=0)[:, 0]
     fa = np.concatenate(fa, axis=0)[:, 2]
+    print(f'Mean {np.mean(fa)} | std {np.std(fa)}')
 
     plt.rcParams.update({"text.usetex": False,
                          "font.family": "serif",
@@ -113,7 +117,10 @@ def plot_fa():
 
 
 def plot_model_prediction(variant: str):
-    model_path = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantD/20220211_174238/'
+    profiler()
+
+    model_d_path = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantD/20220211_174238/'
+    model_a_path = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantA/20220211_203458/'
 
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
@@ -135,47 +142,66 @@ def plot_model_prediction(variant: str):
                       drone_prms['iz'] / drone_prms['ix']])
 
     uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
-    h_prms = pickle.load(open(f'{model_path}h_prms.pkl', 'rb'))
 
-    model = VariantD.load_from_checkpoint(f'{model_path}checkpoints/epoch=11-step=1448747.ckpt',
-                                          activation=h_prms['activation'],
-                                          embedding=h_prms['embedding'],
-                                          learning_rate=h_prms['lr'],
-                                          uav_model=uav_model,
-                                          motor_size=h_prms['motor_size'],
-                                          past=h_prms['past'])
-    model.eval()
+    h_prms_d = pickle.load(open(f'{model_d_path}h_prms.pkl', 'rb'))
+    model_d = VariantD.load_from_checkpoint(f'{model_d_path}checkpoints/epoch=11-step=1448747.ckpt',
+                                            activation=h_prms_d['activation'],
+                                            embedding=h_prms_d['embedding'],
+                                            learning_rate=h_prms_d['lr'],
+                                            uav_model=uav_model,
+                                            motor_size=h_prms_d['motor_size'],
+                                            past=h_prms_d['past'])
+    model_d.eval()
+
+    h_prms_a = pickle.load(open(f'{model_a_path}h_prms.pkl', 'rb'))
+    model_a = VariantA.load_from_checkpoint(f'{model_a_path}default/20220211_203458/checkpoints/epoch=1-step=241457.ckpt',
+                                            activation=h_prms_a['activation'],
+                                            learning_rate=h_prms_a['lr'],
+                                            uav_model=uav_model,
+                                            motor_size=h_prms_a['motor_size'],
+                                            past=h_prms_a['past'])
+    model_a.eval()
+
     index = habitat.build_index_valid_flight()
     for scene_number, flight in index.items():
         for flight_number in flight:
-            z = habitat.load_file('surface_dist', scene_number, flight_number)
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number,
-                                                    flight_number)[:, 2].copy())[h_prms['past']:]
+                                                    flight_number)[:, 2].copy())[h_prms_a['past']:]
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy())
             motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy())
+            depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy())
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy())
 
             with torch.no_grad():
-                fa_hat = []
-                for i in range(h_prms['past'], len(state) - 1):
-                    fa_hat.append(model.forward(motor[i], state[i], depth_emb[i-h_prms['past']:i]))
-                fa_hat = torch.stack(fa_hat, 0).squeeze()
-
-            ((fa - fa_hat) ** 2).mean()
+                fa_hat_d = []
+                for i in range(h_prms_d['past'], len(state) - 1):
+                    fa_hat_d.append(model_d.forward(motor[i], state[i], depth_emb[i - h_prms_d['past']:i]))
+                fa_hat_d = torch.stack(fa_hat_d, 0).squeeze()
+            print(f'Error model d {((fa - fa_hat_d) ** 2).mean()}')
+            with torch.no_grad():
+                fa_hat_a = []
+                for i in tqdm(range(h_prms_a['past'], len(state) - 1), desc='Model a'):
+                    fa_hat_a.append(model_a.forward(motor[i], state[i], depth[i - h_prms_a['past']:i]))
+                    print()
+                fa_hat_a = torch.stack(fa_hat_a, 0).squeeze()
+                print(f'Error model a {((fa - fa_hat_a) ** 2).mean()}')
 
             fig, ax = plt.subplots(1, 1)
-            ax.plot(fa)
-            ax.plot(fa_hat)
+            ax.plot(fa, label='Ground truth')
+            ax.plot(fa_hat_d, label='model d')
+            ax.plot(fa_hat_a, label='model a')
             ax.grid()
             ax.set_ylabel('Ground force (N)')  # Surface distance (m)
             ax.set_xlabel('Sample number')
+            ax.legend()
+            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/model_prediction.pdf')
             plt.show()
 
 
 def main():
     # plot_fa_generator()
-    # plot_fa()
-    plot_model_prediction('d')
+    plot_fa()
+    # plot_model_prediction('d')
 
 
 if __name__ == '__main__':

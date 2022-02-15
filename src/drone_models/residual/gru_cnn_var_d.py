@@ -24,7 +24,7 @@ class VariantD(pl.LightningModule, Run):
         parser = parent_parser.add_argument_group("VariantA")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
         parser.add_argument('--embedding', default='depth', type=str, help='Embedding to use.')
-        parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
+        parser.add_argument('--lr', default=1e-3, type=float, help="Learning rate")
         parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
         return parent_parser
 
@@ -64,7 +64,8 @@ class VariantD(pl.LightningModule, Run):
         self.past = past
 
         self.uav_model = uav_model
-        self.save_hyperparameters(ignore=['uav_model'])
+        self.save_hyperparameters('activation', 'embedding', 'learning_rate', 'motor_size', 'past',
+                                  ignore=['uav_model'])
         self.emb_input_size = 128 if self.embedding in ['depth', 'norm'] else 256
         self.feature_size = self.motor_size + 13
 
@@ -269,22 +270,23 @@ print(f'GPU_COUNT={GPU_COUNT}')
 def main():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
-    parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch')
-    parser.add_argument('--load_weights', default=None, type=str, help='Path to previous weights')
+    parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
+    # parser.add_argument('--load_weights', default=None, type=str, help='Path to previous weights')
     residual_model_class = VariantD
     parser = residual_model_class.add_model_specific_args(parser)  # Module args
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 
     # Display entire dataset
-    for name in ['train', 'valid', 'test']:
-        dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
-                                               load_norm_emb=False)
-        print(name)
-        for scene_number, scene_traj in dataset_stats.index.items():
-            print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-        print('\n\n')
-    print(f'Data length: | {len(dataset_stats)}')
+    if torch.cuda.is_available():
+        for name in ['train', 'valid', 'test']:
+            dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
+                                                   load_norm_emb=False)
+            print(name)
+            for scene_number, scene_traj in dataset_stats.index.items():
+                print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+            print('\n\n')
+        print(f'Data length: | {len(dataset_stats)}')
 
     # Analysis parameters
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -297,8 +299,7 @@ def main():
               'lr': args.lr,
               'motor_size': motor_size,
               'max_epochs': args.max_epochs,
-              'past': args.past,
-              'unit_size': args.unit_size}
+              'past': args.past}
     name = residual_model_class.__name__
     version = f'{now}'
     training_path = f'{SAVING_PATH}/{name}/{version}/'
@@ -333,24 +334,23 @@ def main():
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']], dtype=np.float32)
-    quadrotor = NumpyDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32,
-                                    g=g)
-    if args.load_weights is None:
-        run = residual_model_class(activation=args.activation,
-                                   embedding=args.embedding,
-                                   learning_rate=args.lr,
-                                   uav_model=quadrotor,
-                                   motor_size=motor_size,
-                                   past=args.past)
-    else:
-        print(f'\nReloading weights from: {args.load_weights}')
-        run = residual_model_class.load_from_checkpoint(args.load_weights,
-                                                        activation=args.activation,
-                                                        embedding=args.embedding,
-                                                        learning_rate=args.lr,
-                                                        model=quadrotor,
-                                                        motor_size=motor_size,
-                                                        past=args.past)
+    quadrotor = NumpyDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
+    # if args.load_weights is None:
+    run = residual_model_class(activation=args.activation,
+                               embedding=args.embedding,
+                               learning_rate=args.lr,
+                               motor_size=motor_size,
+                               past=args.past,
+                               uav_model=quadrotor)
+    # else:
+        # print(f'\nReloading weights from: {args.load_weights}')
+        # run = residual_model_class.load_from_checkpoint(args.load_weights,
+        #                                                 activation=args.activation,
+        #                                                 embedding=args.embedding,
+        #                                                 learning_rate=args.lr,
+        #                                                 motor_size=motor_size,
+        #                                                 past=args.past,
+        #                                                 uav_model=quadrotor)
 
     num_workers = 12 if GPU_COUNT else 0
     # Datasets
@@ -367,7 +367,7 @@ def main():
                             pin_memory=True,
                             drop_last=True)
 
-    validation_data = DataLoader(HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
+    validation_data = DataLoader(HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
                                                         load_depth_emb=load_depth_emb,
                                                         load_norm_emb=load_norm_emb),
                                  batch_size=args.batch_size,
@@ -383,9 +383,11 @@ def main():
                          # fast_dev_run=False,
                          # track_grad_norm=2,
                          # accelerator=None,
-                         log_every_n_steps=50,  # default  50
+                         # log_every_n_steps=50,  # default  50
                          accelerator='ddp' if GPU_COUNT else None,
-                         log_gpu_memory='True')
+                         log_gpu_memory='True',
+                         resume_from_checkpoint=args.resume_from_checkpoint)
+    trainer.validate(run, dataloaders=validation_data)
     trainer.fit(run, train_data, validation_data)
 
 

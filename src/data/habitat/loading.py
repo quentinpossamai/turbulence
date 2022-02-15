@@ -30,8 +30,6 @@ def load_file(name: str, scene_number: int, flight_number: int):
     param scene_number: In [0, 90]
 
     param flight_number: in Z
-
-    return:
     """
     scene_id = MP3D_SCENE_LIST[scene_number]
     folder = f'{MP3D_DATA}{scene_id}/flight/{flight_number}/'
@@ -40,9 +38,9 @@ def load_file(name: str, scene_number: int, flight_number: int):
     if name == 'stats':
         return pickle.load(open(f'{folder}stats.pkl', 'rb'))
     elif name in ['depth_emb', 'norm_emb']:
-        return np.load(f'{folder}{name}/{name}.npy', mmap_mode='r', allow_pickle=False)
+        return np.load(f'{folder}{name}/{name}.npy', allow_pickle=False)
     else:
-        return np.load(f'{folder}{name}.npy', mmap_mode='r', allow_pickle=False)
+        return np.load(f'{folder}{name}.npy', allow_pickle=False)
 
 
 def build_index_valid_flight():
@@ -118,16 +116,21 @@ class HabitatResidualDataset(Dataset):
         if self.load_norm_emb:
             self.depth_list.append('norm_emb')
 
+        self.fa_mean = 0.0025
+        self.fa_std = 0.0091
+
     def __len__(self):
         return self.len
 
     def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
+        i = 0  # TODO change for overfit
         scene_number, flight_number, start, stop = self.path[i]
         to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1].copy()),
                      'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1].copy()),
                      'ground_force': torch.from_numpy(load_file('ground_force',
                                                                 scene_number,
                                                                 flight_number)[stop - 1].copy())}
+        to_return['ground_force'] = (to_return['ground_force'] - self.fa_mean) / self.fa_std
         for key in self.depth_list:
             to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop].copy())
             assert not torch.isnan(to_return[key]).any()

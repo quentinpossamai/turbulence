@@ -2,11 +2,10 @@
 cd ~/phd/turbulence/
 #file="/home/qpossamai/phd/turbulence/analysis/habitat_residual_training/"
 #file+="VariantA/20220204_104115/default/20220204_104115/checkpoints/epoch\=0-step\=120728.ckpt"
-~/anaconda3/envs/turbulence/bin/python -m src.learning.train_var_d\
+~/anaconda3/envs/turbulence/bin/python -m src.drone_models.residual.gru_cnn_var_d\
  --activation tanh\
- --batch_size 4\
- --lr 1e-6\
+ --batch_size 20\
+ --lr 1e-3\
  --max_epochs 10000\
- --past 40\
- --unit_size 50
+ --past 40
 # --load_weights $file

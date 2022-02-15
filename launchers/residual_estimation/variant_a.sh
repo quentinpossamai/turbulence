@@ -8,5 +8,4 @@ file+="VariantA/20220204_104115/checkpoints/epoch\=0-step\=120728.ckpt"
  --lr 1e-6\
  --max_epochs 10000\
  --past 40\
- --unit_size 50\
  --load_weights $file
