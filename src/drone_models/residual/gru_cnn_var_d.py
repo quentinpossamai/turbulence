@@ -85,11 +85,11 @@ class VariantD(pl.LightningModule, Run):
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
         self.emb_gru_norm = nn.BatchNorm1d(50)
-        self.emb_gru_dropout = nn.Dropout(p=0.)
+        self.emb_gru_dropout = nn.Dropout(p=0.2)
 
         # - reg (regression) branch
-        self.reg_fc_0 = layer.FullyConnected(self.activation, 0., 50, 50)
-        self.reg_fc_1 = layer.FullyConnected(self.activation, 0., 50, 50)
+        self.reg_fc_0 = layer.FullyConnected(self.activation, 0.2, 50, 50)
+        self.reg_fc_1 = layer.FullyConnected(self.activation, 0.2, 50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
         self.example_input_array = [torch.zeros(2, self.motor_size),
@@ -290,15 +290,15 @@ def main():
               'past': args.past}
     name = residual_model_class.__name__
     version = f'{now}'
-    training_path = f'{SAVING_PATH}/{name}/{version}/'
+    training_path = f'{SAVING_PATH}{name}/{version}/'
     mkdir_if_not_exist([training_path])
     pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
     print(f'training_path={training_path}')
     print(f'name={name} | version={version}')
     # logger = pl_loggers.TensorBoardLogger(save_dir=SAVING_PATH, name=name, version=version, log_graph=True,
     #                                          default_hp_metric=False)
-    logger = WandbLogger(name=f'{name}-{version}', save_dir=training_path[:-1], offline=False,
-                         id=version,
+    logger = WandbLogger(name=f'{name}-{version}', save_dir=training_path, offline=False,
+                         id={name}-{version},
                          # version=version,
                          project='turbulence_residual')
     # tb_logger.experiment.add_hparams(h_prms, {})
@@ -334,6 +334,7 @@ def main():
                                motor_size=motor_size,
                                past=args.past,
                                uav_model=quadrotor)
+    logger.watch(run)
     # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
     #                               f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if GPU_COUNT else 0
