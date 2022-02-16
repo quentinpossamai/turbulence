@@ -5,7 +5,7 @@ cd ~/phd/turbulence/
 ~/anaconda3/envs/turbulence/bin/python -m src.drone_models.residual.gru_cnn_var_d\
  --activation tanh\
  --batch_size 200\
- --lr 1e-4\
+ --lr 1e-5\
  --max_epochs 10000\
  --past 40
 # --load_weights $file
