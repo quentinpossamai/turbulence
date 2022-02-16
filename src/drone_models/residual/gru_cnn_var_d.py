@@ -297,7 +297,7 @@ def main():
     print(f'name={name} | version={version}')
     # logger = pl_loggers.TensorBoardLogger(save_dir=SAVING_PATH, name=name, version=version, log_graph=True,
     #                                          default_hp_metric=False)
-    logger = WandbLogger(name=f'{name}-{version}', save_dir=training_path, offline=False,
+    logger = WandbLogger(name=f'{name}-{version}', save_dir=training_path[:-1], offline=False,
                          id=version,
                          # version=version,
                          project='turbulence_residual')
