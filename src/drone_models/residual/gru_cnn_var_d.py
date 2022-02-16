@@ -6,6 +6,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.utilities.seed import seed_everything
+from pytorch_lightning.loggers import WandbLogger
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -97,7 +98,6 @@ class VariantD(pl.LightningModule, Run):
                                     else torch.zeros(2, self.past, 256)]
 
     def configure_optimizers(self):
-        print(f"Lightning.device: {self.device}", flush=True)
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, motor: torch.Tensor, state: torch.Tensor, emb: torch.Tensor):
@@ -276,17 +276,6 @@ def main():
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 
-    # Display entire dataset
-    if torch.cuda.is_available():
-        for name in ['train', 'valid', 'test']:
-            dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
-                                                   load_norm_emb=False)
-            print(name)
-            for scene_number, scene_traj in dataset_stats.index.items():
-                print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-            print(f'Data length: | {len(dataset_stats)}')
-            print('\n\n')
-
     # Analysis parameters
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     motor_size = 4
@@ -306,8 +295,12 @@ def main():
     pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
     print(f'training_path={training_path}')
     print(f'name={name} | version={version}')
-    tb_logger = pl_loggers.TensorBoardLogger(save_dir=SAVING_PATH, name=name, version=version, log_graph=True,
-                                             default_hp_metric=False)
+    # logger = pl_loggers.TensorBoardLogger(save_dir=SAVING_PATH, name=name, version=version, log_graph=True,
+    #                                          default_hp_metric=False)
+    logger = WandbLogger(name=f'{name}-{version}', save_dir=training_path, offline=False,
+                         id=version,
+                         # version=version,
+                         project='turbulence_residual')
     # tb_logger.experiment.add_hparams(h_prms, {})
 
     # Reproducibility
@@ -367,7 +360,7 @@ def main():
                                  pin_memory=True,
                                  drop_last=True)
     trainer = pl.Trainer(gpus=GPU_COUNT,
-                         logger=tb_logger,
+                         logger=logger,
                          deterministic=True,
                          max_epochs=args.max_epochs,
                          # fast_dev_run=False,
@@ -378,6 +371,17 @@ def main():
                          plugins=DDPPlugin(find_unused_parameters=False),
                          log_gpu_memory='True',
                          resume_from_checkpoint=args.resume_from_checkpoint)
+
+    # Display entire dataset
+    if torch.cuda.is_available():
+        for name in ['train', 'valid', 'test']:
+            dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
+                                                   load_norm_emb=False)
+            print(name)
+            for scene_number, scene_traj in dataset_stats.index.items():
+                print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+            print(f'Data length: | {len(dataset_stats)}')
+            print('\n\n')
 
     if args.resume_from_checkpoint is None:
         trainer.validate(run, dataloaders=validation_data)

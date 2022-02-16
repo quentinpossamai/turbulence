@@ -103,7 +103,6 @@ class VariantA(pl.LightningModule, Run):
                                     torch.zeros(2, self.past, 480, 640)]
 
     def configure_optimizers(self):
-        print(f"Lightning.device: {self.device}", flush=True)
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
 
     def forward(self, motor: torch.Tensor, state: torch.Tensor, depth: torch.Tensor):

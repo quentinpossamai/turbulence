@@ -46,4 +46,5 @@ dependencies:
   - pip:
     - christofides==1.0.1  # In it christofides is in python 2, take the correct one from mac:~ or remsto:~
     - opencv-python-headless  # comment and choose opencv-python for the Mac
+    - wandb
 #    - opencv-python

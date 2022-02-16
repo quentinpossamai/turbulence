@@ -499,7 +499,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                                                             seed=flight_number, viz_navmesh=False)
     if not has_worked:
         simulation.sim.close(True)
-        folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/'
         mkdir_if_not_exist([folder])
         pickle.dump({'done': None, 'info': 'no_trajectory'}, open(f'{folder}stats.pkl', 'wb'))
         return False
