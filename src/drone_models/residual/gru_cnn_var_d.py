@@ -3,6 +3,7 @@ import datetime
 import numpy as np
 import pickle
 import pytorch_lightning as pl
+from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.utilities.seed import seed_everything
 import torch
@@ -373,7 +374,7 @@ def main():
                          # track_grad_norm=2,
                          # accelerator=None,
                          log_every_n_steps=50,  # default  50
-                         accelerator='ddp' if GPU_COUNT else None,
+                         accelerator=DDPPlugin(find_unused_parameters=False) if GPU_COUNT else None,
                          log_gpu_memory='True',
                          resume_from_checkpoint=args.resume_from_checkpoint)
 
