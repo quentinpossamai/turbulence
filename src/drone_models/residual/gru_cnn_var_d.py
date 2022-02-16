@@ -7,10 +7,12 @@ from pytorch_lightning.plugins import DDPPlugin
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.utilities.seed import seed_everything
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from typing import Union, Callable, Tuple, Dict
+import wandb
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 import src.utils.layer as layer
@@ -26,7 +28,7 @@ class VariantD(pl.LightningModule, Run):
         parser = parent_parser.add_argument_group("VariantA")
         parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
         parser.add_argument('--embedding', default='depth', type=str, help='Embedding to use.')
-        parser.add_argument('--lr', default=1e-3, type=float, help="Learning rate")
+        parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
         parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
         return parent_parser
 
@@ -259,25 +261,46 @@ ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
 mkdir_if_not_exist([SAVING_PATH])
 
-use_cuda_if_possible = True
-device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
-GPU_COUNT = int(device != torch.device('cpu'))
-
-print(f'device={device}')
-print(f'GPU_COUNT={GPU_COUNT}')
-
 
 def main():
+    now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    version = f'{now}'
+    residual_model_class = VariantD
+    name = residual_model_class.__name__
+    training_path = f'{SAVING_PATH}{name}/{version}/'
+    mkdir_if_not_exist([training_path])
+
+    wandb.init(name=f'{name}-{version}',
+               id=f'{name}-{version}',
+               project='turbulence_residual',
+               dir=training_path)
+    logger = WandbLogger(experiment=wandb.run)
+
+    use_cuda_if_possible = True
+    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
+    GPU_COUNT = int(device != torch.device('cpu'))
+
+    print(f'device={device}')
+    print(f'GPU_COUNT={GPU_COUNT}')
+
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
-    residual_model_class = VariantD
     parser = residual_model_class.add_model_specific_args(parser)  # Module args
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 
+    # Display entire dataset
+    for name in ['train', 'valid', 'test']:
+        dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
+                                               load_norm_emb=False)
+        print(name)
+        for scene_number, scene_traj in dataset_stats.index.items():
+            print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+        print(f'Data length: | {len(dataset_stats)}')
+        print('\n\n')
+
     # Analysis parameters
-    now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     motor_size = 4
     h_prms = {'time_start': now,  # hyperparameters
               'name': residual_model_class.__name__,
@@ -288,20 +311,9 @@ def main():
               'motor_size': motor_size,
               'max_epochs': args.max_epochs,
               'past': args.past}
-    name = residual_model_class.__name__
-    version = f'{now}'
-    training_path = f'{SAVING_PATH}{name}/{version}/'
-    mkdir_if_not_exist([training_path])
     pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
     print(f'training_path={training_path}')
     print(f'name={name} | version={version}')
-    # logger = pl_loggers.TensorBoardLogger(save_dir=SAVING_PATH, name=name, version=version, log_graph=True,
-    #                                          default_hp_metric=False)
-    logger = WandbLogger(name=f'{name}-{version}', save_dir=training_path, offline=False,
-                         id={name}-{version},
-                         # version=version,
-                         project='turbulence_residual')
-    # tb_logger.experiment.add_hparams(h_prms, {})
 
     # Reproducibility
     seed = 0
@@ -360,6 +372,10 @@ def main():
                                  num_workers=num_workers,
                                  pin_memory=True,
                                  drop_last=True)
+    checkpoint_callback = ModelCheckpoint(dirpath=training_path,
+                                          filename='{epoch}-{step}-{val_loss:.2f}',
+                                          monitor='val_loss',
+                                          mode='min')
     trainer = pl.Trainer(gpus=GPU_COUNT,
                          logger=logger,
                          deterministic=True,
@@ -370,23 +386,14 @@ def main():
                          log_every_n_steps=50,  # default  50
                          accelerator='ddp' if GPU_COUNT else None,
                          plugins=DDPPlugin(find_unused_parameters=False),
-                         log_gpu_memory='True',
-                         resume_from_checkpoint=args.resume_from_checkpoint)
-
-    # Display entire dataset
-    if torch.cuda.is_available():
-        for name in ['train', 'valid', 'test']:
-            dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
-                                                   load_norm_emb=False)
-            print(name)
-            for scene_number, scene_traj in dataset_stats.index.items():
-                print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-            print(f'Data length: | {len(dataset_stats)}')
-            print('\n\n')
+                         log_gpu_memory='False',
+                         resume_from_checkpoint=args.resume_from_checkpoint,
+                         callbacks=[checkpoint_callback])
 
     if args.resume_from_checkpoint is None:
         trainer.validate(run, dataloaders=validation_data)
     trainer.fit(run, train_data, validation_data)
+    print(checkpoint_callback.best_model_path)
 
 
 if __name__ == "__main__":
