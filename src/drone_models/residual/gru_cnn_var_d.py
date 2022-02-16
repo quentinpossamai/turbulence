@@ -374,7 +374,8 @@ def main():
                          # track_grad_norm=2,
                          # accelerator=None,
                          log_every_n_steps=50,  # default  50
-                         accelerator=DDPPlugin(find_unused_parameters=False) if GPU_COUNT else None,
+                         accelerator='ddp' if GPU_COUNT else None,
+                         plugins=DDPPlugin(find_unused_parameters=False),
                          log_gpu_memory='True',
                          resume_from_checkpoint=args.resume_from_checkpoint)
 
