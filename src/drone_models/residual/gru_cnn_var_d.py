@@ -72,23 +72,22 @@ class VariantD(pl.LightningModule, Run):
         # - sm (state, motor) branch
         # For the simulation past motor and state is useless
         self.sm_input_norm = nn.BatchNorm1d(self.feature_size)
-        self.sm_input_drop = nn.Dropout(p=0.2)
-        self.sm_fc_out = layer.FullyConnected(self.activation, dropout_p=0.5, in_features=self.feature_size,
-                                              out_features=50)
+        self.sm_input_drop = nn.Dropout(0.)
+        self.sm_fc_out = layer.FullyConnected(self.activation, 0., self.feature_size, 50)
 
         # - emb (embedding) branch
         self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
-        self.emb_input_drop = nn.Dropout(0.2)
-        self.emb_fc_0 = layer.FullyConnected(torch.tanh, 0.5, self.emb_input_size, 50)
+        self.emb_input_drop = nn.Dropout(0.)
+        self.emb_fc_0 = layer.FullyConnected(torch.tanh, 0., self.emb_input_size, 50)
 
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
         self.emb_gru_norm = nn.BatchNorm1d(50)
-        self.emb_gru_dropout = nn.Dropout(p=0.5)
+        self.emb_gru_dropout = nn.Dropout(p=0.)
 
         # - reg (regression) branch
-        self.reg_fc_0 = layer.FullyConnected(self.activation, 0.5, 50, 50)
-        self.reg_fc_1 = layer.FullyConnected(self.activation, 0.5, 50, 50)
+        self.reg_fc_0 = layer.FullyConnected(self.activation, 0., 50, 50)
+        self.reg_fc_1 = layer.FullyConnected(self.activation, 0., 50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
         self.example_input_array = [torch.zeros(2, self.motor_size),
@@ -284,8 +283,8 @@ def main():
             print(name)
             for scene_number, scene_traj in dataset_stats.index.items():
                 print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+            print(f'Data length: | {len(dataset_stats)}')
             print('\n\n')
-        print(f'Data length: | {len(dataset_stats)}')
 
     # Analysis parameters
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')

@@ -7,13 +7,13 @@ tb_cluster_path = "/home/qpossamai/phd/turbulence/analysis/habitat_residual_trai
 tb_local_path = "/Users/quentin/phd/turbulence/analysis/habitat_residual_training/"
 os.system(f"rsync -rtv --exclude=.DS_Store remsto:{tb_cluster_path} {tb_local_path}")
 os.system(f"rsync -rtv --exclude=.DS_Store {tb_local_path} remsto:{tb_cluster_path}")
-os.system(f'ssh remsto /bin/bash << EOF\n'
-          # f'cd /home/qpossamai &&\n'
-          # f'chmod -R 755 {tb_cluster_path} &&\n'
-          # f'echo "changing permission in analysis done"  &&\n'
-          f'find . -name ".DS_Store" -delete &&\n'
-          f'echo "Removing .DS_Store in homedir"\n'
-          f'EOF')
+# os.system(f'ssh remsto /bin/bash << EOF\n'
+#           # f'cd /home/qpossamai &&\n'
+#           # f'chmod -R 755 {tb_cluster_path} &&\n'
+#           # f'echo "changing permission in analysis done"  &&\n'
+#           f'find . -name ".DS_Store" -delete &&\n'
+#           f'echo "Removing .DS_Store in homedir"\n'
+#           f'EOF')
 # os.system(f"rsync -av --delete remsto:{tb_cluster_path} {tb_local_path}")  # exception
 
 # Launch tensorboard
