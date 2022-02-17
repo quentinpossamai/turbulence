@@ -208,8 +208,8 @@ def plot_model_prediction(variant: str):
 
 def main():
     # plot_fa_generator()
-    # plot_fa()
-    plot_model_prediction('d')
+    plot_fa()
+    # plot_model_prediction('d')
 
 
 if __name__ == '__main__':

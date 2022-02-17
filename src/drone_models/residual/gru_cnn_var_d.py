@@ -77,12 +77,12 @@ class VariantD(pl.LightningModule, Run):
         # For the simulation past motor and state is useless
         self.sm_input_norm = nn.BatchNorm1d(self.feature_size)
         self.sm_input_drop = nn.Dropout(0.)
-        self.sm_fc_out = layer.FullyConnected(self.activation, 0., self.feature_size, 50)
+        self.sm_fc_out = layer.FullyConnected(self.activation, 0.2, self.feature_size, 50)
 
         # - emb (embedding) branch
         self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
         self.emb_input_drop = nn.Dropout(0.)
-        self.emb_fc_0 = layer.FullyConnected(torch.tanh, 0., self.emb_input_size, 50)
+        self.emb_fc_0 = layer.FullyConnected(torch.tanh, 0.2, self.emb_input_size, 50)
 
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)

@@ -128,7 +128,11 @@ class HabitatResidualDataset(Dataset):
                      'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1].copy()),
                      'ground_force': torch.from_numpy(load_file('ground_force',
                                                                 scene_number,
-                                                                flight_number)[stop - 1].copy())}
+                                                                flight_number)[stop - 1].copy()),
+                     'surface_dist': torch.from_numpy(load_file('surface_dist',
+                                                                scene_number,
+                                                                flight_number)[stop - 1].copy())
+                     }
         to_return['ground_force'] = (to_return['ground_force'] - self.fa_mean) / self.fa_std
         for key in self.depth_list:
             to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop].copy())
