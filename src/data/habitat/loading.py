@@ -71,6 +71,9 @@ class HabitatResidualDataset(Dataset):
     fa_mean = 0.0025
     fa_std = 0.0091
 
+    z_mean = 0.27047664
+    z_std = 0.45976904
+
     def __init__(self, train_valid_test: str,
                  past: int,
                  load_depth: bool,
@@ -134,6 +137,7 @@ class HabitatResidualDataset(Dataset):
                                                                 flight_number)[stop - 1].copy())
                      }
         to_return['ground_force'] = (to_return['ground_force'] - self.fa_mean) / self.fa_std
+        to_return['surface_dist'] = (to_return['surface_dist'] - self.z_mean) / self.z_std
         for key in self.depth_list:
             to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop].copy())
             assert not torch.isnan(to_return[key]).any()
