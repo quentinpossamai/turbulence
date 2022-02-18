@@ -6,9 +6,9 @@ echo "Git: push from homedir to github done"  &&
 ssh remsto /bin/bash << EOF
   cd ~/phd/turbulence/launchers/habitat_generation/ &&
   git pull github main &&
-  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen0 -o log-hab_gen0-%A.out habitat_data_generation0.sh
-  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen1 -o log-hab_gen1-%A.out habitat_data_generation1.sh
-  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen2 -o log-hab_gen2-%A.out habitat_data_generation2.sh
-  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen3 -o log-hab_gen3-%A.out habitat_data_generation3.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen0 -o log-hab_gen0-%A.out --time=8-00:00:00 habitat_data_generation0.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen1 -o log-hab_gen1-%A.out --time=8-00:00:00 habitat_data_generation1.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen2 -o log-hab_gen2-%A.out --time=8-00:00:00 habitat_data_generation2.sh
+  sbatch --mem 10G --gres=gpu:1 -p part1 -J hab_gen3 -o log-hab_gen3-%A.out --time=8-00:00:00 habitat_data_generation3.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J emb_depth -o log-emb_depth-%A.out gen_emb.sh
 EOF

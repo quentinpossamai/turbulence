@@ -204,6 +204,9 @@ def generate_reference(sim: habitat_sim.Simulator,
     # Interpolation
     ref_tf_global_agent_collidable = polynomial_interpolation(main_point=entire_path, num_sample=num_sample, degree=1,
                                                               flight_height=flight_height)
+    if np.isnan(ref_tf_global_agent_collidable).any():
+        print('Reference interpolation not possible, change seed', file=sys.stderr, flush=True)
+        return False
 
     # Check if trajectory collides
     directions = [np.array([0, 0, -1]),
