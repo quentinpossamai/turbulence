@@ -14,7 +14,7 @@ from src.data.habitat.mpc import mpc_controller
 from src.data.habitat.hatbitat2flu import Habitat2FLU
 from src.utils.paths import WD_PATH, mkdir_if_not_exist
 from src.utils.trajectory import trace_trajectory3d
-from src.utils.transform import Transform
+from src.utils.transform import Transform as Tf
 
 DTYPE = np.float32
 
@@ -325,7 +325,7 @@ class Simulation:
         next_state_habitat = Habitat2FLU.state_flu_2_state_habitat(next_state)
         trans, quat, linear_velocity, angular_velocity = (next_state_habitat[:3], next_state_habitat[3:7],
                                                           next_state_habitat[7:10], next_state_habitat[10:])
-        tf_global__agent = Transform.from_quat_trans(quat=quat, trans=trans).as_matrix()
+        tf_global__agent = Tf.from_quat_trans(quat=quat, trans=trans).as_matrix()
         self.agent.transformation = tf_global__agent
         self.agent.linear_velocity = linear_velocity
         self.agent.angular_velocity = angular_velocity
@@ -339,7 +339,7 @@ class Simulation:
         cv2.namedWindow("stereo_pair")
         # 1. Agent init
         simulation_iteration = 0
-        # tf_ref = Transform.from_quat_trans(self.state_ref[:, 3:7], self.state_ref[:, :3]).as_matrix()
+        # tf_ref = Tf.from_quat_trans(self.state_ref[:, 3:7], self.state_ref[:, :3]).as_matrix()
         self.agent.transformation = tf_follow[0]
         obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
 
@@ -354,7 +354,7 @@ class Simulation:
                                                 ], axis=1)
             z = obs["surface_dist"][0]
             tf_global_agent = np.array(self.agent.transformation)  # transform origin body
-            rot_global_flu = Transform.from_matrix(tf_global_agent).as_rot_mat() @ Habitat2FLU.rot_hab__flu
+            rot_global_flu = Tf.from_matrix(tf_global_agent).as_rot_mat() @ Habitat2FLU.rot_hab__flu
 
             # Plotting sensors
             print(simulation_iteration)
@@ -421,7 +421,7 @@ class Simulation:
                 self.agent.angular_velocity = saved_velocity[1]
                 simulation_iteration += 1
 
-            if simulation_iteration == len(self.state_ref) - 1:
+            if simulation_iteration == len(tf_follow):
                 break
 
             # 9-Simulating for step seconds
@@ -466,7 +466,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # from src.utils.profiler import profiler
     # profiler()
     # Initialise drone
-    folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight/{flight_number}/'
+    folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight2/{flight_number}/'
+    mkdir_if_not_exist([folder])
 
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
@@ -499,7 +500,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
                                                             seed=flight_number, viz_navmesh=False)
     if not has_worked:
         simulation.sim.close(True)
-        mkdir_if_not_exist([folder])
         pickle.dump({'done': None, 'info': 'no_trajectory'}, open(f'{folder}stats.pkl', 'wb'))
         return False
 
@@ -511,8 +511,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
 
     # state are always [trans 3, quat 4, lin_vel 3, ang_vel 3]
     # Setting the drone at the first reference
-    simulation.agent.transformation = Transform.from_quat_trans(simulation.state_ref[0, 3:7],
-                                                                simulation.state_ref[0, :3]).as_matrix()
+    simulation.agent.transformation = Tf.from_quat_trans(simulation.state_ref[0, 3:7],
+                                                         simulation.state_ref[0, :3]).as_matrix()
     simulation.agent.linear_velocity = np.zeros(3)
     simulation.agent.angular_velocity = np.zeros(3)
 
@@ -552,22 +552,30 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         except ValueError:
             print(f'Drone diverged', file=sys.stderr, flush=True)
             simulation.sim.close(True)
-            mkdir_if_not_exist([folder])
             pickle.dump({'done': None, 'info': 'diverged'}, open(f'{folder}stats.pkl', 'wb'))
             return False
 
         # Simulating result
         if not same_env:
-            out = simulation.one_step_sim(dt=dt, state=data_collection['state'][-1], motor=data_collection['motor'][-1],
+            out = simulation.one_step_sim(dt=dt, state=data_collection['state'][-1], motor=motor_horizon[0],
                                           z=data_collection['surface_dist'][-1])
             next_state_flu, obs, has_collided, ground_effect = out
             if (not np.isfinite(next_state_flu).all() or not np.isfinite(ground_effect).all() or
                     not np.isfinite(obs['surface_dist']).all()):
                 print(f'Incorrect values from habitat', file=sys.stderr, flush=True)
                 simulation.sim.close(True)
-                mkdir_if_not_exist([folder])
                 pickle.dump({'done': None, 'info': 'nan'}, open(f'{folder}stats.pkl', 'wb'))
                 return False
+            if has_collided:
+                print('Drone has collided', file=sys.stderr, flush=True)
+                break
+            if obs['surface_dist'][0] == 0:
+                print('Drone has zeros height', file=sys.stderr, flush=True)
+                # state = np.stack(data_collection['state'])
+                # state_habitat = Habitat2FLU.state_flu_2_state_habitat(state)
+                # tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+                # simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_follow)
+                break
             data_collection['motor'].append(motor_horizon[0])  # t to compute t+1
             data_collection['mpc_error'].append(err)  # t to compute t+1
             data_collection['ground_force'].append(ground_effect)  # t used to compute t+1
@@ -575,10 +583,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
             data_collection['depth'].append(obs['left_depth_camera'])  # t+1
             data_collection['surface_dist'].append(obs['surface_dist'][0])  # t+1
             data_collection['state'].append(next_state_flu)  # t+1
-
-            if has_collided:
-                print('Drone has collided', file=sys.stderr, flush=True)
-                break
         else:
             next_state = simulation.quadrotor.forward(dt=dt, state=data_collection['state'][-1],
                                                       motor=data_collection['motor'][-1])
@@ -596,7 +600,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         # plt.plot(state_ref_flu[:, 2])
         # plt.plot(pose_sim_flu[:, 2])
         trace_trajectory3d(pose_sim_flu, quat_sim_flu, pause=1e-4, step=1, position_ref=state_ref_flu[:time_end, :3])
-        tf_ref_hab = Transform.from_quat_trans(simulation.state_ref[:, 3:7], simulation.state_ref[:, :3]).as_matrix()
+        tf_ref_hab = Tf.from_quat_trans(simulation.state_ref[:, 3:7], simulation.state_ref[:, :3]).as_matrix()
         simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_ref_hab)
 
         # Error | MPC model vs Simulation
@@ -616,7 +620,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
 
         # View camera's simulated trajectory
         state_habitat = Habitat2FLU.state_flu_2_state_habitat(data_generated['state'])
-        tf_real = Transform.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+        tf_real = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
         simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=dt, tf_follow=tf_real)
 
         # # Motor variation
@@ -636,7 +640,6 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         import time
         tic = time.time()
         print(f'Saving', file=sys.stderr, flush=True)
-        mkdir_if_not_exist([folder])
         for name, array in data_generated.items():
             np.save(f'{folder}{name}.npy', array.astype(np.float32))
         info = 'collided' if has_collided else None
@@ -651,8 +654,8 @@ def main():
     parser.add_argument('--scene_start', default=0, type=int, help='Scene number range start [0, 89]')
     parser.add_argument('--scene_stop', default=1, type=int, help='Scene number range stop [1, 90]')
     # fn = flight_number correspond to a specific trajectory.
-    parser.add_argument('--fn_start', default=0, type=int, help='Flight number range start')
-    parser.add_argument('--fn_stop', default=1, type=int, help='Flight number range stop')
+    parser.add_argument('--fn_start', default=1, type=int, help='Flight number range start')
+    parser.add_argument('--fn_stop', default=2, type=int, help='Flight number range stop')
     parser.add_argument('--cluster', default=False, type=bool, help='Execute on cluster.')
     args = parser.parse_args()
 
@@ -664,7 +667,7 @@ def main():
                                   same_env=False,
                                   plot_ref=False,
                                   plot_topdown=False,
-                                  debug=True,
+                                  debug=False,
                                   cluster=args.cluster)
             print(f'\n' * 20, file=sys.stderr, flush=True)
 

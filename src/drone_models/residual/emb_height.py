@@ -250,8 +250,10 @@ def main():
     training_path = f'{SAVING_PATH}{name}/{version}/'
     mkdir_if_not_exist([training_path])
 
-    wandb.init(name=f'{name}-{version}',
-               id=f'{name}-{version}',
+    identifier = f'{name}-{version}'
+    identifier = identifier if torch.cuda.is_available() else identifier + 'local'
+    wandb.init(name=identifier,
+               id=identifier,
                project='turbulence_residual',
                dir=training_path)
     logger = WandbLogger(experiment=wandb.run)

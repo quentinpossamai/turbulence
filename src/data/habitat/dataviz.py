@@ -6,7 +6,10 @@ import pytorch_lightning as pl
 import torch
 from tqdm import tqdm
 
+from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
+import src.data.habitat.data_gen as data_gen
+import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.residual.gru_cnn_var_d import VariantD
 from src.drone_models.residual.gru_cnn_var_a import VariantA
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
@@ -69,7 +72,7 @@ def plot_fa():
     for scene_number, scene_name in enumerate(habitat.MP3D_SCENE_LIST):
         index[scene_number] = {}
         try:  # Try finding flight folder
-            flights = [int(e) for e in next(os.walk(f'{habitat.MP3D_DATA}{scene_name}/flight/'))[1]]
+            flights = sorted([int(e) for e in next(os.walk(f'{habitat.MP3D_DATA}{scene_name}/flight/'))[1]])
             for number in flights:
                 stats = habitat.load_file('stats', scene_number, number)
                 if stats['done'] is not None:  # If the drone has flight at least one step
@@ -82,10 +85,21 @@ def plot_fa():
 
     fa = []
     z = []
+    zero_index = {scene_number: {} for scene_number in index}
     for scene_number, flight in index.items():
         for flight_number in flight:
             fa.append(habitat.load_file('ground_force', scene_number, flight_number))
-            z.append(habitat.load_file('surface_dist', scene_number, flight_number))
+            little_z = habitat.load_file('surface_dist', scene_number, flight_number)
+            if (little_z == 0).any():
+                print(f'{(little_z == 0).sum()} zero found in scene_number: {scene_number} | '
+                      f'flight_number {flight_number}')
+                import matplotlib.pyplot as plt
+                # plt.plot(little_z)
+                # plt.show()
+                zero_index[scene_number][flight_number] = (little_z == 0).sum()
+
+                print()
+            z.append(little_z)
     z = np.concatenate(z, axis=0)[:, 0]
     fa = np.concatenate(fa, axis=0)[:, 2]
     print(f'Mean {np.mean(fa)} | std {np.std(fa)}')
@@ -112,6 +126,12 @@ def plot_fa():
     # ax.set_ylabel('')
     ax.grid()
     plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/fa_distribution_all.pdf')
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(little_z)
+    ax.set_xlabel('Sample #')
+    ax.set_ylabel('Surface distance (m)')
+    ax.grid()
 
     plt.hist(fa, bins='auto', density=True)
 
@@ -206,10 +226,45 @@ def plot_model_prediction(variant: str):
             plt.show()
 
 
+def observe_generated_traj(scene_number, flight_number):
+    scene_id = habitat.MP3D_SCENE_LIST[scene_number]
+    scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/flight/{flight_number}/"
+    state = habitat.load_file('state', scene_number, flight_number)
+    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+
+    command = f'rsync -tv remsto:{cluster_scene_path} {scene_path}'
+    if not os.path.isfile(scene_path):
+        print(command)
+        raise(FileNotFoundError('Scene is not in local'))
+        os.system(command)  # if scene not downloaded
+
+    drone_width, drone_height = 0.1, 0.025
+    volumetric_mass = 200
+    g = 9.81
+    m = volumetric_mass * drone_width ** 2 * drone_height
+    drone_prms = {'width': drone_width,  # [m]
+                  'height': drone_height,  # [m]
+                  'm': m,  # [kg]
+                  'kt': m * g / (4 * 150 ** 2),  #
+                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
+                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
+                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
+                  'prop_radius': drone_width * 0.1}  # [m]
+
+    simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
+    simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1/20, tf_follow=tf_follow)
+
+
 def main():
     # plot_fa_generator()
-    plot_fa()
+    # plot_fa()
     # plot_model_prediction('d')
+    observe_generated_traj(89, 8)
 
 
 if __name__ == '__main__':
