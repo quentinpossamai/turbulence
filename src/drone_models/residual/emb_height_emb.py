@@ -281,10 +281,10 @@ def main():
         dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
                                                load_norm_emb=False)
         print(name)
-    for scene_number, scene_traj in dataset_stats.index.items():
-        print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-    print(f'Data length: | {len(dataset_stats)}')
-    print('\n\n')
+        for scene_number, scene_traj in dataset_stats.index.items():
+            print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+        print(f'Data length: | {len(dataset_stats)}')
+        print('\n\n')
 
     # Analysis parameters
     motor_size = 4
