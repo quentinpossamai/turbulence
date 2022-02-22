@@ -100,6 +100,7 @@ class HabitatResidualDataset(Dataset):
         else:
             assert self.train_valid_test == 'test'
             include = TEST
+
         self.index = {}
         for i in include:
             if self.valid_index[i] != {}:
