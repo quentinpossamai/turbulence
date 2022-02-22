@@ -153,7 +153,8 @@ def main_habitat():
                 sce_num, flight_number = trajectory['name']
                 sce_num = sce_num.item()
                 flight_number = flight_number.item()
-                folder = f'{habitat.MP3D_DATA}{habitat.MP3D_SCENE_LIST[sce_num]}/flight/{flight_number}/depth_emb/'
+                folder = f'{habitat.MP3D_DATA}{habitat.MP3D_SCENE_LIST[sce_num]}/{habitat.FLIGHT}/{flight_number}/' \
+                         f'depth_emb/'
                 paths.mkdir_if_not_exist([folder])
 
                 mse_normal = MSE(depthmap_gt, depthmap_hat)
