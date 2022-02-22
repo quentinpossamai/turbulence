@@ -22,6 +22,8 @@ TRAIN = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_train.pkl', 'rb'))
 VALID = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_valid.pkl', 'rb'))
 TEST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_test.pkl', 'rb'))
 
+FLIGHT = 'flight2'
+
 
 def load_file(name: str, scene_number: int, flight_number: int):
     """
@@ -32,31 +34,34 @@ def load_file(name: str, scene_number: int, flight_number: int):
     param flight_number: in Z
     """
     scene_id = MP3D_SCENE_LIST[scene_number]
-    folder = f'{MP3D_DATA}{scene_id}/flight/{flight_number}/'
+    folder = f'{MP3D_DATA}{scene_id}/{FLIGHT}/{flight_number}/'
     assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
                     'depth_emb', 'norm_emb']
     if name == 'stats':
         return pickle.load(open(f'{folder}stats.pkl', 'rb'))
     elif name in ['depth_emb', 'norm_emb']:
-        return np.load(f'{folder}{name}/{name}.npy', allow_pickle=False)
+        return np.load(f'{folder}{name}/{name}.npy', mmap_mode='r', allow_pickle=False)
     else:
-        return np.load(f'{folder}{name}.npy', allow_pickle=False)
+        return np.load(f'{folder}{name}.npy', mmap_mode='r', allow_pickle=False)
 
 
-def build_index_valid_flight():
+def build_index_valid_flight(check_all_file: bool = True):
     index = {i: None for i in range(len(MP3D_SCENE_LIST))}
     to_test = ['depth.npy', 'depth_emb/depth_emb.npy', 'ground_force.npy', 'motor.npy', 'mpc_error.npy',
                'norm_emb/norm_emb.npy', 'state.npy', 'stats.pkl', 'surface_dist.npy']
-
     for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
         index[scene_number] = {}
         try:  # Try finding flight folder
-            flights = [int(e) for e in next(os.walk(f'{MP3D_DATA}{scene_name}/flight/'))[1]]
+            flights = sorted([int(e) for e in next(os.walk(f'{MP3D_DATA}{scene_name}/{FLIGHT}/'))[1]])
             for number in flights:
-                is_valid = all([os.path.isfile(f'{MP3D_DATA}{scene_name}/flight/{number}/{test}') for test in to_test])
+                if check_all_file:
+                    is_valid = all([os.path.isfile(f'{MP3D_DATA}{scene_name}/{FLIGHT}/'
+                                                   f'{number}/{test}') for test in to_test])
+                else:
+                    is_valid = True
                 if is_valid:  # if every needed files are present
                     stats = load_file('stats', scene_number, number)
-                    if stats['done'] is not None:  # If the drone has flight at least one step
+                    if stats['done'] is not None and stats['done'] > 2:  # If the drone has flight at least one step
                         mpc_error = load_file('mpc_error', scene_number, number)
                         if (mpc_error < 5).all() and len(mpc_error) >= 200:  # If controller is not wrong and traj long
                             # enough
@@ -179,8 +184,11 @@ class HabitatNormedDepthDataset(Dataset):
 
 
 def main():
-    dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=True, load_norm_emb=False)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
+    # dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=True, load_norm_emb=False)
+    # dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
+
+    dataset = HabitatNormedDepthDataset()
+
 
     dataset[0]
 
