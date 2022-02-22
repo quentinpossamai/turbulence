@@ -84,7 +84,7 @@ class HabitatResidualDataset(Dataset):
                  load_depth: bool,
                  load_depth_emb: bool,
                  load_norm_emb: bool):
-        build_index_valid_flight(False)
+        build_index_valid_flight()
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -159,7 +159,7 @@ class HabitatNormedDepthDataset(Dataset):
 
              'name': scene_number, flight_number}
         """
-        build_index_valid_flight()
+        build_index_valid_flight(False)
         self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
 
         self.len = np.sum([1 for scene_traj in self.valid_index.values() for _ in scene_traj.values()])
