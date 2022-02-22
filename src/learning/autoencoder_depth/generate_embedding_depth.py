@@ -26,7 +26,7 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 
 MSE = nn.MSELoss()
 
-ZMAX = 7.48
+# ZMAX = 7.48
 
 
 class EurocMavLoader(Dataset):

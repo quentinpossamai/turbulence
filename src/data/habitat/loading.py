@@ -84,7 +84,7 @@ class HabitatResidualDataset(Dataset):
                  load_depth: bool,
                  load_depth_emb: bool,
                  load_norm_emb: bool):
-        build_index_valid_flight()
+        build_index_valid_flight(False)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
