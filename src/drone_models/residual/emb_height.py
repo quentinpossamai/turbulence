@@ -70,7 +70,7 @@ class EmbHeight(pl.LightningModule, Run):
         # - emb (embedding) branch
         # self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
         # self.emb_input_drop = nn.Dropout(0.)
-        self.emb_fc_0 = nn.Linear(self.emb_input_size, 50)
+        self.emb_linear_0 = nn.Linear(self.emb_input_size, 50)
 
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
@@ -78,8 +78,8 @@ class EmbHeight(pl.LightningModule, Run):
         # self.emb_gru_dropout = nn.Dropout(p=0.)
 
         # - reg (regression) branch
-        self.reg_fc_0 = nn.Linear(50, 50)
-        self.reg_fc_1 = nn.Linear(50, 50)
+        self.reg_linear_0 = nn.Linear(50, 50)
+        self.reg_linear_1 = nn.Linear(50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
         self.example_input_array = [torch.zeros(2, self.past, 128) if self.embedding in ['depth', 'norm']
@@ -109,15 +109,15 @@ class EmbHeight(pl.LightningModule, Run):
 
         # - emb branch
         star_shape = list(emb.shape[:-1])
-        out = self.emb_fc_0(emb.reshape((-1, 128)))
+        out = self.activation(self.emb_linear_0(emb.reshape((-1, 128))))
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         out = out[:, -1, :]  # last hidden states, (*, feature_size)
         emb_out = out  # (batch, feature_size)
 
         # - reg branch
         # out = self.reg_fc_0(sm_out + emb_out)
-        out = self.reg_fc_0(emb_out)
-        out = self.reg_fc_1(out)
+        out = self.activation(self.reg_linear_0(emb_out))
+        out = self.activation(self.reg_linear_1(out))
         out = self.reg_linear_out(out)
         return out
 
