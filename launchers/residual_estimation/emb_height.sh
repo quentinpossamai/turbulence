@@ -5,6 +5,7 @@ cd ~/phd/turbulence/
 ~/anaconda3/envs/turbulence/bin/python -m src.drone_models.residual.emb_height\
  --activation relu\
  --batch_size 2000\
+ --embedding depth\
  --l2 0.1\
  --lr 1e-6\
  --max_epochs 10000\
