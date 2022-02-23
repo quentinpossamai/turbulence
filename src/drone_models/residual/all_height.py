@@ -14,7 +14,7 @@ from typing import Union, Callable, Tuple, Dict
 import wandb
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
-from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
+import src.data.habitat.loading as habitat
 from src.drone_models.model_structure import Run
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
@@ -69,10 +69,12 @@ class AllHeight(pl.LightningModule, Run):
         self.depth_conv2d_1 = nn.Conv2d(16, 32, (3, 3), 1)
         self.depth_conv2d_2 = nn.Conv2d(32, 64, (3, 3), 2)
         self.depth_conv2d_3 = nn.Conv2d(64, 64, (3, 3), 1)
+        self.depth_pool_3 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_4 = nn.Conv2d(64, 32, (3, 3), 2)
         self.depth_pool_4 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_5 = nn.Conv2d(32, 4, (3, 3), 1)
-        self.depth_linear_0 = nn.Linear(in_features=4 * 13 * 18, out_features=128)
+        self.depth_pool_5 = nn.MaxPool2d((2, 2))
+        self.depth_linear_0 = nn.Linear(in_features=4 * 6 * 8, out_features=128)
         self.depth_linear_1 = nn.Linear(128, 50)
 
         # Time reduction
@@ -85,8 +87,7 @@ class AllHeight(pl.LightningModule, Run):
         self.reg_linear_1 = nn.Linear(50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
-        self.example_input_array = [torch.zeros(2, self.past, 128) if self.embedding in ['depth', 'norm']
-                                    else torch.zeros(2, self.past, 256)]
+        self.example_input_array = [torch.zeros(2, self.past, 480, 640)]
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l2)
@@ -102,7 +103,7 @@ class AllHeight(pl.LightningModule, Run):
         return: (*, value=1)
         """
         # - Input processing
-        assert depth.shape[-3] == [self.past, 480, 640]
+        assert list(depth.shape[-3:]) == [self.past, 480, 640]
 
         # - emb branch
         out = self.activation(self.depth_conv2d_0(depth.reshape((-1, 1, 480, 640))))
@@ -110,10 +111,12 @@ class AllHeight(pl.LightningModule, Run):
         out = self.activation(self.depth_conv2d_1(out))
         out = self.activation(self.depth_conv2d_2(out))
         out = self.activation(self.depth_conv2d_3(out))
+        out = self.depth_pool_3(out)
         out = self.activation(self.depth_conv2d_4(out))
         out = self.depth_pool_4(out)
         out = self.activation(self.depth_conv2d_5(out))
-        out = self.activation(self.depth_linear_0(out))
+        out = self.depth_pool_5(out)
+        out = self.activation(self.depth_linear_0(out.reshape((-1, 4 * 6 * 8))))
         out = self.activation(self.depth_linear_1(out))
 
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
@@ -276,13 +279,13 @@ def main():
 
     # Display entire dataset
     for name in ['train', 'valid', 'test']:
-        dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
-                                               load_norm_emb=False)
+        dataset_stats = habitat.HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
+                                                       load_norm_emb=False)
         print(name)
-    for scene_number, scene_traj in dataset_stats.index.items():
-        print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-    print(f'Data length: | {len(dataset_stats)}')
-    print('\n\n')
+        for scene_number, scene_traj in dataset_stats.index.items():
+            print(f'{scene_number} - {habitat.MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+        print(f'Data length: | {len(dataset_stats)}')
+        print('\n\n')
 
     # Analysis parameters
     motor_size = 4
@@ -335,22 +338,22 @@ def main():
     #                               f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if gpu_count else 0
     # Datasets
-    load_depth = False
-    load_depth_emb = True if args.embedding in ['depth', 'both'] else False
-    load_norm_emb = True if args.embedding in ['norm', 'both'] else False
+    load_depth = True
+    load_depth_emb = False
+    load_norm_emb = False
     print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}')
-    train_data = DataLoader(HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
-                                                   load_depth_emb=load_depth_emb,
-                                                   load_norm_emb=load_norm_emb),
+    train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
+                                                           load_depth_emb=load_depth_emb,
+                                                           load_norm_emb=load_norm_emb),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
                             pin_memory=True,
                             drop_last=True)
 
-    validation_data = DataLoader(HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
-                                                        load_depth_emb=load_depth_emb,
-                                                        load_norm_emb=load_norm_emb),
+    validation_data = DataLoader(habitat.HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
+                                                                load_depth_emb=load_depth_emb,
+                                                                load_norm_emb=load_norm_emb),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
