@@ -640,6 +640,8 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
         import time
         tic = time.time()
         print(f'Saving', file=sys.stderr, flush=True)
+        if len(data_generated['motor']) == 0:
+            pickle.dump({'done': None, 'info': 'Not enough data'}, open(f'{folder}stats.pkl', 'wb'))
         for name, array in data_generated.items():
             np.save(f'{folder}{name}.npy', array.astype(np.float32))
         info = 'collided' if has_collided else None

@@ -270,7 +270,7 @@ def main():
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
     parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
     parser.add_argument('--embedding', default='depth', type=str, help='Embedding to use.')
-    parser.add_argument('--l2', default=0.1, type=float, help="Number of past information to take in the model")
+    parser.add_argument('--l2', default=1e-3, type=float, help="Number of past information to take in the model")
     parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
     parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
@@ -281,10 +281,10 @@ def main():
         dataset_stats = HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
                                                load_norm_emb=False)
         print(name)
-    for scene_number, scene_traj in dataset_stats.index.items():
-        print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-    print(f'Data length: | {len(dataset_stats)}')
-    print('\n\n')
+        for scene_number, scene_traj in dataset_stats.index.items():
+            print(f'{scene_number} - {MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+        print(f'Data length: | {len(dataset_stats)}')
+        print('\n\n')
 
     # Analysis parameters
     motor_size = 4

@@ -46,11 +46,10 @@ def load_file(name: str, scene_number: int, flight_number: int):
 
 
 def build_index_valid_flight(check_all_file: bool = True):
-    index = {i: None for i in range(len(MP3D_SCENE_LIST))}
+    index = {i: {} for i in range(len(MP3D_SCENE_LIST))}
     to_test = ['depth.npy', 'depth_emb/depth_emb.npy', 'ground_force.npy', 'motor.npy', 'mpc_error.npy',
                'norm_emb/norm_emb.npy', 'state.npy', 'stats.pkl', 'surface_dist.npy']
     for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
-        index[scene_number] = {}
         try:  # Try finding flight folder
             flights = sorted([int(e) for e in next(os.walk(f'{MP3D_DATA}{scene_name}/{FLIGHT}/'))[1]])
             for number in flights:
@@ -61,7 +60,7 @@ def build_index_valid_flight(check_all_file: bool = True):
                     is_valid = True
                 if is_valid:  # if every needed files are present
                     stats = load_file('stats', scene_number, number)
-                    if stats['done'] is not None and stats['done'] > 2:  # If the drone has flight at least one step
+                    if stats['done'] is not None:  # If the drone has flight at least one step
                         mpc_error = load_file('mpc_error', scene_number, number)
                         if (mpc_error < 5).all() and len(mpc_error) >= 200:  # If controller is not wrong and traj long
                             # enough
@@ -84,7 +83,7 @@ class HabitatResidualDataset(Dataset):
                  load_depth: bool,
                  load_depth_emb: bool,
                  load_norm_emb: bool):
-        build_index_valid_flight()
+        build_index_valid_flight(False)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -185,13 +184,11 @@ class HabitatNormedDepthDataset(Dataset):
 
 
 def main():
-    # dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=True, load_norm_emb=False)
-    # dataloader = DataLoader(dataset, batch_size=4, shuffle=True, num_workers=1, pin_memory=True, drop_last=True)
-
-    dataset = HabitatNormedDepthDataset()
-
-
-    dataset[0]
+    dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=False, load_norm_emb=False)
+    dataloader = DataLoader(dataset, batch_size=int(dataset.len), shuffle=False, num_workers=1, pin_memory=True,
+                            drop_last=False)
+    data = next(iter(dataloader))
+    print()
 
     # from tqdm import tqdm
     # print('Instanciating dataset', flush=True)

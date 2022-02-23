@@ -16,7 +16,7 @@ from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalMo
 from src.utils.profiler import profiler
 
 
-def plot_fa_generator():
+def plot_fa_law():
     cap = 0.1
     mu = 1
     drone_width, drone_height = 0.1, 0.025
@@ -68,72 +68,67 @@ def plot_fa_generator():
 
 
 def plot_fa():
-    index = {i: None for i in range(len(habitat.MP3D_SCENE_LIST))}
-    for scene_number, scene_name in enumerate(habitat.MP3D_SCENE_LIST):
-        index[scene_number] = {}
-        try:  # Try finding flight folder
-            flights = sorted([int(e) for e in next(os.walk(f'{habitat.MP3D_DATA}{scene_name}/flight/'))[1]])
-            for number in flights:
-                stats = habitat.load_file('stats', scene_number, number)
-                if stats['done'] is not None:  # If the drone has flight at least one step
-                    mpc_error = habitat.load_file('mpc_error', scene_number, number)
-                    if (mpc_error < 5).all() and len(mpc_error) >= 200:  # If controller is not wrong and traj long
-                        # enough
-                        index[scene_number][number] = len(mpc_error)
-        except StopIteration:
-            continue
+    index = habitat.build_index_valid_flight(False)
 
     fa = []
     z = []
+    z_split = {'train': [], 'valid': [], 'test': []}
     zero_index = {scene_number: {} for scene_number in index}
     for scene_number, flight in index.items():
+        if scene_number in habitat.TRAIN:
+            include = 'train'
+        elif scene_number in habitat.VALID:
+            include = 'valid'
+        else:
+            assert scene_number in habitat.TEST
+            include = 'test'
         for flight_number in flight:
             fa.append(habitat.load_file('ground_force', scene_number, flight_number))
             little_z = habitat.load_file('surface_dist', scene_number, flight_number)
             if (little_z == 0).any():
                 print(f'{(little_z == 0).sum()} zero found in scene_number: {scene_number} | '
                       f'flight_number {flight_number}')
-                import matplotlib.pyplot as plt
-                # plt.plot(little_z)
-                # plt.show()
                 zero_index[scene_number][flight_number] = (little_z == 0).sum()
-
-                print()
+            z_split[include].append(little_z)
             z.append(little_z)
+    for key in z_split:
+        z_split[key] = np.concatenate(z_split[key], 0)[:, 0]
     z = np.concatenate(z, axis=0)[:, 0]
     fa = np.concatenate(fa, axis=0)[:, 2]
-    print(f'Mean {np.mean(fa)} | std {np.std(fa)}')
+
+    print(f'''z train: Mean {np.mean(z_split['train'])} | std {np.std(z_split['train'])}''')
+    print(f'''z valid: Mean {np.mean(z_split['valid'])} | std {np.std(z_split['valid'])}''')
+    print(f'''z test: Mean {np.mean(z_split['test'])} | std {np.std(z_split['test'])}''')
+
+    print(f'z: Mean {np.mean(z)} | std {np.std(z)}')
+    print(f'fa: Mean {np.mean(fa)} | std {np.std(fa)}')
 
     plt.rcParams.update({"text.usetex": False,
                          "font.family": "serif",
                          "font.sans-serif": ["Computer Modern Roman"]})
 
-    z_reduced = z[np.where(z < 1.5)]
-
     fig, ax = plt.subplots(1, 1)
-    ax.hist(z_reduced, bins='auto')
+    ax.hist(z, bins='auto')
     ax.set_xlabel('Surface distance (m)')
-    # ax.set_xlim([0, 1.5])
+    ax.set_xlim([0, 1.5])
     # ax.set_ylabel('')
     ax.grid()
     plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/surface_dist_distribution.pdf')
 
     fig, ax = plt.subplots(1, 1)
-    ax.hist(fa, bins=100)
+    ax.hist(fa, bins='auto')
     ax.set_xlabel('Ground effect (N)')
     x = 0.004
-    # ax.set_xlim([-3e-2 * x, x])
+    ax.set_xlim([0, x])
     # ax.set_ylabel('')
     ax.grid()
     plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/fa_distribution_all.pdf')
 
     fig, ax = plt.subplots(1, 1)
-    ax.plot(little_z)
+    ax.plot(z)
     ax.set_xlabel('Sample #')
     ax.set_ylabel('Surface distance (m)')
     ax.grid()
-
-    plt.hist(fa, bins='auto', density=True)
 
 
 def plot_model_prediction(variant: str):
@@ -262,9 +257,9 @@ def observe_generated_traj(scene_number, flight_number):
 
 def main():
     # plot_fa_generator()
-    # plot_fa()
+    plot_fa()
     # plot_model_prediction('d')
-    observe_generated_traj(89, 8)
+    # observe_generated_traj(89, 8)
 
 
 if __name__ == '__main__':
