@@ -255,7 +255,7 @@ def main():
     mkdir_if_not_exist([training_path])
 
     identifier = f'{name}-{version}'
-    identifier = identifier if torch.cuda.is_available() else identifier + 'local'
+    identifier = identifier if torch.cuda.is_available() else identifier + '_local'
     wandb.init(name=identifier,
                id=identifier,
                project='turbulence_residual',
