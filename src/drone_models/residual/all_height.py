@@ -79,7 +79,7 @@ class AllHeight(pl.LightningModule, Run):
         self.depth_linear_1 = nn.Linear(128, 50)
 
         # Time reduction
-        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
+        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
         # self.emb_gru_norm = nn.BatchNorm1d(50)
         # self.emb_gru_dropout = nn.Dropout(p=0.)
 
