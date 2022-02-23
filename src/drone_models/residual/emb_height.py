@@ -92,7 +92,7 @@ class EmbHeight(pl.LightningModule, Run):
         r"""
         Estimate the residual
 
-        param depth: (*, past, 128 or 256)
+        param emb: (*, past, 128 or 256)
 
         Generally * means batch dimension or more but must exist during training to compute batch_norm.
 
@@ -125,7 +125,8 @@ class EmbHeight(pl.LightningModule, Run):
         """
         param batch: {motor: (batch, 6),
                       state: (batch, 13),
-                      depth: (batch, self.past, 480, 640),
+                      depth_emb: (batch, self.past, 128),
+                      norm_emb: (batch, self.past, 128),
                       residual: (batch, 1),
                       surface_dist: (batch, 1)}
 
