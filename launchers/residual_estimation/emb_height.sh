@@ -6,7 +6,7 @@ cd ~/phd/turbulence/
  --activation relu\
  --batch_size 2000\
  --embedding depth\
- --l2 0.1\
+ --l2 1e-4\
  --lr 1e-6\
  --max_epochs 10000\
  --past 40
