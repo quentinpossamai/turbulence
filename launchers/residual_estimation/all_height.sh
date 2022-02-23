@@ -8,5 +8,5 @@ cd ~/phd/turbulence/
  --l2 1e-4\
  --lr 1e-6\
  --max_epochs 10000\
- --past 40
+ --past 20
 # --resume_from_checkpoint $file
