@@ -337,7 +337,7 @@ def main():
     logger.watch(run)
     # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
     #                               f'checkpoints/epoch=16-step=832.ckpt'
-    num_workers = 12 if GPU_COUNT else 0
+    num_workers = 12 if GPU_COUNT else 8
     # Datasets
     load_depth = False
     load_depth_emb = True if args.embedding in ['depth', 'both'] else False

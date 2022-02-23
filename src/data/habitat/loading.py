@@ -145,7 +145,6 @@ class HabitatResidualDataset(Dataset):
         to_return['surface_dist'] = (to_return['surface_dist'] - self.z_mean) / self.z_std
         for key in self.depth_list:
             to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop].copy())
-            assert not torch.isnan(to_return[key]).any()
         return to_return
 
 
