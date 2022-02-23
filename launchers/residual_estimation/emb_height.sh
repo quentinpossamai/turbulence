@@ -10,4 +10,4 @@ cd ~/phd/turbulence/
  --lr 1e-6\
  --max_epochs 10000\
  --past 40
-# --load_weights $file
+# --resume_from_checkpoint $file

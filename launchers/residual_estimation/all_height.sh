@@ -2,7 +2,7 @@
 cd ~/phd/turbulence/
 #file="/home/qpossamai/phd/turbulence/analysis/habitat_residual_training/"
 #file+="VariantA/20220204_104115/default/20220204_104115/checkpoints/epoch\=0-step\=120728.ckpt"
-~/anaconda3/envs/turbulence/bin/python -m src.drone_models.residual.emb_height\
+~/anaconda3/envs/turbulence/bin/python -m src.drone_models.residual.all_height\
  --activation relu\
  --batch_size 2000\
  --embedding depth\
@@ -10,4 +10,4 @@ cd ~/phd/turbulence/
  --lr 1e-6\
  --max_epochs 10000\
  --past 40
-# --load_weights $file
+# --resume_from_checkpoint $file
