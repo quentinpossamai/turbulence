@@ -16,6 +16,7 @@ import wandb
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 import src.data.habitat.loading as habitat
 from src.drone_models.model_structure import Run
+from src.utils.profiler import profiler
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
 
@@ -245,6 +246,7 @@ mkdir_if_not_exist([SAVING_PATH])
 
 
 def main():
+    profiler()
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     version = f'{now}'
     residual_model_class = AllHeight
