@@ -254,7 +254,7 @@ def main():
     training_path = f'{SAVING_PATH}{name}/{version}/'
     mkdir_if_not_exist([training_path])
 
-    identifier = f'{name}-{version}'
+    identifier = f'{name}-{version}-debug'
     identifier = identifier if torch.cuda.is_available() else identifier + '_local'
     wandb.init(name=identifier,
                id=identifier,
