@@ -79,7 +79,7 @@ class FineTunning(pl.LightningModule, Run):
         self.reg_linear_1 = nn.Linear(50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
-        self.example_input_array = [torch.zeros(2, self.past, 480, 640)]
+        self.example_input_array = [torch.zeros(4, self.past, 240, 376)]
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l2)
