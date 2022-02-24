@@ -6,7 +6,7 @@ cd ~/phd/turbulence/
  --activation relu\
  --batch_size 320\
  --l2 1e-4\
- --lr 1e-6\
+ --lr 1e-5\
  --max_epochs 10000\
  --past 1
 # --resume_from_checkpoint $file
