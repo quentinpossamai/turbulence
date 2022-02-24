@@ -319,7 +319,7 @@ def main():
         enc_path = f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/autoencoder_depth_irs_128.nn"
     else:
         enc_path = f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/autoencoder_depth_irs_128.nn"
-    state_dict = torch.load(enc_path, map_location=device)
+    state_dict = torch.load(enc_path)
     for i, e in enumerate(run.encoder.state_dict().keys()):
         run.encoder.state_dict()[e].copy_(state_dict[f'encoder.{e}'])
         assert (run.encoder.state_dict()[e] == state_dict[f'encoder.{e}']).all()
