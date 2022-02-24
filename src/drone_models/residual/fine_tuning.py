@@ -124,11 +124,6 @@ class FineTunning(pl.LightningModule, Run):
         """
         z_hat = self.forward(depth=batch['depth'])
         z_gt = batch["surface_dist"]
-
-        print(f'z_gt: {z_gt}', flush=True)
-        print(f'\n\n\n\n\n\n', flush=True)
-        print(f'z_hat: {z_hat}', flush=True)
-        print(f'\n\n\n\n\n\n', flush=True)
         loss = (z_gt - z_hat) ** 2
         return loss.mean()
 
