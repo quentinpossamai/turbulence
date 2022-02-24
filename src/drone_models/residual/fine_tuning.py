@@ -375,8 +375,8 @@ def main():
                          resume_from_checkpoint=args.resume_from_checkpoint,
                          callbacks=[checkpoint_callback])
 
-    if args.resume_from_checkpoint is None:
-        trainer.validate(run, dataloaders=validation_data)
+    # if args.resume_from_checkpoint is None:
+    #     trainer.validate(run, dataloaders=validation_data)
     trainer.fit(run, train_data, validation_data)
     print(checkpoint_callback.best_model_path)
 
