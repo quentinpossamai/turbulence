@@ -344,7 +344,7 @@ def main():
     load_depth_emb = False
     load_norm_emb = False
     print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}')
-    train_data = DataLoader(habitat.HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
+    train_data = DataLoader(habitat.HabitatResidualDataset('Train', past=args.past, load_depth=load_depth,
                                                            load_depth_emb=load_depth_emb,
                                                            load_norm_emb=load_norm_emb),
                             batch_size=args.batch_size,
