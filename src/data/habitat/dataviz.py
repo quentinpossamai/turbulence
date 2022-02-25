@@ -377,13 +377,15 @@ def rmse_model_prediction(name):
             z_loss[i] = loss
 
             fa_gt = batch['ground_force'].cpu().numpy()[:, 2] * fa_std + fa_mean
-            assert np.isclose(fa_gt, compute_ground_effect(motor, z_gt)).all()
+            fa_gt_test = compute_ground_effect(motor, z_gt)
+            print(f'fa_gt {fa_gt} | fa_gt_test {fa_gt_test}')
+            assert np.isclose(fa_gt, fa_gt_test, atol=1e-6).all()
             fa_hat = compute_ground_effect(motor, z_hat)[:, 2]
             loss = ((fa_gt - fa_hat) ** 2).squeeze()
             print(f'fa loss {loss.shape}')
             fa_loss[i] = loss
-    print(f'z_loss: {z_loss.mean()}')
-    print(f'fa_loss: {fa_loss.mean()}')
+    print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
+    print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
     print(f'\n\n')
 
 
