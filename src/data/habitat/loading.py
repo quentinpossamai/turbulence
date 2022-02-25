@@ -198,15 +198,15 @@ def main():
     print()
 
     index = build_index_valid_flight()
-num_traj = 0
-num_not_empty = 0
-num_len = 0
-for scene_number, flight in index.items():
-    if flight != {}:
-        num_not_empty += 1
-    for flight_number, len in flight.items():
-        num_traj += 1
-        num_len += len
+    num_traj = 0
+    num_not_empty = 0
+    num_len = 0
+    for scene_number, flight in index.items():
+        if flight != {}:
+            num_not_empty += 1
+        for flight_number, len in flight.items():
+            num_traj += 1
+            num_len += len
 
 
     # from tqdm import tqdm
