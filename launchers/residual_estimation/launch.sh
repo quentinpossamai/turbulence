@@ -7,8 +7,8 @@ ssh remsto /bin/bash << EOF
   git pull github main &&
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J all_height_d -o log-all_height_d-%A.out --time=8-00:00:00 all_height.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J emb_height -o log-emb_height_1-%A.out --time=8-00:00:00 emb_height.sh
-  sbatch --mem 10G --gres=gpu:1 -p part3 -J fine_tuning_depth -o log-fine_tuning_depth-%A.out --time=8-00:00:00 fine_tuning_depth.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part3 -J fine_tuning_norm -o log-fine_tuning_norm-%A.out --time=8-00:00:00 fine_tuning_norm.sh
+  sbatch --mem 10G --gres=gpu:1 -p part3 -J fine_tuning_depth -o log-depth_ft-%A.out --time=8-00:00:00 fine_tuning_depth.sh
+#  sbatch --mem 10G --gres=gpu:1 -p part3 -J fine_tuning_norm -o log-norm_ft-%A.out --time=8-00:00:00 fine_tuning_norm.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J dataviz -o log-dataviz-%A.out --time=8-00:00:00 dataviz.sh
 #
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J tr_a -o log-tr_a-%A.out --time=8-00:00:00 variant_a.sh
