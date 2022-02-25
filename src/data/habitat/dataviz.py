@@ -4,6 +4,7 @@ import os
 import pickle
 import pytorch_lightning as pl
 import torch
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from src.utils.transform import Transform as Tf
@@ -129,14 +130,9 @@ def plot_fa():
     ax.grid()
 
 
-def plot_model_prediction():
-    from src.drone_models.residual.gru_cnn_var_d import VariantD
-    from src.drone_models.residual.gru_cnn_var_a import VariantA
-    from src.drone_models.residual.emb_height import EmbHeight
-    model_d_path = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantD/20220215_165522/'
-    model_d_point = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantD/20220215_165522/' \
-                    f'checkpoints/epoch=20-step=1028.ckpt'
-    model_a_path = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantA/20220211_203458/'
+def plot_model_prediction(name):
+    msg = ['nogru', 'all', 'emb', 'fine']
+    assert name in msg, f'Name must be in {msg}'
 
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
@@ -156,51 +152,75 @@ def plot_model_prediction():
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']])
-
     uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
-    # h_prms_d = pickle.load(open(f'{model_d_path}h_prms.pkl', 'rb'))
-    # model_d = VariantD.load_from_checkpoint(model_d_point,
-    #                                         activation=h_prms_d['activation'],
-    #                                         embedding=h_prms_d['embedding'],
-    #                                         learning_rate=h_prms_d['lr'],
-    #                                         uav_model=uav_model,
-    #                                         motor_size=h_prms_d['motor_size'],
-    #                                         past=h_prms_d['past'])
-    # model_d.eval()
+    if name == 'nogru':
+        from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+        model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
 
-    # h_prms_a = pickle.load(open(f'{model_a_path}h_prms.pkl', 'rb'))
-    # model_a = VariantA.load_from_checkpoint(f'{model_a_path}default/20220211_203458/checkpoints/
-    # epoch=1-step=241457.ckpt',
-    #                                         activation=h_prms_a['activation'],
-    #                                         learning_rate=h_prms_a['lr'],
-    #                                         uav_model=uav_model,
-    #                                         motor_size=h_prms_a['motor_size'],
-    #                                         past=h_prms_a['past'])
-    # model_a.eval()
+    elif name == 'all':
+        from src.drone_models.residual.all_height import AllHeight as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+        model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
 
-    model_emb_height = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
-    h_prms = pickle.load(open(f'{model_emb_height}h_prms.pkl', 'rb'))
-    model_emb_height = EmbHeight.load_from_checkpoint(f'{model_emb_height}epoch=136-step=13425-val_loss=0.50.ckpt',
-                                                      activation=h_prms['activation'],
-                                                      embedding=h_prms['embedding'],
-                                                      learning_rate=h_prms['lr'],
-                                                      uav_model=uav_model,
-                                                      motor_size=h_prms['motor_size'],
-                                                      past=h_prms['past'])
-    model_emb_height.eval()
+    elif name == 'emb':
+        from src.drone_models.residual.emb_height import EmbHeight as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_121251/'
+        model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           embedding=h_prms['embedding'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
+    else:
+        assert name == 'fine'
+        from src.drone_models.residual.fine_tuning import FineTunning as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_183259/'
+        model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
+
+    model.eval()
+
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
-    index = habitat.build_index_valid_flight(False)
-    for scene_number in habitat.TRAIN:
+    index = habitat.build_index_valid_flight(True)
+    for scene_number in habitat.TEST:
         flight = index[scene_number]
         for flight_number in flight:
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy())
-            size = len(state)
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy())
             z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
             motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy())
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy())
+            depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy())
 
             assert len(fa) == len(motor)
             assert len(fa) + 1 == len(z)
@@ -217,7 +237,7 @@ def plot_model_prediction():
                 # fa_hat = torch.empty(len(fa), dtype=torch.float32) * torch.nan
                 z_hat = torch.empty(len(z_gt), dtype=torch.float32) * torch.nan
                 for i in range(len(z_hat)):
-                    output = model_emb_height(depth_emb[i:i + h_prms['past']])
+                    output = model(depth_emb[i:i + h_prms['past']])
                     z_hat[i] = (output * z_std + z_mean)
             print(f'{scene_number} | {flight_number} | '
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
@@ -235,6 +255,131 @@ def plot_model_prediction():
             # plt.show()
             plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/model_prediction-{scene_number}-'
                         f'{flight_number}.pdf')
+
+
+def rmse_model_prediction(name):
+    use_cuda_if_possible = True
+    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
+
+    msg = ['nogru', 'all', 'emb', 'fine']
+    assert name in msg, f'Name must be in {msg}'
+
+    drone_width, drone_height = 0.1, 0.025
+    volumetric_mass = 200
+    g = 9.81
+    m = volumetric_mass * drone_width ** 2 * drone_height
+    drone_prms = {'width': drone_width,  # [m]
+                  'height': drone_height,  # [m]
+                  'm': m,  # [kg]
+                  'kt': m * g / (4 * 150 ** 2),  #
+                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
+                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
+                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
+                  'prop_radius': drone_width * 0.1}  # [m]
+    theta = np.array([drone_prms['kt'] / drone_prms['m'],
+                      drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
+                      drone_prms['km'] / drone_prms['iz'],
+                      drone_prms['iz'] / drone_prms['ix']])
+    uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
+
+    if name == 'nogru':
+        from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+        model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past']).to(device)
+        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+
+    elif name == 'all':
+        from src.drone_models.residual.all_height import AllHeight as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+        model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
+        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+
+    elif name == 'emb':
+        from src.drone_models.residual.emb_height import EmbHeight as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_121251/'
+        model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           embedding=h_prms['embedding'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
+        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
+    else:
+        assert name == 'fine'
+        from src.drone_models.residual.fine_tuning import FineTunning as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_183259/'
+        model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past'])
+        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+
+    def compute_ground_effect(motor: np.ndarray, z: float, mu=1, cap=0.1) -> np.ndarray:
+        g = 9.81
+        ground_force = np.zeros(3)
+        if z <= np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+            ground_force[2] = cap * drone_prms['m'] * g
+        else:
+            mu_r_z = mu * (drone_prms['prop_radius'] / (4 * z)) ** 2
+            ground_force[2] = np.clip(np.sum(motor) ** 2 * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                      a_min=0, a_max=cap * drone_prms['m'] * g)
+        return np.concatenate([ground_force, np.zeros(3)])
+
+    data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=12, pin_memory=True, drop_last=False)
+
+    model.eval()
+
+    z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
+    fa_mean, fa_std = habitat.HabitatResidualDataset.fa_mean, habitat.HabitatResidualDataset.fa_std
+
+    z_loss = (np.empty(len(data), dtype=np.float32) * np.nan)
+    fa_loss = (np.empty(len(data), dtype=np.float32) * np.nan)
+    print(name)
+    with torch.no_grad():
+        for i, batch in tqdm(enumerate(data)):
+            if name == 'emb':
+                depth = batch['depth_emb'].to(device)
+            else:
+                depth = batch['depth'].to(device)
+            motor = batch['motor'].cpu().numpy()
+
+            z_hat = model(depth).cpu().numpy() * z_std + z_mean
+            z_gt = batch['surface_dist'].cpu().numpy() * z_std + z_mean
+            z_loss[i] = (z_gt - z_hat) ** 2
+
+            fa_gt = batch['ground_force'].cpu().numpy() * fa_std + fa_mean
+            assert np.isclose(fa_gt, compute_ground_effect(motor, z_gt))
+            fa_hat = compute_ground_effect(motor, z_hat)
+    print(f'z_loss: {z_loss.mean()}')
+    print(f'fa_loss: {fa_loss.mean()}')
+    print(f'\n\n')
 
 
 def observe_generated_traj(scene_number, flight_number):
@@ -274,7 +419,8 @@ def observe_generated_traj(scene_number, flight_number):
 def main():
     # plot_fa_generator()
     # plot_fa()
-    plot_model_prediction()
+    for e in ['nogru', 'all', 'emb', 'fine']:
+        rmse_model_prediction(e)
     # observe_generated_traj(32, 3)
 
 
