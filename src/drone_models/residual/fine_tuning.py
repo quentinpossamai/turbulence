@@ -338,7 +338,7 @@ def main():
     state_dict = torch.load(f'{path}{model_name}', map_location=device)
     for i, e in enumerate(state_dict['state_dict'].keys()):
         run.state_dict()[e].copy_(state_dict['state_dict'][e])
-        assert (run.state_dict()[e] == state_dict['state_dict'][e]).all()
+        assert (run.state_dict()[e].to(device) == state_dict['state_dict'][e]).all()
 
     logger.watch(run)
     # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
