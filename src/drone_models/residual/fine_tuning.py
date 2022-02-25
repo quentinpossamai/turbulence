@@ -275,6 +275,7 @@ def main():
     h_prms = {'time_start': now,  # hyperparameters
               'name': residual_model_class.__name__,
               'activation': args.activation,
+              'embedding': args.embedding,
               'batch_size': args.batch_size,
               'l2': args.l2,
               'lr': args.lr,
