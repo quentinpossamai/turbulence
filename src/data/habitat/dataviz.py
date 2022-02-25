@@ -309,7 +309,7 @@ def rmse_model_prediction(name):
                                            learning_rate=h_prms['lr'],
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+                                           past=h_prms['past']).to(device)
         dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'emb':
@@ -324,7 +324,7 @@ def rmse_model_prediction(name):
                                            learning_rate=h_prms['lr'],
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+                                           past=h_prms['past']).to(device)
         dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
     else:
         assert name == 'fine'
@@ -338,7 +338,7 @@ def rmse_model_prediction(name):
                                            learning_rate=h_prms['lr'],
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+                                           past=h_prms['past']).to(device)
         dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
 
     def compute_ground_effect(motor: np.ndarray, z: float, mu=1, cap=0.1) -> np.ndarray:
