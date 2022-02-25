@@ -67,10 +67,10 @@ class FineTunning(pl.LightningModule, Run):
         # self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
         # self.emb_input_drop = nn.Dropout(0.)
         self.encoder = Encoder(128, 1)
-        self.depth_linear_0 = nn.Linear(128, 50)
+        self.emb_linear_0 = nn.Linear(128, 50)
 
         # Time reduction
-        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
+        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
         # self.emb_gru_norm = nn.BatchNorm1d(50)
         # self.emb_gru_dropout = nn.Dropout(p=0.)
 
@@ -99,7 +99,7 @@ class FineTunning(pl.LightningModule, Run):
 
         # - emb branch
         out = self.encoder(depth.reshape((-1, 1, 240, 376)))
-        out = self.activation(self.depth_linear_0(out))
+        out = self.activation(self.emb_linear_0(out))
 
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         out = out[:, -1, :]  # last hidden states, (*, feature_size)
@@ -253,6 +253,7 @@ def main():
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
     parser.add_argument('--batch_size', default=4, type=int, help='Size of a batch')
+    parser.add_argument('--embedding', default='depth', type=str, help='Which autoencoder to load')
     parser.add_argument('--l2', default=1e-4, type=float, help="Number of past information to take in the model")
     parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
     parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
@@ -315,14 +316,28 @@ def main():
                                motor_size=motor_size,
                                past=args.past,
                                uav_model=quadrotor)
-    if 'quentin' in WD_PATH:
-        enc_path = f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/autoencoder_depth_irs_128.nn"
+    if args.embedding == 'depth':
+        model_variant = 'autoencoder_depth_irs_128'
     else:
-        enc_path = f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/autoencoder_depth_irs_128.nn"
+        assert args.embedding == 'norm'
+        model_variant = 'autoencoder_normal_irs_128_irs'
+
+    if 'quentin' in WD_PATH:
+        enc_path = f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/{model_variant}.nn"
+    else:
+        enc_path = f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/{model_variant}.nn"
     state_dict = torch.load(enc_path, map_location=device)
     for i, e in enumerate(run.encoder.state_dict().keys()):
         run.encoder.state_dict()[e].copy_(state_dict[f'encoder.{e}'])
         assert (run.encoder.state_dict()[e].to(device) == state_dict[f'encoder.{e}']).all()
+
+    # Loading head
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+    model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+    state_dict = torch.load(f'{path}{model_name}', map_location=device)
+    for i, e in enumerate(state_dict['state_dict'].keys()):
+        run.state_dict()[e].copy_(state_dict['state_dict'][e])
+        assert (run.state_dict()[e] == state_dict['state_dict'][e]).all()
 
     logger.watch(run)
     # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
