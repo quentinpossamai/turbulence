@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 
 INTERMEDIATE_DATASET_PATH = EurocMAV.INTERMEDIATE_DATASET_PATH
+# INTERMEDIATE_DATASET_PATH = "/Volumes/Samsung_T5/EurocMav/"
 
 
 class EurocMAVDatasetHorizon2(Dataset):
@@ -29,15 +30,16 @@ class EurocMAVDatasetHorizon2(Dataset):
                                                                                   in
                                                                                   range(18600 + past * 10,
                                                                                         19343, 10)]
+
+        self.data = {key: pickle.load(open(INTERMEDIATE_DATASET_PATH + key + "/data.pkl", 'rb')) for key in
+                     ["V1_01_easy/",
+                      "V1_02_medium/",
+                      "V1_03_difficult/"]}
         try:
-            self.data = {key: pickle.load(open(INTERMEDIATE_DATASET_PATH + key + "/data.pkl", 'rb')) for key in
-                         ["V1_01_easy/",
-                          "V1_02_medium/",
-                          "V1_03_difficult/"]}
+            self.heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
         except FileNotFoundError:
             raise FileNotFoundError("Tu as pas copiere-collere depth_iros_test depuis /storage vers ton data...")
         self.past = past
-        self.heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
 
     def __len__(self):
         return len(self.splits)
@@ -61,23 +63,48 @@ class EurocMAVDatasetHorizon2(Dataset):
         depth = np.stack(depth, axis=0)
 
         heights = (heights - EurocMAVDatasetHorizon2.z_mean) / EurocMAVDatasetHorizon2.z_std
-        data_isolated['residual'] = (data_isolated["residual"] - EurocMAVDatasetHorizon2.fa_mean) / EurocMAVDatasetHorizon2.fa_std
+        data_isolated['residual'] = (data_isolated[
+                                         "residual"] - EurocMAVDatasetHorizon2.fa_mean) / EurocMAVDatasetHorizon2.fa_std
 
         to_return = {'state': torch.from_numpy(data_isolated["state"]),
                      'motor': torch.from_numpy(data_isolated["motor"]),
                      'ground_force': torch.from_numpy(data_isolated["residual"]),
                      'surface_dist': torch.from_numpy(np.array(heights)).view(1),
                      'depth': torch.from_numpy(depth)}
-        # TODO : Deal with motors
 
         return to_return
 
 
+def estimate_cheeseman():
+    data = {key: pickle.load(open(INTERMEDIATE_DATASET_PATH + key + "/data.pkl", 'rb')) for key in
+            ["V1_01_easy/",
+             "V1_02_medium/",
+             "V1_03_difficult/"]}
+    heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
+
+    fa, n = [], []
+    for key in heights.keys():
+        for i in range(heights[key].shape[0]):
+            idx = list(data[key]['t']).index(heights[key][i, 0])
+            fa.append(data[key]['residual'][idx])
+            n.append(np.sum(data[key]["motor"][idx] ** 2))
+
+    n = np.stack(n, axis=0).reshape((-1, 1))
+    fa = np.stack(fa, axis=0)
+
+    height = np.concatenate([heights[key][:, 1] for key in heights.keys()], axis=0).reshape((-1, 1))
+
+    # height = np.clip(height, 0.5, 100000)
+    faz = fa[:, 2:3]
+
+    def error(x):
+        fa = np.sum((faz - x[0] * n / (height ** 2 - x[1])) ** 2)
+        return fa
+
+    import scipy.optimize
+    sol = scipy.optimize.fmin(error, np.ones((2)) * 1e-2)
+    print(sol)
+
+
 if __name__ == '__main__':
-    d = EurocMAVDatasetHorizon2("train", past=40, load_depth=False, load_depth_emb=False, load_norm_emb=False)
-    timestamps = {'V1_01_easy/': [], 'V1_02_medium/': [], 'V1_03_difficult/': [], }
-    for x in d:
-        timestamps[x["flight"]].append(x["timestamp"])
-    for key in timestamps.keys():
-        timestamps[key] = np.concatenate(timestamps[key])
-        timestamps[key] = np.unique(timestamps[key])
+    estimate_cheeseman()
