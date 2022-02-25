@@ -363,7 +363,7 @@ def rmse_model_prediction(name):
     fa_loss = (np.empty(len(data), dtype=np.float32) * np.nan)
     print(name)
     with torch.no_grad():
-        for i, batch in tqdm(enumerate(data)):
+        for i, batch in tqdm(enumerate(data), total=len(data)):
             if name == 'emb':
                 depth = batch['depth_emb'].to(device)
             else:
@@ -373,7 +373,6 @@ def rmse_model_prediction(name):
             z_hat = model(depth).cpu().numpy() * z_std + z_mean
             z_gt = batch['surface_dist'].cpu().numpy() * z_std + z_mean
             loss = ((z_gt - z_hat) ** 2).squeeze()
-            print(f'z loss {loss.shape}')
             z_loss[i] = loss
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
@@ -382,7 +381,6 @@ def rmse_model_prediction(name):
             assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
             fa_hat = compute_ground_effect(motor, z_hat).squeeze()[2]
             loss = ((fa_gt - fa_hat) ** 2).squeeze()
-            print(f'fa loss {loss.shape}')
             fa_loss[i] = loss
     print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
     print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
