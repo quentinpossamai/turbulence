@@ -10,8 +10,6 @@ from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
 import src.data.habitat.data_gen as data_gen
 import src.data.habitat.hatbitat2flu as hatbitat2flu
-from src.drone_models.residual.gru_cnn_var_d import VariantD
-from src.drone_models.residual.gru_cnn_var_a import VariantA
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 
@@ -131,7 +129,10 @@ def plot_fa():
     ax.grid()
 
 
-def plot_model_prediction(variant: str):
+def plot_model_prediction():
+    from src.drone_models.residual.gru_cnn_var_d import VariantD
+    from src.drone_models.residual.gru_cnn_var_a import VariantA
+    from src.drone_models.residual.emb_height import EmbHeight
     model_d_path = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantD/20220215_165522/'
     model_d_point = f'{habitat.WD_PATH}analysis/habitat_residual_training/VariantD/20220215_165522/' \
                     f'checkpoints/epoch=20-step=1028.ckpt'
@@ -158,15 +159,15 @@ def plot_model_prediction(variant: str):
 
     uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
-    h_prms_d = pickle.load(open(f'{model_d_path}h_prms.pkl', 'rb'))
-    model_d = VariantD.load_from_checkpoint(model_d_point,
-                                            activation=h_prms_d['activation'],
-                                            embedding=h_prms_d['embedding'],
-                                            learning_rate=h_prms_d['lr'],
-                                            uav_model=uav_model,
-                                            motor_size=h_prms_d['motor_size'],
-                                            past=h_prms_d['past'])
-    model_d.eval()
+    # h_prms_d = pickle.load(open(f'{model_d_path}h_prms.pkl', 'rb'))
+    # model_d = VariantD.load_from_checkpoint(model_d_point,
+    #                                         activation=h_prms_d['activation'],
+    #                                         embedding=h_prms_d['embedding'],
+    #                                         learning_rate=h_prms_d['lr'],
+    #                                         uav_model=uav_model,
+    #                                         motor_size=h_prms_d['motor_size'],
+    #                                         past=h_prms_d['past'])
+    # model_d.eval()
 
     # h_prms_a = pickle.load(open(f'{model_a_path}h_prms.pkl', 'rb'))
     # model_a = VariantA.load_from_checkpoint(f'{model_a_path}default/20220211_203458/checkpoints/
@@ -178,54 +179,69 @@ def plot_model_prediction(variant: str):
     #                                         past=h_prms_a['past'])
     # model_a.eval()
 
-    index = habitat.build_index_valid_flight()
-    for scene_number, flight in index.items():
+    model_emb_height = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+    h_prms = pickle.load(open(f'{model_emb_height}h_prms.pkl', 'rb'))
+    model_emb_height = EmbHeight.load_from_checkpoint(f'{model_emb_height}epoch=136-step=13425-val_loss=0.50.ckpt',
+                                                      activation=h_prms['activation'],
+                                                      embedding=h_prms['embedding'],
+                                                      learning_rate=h_prms['lr'],
+                                                      uav_model=uav_model,
+                                                      motor_size=h_prms['motor_size'],
+                                                      past=h_prms['past'])
+    model_emb_height.eval()
+    z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
+
+    index = habitat.build_index_valid_flight(False)
+    for scene_number in habitat.TRAIN:
+        flight = index[scene_number]
         for flight_number in flight:
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy())
             size = len(state)
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy())
-            fa = fa[h_prms_d['past']-1:-1, 2]
+            z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
             motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy())
-            depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy())
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy())
 
+            assert len(fa) == len(motor)
+            assert len(fa) + 1 == len(z)
+            assert len(fa) + 1 == len(depth_emb)
+
+            # fa = fa[h_prms['past'] - 1:-1, 2]
+            xx = torch.arange(h_prms['past'] - 1, len(fa))
+            fa_gt = fa[h_prms['past'] - 1:, 2]
+            z_gt = z[h_prms['past'] - 1:-1, 0]
+            assert len(xx) == len(fa_gt)
+            assert len(fa_gt) == len(z_gt)
+
             with torch.no_grad():
-                fa_hat_d = []
-                for i in range(h_prms_d['past'], len(state) - 1):
-                    output = model_d.forward(motor[i], state[i], depth_emb[i - h_prms_d['past']:i])
-
-                    fa_hat_d.append(output * habitat.HabitatResidualDataset.fa_std +
-                                    habitat.HabitatResidualDataset.fa_mean)
-                fa_hat_d = torch.stack(fa_hat_d, 0).squeeze()
-            print(f'Error model d {((fa[0] - fa_hat_d[0]) ** 2).mean()}')
-            # with torch.no_grad():
-            #     fa_hat_a = []
-            #     for i in tqdm(range(h_prms_a['past'], len(state) - 1), desc='Model a'):
-            #         fa_hat_a.append(model_a.forward(motor[i], state[i], depth[i - h_prms_a['past']:i]))
-            #         print()
-            #     fa_hat_a = torch.stack(fa_hat_a, 0).squeeze()
-            #     print(f'Error model a {((fa - fa_hat_a) ** 2).mean()}')
-
-            dataset = habitat.HabitatResidualDataset('train', 40, False, True, False)
-            sample = dataset[0]
+                # fa_hat = torch.empty(len(fa), dtype=torch.float32) * torch.nan
+                z_hat = torch.empty(len(z_gt), dtype=torch.float32) * torch.nan
+                for i in range(len(z_hat)):
+                    output = model_emb_height(depth_emb[i:i + h_prms['past']])
+                    z_hat[i] = (output * z_std + z_mean)
+            print(f'{scene_number} | {flight_number} | '
+                  f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
+                  f'Real loss {((z_hat - z) ** 2).mean():0.4f}')
 
             fig, ax = plt.subplots(1, 1)
-            ax.plot(fa, label='Ground truth', marker='x')
-            ax.plot(fa_hat_d, label='model d', marker='x')
+            ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
+            ax.plot(xx, z_gt, label='Ground truth', marker=',')
+            ax.plot(xx, z_hat, label='All height', marker=',')
             # ax.plot(fa_hat_a, label='model a')
             ax.grid()
-            ax.set_ylabel('Ground force (N)')  # Surface distance (m)
+            ax.set_ylabel('Surface distance (m)')  # Surface distance (m)
             ax.set_xlabel('Sample number')
             ax.legend()
-            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/model_prediction.pdf')
-            plt.show()
+            # plt.show()
+            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/model_prediction-{scene_number}-'
+                        f'{flight_number}.pdf')
 
 
 def observe_generated_traj(scene_number, flight_number):
     scene_id = habitat.MP3D_SCENE_LIST[scene_number]
     scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
-    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/flight/{flight_number}/"
+    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
@@ -233,7 +249,7 @@ def observe_generated_traj(scene_number, flight_number):
     command = f'rsync -tv remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
         print(command)
-        raise(FileNotFoundError('Scene is not in local'))
+        raise (FileNotFoundError('Scene is not in local'))
         os.system(command)  # if scene not downloaded
 
     drone_width, drone_height = 0.1, 0.025
@@ -252,14 +268,14 @@ def observe_generated_traj(scene_number, flight_number):
                   'prop_radius': drone_width * 0.1}  # [m]
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
-    simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1/20, tf_follow=tf_follow)
+    simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1 / 20, tf_follow=tf_follow)
 
 
 def main():
     # plot_fa_generator()
-    plot_fa()
-    # plot_model_prediction('d')
-    # observe_generated_traj(89, 8)
+    # plot_fa()
+    plot_model_prediction()
+    # observe_generated_traj(32, 3)
 
 
 if __name__ == '__main__':

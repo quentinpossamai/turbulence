@@ -82,7 +82,8 @@ class HabitatResidualDataset(Dataset):
                  past: int,
                  load_depth: bool,
                  load_depth_emb: bool,
-                 load_norm_emb: bool):
+                 load_norm_emb: bool,
+                 normed_depth: bool):
         build_index_valid_flight()
 
         assert train_valid_test in ['train', 'valid', 'test']
@@ -119,6 +120,7 @@ class HabitatResidualDataset(Dataset):
         self.load_depth = load_depth
         self.load_depth_emb = load_depth_emb
         self.load_norm_emb = load_norm_emb
+        self.normed_depth = normed_depth
         self.depth_list = []
         if self.load_depth:
             self.depth_list.append('depth')
@@ -145,6 +147,12 @@ class HabitatResidualDataset(Dataset):
         to_return['surface_dist'] = (to_return['surface_dist'] - self.z_mean) / self.z_std
         for key in self.depth_list:
             to_return[key] = torch.from_numpy(load_file(key, scene_number, flight_number)[start:stop].copy())
+
+        if self.normed_depth:
+            to_return['depth'] = f.resized_crop(to_return['depth'], (480 - 408) // 2, 0, 408, 640, [240, 376])
+
+            # Divide by 20 because 20 is the ZMAX of CophyLike autoencoder trained on IRS
+            to_return['depth'] = np.clip(to_return['depth'] / 20, 0, 1) * 2 - 1
         return to_return
 
 

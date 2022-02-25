@@ -282,7 +282,7 @@ def main():
     # Display entire dataset
     for name in ['train', 'valid', 'test']:
         dataset_stats = habitat.HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
-                                                       load_norm_emb=False)
+                                                       load_norm_emb=False, normed_depth=False)
         print(name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {habitat.MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
@@ -346,7 +346,8 @@ def main():
     print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}')
     train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
                                                            load_depth_emb=load_depth_emb,
-                                                           load_norm_emb=load_norm_emb),
+                                                           load_norm_emb=load_norm_emb,
+                                                           normed_depth=False),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
@@ -355,7 +356,8 @@ def main():
 
     validation_data = DataLoader(habitat.HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
                                                                 load_depth_emb=load_depth_emb,
-                                                                load_norm_emb=load_norm_emb),
+                                                                load_norm_emb=load_norm_emb,
+                                                                normed_depth=False),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
