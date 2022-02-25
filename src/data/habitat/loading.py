@@ -191,11 +191,23 @@ class HabitatNormedDepthDataset(Dataset):
 
 
 def main():
-    dataset = HabitatResidualDataset('train', 40, load_depth=False, load_depth_emb=False, load_norm_emb=False)
-    dataloader = DataLoader(dataset, batch_size=int(dataset.len), shuffle=False, num_workers=1, pin_memory=True,
-                            drop_last=False)
-    data = next(iter(dataloader))
+    dataset = HabitatResidualDataset('train', 40, True, False, False, False)
+    # dataloader = DataLoader(dataset, batch_size=int(dataset.len), shuffle=False, num_workers=1, pin_memory=True,
+    #                         drop_last=False)
+    a = dataset[0]
     print()
+
+    index = build_index_valid_flight()
+num_traj = 0
+num_not_empty = 0
+num_len = 0
+for scene_number, flight in index.items():
+    if flight != {}:
+        num_not_empty += 1
+    for flight_number, len in flight.items():
+        num_traj += 1
+        num_len += len
+
 
     # from tqdm import tqdm
     # print('Instanciating dataset', flush=True)

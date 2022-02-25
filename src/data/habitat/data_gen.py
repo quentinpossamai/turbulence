@@ -434,7 +434,7 @@ class Simulation:
 
     def compute_ground_effect(self, motor: np.ndarray, z: float, mu: float, cap: float) -> np.ndarray:
         ground_force = np.zeros(3)
-        if z < np.sqrt(mu) * self.drone_prms['prop_radius'] / 4:
+        if z <= np.sqrt(mu) * self.drone_prms['prop_radius'] / 4:
             ground_force[2] = cap * self.drone_prms['m'] * self.g
         else:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
@@ -639,16 +639,16 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     if not debug:
         import time
         tic = time.time()
-        print(f'Saving', file=sys.stderr, flush=True)
-        if len(data_generated['motor']) == 0:
-            pickle.dump({'done': None, 'info': 'Not enough data'}, open(f'{folder}stats.pkl', 'wb'))
-        for name, array in data_generated.items():
-            np.save(f'{folder}{name}.npy', array.astype(np.float32))
-        info = 'collided' if has_collided else None
-        pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{folder}stats.pkl', 'wb'))
-        print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
-        print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
-        return True
+        # print(f'Saving', file=sys.stderr, flush=True)
+        # if len(data_generated['motor']) == 0:
+        #     pickle.dump({'done': None, 'info': 'Not enough data'}, open(f'{folder}stats.pkl', 'wb'))
+        # for name, array in data_generated.items():
+        #     np.save(f'{folder}{name}.npy', array.astype(np.float32))
+        # info = 'collided' if has_collided else None
+        # pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{folder}stats.pkl', 'wb'))
+        # print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
+        # print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
+        # return True
 
 
 def main():
