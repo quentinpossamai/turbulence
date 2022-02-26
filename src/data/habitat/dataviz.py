@@ -386,6 +386,9 @@ def rmse_model_prediction(name, dataset_name: str):
     fa_loss = (np.empty(len(data), dtype=np.float32) * np.nan)
     z_hat_log = (np.empty(len(data), dtype=np.float32) * np.nan)
     fa_hat_log = (np.empty(len(data), dtype=np.float32) * np.nan)
+    z_gt_log = (np.empty(len(data), dtype=np.float32) * np.nan)
+    fa_gt_log = (np.empty(len(data), dtype=np.float32) * np.nan)
+    fa_gttest_log = (np.empty(len(data), dtype=np.float32) * np.nan)
     print(name)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data), total=len(data)):
@@ -400,6 +403,7 @@ def rmse_model_prediction(name, dataset_name: str):
             loss = ((z_gt - z_hat) ** 2).squeeze()
             z_loss[i] = loss
             z_hat_log[i] = z_hat.squeeze()
+            z_gt_log[i] = z_gt.squeeze()
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
             fa_gt_test = compute_ground_effect(motor, z_gt)
@@ -410,9 +414,22 @@ def rmse_model_prediction(name, dataset_name: str):
             loss = (fa_gt - fa_hat) ** 2
             fa_loss[i] = loss
             fa_hat_log[i] = fa_hat
+            fa_gt_log[i] = fa_gt
+            fa_gttest_log[i] = fa_gt_test
 
     pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fag_gt_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fag_gttest_{name}_{dataset_name}.pkl', 'wb'))
+
+    plt.plot(z_gt_log)
+    plt.plot(z_hat_log)
+    plt.savefig(f'{habitat.WD_PATH}z_{name}_{dataset_name}.png')
+    plt.plot(fa_hat_log)
+    plt.plot(fa_gt_log)
+    plt.plot(fa_gttest_log)
+    plt.savefig(f'{habitat.WD_PATH}fa_{name}_{dataset_name}.png')
     print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
     print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
     print(f'\n\n')

@@ -73,8 +73,8 @@ class EurocMAVDatasetHorizon2(Dataset):
             depth = np.clip(depth / 20, 0, 1) * 2 - 1
 
         heights = (heights - EurocMAVDatasetHorizon2.z_mean) / EurocMAVDatasetHorizon2.z_std
-        data_isolated['residual'] = (data_isolated[
-                                         "residual"] - EurocMAVDatasetHorizon2.fa_mean) / EurocMAVDatasetHorizon2.fa_std
+        data_isolated['residual'] = ((data_isolated["residual"] - EurocMAVDatasetHorizon2.fa_mean)
+                                     / EurocMAVDatasetHorizon2.fa_std)
 
         to_return = {'state': torch.from_numpy(data_isolated["state"].astype(np.float32)),
                      'motor': torch.from_numpy(data_isolated["motor"].astype(np.float32)),
@@ -91,6 +91,10 @@ def estimate_cheeseman():
              "V1_02_medium/",
              "V1_03_difficult/"]}
     heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
+
+    from src.utils.paths import WD_PATH
+    z_hat = pickle.load(open(f'{WD_PATH}z_hat_fine_euroc_mav.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{WD_PATH}fa_hat_fine_euroc_mav.pkl', 'rb'))
 
     fa, n = [], []
     for key in heights.keys():
@@ -130,7 +134,11 @@ def estimate_cheeseman():
     fapred = sol[0] * n / (height ** 2 - sol[1])
     plt.plot(fa)
     plt.plot(fapred)
+    plt.plot(fa_hat)
     plt.show()
+
+    plt.plot(z_hat)
+    plt.plot(height)
     print(sol)
 
 
