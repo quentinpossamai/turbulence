@@ -6,8 +6,8 @@ cd ~/phd/turbulence/
  --activation relu\
  --embedding norm\
  --batch_size 4\
- --l2 1e-4\
- --lr 1e-6\
+ --l2 0\
+ --lr 1e-7\
  --max_epochs 10000\
  --past 40
 # --resume_from_checkpoint $file
