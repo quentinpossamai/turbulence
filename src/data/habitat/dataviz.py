@@ -367,7 +367,7 @@ def rmse_model_prediction(name, dataset_name: str):
                 mu_r_z = mu * (drone_prms['prop_radius'] / (4 * z)) ** 2
                 ground_force[2] = np.clip(np.sum(motor) ** 2 * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                           a_min=0, a_max=cap * drone_prms['m'] * g)
-            return np.concatenate([ground_force, np.zeros(3)])
+            return np.concatenate([ground_force, np.zeros(3)]).squeeze()[2]
     else:
         def compute_ground_effect(motor: np.ndarray, z: float) -> np.ndarray:
             sol = [9.40693193e-07, -4.17981623e-03]
@@ -402,12 +402,12 @@ def rmse_model_prediction(name, dataset_name: str):
             z_hat_log[i] = z_hat.squeeze()
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
-            fa_gt_test = compute_ground_effect(motor, z_gt)[2]
+            fa_gt_test = compute_ground_effect(motor, z_gt)
             # print(f'fa_gt {fa_gt} | fa_gt_test {fa_gt_test}')
             if dataset_name == 'habitat':
                 assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
-            fa_hat = compute_ground_effect(motor, z_hat).squeeze()[2]
-            loss = ((fa_gt - fa_hat) ** 2).squeeze()
+            fa_hat = compute_ground_effect(motor, z_hat)
+            loss = (fa_gt - fa_hat) ** 2
             fa_loss[i] = loss
             fa_hat_log[i] = fa_hat
 
