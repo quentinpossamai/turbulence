@@ -370,6 +370,8 @@ def rmse_model_prediction(name, dataset_name: str):
 
     data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=12, pin_memory=True, drop_last=False)
 
+    print(f'past: {h_prms["past"]}')
+
     model.eval()
 
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
