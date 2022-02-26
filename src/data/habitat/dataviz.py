@@ -377,6 +377,8 @@ def rmse_model_prediction(name, dataset_name: str):
 
     z_loss = (np.empty(len(data), dtype=np.float32) * np.nan)
     fa_loss = (np.empty(len(data), dtype=np.float32) * np.nan)
+    z_hat_log = (np.empty(len(data), dtype=np.float32) * np.nan)
+    fa_hat_log = (np.empty(len(data), dtype=np.float32) * np.nan)
     print(name)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data), total=len(data)):
@@ -390,6 +392,7 @@ def rmse_model_prediction(name, dataset_name: str):
             z_gt = batch['surface_dist'].cpu().numpy() * z_std + z_mean
             loss = ((z_gt - z_hat) ** 2).squeeze()
             z_loss[i] = loss
+            z_hat_log[i] = z_hat.squeeze()
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
             fa_gt_test = compute_ground_effect(motor, z_gt)[2]
@@ -398,6 +401,10 @@ def rmse_model_prediction(name, dataset_name: str):
             fa_hat = compute_ground_effect(motor, z_hat).squeeze()[2]
             loss = ((fa_gt - fa_hat) ** 2).squeeze()
             fa_loss[i] = loss
+            fa_hat_log[i] = fa_hat
+
+    pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
     print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
     print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
     print(f'\n\n')
@@ -441,8 +448,10 @@ def main():
     # plot_fa_generator()
     # plot_fa()
     # ['nogru', 'all', 'emb', 'fine']
-    for e in ['fine']:
-        rmse_model_prediction(e, 'euroc_mav')
+    for e in ['nogru', 'all', 'emb', 'fine']:
+        rmse_model_prediction(e, 'habitat')
+    # for e in ['fine']:
+    #     rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
 
 
