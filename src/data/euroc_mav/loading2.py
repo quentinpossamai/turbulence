@@ -30,12 +30,9 @@ class EurocMAVDatasetHorizon2(Dataset):
                  normed_depth: bool):
         self.train_valid_test = train_valid_test
 
-        self.splits = [("V1_01_easy/", i) for i in range(25800 + past * 10, 27179, 10)] + [
-            ("V1_02_medium/", i) for i in range(14000 + past * 10, 15547, 10)] + [("V1_03_difficult/", i)
-                                                                                  for i
-                                                                                  in
-                                                                                  range(18600 + past * 10,
-                                                                                        19343, 10)]
+        self.splits = [("V1_01_easy/", i) for i in range(25800 + past * 10, 27169, 10)] + [
+            ("V1_02_medium/", i) for i in range(14000 + past * 10, 15537, 10)] + \
+                      [("V1_03_difficult/", i) for i in range(18600 + past * 10, 19333, 10)]
 
         self.data = {key: pickle.load(open(INTERMEDIATE_DATASET_PATH + key + "/data.pkl", 'rb')) for key in
                      ["V1_01_easy/",

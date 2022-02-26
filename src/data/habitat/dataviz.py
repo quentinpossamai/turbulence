@@ -453,7 +453,7 @@ def main():
     # ['nogru', 'all', 'emb', 'fine']
     # for e in ['nogru', 'all', 'emb', 'fine']:
     #     rmse_model_prediction(e, 'habitat')
-    for e in ['all']:
+    for e in ['fine']:
         rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
 
