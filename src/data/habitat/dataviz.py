@@ -357,16 +357,21 @@ def rmse_model_prediction(name, dataset_name: str):
         else:
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
 
-    def compute_ground_effect(motor: np.ndarray, z: float, mu=1, cap=0.1) -> np.ndarray:
-        g = 9.81
-        ground_force = np.zeros(3)
-        if z <= np.sqrt(mu) * drone_prms['prop_radius'] / 4:
-            ground_force[2] = cap * drone_prms['m'] * g
-        else:
-            mu_r_z = mu * (drone_prms['prop_radius'] / (4 * z)) ** 2
-            ground_force[2] = np.clip(np.sum(motor) ** 2 * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
-                                      a_min=0, a_max=cap * drone_prms['m'] * g)
-        return np.concatenate([ground_force, np.zeros(3)])
+    if dataset_name == 'habitat':
+        def compute_ground_effect(motor: np.ndarray, z: float, mu=1, cap=0.1) -> np.ndarray:
+            g = 9.81
+            ground_force = np.zeros(3)
+            if z <= np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+                ground_force[2] = cap * drone_prms['m'] * g
+            else:
+                mu_r_z = mu * (drone_prms['prop_radius'] / (4 * z)) ** 2
+                ground_force[2] = np.clip(np.sum(motor) ** 2 * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                          a_min=0, a_max=cap * drone_prms['m'] * g)
+            return np.concatenate([ground_force, np.zeros(3)])
+    else:
+        def compute_ground_effect(motor: np.ndarray, z: float) -> np.ndarray:
+            sol = [9.40693193e-07, -4.17981623e-03]
+            return sol[0] * motor.sum(axis=-1) / (z ** 2 - sol[1])
 
     data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=12, pin_memory=True, drop_last=False)
 

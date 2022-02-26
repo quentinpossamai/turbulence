@@ -115,24 +115,23 @@ def estimate_cheeseman():
     import scipy.optimize
     sol = scipy.optimize.fmin(error, np.ones((2)) * 1e-2)
 
-    return sol
-    # print(sol)
-    # import matplotlib.pyplot as plt
-    #
-    # fa, n = [], []
-    # for key in heights.keys():
-    #     for i in range(heights[key].shape[0]):
-    #         idx = list(data[key]['t']).index(heights[key][i, 0])
-    #         fa.append(data[key]['residual'][idx])
-    #         n.append(np.sum(data[key]["motor"][idx] ** 2))
-    # n = np.stack(n, axis=0).reshape((-1, 1))
-    # fa = np.stack(fa, axis=0)[:, 2]
-    # height = np.concatenate([heights[key][:, 1] for key in heights.keys()], axis=0).reshape((-1, 1))
-    # fapred = sol[0] * n / (height ** 2 - sol[1])
-    # plt.plot(fa)
-    # plt.plot(fapred)
-    # plt.show()
-    # print(sol)
+    print(sol)
+    import matplotlib.pyplot as plt
+
+    fa, n = [], []
+    for key in heights.keys():
+        for i in range(heights[key].shape[0]):
+            idx = list(data[key]['t']).index(heights[key][i, 0])
+            fa.append(data[key]['residual'][idx])
+            n.append(np.sum(data[key]["motor"][idx] ** 2))
+    n = np.stack(n, axis=0).reshape((-1, 1))
+    fa = np.stack(fa, axis=0)[:, 2]
+    height = np.concatenate([heights[key][:, 1] for key in heights.keys()], axis=0).reshape((-1, 1))
+    fapred = sol[0] * n / (height ** 2 - sol[1])
+    plt.plot(fa)
+    plt.plot(fapred)
+    plt.show()
+    print(sol)
 
 
 if __name__ == '__main__':
