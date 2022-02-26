@@ -257,7 +257,9 @@ def plot_model_prediction(name):
                         f'{flight_number}.pdf')
 
 
-def rmse_model_prediction(name):
+def rmse_model_prediction(name, dataset: str):
+    msg = ['habitat', 'euroc_mav']
+    assert dataset in msg, f'dataset must be in {msg}'
     use_cuda_if_possible = True
     device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
@@ -328,7 +330,7 @@ def rmse_model_prediction(name):
         dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
     else:
         assert name == 'fine'
-        from src.drone_models.residual.fine_tuning import FineTunning as Model
+        from src.drone_models.residual.fine_tuning2 import FineTunning as Model
         path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
@@ -424,8 +426,9 @@ def observe_generated_traj(scene_number, flight_number):
 def main():
     # plot_fa_generator()
     # plot_fa()
-    for e in ['nogru', 'all', 'emb', 'fine']:
-        rmse_model_prediction(e)
+    # 'nogru', 'all', 'emb',
+    for e in ['fine']:
+        rmse_model_prediction(e, 'habitat')
     # observe_generated_traj(32, 3)
 
 

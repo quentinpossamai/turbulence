@@ -99,7 +99,7 @@ class HabitatResidualDataset(Dataset):
             include = VALID
         else:
             assert self.train_valid_test == 'test'
-            include = TEST
+            include = VALID
 
         self.index = {}
         for i in include:

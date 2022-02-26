@@ -8,7 +8,7 @@ import torch
 
 INTERMEDIATE_DATASET_PATH = EurocMAV.INTERMEDIATE_DATASET_PATH
 
-INTERMEDIATE_DATASET_PATH = "/Volumes/Samsung_T5/EurocMav/"
+# INTERMEDIATE_DATASET_PATH = "/Volumes/Samsung_T5/EurocMav/"
 
 
 class EurocMAVDatasetHorizon2(Dataset):
