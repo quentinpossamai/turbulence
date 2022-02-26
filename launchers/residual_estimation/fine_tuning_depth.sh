@@ -9,5 +9,5 @@ file+="FineTunning/20220225_184929/epoch\=0-step\=49005-val_loss\=0.53.ckpt"
  --l2 0\
  --lr 1e-7\
  --max_epochs 10000\
- --past 40
+ --past 40\
  --resume_from_checkpoint $file
