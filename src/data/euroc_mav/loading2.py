@@ -6,7 +6,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
+import torchvision.transforms.functional as f
+
+
 INTERMEDIATE_DATASET_PATH = EurocMAV.INTERMEDIATE_DATASET_PATH
+
 
 # INTERMEDIATE_DATASET_PATH = "/Volumes/Samsung_T5/EurocMav/"
 
@@ -22,7 +26,8 @@ class EurocMAVDatasetHorizon2(Dataset):
                  past: int,
                  load_depth: bool,
                  load_depth_emb: bool,
-                 load_norm_emb: bool):
+                 load_norm_emb: bool,
+                 normed_depth: bool):
         self.train_valid_test = train_valid_test
 
         self.splits = [("V1_01_easy/", i) for i in range(25800 + past * 10, 27179, 10)] + [
@@ -41,6 +46,10 @@ class EurocMAVDatasetHorizon2(Dataset):
         except FileNotFoundError:
             raise FileNotFoundError("Tu as pas copiere-collere depth_iros_test depuis /storage vers ton data...")
         self.past = past
+        self.load_depth = load_depth
+        self.load_depth_emb = load_depth_emb
+        self.load_norm_emb = load_norm_emb
+        self.normed_depth = normed_depth
 
     def __len__(self):
         return len(self.splits)
@@ -61,7 +70,10 @@ class EurocMAVDatasetHorizon2(Dataset):
         idx = list(self.heights[flight][:, 0]).index(t)
         heights = self.heights[flight][idx, 1]
 
-        depth = np.stack(depth, axis=0)
+        depth = torch.from_numpy(np.stack(depth, axis=0))
+        if self.normed_depth:
+            depth = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
+            depth = np.clip(depth / 20, 0, 1) * 2 - 1
 
         heights = (heights - EurocMAVDatasetHorizon2.z_mean) / EurocMAVDatasetHorizon2.z_std
         data_isolated['residual'] = (data_isolated[
@@ -71,7 +83,7 @@ class EurocMAVDatasetHorizon2(Dataset):
                      'motor': torch.from_numpy(data_isolated["motor"]),
                      'ground_force': torch.from_numpy(data_isolated["residual"]),
                      'surface_dist': torch.from_numpy(np.array(heights)).view(1),
-                     'depth': torch.from_numpy(depth)}
+                     'depth': depth}
 
         return to_return
 

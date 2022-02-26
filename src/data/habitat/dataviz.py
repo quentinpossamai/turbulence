@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
+import src.data.euroc_mav.loading2 as euroc_mav
 import src.data.habitat.data_gen as data_gen
 import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
@@ -257,9 +258,9 @@ def plot_model_prediction(name):
                         f'{flight_number}.pdf')
 
 
-def rmse_model_prediction(name, dataset: str):
+def rmse_model_prediction(name, dataset_name: str):
     msg = ['habitat', 'euroc_mav']
-    assert dataset in msg, f'dataset must be in {msg}'
+    assert dataset_name in msg, f'dataset must be in {msg}'
     use_cuda_if_possible = True
     device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
@@ -298,7 +299,10 @@ def rmse_model_prediction(name, dataset: str):
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
                                            past=h_prms['past']).to(device)
-        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'all':
         from src.drone_models.residual.all_height import AllHeight as Model
@@ -312,7 +316,10 @@ def rmse_model_prediction(name, dataset: str):
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
                                            past=h_prms['past']).to(device)
-        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'emb':
         from src.drone_models.residual.emb_height import EmbHeight as Model
@@ -327,7 +334,11 @@ def rmse_model_prediction(name, dataset: str):
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
                                            past=h_prms['past']).to(device)
-        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
+        if dataset_name == 'euroc_mav':
+            print(f'name: {name} | dataset_name: {dataset_name} | Emb not generated')
+            return
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
     else:
         assert name == 'fine'
         from src.drone_models.residual.fine_tuning2 import FineTunning as Model
@@ -341,7 +352,10 @@ def rmse_model_prediction(name, dataset: str):
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
                                            past=h_prms['past']).to(device)
-        dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
 
     def compute_ground_effect(motor: np.ndarray, z: float, mu=1, cap=0.1) -> np.ndarray:
         g = 9.81
@@ -426,9 +440,9 @@ def observe_generated_traj(scene_number, flight_number):
 def main():
     # plot_fa_generator()
     # plot_fa()
-    #
-    for e in ['nogru', 'all', 'emb', 'fine']:
-        rmse_model_prediction(e, 'habitat')
+    # ['nogru', 'all', 'emb', 'fine']
+    for e in ['fine']:
+        rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
 
 
