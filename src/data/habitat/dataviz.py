@@ -426,8 +426,8 @@ def observe_generated_traj(scene_number, flight_number):
 def main():
     # plot_fa_generator()
     # plot_fa()
-    # 'nogru', 'all', 'emb',
-    for e in ['fine']:
+    #
+    for e in ['nogru', 'all', 'emb', 'fine']:
         rmse_model_prediction(e, 'habitat')
     # observe_generated_traj(32, 3)
 
