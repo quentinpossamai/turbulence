@@ -70,7 +70,7 @@ class EurocMAVDatasetHorizon2(Dataset):
         idx = list(self.heights[flight][:, 0]).index(t)
         heights = self.heights[flight][idx, 1]
 
-        depth = torch.from_numpy(np.stack(depth, axis=0))
+        depth = torch.from_numpy(np.stack(depth, axis=0).astype(np.float32))
         if self.normed_depth:
             depth = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
             depth = np.clip(depth / 20, 0, 1) * 2 - 1
@@ -79,10 +79,10 @@ class EurocMAVDatasetHorizon2(Dataset):
         data_isolated['residual'] = (data_isolated[
                                          "residual"] - EurocMAVDatasetHorizon2.fa_mean) / EurocMAVDatasetHorizon2.fa_std
 
-        to_return = {'state': torch.from_numpy(data_isolated["state"]),
-                     'motor': torch.from_numpy(data_isolated["motor"]),
-                     'ground_force': torch.from_numpy(data_isolated["residual"]),
-                     'surface_dist': torch.from_numpy(np.array(heights)).view(1),
+        to_return = {'state': torch.from_numpy(data_isolated["state"].astype(np.float32)),
+                     'motor': torch.from_numpy(data_isolated["motor"].astype(np.float32)),
+                     'ground_force': torch.from_numpy(data_isolated["residual"].astype(np.float32)),
+                     'surface_dist': torch.from_numpy(np.array(heights).astype(np.float32)).view(1),
                      'depth': depth}
 
         return to_return
