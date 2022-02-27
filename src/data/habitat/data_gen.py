@@ -438,6 +438,8 @@ class Simulation:
             ground_force[2] = cap * self.drone_prms['m'] * self.g
         else:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
+            # TODO change from body to fixe in quadrotor
+            # TODO include np.sum(motor ** 2) !!
             ground_force[2] = np.clip(np.sum(motor) ** 2 * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                       a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
         return np.concatenate([ground_force, np.zeros(3)])

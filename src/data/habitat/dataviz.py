@@ -15,7 +15,7 @@ import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 
-plt.style.use('seaborn')
+plt.style.use('seaborn-deep')
 plt.rcParams.update({"text.usetex": False,
                      "font.family": "serif",
                      "font.sans-serif": ["Computer Modern Roman"]})
@@ -488,11 +488,11 @@ def histogram():
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
     dataset_name = 'habitat'  # habitat  euroc_mav
-    z_gt = pickle.load(open(f'{habitat.WD_PATH}z_gt_fine_{dataset_name}.pkl', 'rb'))
-    fa_gt = pickle.load(open(f'{habitat.WD_PATH}fa_gt_fine_{dataset_name}.pkl', 'rb'))
-    z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_{dataset_name}.pkl', 'rb'))
-    fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_{dataset_name}.pkl', 'rb'))
-    fa_gttest = pickle.load(open(f'{habitat.WD_PATH}fa_gttest_fine_{dataset_name}.pkl', 'rb'))
+    z_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
+    fa_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gt_fine_{dataset_name}.pkl', 'rb'))
+    z_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_gttest = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gttest_fine_{dataset_name}.pkl', 'rb'))
 
     fa_or_z = 'z'
     if fa_or_z == 'z':
@@ -503,21 +503,30 @@ def histogram():
         plt.ylabel(f'Height (m)')
         plt.xlabel(f'Sample #')
         plt.legend()
+        plt.scatter(z_gt, fa_gt, s=0.1)
+        plt.scatter(z_hat, fa_hat, s=0.1)
+
     else:
         hat = fa_hat
         gt = fa_gt
-        plt.plot(gt, label=f'{fa_or_z} GT')
-        plt.plot(fa_gttest, label=f'{fa_or_z} (Analytical ground effect from GT heights)')
-        plt.plot(hat, label=f'{fa_or_z} (Ours)')
-        plt.ylabel(f'Ground Effect (N)')
-        plt.xlabel(f'Sample #')
+
+        fig, ax = plt.subplots(figsize=(11, 3))
+        ax.plot(gt, label=f'{fa_or_z} GT')
+        ax.plot(fa_gttest, label=f'{fa_or_z} (Analytical ground effect from GT heights)')
+        ax.plot(hat, label=f'{fa_or_z} (Ours)')
+        ax.set_ylabel(f'Ground Effect (N)')
+        ax.set_xlabel(f'Sample #')
+        ax.set_facecolor('w')
+        ax.legend()
+        # ax.grid(True)
+        plt.subplots_adjust(left=0.11, bottom=0.1, right=0.99, top=0.99, wspace=0.3, hspace=0.3)
+        plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/fa_euroc_prediction.pdf')
+
         np.sqrt(((gt - fa_gttest) ** 2).mean())
         np.sqrt(((fa_gttest - hat) ** 2).mean())
         np.sqrt(((gt - hat) ** 2).mean())
 
-    plt.legend()
-
-    hist1, bin_edges1 = np.histogram(gt, bins=20)
+    hist1, bin_edges1 = np.histogram(gt, bins=200)
     hist2 = np.zeros(len(hist1))
     box_plot = []
     for i in range(len(bin_edges1) - 2):
@@ -530,7 +539,10 @@ def histogram():
 
     fig, ax = plt.subplots()
     ax.bar(bin_edges1[:-1], hist1, width=diff_edges1, align="edge")
-    ax.bar(bin_edges1[:-1], hist2, width=diff_edges1, align="edge")
+    ax.set_xlabel(f'fa GT (N)' if fa_or_z == 'fa' else f'z GT (m)' + f' {dataset_name}')
+    if dataset_name == 'habitat':
+        ax.set_xlim([0, 1.8])
+    # ax.bar(bin_edges1[:-1], hist2, width=diff_edges1, align="edge")
     ax.grid()
 
     fig, ax = plt.subplots()
@@ -538,27 +550,68 @@ def histogram():
     ax.boxplot(box_plot, showfliers=False)
     initial_ticks = ax.get_xticks()
     ax.plot(initial_ticks, positions, label='y=x')
-    ax.set_xlabel(f'fa GT (N)')
-    ax.set_ylabel(f'fa (Ours) (N)')
+    ax.set_xlabel(f'fa GT (N)' if fa_or_z == 'fa' else f'z GT (m)')
+    ax.set_ylabel(f'fa (Ours) (N)' if fa_or_z == 'fa' else f'z (Ours) (m)')
     plt.xticks(initial_ticks, [f'{e:.3f}' for e in positions], rotation=-45)
     ax.legend()
 
-    fig, ax = plt.subplots()
-    positions = bin_edges1[:-1] + diff_edges1 / 2
-    ax.boxplot(box_plot, showfliers=False)
-    initial_ticks = ax.get_xticks()
-    ax.plot(initial_ticks, positions, label='y=x')
-    ax.set_xlabel(f'fa GT (m)')
-    ax.set_ylabel(f'fa (Ours) (m)')
-    plt.xticks(initial_ticks, [f'{e:.3f}' for e in positions], rotation=-45)
-    ax.legend()
-    plt.scatter(gt, hat, s=0.1)
-    plt.plot(gt, gt)
 
     plt.plot(gt)
     plt.plot(hat)
 
     len(z_hat)
+
+
+def euroc_mav_table():
+    dataset_name = 'euroc_mav'
+    z_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
+    fa_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gt_fine_{dataset_name}.pkl', 'rb'))
+    z_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_gttest = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gttest_fine_{dataset_name}.pkl', 'rb'))
+
+    dataset = euroc_mav.EurocMAVDatasetHorizon2('test', 40, False, False, False, False)
+    print(f'Balise 1')
+
+    # flight = [dataset[i]['flight'] for i in tqdm(range(len(dataset)))]
+    flight_path = f'{habitat.WD_PATH}data_prediction/flight.pkl'
+    # pickle.dump(flight, open(flight_path, 'wb'))
+    flight = pickle.load(open(flight_path, 'rb'))
+
+    error_z = {"V1_01_easy/": [],
+               "V1_02_medium/": [],
+               "V1_03_difficult/": []}
+    error_fa = {"V1_01_easy/": [],
+                "V1_02_medium/": [],
+                "V1_03_difficult/": []}
+    error_fa_cheeseman = {"V1_01_easy/": [],
+                          "V1_02_medium/": [],
+                          "V1_03_difficult/": []}
+    print(f'Balise 2')
+
+    for i, _ in tqdm(enumerate(z_gt)):
+        # assert z_gt[i] == dataset[i]['surface_dist'] * dataset.z_std + dataset.z_mean
+        error_z[flight[i]].append((z_gt[i] - z_hat[i]) ** 2)
+        error_fa[flight[i]].append((fa_gt[i] - fa_hat[i]) ** 2)
+        error_fa_cheeseman[flight[i]].append((fa_gt[i] - fa_gttest[i]) ** 2)
+    print(f'Balise 3')
+
+    total_z = []
+    total_fa = []
+    total_fa_cheese = []
+    for e in error_z:
+        print(f'{e}')
+        print(f'Error z {e}: {np.sqrt(np.mean(error_z[e]))}')
+        print(f'Error fa {e}: {np.sqrt(np.mean(error_fa[e]))}')
+        print(f'Error fa_cheese {e}: {np.sqrt(np.mean(error_fa_cheeseman[e]))}')
+        print(f'\n\n')
+        total_z = total_z + error_z[e]
+        total_fa = total_fa + error_fa[e]
+        total_fa_cheese = total_fa_cheese + error_fa_cheeseman[e]
+    print(f'Error z total: {np.sqrt(np.mean(total_z))}')
+    print(f'Error fa total: {np.sqrt(np.mean(total_fa))}')
+    print(f'Error fa_cheese total: {np.sqrt(np.mean(total_fa_cheese))}')
+    print()
 
 
 def main():
@@ -571,6 +624,7 @@ def main():
     #     rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
     histogram()
+    # euroc_mav_table()
 
 
 if __name__ == '__main__':

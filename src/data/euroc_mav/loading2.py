@@ -80,7 +80,8 @@ class EurocMAVDatasetHorizon2(Dataset):
                      'motor': torch.from_numpy(data_isolated["motor"].astype(np.float32)),
                      'ground_force': torch.from_numpy(data_isolated["residual"].astype(np.float32)),
                      'surface_dist': torch.from_numpy(np.array(heights).astype(np.float32)).view(1),
-                     'depth': depth}
+                     'depth': depth,
+                     'flight': flight}
 
         return to_return
 
