@@ -350,10 +350,8 @@ def rmse_model_prediction(name, dataset_name: str):
         # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
         from src.drone_models.residual.fine_tuning import FineTunning as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
         model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
-
-        '20220226_183121'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
                                            activation=h_prms['activation'],
