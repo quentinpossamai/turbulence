@@ -400,45 +400,45 @@ def rmse_model_prediction(name, dataset_name: str):
                 depth = batch['depth'].to(device)
             motor = batch['motor'].cpu().numpy()
 
-            # z_hat = model(depth).cpu().numpy() * z_std + z_mean
+            z_hat = model(depth).cpu().numpy() * z_std + z_mean
             z_gt = batch['surface_dist'].cpu().numpy() * z_std + z_mean
-            # loss = ((z_gt - z_hat) ** 2).squeeze()
-            # z_loss[i] = loss
-            # z_hat_log[i] = z_hat.squeeze()
+            loss = ((z_gt - z_hat) ** 2).squeeze()
+            z_loss[i] = loss
+            z_hat_log[i] = z_hat.squeeze()
             z_gt_log[i] = z_gt.squeeze()
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
             fa_gt_test = compute_ground_effect(motor, z_gt)
-            # if dataset_name == 'habitat':
-            #     assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
-            # fa_hat = compute_ground_effect(motor, z_hat)
-            # loss = (fa_gt - fa_hat) ** 2
-            # fa_loss[i] = loss
-            # fa_hat_log[i] = fa_hat
+            if dataset_name == 'habitat':
+                assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
+            fa_hat = compute_ground_effect(motor, z_hat)
+            loss = (fa_gt - fa_hat) ** 2
+            fa_loss[i] = loss
+            fa_hat_log[i] = fa_hat
             fa_gt_log[i] = fa_gt
             fa_gttest_log[i] = fa_gt_test
 
-    # pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
-    # pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fa_gttest_{name}_{dataset_name}.pkl', 'wb'))
 
-    # fig, ax = plt.subplots(1, 1)
-    # ax.plot(z_gt_log)
-    # ax.plot(z_hat_log)
-    # ax.legend()
-    # plt.savefig(f'{habitat.WD_PATH}z_{name}_{dataset_name}.png')
-    #
-    # fig, ax = plt.subplots(1, 1)
-    # ax.plot(fa_hat_log)
-    # ax.plot(fa_gt_log)
-    # ax.plot(fa_gttest_log)
-    # ax.legend()
-    # plt.savefig(f'{habitat.WD_PATH}fa_{name}_{dataset_name}.png')
-    # print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
-    # print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
-    # print(f'\n\n')
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(z_gt_log)
+    ax.plot(z_hat_log)
+    ax.legend()
+    plt.savefig(f'{habitat.WD_PATH}z_{name}_{dataset_name}.png')
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(fa_hat_log)
+    ax.plot(fa_gt_log)
+    ax.plot(fa_gttest_log)
+    ax.legend()
+    plt.savefig(f'{habitat.WD_PATH}fa_{name}_{dataset_name}.png')
+    print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
+    print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
+    print(f'\n\n')
 
 
 def observe_generated_traj(scene_number, flight_number):
@@ -527,10 +527,10 @@ def main():
     # ['nogru', 'all', 'emb', 'fine']
     # for e in ['nogru', 'all', 'emb', 'fine']:
     #     rmse_model_prediction(e, 'habitat')
-    for e in ['fine']:
-        rmse_model_prediction(e, 'euroc_mav')
+    # for e in ['fine']:
+    #     rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
-    # histogram()
+    histogram()
 
 
 if __name__ == '__main__':
