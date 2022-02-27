@@ -493,7 +493,7 @@ def main():
     # for e in ['nogru', 'all', 'emb', 'fine']:
     #     rmse_model_prediction(e, 'habitat')
     for e in ['fine']:
-        rmse_model_prediction(e, 'euroc_mav')
+        rmse_model_prediction(e, 'habitat')
     # observe_generated_traj(32, 3)
     # histogram()
 
