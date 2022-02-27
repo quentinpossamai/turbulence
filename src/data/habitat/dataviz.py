@@ -16,6 +16,9 @@ from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalMo
 from src.utils.profiler import profiler
 
 plt.style.use('seaborn')
+plt.rcParams.update({"text.usetex": False,
+                     "font.family": "serif",
+                     "font.sans-serif": ["Computer Modern Roman"]})
 
 
 def plot_fa_law():
@@ -343,9 +346,14 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
     else:
         assert name == 'fine'
-        from src.drone_models.residual.fine_tuning2 import FineTunning as Model
+        # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
+        # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+        # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+        from src.drone_models.residual.fine_tuning import FineTunning as Model
         path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
-        model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+        model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
+
+        '20220226_183121'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
                                            activation=h_prms['activation'],
@@ -486,17 +494,26 @@ def histogram():
     fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_{dataset_name}.pkl', 'rb'))
     fa_gttest = pickle.load(open(f'{habitat.WD_PATH}fa_gttest_fine_{dataset_name}.pkl', 'rb'))
 
-    fa_or_z = 'fa'
+    fa_or_z = 'z'
     if fa_or_z == 'z':
         hat = z_hat
         gt = z_gt
+        plt.plot(gt, label=f'{fa_or_z} GT')
+        plt.plot(hat, label=f'{fa_or_z} (Ours)')
+        plt.ylabel(f'Height (m)')
+        plt.xlabel(f'Sample #')
+        plt.legend()
     else:
         hat = fa_hat
         gt = fa_gt
-
-    plt.plot(gt, label=f'{fa_or_z}_gt')
-    plt.plot(fa_gttest, label=f'{fa_or_z}_test')
-    plt.plot(hat, label=f'{fa_or_z}_hat')
+        plt.plot(gt, label=f'{fa_or_z} GT')
+        plt.plot(fa_gttest, label=f'{fa_or_z} (Analytical ground effect from GT heights)')
+        plt.plot(hat, label=f'{fa_or_z} (Ours)')
+        plt.ylabel(f'Ground Effect (N)')
+        plt.xlabel(f'Sample #')
+        np.sqrt(((gt - fa_gttest) ** 2).mean())
+        np.sqrt(((fa_gttest - hat) ** 2).mean())
+        np.sqrt(((gt - hat) ** 2).mean())
 
     plt.legend()
 
@@ -518,10 +535,14 @@ def histogram():
 
     fig, ax = plt.subplots()
     positions = bin_edges1[:-1] + diff_edges1 / 2
-    ax.boxplot(box_plot, )
+    ax.boxplot(box_plot, showfliers=False)
     initial_ticks = ax.get_xticks()
-    ax.plot(initial_ticks, positions)
-    plt.xticks(initial_ticks, [str(e) for e in positions])
+    ax.plot(initial_ticks, positions, label='y=x')
+    ax.set_xlabel(f'z GT (m)')
+    ax.set_ylabel(f'z (Ours) (m)')
+    plt.xticks(initial_ticks, [f'{e:.3f}' for e in positions], rotation=-45)
+    ax.legend()
+
     len(z_hat)
 
 
@@ -529,12 +550,12 @@ def main():
     # plot_fa_generator()
     # plot_fa()
     # ['nogru', 'all', 'emb', 'fine']
-    # for e in ['nogru', 'all', 'emb', 'fine']:
-    #     rmse_model_prediction(e, 'habitat')
+    for e in ['fine']:
+        rmse_model_prediction(e, 'habitat')
     for e in ['fine']:
         rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
-    # histogram()
+    histogram()
 
 
 if __name__ == '__main__':
