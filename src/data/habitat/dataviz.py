@@ -15,6 +15,8 @@ import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 
+plt.style.use('seaborn')
+
 
 def plot_fa_law():
     cap = 0.1
@@ -371,7 +373,7 @@ def rmse_model_prediction(name, dataset_name: str):
     else:
         def compute_ground_effect(motor: np.ndarray, z: float) -> np.ndarray:
             sol = [9.40693193e-07, -4.17981623e-03]
-            return sol[0] * motor.sum(axis=-1) / (z ** 2 - sol[1])
+            return sol[0] * motor.sum(axis=-1) ** 2 / (z ** 2 - sol[1])
 
     data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=12, pin_memory=True, drop_last=False)
 
@@ -419,8 +421,8 @@ def rmse_model_prediction(name, dataset_name: str):
     # pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
     # pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fag_gt_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fag_gttest_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fa_gttest_{name}_{dataset_name}.pkl', 'wb'))
 
     # fig, ax = plt.subplots(1, 1)
     # ax.plot(z_gt_log)
@@ -477,13 +479,46 @@ def histogram():
     dataset = habitat.HabitatResidualDataset('test', 40, False, False, False, False)
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
-    dataset_name = 'euroc_mav'  # habitat
+    dataset_name = 'euroc_mav'  # habitat  euroc_mav
     z_gt = pickle.load(open(f'{habitat.WD_PATH}z_gt_fine_{dataset_name}.pkl', 'rb'))
     fa_gt = pickle.load(open(f'{habitat.WD_PATH}fa_gt_fine_{dataset_name}.pkl', 'rb'))
     z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_{dataset_name}.pkl', 'rb'))
     fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_{dataset_name}.pkl', 'rb'))
 
+    fa_or_z = 'fa'
+    if fa_or_z == 'z':
+        hat = z_hat
+        gt = z_gt
+    else:
+        hat = fa_hat
+        gt = fa_gt
 
+    plt.plot(gt)
+    plt.plot(hat)
+
+    hist1, bin_edges1 = np.histogram(gt, bins=40)
+    hist2 = np.zeros(len(hist1))
+    box_plot = []
+    for i in range(len(bin_edges1) - 2):
+        box_plot.append(hat[np.where(np.logical_and(bin_edges1[i] <= hat, hat < bin_edges1[i + 1]))[0]])
+        hist2[i] = len(box_plot[i])
+    i = len(bin_edges1) - 2
+    box_plot.append(hat[np.where(np.logical_and(bin_edges1[i] <= hat, hat <= bin_edges1[i + 1]))[0]])
+    hist2[i] = len(box_plot[i])
+
+    diff_edges1 = np.diff(bin_edges1)
+    fig, ax = plt.subplots()
+    ax.bar(bin_edges1[:-1], hist1, width=diff_edges1, align="edge")
+    ax.bar(bin_edges1[:-1], hist2, width=diff_edges1, align="edge")
+    ax.grid()
+
+    fig, ax = plt.subplots()
+    positions = bin_edges1[:-1] + diff_edges1 / 2
+    ax.boxplot(box_plot, )
+    initial_ticks = ax.get_xticks()
+    ax.plot(initial_ticks, positions)
+    plt.xticks(initial_ticks, [str(e) for e in positions])
+    len(z_hat)
 
 
 def main():
