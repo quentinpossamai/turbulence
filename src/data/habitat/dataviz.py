@@ -418,7 +418,7 @@ def rmse_model_prediction(name, dataset_name: str):
 
     # pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
     # pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fag_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fag_gttest_{name}_{dataset_name}.pkl', 'wb'))
 
@@ -475,15 +475,15 @@ def observe_generated_traj(scene_number, flight_number):
 
 def histogram():
     dataset = habitat.HabitatResidualDataset('test', 40, False, False, False, False)
-    z_gt = torch.empty(len(dataset), dtype=torch.float32) * torch.nan
-    fa_gt = torch.empty(len(dataset), dtype=torch.float32) * torch.nan
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
-    # for i in tqdm(range(len(dataset))):
-    #     z_gt[i] = dataset[i]['surface_dist'].squeeze() * z_std + z_mean
-    #     fa_gt[i] = dataset[i]['ground_force'].squeeze()[2] * fa_std + fa_mean
-    z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_habitat.pkl', 'rb'))
-    fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_habitat.pkl', 'rb'))
+    dataset_name = 'euroc_mav'  # habitat
+    z_gt = pickle.load(open(f'{habitat.WD_PATH}z_gt_fine_{dataset_name}.pkl', 'rb'))
+    fa_gt = pickle.load(open(f'{habitat.WD_PATH}fa_gt_fine_{dataset_name}.pkl', 'rb'))
+    z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_{dataset_name}.pkl', 'rb'))
+
+
 
 
 def main():
@@ -492,10 +492,10 @@ def main():
     # ['nogru', 'all', 'emb', 'fine']
     # for e in ['nogru', 'all', 'emb', 'fine']:
     #     rmse_model_prediction(e, 'habitat')
-    for e in ['fine']:
-        rmse_model_prediction(e, 'habitat')
+    # for e in ['fine']:
+    #     rmse_model_prediction(e, 'habitat')
     # observe_generated_traj(32, 3)
-    # histogram()
+    histogram()
 
 
 if __name__ == '__main__':
