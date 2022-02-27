@@ -422,21 +422,21 @@ def rmse_model_prediction(name, dataset_name: str):
     pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fag_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fag_gttest_{name}_{dataset_name}.pkl', 'wb'))
 
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(z_gt_log)
-    ax.plot(z_hat_log)
-    ax.legend()
-    plt.savefig(f'{habitat.WD_PATH}z_{name}_{dataset_name}.png')
-
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(fa_hat_log)
-    ax.plot(fa_gt_log)
-    ax.plot(fa_gttest_log)
-    ax.legend()
-    plt.savefig(f'{habitat.WD_PATH}fa_{name}_{dataset_name}.png')
-    print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
-    print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
-    print(f'\n\n')
+    # fig, ax = plt.subplots(1, 1)
+    # ax.plot(z_gt_log)
+    # ax.plot(z_hat_log)
+    # ax.legend()
+    # plt.savefig(f'{habitat.WD_PATH}z_{name}_{dataset_name}.png')
+    #
+    # fig, ax = plt.subplots(1, 1)
+    # ax.plot(fa_hat_log)
+    # ax.plot(fa_gt_log)
+    # ax.plot(fa_gttest_log)
+    # ax.legend()
+    # plt.savefig(f'{habitat.WD_PATH}fa_{name}_{dataset_name}.png')
+    # print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
+    # print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
+    # print(f'\n\n')
 
 
 def observe_generated_traj(scene_number, flight_number):
