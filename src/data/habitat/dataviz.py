@@ -377,6 +377,8 @@ def rmse_model_prediction(name, dataset_name: str):
                                           a_min=0, a_max=cap * drone_prms['m'] * g)
             return np.concatenate([ground_force, np.zeros(3)]).squeeze()[2]
     else:
+        assert dataset_name == 'euroc_mav'
+
         def compute_ground_effect(motor: np.ndarray, z: float) -> np.ndarray:
             sol = [9.40693193e-07, -4.17981623e-03]
             return sol[0] * (motor ** 2).sum(axis=-1) / (z ** 2 - sol[1])
@@ -485,7 +487,7 @@ def histogram():
     dataset = habitat.HabitatResidualDataset('test', 40, False, False, False, False)
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
-    dataset_name = 'euroc_mav'  # habitat  euroc_mav
+    dataset_name = 'habitat'  # habitat  euroc_mav
     z_gt = pickle.load(open(f'{habitat.WD_PATH}z_gt_fine_{dataset_name}.pkl', 'rb'))
     fa_gt = pickle.load(open(f'{habitat.WD_PATH}fa_gt_fine_{dataset_name}.pkl', 'rb'))
     z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_{dataset_name}.pkl', 'rb'))
@@ -515,17 +517,17 @@ def histogram():
 
     plt.legend()
 
-    hist1, bin_edges1 = np.histogram(gt, bins=40)
+    hist1, bin_edges1 = np.histogram(gt, bins=20)
     hist2 = np.zeros(len(hist1))
     box_plot = []
     for i in range(len(bin_edges1) - 2):
-        box_plot.append(hat[np.where(np.logical_and(bin_edges1[i] <= hat, hat < bin_edges1[i + 1]))[0]])
+        box_plot.append(hat[np.where(np.logical_and(bin_edges1[i] <= gt, gt < bin_edges1[i + 1]))[0]])
         hist2[i] = len(box_plot[i])
     i = len(bin_edges1) - 2
-    box_plot.append(hat[np.where(np.logical_and(bin_edges1[i] <= hat, hat <= bin_edges1[i + 1]))[0]])
+    box_plot.append(hat[np.where(np.logical_and(bin_edges1[i] <= gt, gt <= bin_edges1[i + 1]))[0]])
     hist2[i] = len(box_plot[i])
-
     diff_edges1 = np.diff(bin_edges1)
+
     fig, ax = plt.subplots()
     ax.bar(bin_edges1[:-1], hist1, width=diff_edges1, align="edge")
     ax.bar(bin_edges1[:-1], hist2, width=diff_edges1, align="edge")
@@ -536,10 +538,25 @@ def histogram():
     ax.boxplot(box_plot, showfliers=False)
     initial_ticks = ax.get_xticks()
     ax.plot(initial_ticks, positions, label='y=x')
-    ax.set_xlabel(f'z GT (m)')
-    ax.set_ylabel(f'z (Ours) (m)')
+    ax.set_xlabel(f'fa GT (N)')
+    ax.set_ylabel(f'fa (Ours) (N)')
     plt.xticks(initial_ticks, [f'{e:.3f}' for e in positions], rotation=-45)
     ax.legend()
+
+    fig, ax = plt.subplots()
+    positions = bin_edges1[:-1] + diff_edges1 / 2
+    ax.boxplot(box_plot, showfliers=False)
+    initial_ticks = ax.get_xticks()
+    ax.plot(initial_ticks, positions, label='y=x')
+    ax.set_xlabel(f'fa GT (m)')
+    ax.set_ylabel(f'fa (Ours) (m)')
+    plt.xticks(initial_ticks, [f'{e:.3f}' for e in positions], rotation=-45)
+    ax.legend()
+    plt.scatter(gt, hat, s=0.1)
+    plt.plot(gt, gt)
+
+    plt.plot(gt)
+    plt.plot(hat)
 
     len(z_hat)
 
@@ -548,10 +565,10 @@ def main():
     # plot_fa_generator()
     # plot_fa()
     # ['nogru', 'all', 'emb', 'fine']
-    for e in ['fine']:
-        rmse_model_prediction(e, 'habitat')
-    for e in ['fine']:
-        rmse_model_prediction(e, 'euroc_mav')
+    # for e in ['fine']:
+    #     rmse_model_prediction(e, 'habitat')
+    # for e in ['fine']:
+    #     rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
     histogram()
 
