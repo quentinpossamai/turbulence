@@ -398,27 +398,26 @@ def rmse_model_prediction(name, dataset_name: str):
                 depth = batch['depth'].to(device)
             motor = batch['motor'].cpu().numpy()
 
-            z_hat = model(depth).cpu().numpy() * z_std + z_mean
+            # z_hat = model(depth).cpu().numpy() * z_std + z_mean
             z_gt = batch['surface_dist'].cpu().numpy() * z_std + z_mean
-            loss = ((z_gt - z_hat) ** 2).squeeze()
-            z_loss[i] = loss
-            z_hat_log[i] = z_hat.squeeze()
+            # loss = ((z_gt - z_hat) ** 2).squeeze()
+            # z_loss[i] = loss
+            # z_hat_log[i] = z_hat.squeeze()
             z_gt_log[i] = z_gt.squeeze()
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
             fa_gt_test = compute_ground_effect(motor, z_gt)
-            # print(f'fa_gt {fa_gt} | fa_gt_test {fa_gt_test}')
-            if dataset_name == 'habitat':
-                assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
-            fa_hat = compute_ground_effect(motor, z_hat)
-            loss = (fa_gt - fa_hat) ** 2
-            fa_loss[i] = loss
-            fa_hat_log[i] = fa_hat
+            # if dataset_name == 'habitat':
+            #     assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
+            # fa_hat = compute_ground_effect(motor, z_hat)
+            # loss = (fa_gt - fa_hat) ** 2
+            # fa_loss[i] = loss
+            # fa_hat_log[i] = fa_hat
             fa_gt_log[i] = fa_gt
             fa_gttest_log[i] = fa_gt_test
 
-    pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
+    # pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
+    # pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fag_gt_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fag_gttest_{name}_{dataset_name}.pkl', 'wb'))
@@ -474,6 +473,19 @@ def observe_generated_traj(scene_number, flight_number):
     simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1 / 20, tf_follow=tf_follow)
 
 
+def histogram():
+    dataset = habitat.HabitatResidualDataset('test', 40, False, False, False, False)
+    z_gt = torch.empty(len(dataset), dtype=torch.float32) * torch.nan
+    fa_gt = torch.empty(len(dataset), dtype=torch.float32) * torch.nan
+    z_mean, z_std = dataset.z_mean, dataset.z_std
+    fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
+    # for i in tqdm(range(len(dataset))):
+    #     z_gt[i] = dataset[i]['surface_dist'].squeeze() * z_std + z_mean
+    #     fa_gt[i] = dataset[i]['ground_force'].squeeze()[2] * fa_std + fa_mean
+    z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_habitat.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_habitat.pkl', 'rb'))
+
+
 def main():
     # plot_fa_generator()
     # plot_fa()
@@ -483,6 +495,7 @@ def main():
     for e in ['fine']:
         rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
+    # histogram()
 
 
 if __name__ == '__main__':
