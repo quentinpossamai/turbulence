@@ -134,7 +134,7 @@ def estimate_cheeseman():
     fapred = sol[0] * n / (height ** 2 - sol[1])
     plt.plot(fa)
     plt.plot(fapred)
-    plt.plot(fa_hat)
+    # plt.plot(fa_hat)
     plt.show()
 
     plt.plot(z_hat)

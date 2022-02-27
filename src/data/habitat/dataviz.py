@@ -373,7 +373,7 @@ def rmse_model_prediction(name, dataset_name: str):
     else:
         def compute_ground_effect(motor: np.ndarray, z: float) -> np.ndarray:
             sol = [9.40693193e-07, -4.17981623e-03]
-            return sol[0] * motor.sum(axis=-1) ** 2 / (z ** 2 - sol[1])
+            return sol[0] * (motor ** 2).sum(axis=-1) / (z ** 2 - sol[1])
 
     data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=12, pin_memory=True, drop_last=False)
 
@@ -484,6 +484,7 @@ def histogram():
     fa_gt = pickle.load(open(f'{habitat.WD_PATH}fa_gt_fine_{dataset_name}.pkl', 'rb'))
     z_hat = pickle.load(open(f'{habitat.WD_PATH}z_hat_fine_{dataset_name}.pkl', 'rb'))
     fa_hat = pickle.load(open(f'{habitat.WD_PATH}fa_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_gttest = pickle.load(open(f'{habitat.WD_PATH}fa_gttest_fine_{dataset_name}.pkl', 'rb'))
 
     fa_or_z = 'fa'
     if fa_or_z == 'z':
@@ -493,8 +494,11 @@ def histogram():
         hat = fa_hat
         gt = fa_gt
 
-    plt.plot(gt)
-    plt.plot(hat)
+    plt.plot(gt, label=f'{fa_or_z}_gt')
+    plt.plot(fa_gttest, label=f'{fa_or_z}_test')
+    plt.plot(hat, label=f'{fa_or_z}_hat')
+
+    plt.legend()
 
     hist1, bin_edges1 = np.histogram(gt, bins=40)
     hist2 = np.zeros(len(hist1))
@@ -527,10 +531,10 @@ def main():
     # ['nogru', 'all', 'emb', 'fine']
     # for e in ['nogru', 'all', 'emb', 'fine']:
     #     rmse_model_prediction(e, 'habitat')
-    for e in ['fine']:
-        rmse_model_prediction(e, 'euroc_mav')
+    # for e in ['fine']:
+    #     rmse_model_prediction(e, 'euroc_mav')
     # observe_generated_traj(32, 3)
-    # histogram()
+    histogram()
 
 
 if __name__ == '__main__':
