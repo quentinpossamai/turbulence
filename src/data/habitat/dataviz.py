@@ -265,12 +265,12 @@ def plot_model_prediction(name):
             ax.set_xlabel('Sample number')
             ax.legend()
             # plt.show()
-            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
+            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/train_emb_depth/'
                         f'model_prediction-{scene_number}-{flight_number}.pdf')
             plt.close(fig)
             return
-            cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth'
-            scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth/'
+            cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth'
+            scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth/'
             command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
             if not os.path.isfile(scene_path):
                 print(command)
