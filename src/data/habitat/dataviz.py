@@ -225,7 +225,7 @@ def plot_model_prediction(name):
         for flight_number in tqdm(flight, desc='flight'):
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy()).to(device)
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy()).to(device)
-            z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy()).to(device)
+            z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
             motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy()).to(device)
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy()).to(device)
             depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy()).to(device)
