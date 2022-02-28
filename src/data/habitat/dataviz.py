@@ -241,8 +241,8 @@ def plot_model_prediction(name):
 
             with torch.no_grad():
                 # fa_hat = torch.empty(len(fa), dtype=torch.float32) * torch.nan
-                z_hat = torch.empty(len(z_gt), dtype=torch.float32) * torch.nan
-                z_hat2 = torch.empty(len(z_gt), dtype=torch.float32) * torch.nan
+                z_hat = torch.empty(len(z_gt), dtype=torch.float32)
+                z_hat2 = torch.empty(len(z_gt), dtype=torch.float32)
                 for i in range(len(z_hat)):
                     output = model(depth_emb[i:i + h_prms['past']])
                     z_hat[i] = (output * z_std + z_mean)
