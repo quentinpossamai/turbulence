@@ -370,7 +370,7 @@ def main():
                                           filename='{epoch}-{step}-{val_loss:.2f}',
                                           monitor='val_loss',
                                           mode='min')
-    trainer = pl.Trainer(gpus=4,
+    trainer = pl.Trainer(gpus=8,
                          logger=logger,
                          deterministic=True,
                          max_epochs=args.max_epochs,
