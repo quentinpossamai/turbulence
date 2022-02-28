@@ -188,7 +188,7 @@ def plot_model_prediction(name):
 
     elif name == 'emb':
         from src.drone_models.residual.emb_height import EmbHeight as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251'
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
         model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
