@@ -10,8 +10,8 @@ from tqdm import tqdm
 from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
-import src.data.habitat.data_gen as data_gen
-import src.data.habitat.hatbitat2flu as hatbitat2flu
+# import src.data.habitat.data_gen as data_gen
+# import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
@@ -844,7 +844,7 @@ def main():
     # plot_fa()
     # plot_model_prediction('emb')
     ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
-    for e in ['fine_norm']:
+    for e in ['fine']:
         rmse_model_prediction(e, 'habitat')
     # for e in ['emb_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
