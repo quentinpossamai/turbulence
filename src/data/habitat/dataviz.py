@@ -218,9 +218,9 @@ def plot_model_prediction(name):
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
     index = habitat.build_index_valid_flight(True)
-    for scene_number in tqdm(habitat.TEST):
+    for scene_number in tqdm(habitat.TEST, desc='scene'):
         flight = index[scene_number]
-        for flight_number in flight:
+        for flight_number in tqdm(flight, desc='flight'):
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy())
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy())
             z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
@@ -243,7 +243,7 @@ def plot_model_prediction(name):
                 # fa_hat = torch.empty(len(fa), dtype=torch.float32) * torch.nan
                 z_hat = torch.empty(len(z_gt), dtype=torch.float32)
                 z_hat2 = torch.empty(len(z_gt), dtype=torch.float32)
-                for i in range(len(z_hat)):
+                for i in tqdm(range(len(z_hat)), desc='prediction'):
                     output = model(depth_emb[i:i + h_prms['past']])
                     z_hat[i] = (output * z_std + z_mean)
                     output2 = model_nogru(depth[i + h_prms['past'] - 1].reshape(1, 480, 640))
