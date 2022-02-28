@@ -223,7 +223,7 @@ def plot_model_prediction(name):
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
     index = habitat.build_index_valid_flight(True)
-    for scene_number in tqdm(habitat.TRAIN, desc='scene'):
+    for scene_number in tqdm(habitat.VALID, desc='scene'):
         flight = index[scene_number]
         for flight_number in tqdm(flight, desc='flight'):
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy()).to(device)
