@@ -140,6 +140,7 @@ def plot_fa():
 def plot_model_prediction(name):
     msg = ['nogru', 'all', 'emb', 'fine']
     assert name in msg, f'Name must be in {msg}'
+    use_cuda_if_possible = True
     device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
     drone_width, drone_height = 0.1, 0.025
