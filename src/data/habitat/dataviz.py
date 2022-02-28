@@ -11,7 +11,7 @@ from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
 import src.data.habitat.data_gen as data_gen
-import src.data.habitat.hatbitat2flu as hatbitat2flu
+# import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
