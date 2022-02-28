@@ -246,7 +246,7 @@ def plot_model_prediction(name):
                 for i in range(len(z_hat)):
                     output = model(depth_emb[i:i + h_prms['past']])
                     z_hat[i] = (output * z_std + z_mean)
-                    output2 = model_nogru(depth[i + h_prms['past'] - 1])
+                    output2 = model_nogru(depth[i + h_prms['past'] - 1].reshape(1, 480, 640))
                     z_hat2[i] = (output2 * z_std + z_mean)
             print(f'{scene_number} | {flight_number} | '
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
