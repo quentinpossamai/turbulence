@@ -863,12 +863,12 @@ def predict_good_fa():
 def main():
     # plot_fa_law()
     # plot_fa()
-    # plot_model_prediction('emb')
+    plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'habitat')
-    for e in ['fine_norm']:
-        rmse_model_prediction(e, 'euroc_mav')
+    # for e in ['fine_norm']:
+    #     rmse_model_prediction(e, 'euroc_mav')
 
     # observe_generated_traj(9, 0)
     # histogram()
