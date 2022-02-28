@@ -367,9 +367,11 @@ def rmse_model_prediction(name, dataset_name: str):
                                            past=h_prms['past']).to(device)
         if dataset_name == 'euroc_mav':
             print(f'name: {name} | dataset_name: {dataset_name} | Emb not generated')
-            return
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
+
     elif name == 'emb_norm':
-        from src.drone_models.residual.emb_height import EmbHeight as Model
+        from src.drone_models.residual.emb_height2 import EmbHeight as Model
         path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
         model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
@@ -411,7 +413,7 @@ def rmse_model_prediction(name, dataset_name: str):
         # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
         # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
-        from src.drone_models.residual.fine_tuning import FineTunning as Model
+        from src.drone_models.residual.fine_tuning2 import FineTunning as Model
         path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
         model_name = 'epoch=0-step=6124-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
@@ -466,6 +468,8 @@ def rmse_model_prediction(name, dataset_name: str):
         for i, batch in tqdm(enumerate(data), total=len(data)):
             if name == 'emb':
                 depth = batch['depth_emb'].to(device)
+            elif name == 'emb_norm':
+                depth = batch['norm_emb'].to(device)
             else:
                 depth = batch['depth'].to(device)
             motor = batch['motor'].cpu().numpy()
@@ -840,7 +844,7 @@ def main():
     # plot_fa()
     # plot_model_prediction('emb')
     ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
-    for e in ['fine_norm']:
+    for e in ['emb']:
         rmse_model_prediction(e, 'habitat')
     # for e in ['emb_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
