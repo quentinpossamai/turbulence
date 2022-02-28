@@ -67,7 +67,7 @@ class FineTunning(pl.LightningModule, Run):
         # self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
         # self.emb_input_drop = nn.Dropout(0.)
         self.encoder = Encoder(128, 1)
-        self.depth_linear_0 = nn.Linear(128, 50)
+        self.emb_linear_0 = nn.Linear(128, 50)
 
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
@@ -99,7 +99,7 @@ class FineTunning(pl.LightningModule, Run):
 
         # - emb branch
         out = self.encoder(depth.reshape((-1, 1, 240, 376)))
-        out = self.activation(self.depth_linear_0(out))
+        out = self.activation(self.emb_linear_0(out))
 
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         out = out[:, -1, :]  # last hidden states, (*, feature_size)
