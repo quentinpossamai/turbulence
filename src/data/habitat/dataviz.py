@@ -241,7 +241,7 @@ def plot_model_prediction(name):
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy()).to(device)
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy()).to(device)
             z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
-            motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy()).to(device)
+            motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy())
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy()).to(device)
             depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy()).to(device)
 
@@ -252,7 +252,7 @@ def plot_model_prediction(name):
             # fa = fa[h_prms['past'] - 1:-1, 2]
             xx = torch.arange(h_prms['past'] - 1, len(fa))
             fa_gt = fa[h_prms['past'] - 1:, 2]
-            motor = motor[h_prms['past'] - 1:, 2]
+            motor = motor[h_prms['past'] - 1:].numpy()
             z_gt = z[h_prms['past'] - 1:-1, 0]
             assert len(xx) == len(fa_gt)
             assert len(fa_gt) == len(z_gt)
