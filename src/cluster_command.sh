@@ -10,5 +10,5 @@ rsync -rtv --exclude rgb.npy --exclude '*.glb' --exclude '*.navmesh' --exclude '
 cd ~/phd/turbulence/data/habitat/scene_datasets/mp3d/2t7WUuJeko7/flight2/0/
 rsync -rtv --exclude rgb.npy --exclude '*.glb' --exclude '*.navmesh' --exclude '*.house' --exclude '*.ply' --delete remsto:/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/2t7WUuJeko7/flight2/0/ ./
 
-rsync -atv  --include='*.pkl' --exclude='*' remsto:~/phd/turbulence/ ~/phd/turbulence/
+rsync -atv --progress --include='*.pkl' --exclude='*' remsto:~/phd/turbulence/ ~/phd/turbulence/
 rsync -atv  --include='*.png' --exclude='*' ./ remsto:~/phd/turbulence/
