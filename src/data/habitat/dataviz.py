@@ -276,6 +276,20 @@ def plot_model_prediction(name):
 
             fig, ax = plt.subplots(1, 1)
             ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
+            ax.plot(xx, z_gt, label='Ground truth', marker=',')
+            ax.plot(xx, z_hat, label='Ours', marker=',')
+            ax.plot(xx, z_hat2, label='No gru', marker=',')
+            # ax.plot(fa_hat_a, label='model a')
+            ax.grid()
+            ax.set_ylabel('z (m)')  # Surface distance (m)
+            ax.set_xlabel('Sample number')
+            ax.legend()
+            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
+                        f'model_prediction-{scene_number}-{flight_number}.pdf')
+            plt.close(fig)
+
+            fig, ax = plt.subplots(1, 1)
+            ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
             ax.plot(xx, fa_gt, label='Ground truth', marker=',')
             ax.plot(xx, fa_hat, label='Ours', marker=',')
             ax.plot(xx, fa_hat2, label='No gru', marker=',')
