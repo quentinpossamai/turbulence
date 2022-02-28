@@ -11,4 +11,10 @@ fa_hat = pickle.load(open(f'{paths.WD_PATH}fa_hat_nogru_habitat.pkl', 'rb'))
 np.sqrt(((fa_hat - fa_gt) ** 2).mean())
 np.min(fa_gt)
 
+np.min(z_gt)
+np.max(z_gt)
+
+np.min(z_hat)
+np.max(z_hat)
+
 print()

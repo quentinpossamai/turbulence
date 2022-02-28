@@ -220,6 +220,18 @@ def plot_model_prediction(name):
 
     model.eval()
 
+    def _apply(_z, _motor):
+        mu = 1
+        cap = 0.1
+        ground_force = np.zeros(3)
+        if _z < np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+            ground_force[2] = cap * drone_prms['m'] * g
+        else:
+            mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
+            ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                      a_min=0, a_max=cap * drone_prms['m'] * g)
+        return ground_force
+
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
     index = habitat.build_index_valid_flight(True)
@@ -240,6 +252,7 @@ def plot_model_prediction(name):
             # fa = fa[h_prms['past'] - 1:-1, 2]
             xx = torch.arange(h_prms['past'] - 1, len(fa))
             fa_gt = fa[h_prms['past'] - 1:, 2]
+            motor = motor[h_prms['past'] - 1:, 2]
             z_gt = z[h_prms['past'] - 1:-1, 0]
             assert len(xx) == len(fa_gt)
             assert len(fa_gt) == len(z_gt)
@@ -257,19 +270,23 @@ def plot_model_prediction(name):
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
                   f'Real loss {((z_hat - z) ** 2).mean():0.4f}')
 
+            fa_gt = _apply(z_gt, motor)
+            fa_hat = _apply(z_hat, motor)
+            fa_hat2 = _apply(z_hat2, motor)
+
             fig, ax = plt.subplots(1, 1)
             ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
-            ax.plot(xx, z_gt, label='Ground truth', marker=',')
-            ax.plot(xx, z_hat, label='Ours', marker=',')
-            ax.plot(xx, z_hat2, label='No gru', marker=',')
+            ax.plot(xx, fa_gt, label='Ground truth', marker=',')
+            ax.plot(xx, fa_hat, label='Ours', marker=',')
+            ax.plot(xx, fa_hat2, label='No gru', marker=',')
             # ax.plot(fa_hat_a, label='model a')
             ax.grid()
-            ax.set_ylabel('Surface distance (m)')  # Surface distance (m)
+            ax.set_ylabel('Fa (N)')  # Surface distance (m)
             ax.set_xlabel('Sample number')
             ax.legend()
             # plt.show()
-            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/train_emb_depth/'
-                        f'model_prediction-{scene_number}-{flight_number}.pdf')
+            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
+                        f'fa_model_prediction-{scene_number}-{flight_number}.pdf')
             plt.close(fig)
             return
             cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth'
