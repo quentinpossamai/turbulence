@@ -844,7 +844,7 @@ def main():
     # plot_fa()
     # plot_model_prediction('emb')
     ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
-    for e in ['fine_norm']:
+    for e in ['nogru']:
         rmse_model_prediction(e, 'habitat')
     # for e in ['emb_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
