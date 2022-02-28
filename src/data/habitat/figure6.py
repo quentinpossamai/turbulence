@@ -9,19 +9,30 @@ from tqdm import tqdm
 
 import src.data.habitat.dataviz as dataviz
 
-plt.rcParams.update({"text.usetex": True,
+plt.style.use('seaborn-deep')
+plt.rcParams.update({"text.usetex": False,
                      "font.family": "serif",
                      "font.sans-serif": ["Computer Modern Roman"]})
 
-image_num = 5  # [152] [591,  595, 597, 598, 604]
-# rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(17, 18, np.linspace(595, 608, 5, dtype=int))
-rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(17, 18, [591,  595, 597, 598, 604])
-# np.linspace(0, 200, image_num, dtype=int)
-rgb2, z2, fa2, z2_hat = dataviz.get_image_from_generated_traj(2, 14, np.linspace(110, 180, 5, dtype=int))
-# np.linspace(340, 390, image_num, dtype=int) 16
-# a = [40, 73, 105, 132, 167] 0 3
-a = [420, 425, 432, 439, 456]
-rgb3, z3, fa3, z3_hat = dataviz.get_image_from_generated_traj(6, 0, a)
+xx = np.arange(280, 320)
+rgb1, z1, fa1, z1_hat, z_hat_nogru = dataviz.get_image_from_generated_traj(9, 0, xx)
+
+
+
+fig, ax = plt.subplots()
+ax.plot(xx, z1, label='GT')
+ax.plot(xx, z1_hat, label='Ours')
+ax.plot(xx, z_hat_nogru, label='No GRU')
+ax.grid()
+ax.set_xlabel('Sample #')
+ax.set_ylabel('d (m)')
+# ax.set_ylim([0.1, 1.2])
+ax.axvline(311, c='black')
+ax.legend()
+plt.sav
+print()
+
+
 pickle.dump([[rgb1, rgb2, rgb3],
              [z1, z2, z3],
              [fa1, fa2, fa3],

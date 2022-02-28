@@ -280,6 +280,14 @@ def plot_model_prediction(name):
                 raise (FileNotFoundError('Scene is not in local'))
                 os.system(command)  # if scene not downloaded
 
+            scene_path = '/Users/quentin/phd/turbulence/data/habitat/scene_datasets/mp3d/5ZKStnWn8Zo/' \
+                         'flight2/0/depth.npy'
+            cluster_scene_path = f'/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/5ZKStnWn8Zo/' \
+                                 f'flight2/0/depth.npy'
+            command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
+            print(command)
+            os.system(command)  # if scene not downloaded
+
 
 def rmse_model_prediction(name, dataset_name: str):
     msg = ['habitat', 'euroc_mav']
@@ -287,7 +295,7 @@ def rmse_model_prediction(name, dataset_name: str):
     use_cuda_if_possible = True
     device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
-    msg = ['emb_norm', 'nogru', 'all', 'emb', 'fine']
+    msg = ['emb_norm', 'nogru', 'all', 'emb', 'fine', 'fine_norm']
     assert name in msg, f'Name must be in {msg}'
 
     drone_width, drone_height = 0.1, 0.025
@@ -378,14 +386,34 @@ def rmse_model_prediction(name, dataset_name: str):
             return
         else:
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, False, True, False)
-    else:
-        assert name == 'fine'
+    elif name == 'fine':
         # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
         # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
         from src.drone_models.residual.fine_tuning import FineTunning as Model
         path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
         model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past']).to(device)
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+
+    else:
+        assert name == 'fine_norm'
+        # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
+        # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+        # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+        from src.drone_models.residual.fine_tuning import FineTunning as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
+        model_name = 'epoch=0-step=6124-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
                                            activation=h_prms['activation'],
@@ -707,12 +735,26 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
                                        uav_model=None,
                                        motor_size=h_prms['motor_size'],
                                        past=h_prms['past'])
+
+    from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+    model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
+    h_prms_nogru = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+    model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
+                                             activation=h_prms_nogru['activation'],
+                                             l2=h_prms_nogru['l2'],
+                                             learning_rate=h_prms_nogru['lr'],
+                                             uav_model=None,
+                                             motor_size=h_prms_nogru['motor_size'],
+                                             past=h_prms_nogru['past'])
+
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
     rgb = []
     z = []
     fa = []
     z_hat = []
+    z_hat_nogru = []
     with torch.no_grad():
         for ind in idx:
             simulation.agent.transformation = tf_follow[ind]
@@ -723,10 +765,15 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
             depth_emb = habitat.load_file('depth_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
             depth_emb = torch.from_numpy(depth_emb.copy())
             z_hat.append(model(depth_emb).squeeze().item() * z_std + z_mean)
+            depth = habitat.load_file('depth', scene_number, flight_number)[ind:ind + 1]
+            depth = torch.from_numpy(depth.copy())
+            z_hat_nogru.append(model_nogru(depth).squeeze().item() * z_std + z_mean)
     simulation.sim.close(True)
 
     return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),
-            np.stack(z_hat, axis=0).flatten())
+            np.stack(z_hat, axis=0).flatten(),
+            np.stack(z_hat_nogru, axis=0).flatten(),
+            )
 
 
 def predict_good_fa():
@@ -791,13 +838,14 @@ def predict_good_fa():
 def main():
     # plot_fa_law()
     # plot_fa()
-    plot_model_prediction('emb')
-    # ['nogru', 'all', 'emb', 'fine', 'emb_norm']
-    # for e in ['emb']:
-    #     rmse_model_prediction(e, 'habitat')
+    # plot_model_prediction('emb')
+    ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
+    for e in ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']:
+        rmse_model_prediction(e, 'habitat')
     # for e in ['emb_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
-    # observe_generated_traj(6, 0)
+
+    # observe_generated_traj(9, 0)
     # histogram()
     # euroc_mav_table()
     # predict_good_fa()

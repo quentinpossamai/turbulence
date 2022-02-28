@@ -15,7 +15,7 @@ plt.rcParams.update({"text.usetex": True,
 
 image_num = 5  # [152] [591,  595, 597, 598, 604]
 # rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(17, 18, np.linspace(595, 608, 5, dtype=int))
-rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(17, 18, [591,  595, 597, 598, 604])
+rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(9, 0, np.arange(425, 442, 1))
 # np.linspace(0, 200, image_num, dtype=int)
 rgb2, z2, fa2, z2_hat = dataviz.get_image_from_generated_traj(2, 14, np.linspace(110, 180, 5, dtype=int))
 # np.linspace(340, 390, image_num, dtype=int) 16
