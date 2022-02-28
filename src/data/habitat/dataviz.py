@@ -220,7 +220,7 @@ def plot_model_prediction(name):
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
     index = habitat.build_index_valid_flight(True)
-    for scene_number in tqdm(habitat.TEST, desc='scene'):
+    for scene_number in tqdm(habitat.TRAIN, desc='scene'):
         flight = index[scene_number]
         for flight_number in tqdm(flight, desc='flight'):
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy()).to(device)
@@ -265,9 +265,17 @@ def plot_model_prediction(name):
             ax.set_xlabel('Sample number')
             ax.legend()
             # plt.show()
-            plt.savefig(
-                f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/model_prediction-{scene_number}-'
-                f'{flight_number}.pdf')
+            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
+                        f'model_prediction-{scene_number}-{flight_number}.pdf')
+            plt.close(fig)
+            return
+            cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth'
+            scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth/'
+            command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
+            if not os.path.isfile(scene_path):
+                print(command)
+                raise (FileNotFoundError('Scene is not in local'))
+                os.system(command)  # if scene not downloaded
 
 
 def rmse_model_prediction(name, dataset_name: str):
@@ -481,7 +489,7 @@ def observe_generated_traj(scene_number, flight_number):
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
-    command = f'rsync -tv remsto:{cluster_scene_path} {scene_path}'
+    command = f'rsync -tv --progress remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
         print(command)
         raise (FileNotFoundError('Scene is not in local'))
@@ -646,7 +654,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
-    command = f'rsync -tv remsto:{cluster_scene_path} {scene_path}'
+    command = f'rsync -tv --progress remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
         print(command)
         raise (FileNotFoundError('Scene is not in local'))
@@ -680,12 +688,12 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
         return ground_force[2]
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
-    from src.drone_models.residual.emb_height2 import EmbHeight as Model
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
-    model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
-    # from src.drone_models.residual.emb_height import EmbHeight as Model
-    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
-    # model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+    # from src.drone_models.residual.emb_height2 import EmbHeight as Model
+    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    # model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
+    from src.drone_models.residual.emb_height import EmbHeight as Model
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+    model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
     #
     h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
     model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -696,6 +704,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
                                        uav_model=None,
                                        motor_size=h_prms['motor_size'],
                                        past=h_prms['past'])
+    z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
     rgb = []
     z = []
@@ -708,8 +717,9 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
             rgb.append(obs['left_camera'])
             z.append(obs['surface_dist'])
             fa.append(_apply(obs['surface_dist'], motor[ind]))
-            depth_emb = habitat.load_file('deptph_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
-            z_hat.append(model(depth_emb).squeeze().item())
+            depth_emb = habitat.load_file('depth_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
+            depth_emb = torch.from_numpy(depth_emb.copy())
+            z_hat.append(model(depth_emb).squeeze().item() * z_std + z_mean)
     simulation.sim.close(True)
 
     return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),

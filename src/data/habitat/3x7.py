@@ -9,12 +9,12 @@ from tqdm import tqdm
 
 import src.data.habitat.dataviz as dataviz
 
-image_num = 5
-rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(0, 6, np.linspace(874, 898, image_num, dtype=int))
+image_num = 20 # [152]
+rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(6, 18, np.linspace(550, 600, image_num, dtype=int))
 # np.linspace(0, 200, image_num, dtype=int)
 rgb2, z2, fa2, z2_hat = dataviz.get_image_from_generated_traj(2, 14, np.linspace(110, 180, image_num, dtype=int))
 # np.linspace(340, 390, image_num, dtype=int) 16
-# rgb3, z3, fa3, z3_hat = dataviz.get_image_from_generated_traj(24, 16, np.linspace(40, 183, image_num, dtype=int))
+rgb3, z3, fa3, z3_hat = dataviz.get_image_from_generated_traj(24, 16, np.linspace(40, 183, image_num, dtype=int))
 pickle.dump([[rgb1, rgb2, rgb3],
              [z1, z2, z3],
              [fa1, fa2, fa3],
@@ -27,11 +27,11 @@ pickle.dump([[rgb1, rgb2, rgb3],
 
 shape = [480, 640]
 fig, axs = plt.subplots(3, image_num, figsize=(image_num * shape[1] / 250, 3 * shape[0] / 250))
-for rgb, i, z, fa, z_hat in zip([rgb1, rgb2],  # rgb3
-                                [0, 1],  # 2
-                                [z1, z2],  # z3
-                                [fa1, fa2],  # fa3
-                                [z1_hat, z2_hat]):  # z3_hat
+for rgb, i, z, fa, z_hat in zip([rgb1, rgb2, rgb3],  #
+                                [0, 1, 2],  #
+                                [z1, z2, z3],  #
+                                [fa1, fa2, fa3],  #
+                                [z1_hat, z2_hat, z3_hat]):  #
     for j, img in enumerate(rgb):
         ax = axs[i, j]
         ax.imshow(img)
