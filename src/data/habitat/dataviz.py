@@ -483,10 +483,10 @@ def rmse_model_prediction(name, dataset_name: str):
 
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
             fa_gt_test = compute_ground_effect(motor, z_gt)
-            if dataset_name == 'habitat':
-                assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
+            # if dataset_name == 'habitat':
+                # assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
             fa_hat = compute_ground_effect(motor, z_hat)
-            loss = (fa_gt - fa_hat) ** 2
+            loss = (fa_gt_test - fa_hat) ** 2
             fa_loss[i] = loss
             fa_hat_log[i] = fa_hat
             fa_gt_log[i] = fa_gt
