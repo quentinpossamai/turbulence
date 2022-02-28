@@ -9,12 +9,19 @@ from tqdm import tqdm
 
 import src.data.habitat.dataviz as dataviz
 
-image_num = 20 # [152]
-rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(6, 18, np.linspace(550, 600, image_num, dtype=int))
+plt.rcParams.update({"text.usetex": True,
+                     "font.family": "serif",
+                     "font.sans-serif": ["Computer Modern Roman"]})
+
+image_num = 5  # [152] [591,  595, 597, 598, 604]
+# rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(17, 18, np.linspace(595, 608, 5, dtype=int))
+rgb1, z1, fa1, z1_hat = dataviz.get_image_from_generated_traj(17, 18, [591,  595, 597, 598, 604])
 # np.linspace(0, 200, image_num, dtype=int)
-rgb2, z2, fa2, z2_hat = dataviz.get_image_from_generated_traj(2, 14, np.linspace(110, 180, image_num, dtype=int))
+rgb2, z2, fa2, z2_hat = dataviz.get_image_from_generated_traj(2, 14, np.linspace(110, 180, 5, dtype=int))
 # np.linspace(340, 390, image_num, dtype=int) 16
-rgb3, z3, fa3, z3_hat = dataviz.get_image_from_generated_traj(24, 16, np.linspace(40, 183, image_num, dtype=int))
+# a = [40, 73, 105, 132, 167] 0 3
+a = [420, 425, 432, 439, 456]
+rgb3, z3, fa3, z3_hat = dataviz.get_image_from_generated_traj(6, 0, a)
 pickle.dump([[rgb1, rgb2, rgb3],
              [z1, z2, z3],
              [fa1, fa2, fa3],
@@ -36,8 +43,10 @@ for rgb, i, z, fa, z_hat in zip([rgb1, rgb2, rgb3],  #
         ax = axs[i, j]
         ax.imshow(img)
         ax.axis('off')
-        ax.annotate(f'd: {z[j]:0.2f}\nd_hat: {z_hat[j]:0.2f}', (shape[1] - 10, 10), xycoords='data', size=8,
+        symbole = '$\hat{d}$'
+        ax.annotate(f'd: {z[j]:0.2f}\n{symbole}: {z_hat[j]:0.2f}', (shape[1] - 10, 10), xycoords='data', size=8,
                     ha='right', va='top', bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
 plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0.02, hspace=0.02)
-
 plt.savefig(f'{dataviz.habitat.WD_PATH}reports/IROS_01_03_2022/graphics/3x72.pdf')
+plt.show()
+

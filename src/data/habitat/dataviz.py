@@ -23,6 +23,9 @@ plt.rcParams.update({"text.usetex": False,
 
 
 def plot_fa_law():
+    plt.rcParams.update({"text.usetex": True,
+                         "font.family": "serif",
+                         "font.sans-serif": ["Computer Modern Roman"]})
     cap = 0.1
     mu = 1
     drone_width, drone_height = 0.1, 0.025
@@ -62,7 +65,7 @@ def plot_fa_law():
                          "font.sans-serif": ["Computer Modern Roman"]})
     for mu in [1, 2, 3, 4, 5]:
         to_plot = np.array([_apply(e, motor) for e in z])[:, 2]
-        plt.plot(z, to_plot, label=f'mu={mu}')
+        plt.plot(z, to_plot, label=f'$\mu={mu}$')
     plt.title('Ground effect')
     plt.grid()
     plt.ylabel('Ground effect (N)')
@@ -794,7 +797,7 @@ def main():
     #     rmse_model_prediction(e, 'habitat')
     # for e in ['emb_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
-    # observe_generated_traj(24, 16)
+    # observe_generated_traj(6, 0)
     # histogram()
     # euroc_mav_table()
     # predict_good_fa()
