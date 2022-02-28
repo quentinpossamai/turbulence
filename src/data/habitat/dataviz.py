@@ -480,6 +480,7 @@ def rmse_model_prediction(name, dataset_name: str):
     z_gt_log = (np.empty(len(data), dtype=np.float32) * np.nan)
     fa_gt_log = (np.empty(len(data), dtype=np.float32) * np.nan)
     fa_gttest_log = (np.empty(len(data), dtype=np.float32) * np.nan)
+    aquoiilsertcepoint = []
     print(name)
     with torch.no_grad():
         for i, batch in tqdm(enumerate(data), total=len(data)):
@@ -508,7 +509,10 @@ def rmse_model_prediction(name, dataset_name: str):
             fa_hat_log[i] = fa_hat
             fa_gt_log[i] = fa_gt
             fa_gttest_log[i] = fa_gt_test
+            aquoiilsertcepoint.append(batch['flight'])
 
+    if dataset_name == 'euroc_mav':
+        pickle.dump(aquoiilsertcepoint, open(f'{habitat.WD_PATH}aquoiilsertcepoint_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
@@ -859,7 +863,7 @@ def predict_good_fa():
 def main():
     # plot_fa_law()
     # plot_fa()
-    plot_model_prediction('emb')
+    # plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'habitat')
