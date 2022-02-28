@@ -270,9 +270,9 @@ def plot_model_prediction(name):
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
                   f'Real loss {((z_hat - z) ** 2).mean():0.4f}')
 
-            fa_gt = [_apply(e, motor) for e in z_gt.numpy()]
-            fa_hat = [_apply(e, motor) for e in z_hat.numpy()]
-            fa_hat2 = [_apply(e, motor) for e in z_hat2.numpy()]
+            fa_gt = [_apply(e, motor)[2] for e in z_gt.numpy()]
+            fa_hat = [_apply(e, motor)[2] for e in z_hat.numpy()]
+            fa_hat2 = [_apply(e, motor)[2] for e in z_hat2.numpy()]
 
             fig, ax = plt.subplots(1, 1)
             ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
@@ -289,8 +289,8 @@ def plot_model_prediction(name):
                         f'fa_model_prediction-{scene_number}-{flight_number}.pdf')
             plt.close(fig)
     return
-    cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth'
-    scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth/'
+    cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth'
+    scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth/'
     command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
         print(command)
