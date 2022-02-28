@@ -10,8 +10,8 @@ from tqdm import tqdm
 from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
-# import src.data.habitat.data_gen as data_gen
-# import src.data.habitat.hatbitat2flu as hatbitat2flu
+import src.data.habitat.data_gen as data_gen
+import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
@@ -236,8 +236,10 @@ def plot_model_prediction(name):
 
     index = habitat.build_index_valid_flight(True)
     for scene_number in tqdm(habitat.VALID, desc='scene'):
+        scene_number = 64
         flight = index[scene_number]
         for flight_number in tqdm(flight, desc='flight'):
+            flight_number = 14
             state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy()).to(device)
             fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy()).to(device)
             z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
@@ -302,6 +304,13 @@ def plot_model_prediction(name):
             plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
                         f'fa_model_prediction-{scene_number}-{flight_number}.pdf')
             plt.close(fig)
+            pickle.dump(z_gt, open(f'{habitat.WD_PATH}figure6/z_gt.pkl', 'wb'))
+            pickle.dump(z_hat, open(f'{habitat.WD_PATH}figure6/z_hat.pkl', 'wb'))
+            pickle.dump(z_hat2, open(f'{habitat.WD_PATH}figure6/z_hat2.pkl', 'wb'))
+            pickle.dump(fa_gt, open(f'{habitat.WD_PATH}figure6/fa_gt.pkl', 'wb'))
+            pickle.dump(fa_hat, open(f'{habitat.WD_PATH}figure6/fa_hat.pkl', 'wb'))
+            pickle.dump(fa_hat2, open(f'{habitat.WD_PATH}figure6/fa_hat2.pkl', 'wb'))
+            return
     return
     cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth'
     scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth/'
@@ -311,10 +320,8 @@ def plot_model_prediction(name):
         raise (FileNotFoundError('Scene is not in local'))
         os.system(command)  # if scene not downloaded
 
-    scene_path = '/Users/quentin/phd/turbulence/data/habitat/scene_datasets/mp3d/5ZKStnWn8Zo/' \
-                 'flight2/0/depth.npy'
-    cluster_scene_path = f'/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/5ZKStnWn8Zo/' \
-                         f'flight2/0/depth.npy'
+    scene_path = '/Users/quentin/phd/turbulence/data/habitat/scene_datasets/mp3d/TbHJrupSAjP/flight2/7/depth.npy'
+    cluster_scene_path = f'/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/TbHJrupSAjP/flight2/7/depth.npy'
     command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
     print(command)
     os.system(command)  # if scene not downloaded
@@ -794,6 +801,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     fa = []
     z_hat = []
     z_hat_nogru = []
+    motor = []
     with torch.no_grad():
         for ind in idx:
             simulation.agent.transformation = tf_follow[ind]
@@ -807,6 +815,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
             depth = habitat.load_file('depth', scene_number, flight_number)[ind:ind + 1]
             depth = torch.from_numpy(depth.copy())
             z_hat_nogru.append(model_nogru(depth).squeeze().item() * z_std + z_mean)
+            motor.append()
     simulation.sim.close(True)
 
     return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),

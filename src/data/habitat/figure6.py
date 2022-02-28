@@ -14,9 +14,45 @@ plt.rcParams.update({"text.usetex": False,
                      "font.family": "serif",
                      "font.sans-serif": ["Computer Modern Roman"]})
 
-xx = np.arange(280, 320)
-rgb1, z1, fa1, z1_hat, z_hat_nogru = dataviz.get_image_from_generated_traj(9, 0, xx)
+xx = np.arange(200, 275)
+rgb1, z1, fa1, z1_hat, z_hat_nogru, motor = dataviz.get_image_from_generated_traj(64, 7, xx)
 
+# pickle.dump([rgb1, z1, fa1, z1_hat, z_hat_nogru], open(f'{dataviz.habitat.WD_PATH}figure6.pkl', 'wb'))
+[rgb1, z1, fa1, z1_hat, z_hat_nogru] = pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6.pkl', 'wb'))
+
+drone_width, drone_height = 0.1, 0.025
+volumetric_mass = 200
+g = 9.81
+m = volumetric_mass * drone_width ** 2 * drone_height
+drone_prms = {'width': drone_width,  # [m]
+              'height': drone_height,  # [m]
+              'm': m,  # [kg]
+              'kt': m * g / (4 * 150 ** 2),  #
+              'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
+              'l': 2 ** 0.5 * drone_width / 2,  # [m]
+              'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+              'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+              'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
+              'prop_radius': drone_width * 0.1}  # [m]
+theta = np.array([drone_prms['kt'] / drone_prms['m'],
+                  drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
+                  drone_prms['km'] / drone_prms['iz'],
+                  drone_prms['iz'] / drone_prms['ix']])
+
+
+def _apply(_z, _motor):
+    mu = 1
+    cap = 0.1
+    ground_force = np.zeros(3)
+    if _z < np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+        ground_force[2] = cap * drone_prms['m'] * g
+    else:
+        mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
+        ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                  a_min=0, a_max=cap * drone_prms['m'] * g)
+    return ground_force
+
+def _apply(_z, _motor):
 
 
 fig, ax = plt.subplots()
