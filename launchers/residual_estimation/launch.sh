@@ -11,7 +11,7 @@ ssh remsto /bin/bash << EOF
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J fine_tuning_depth -o log-depth_ft-%A.out --time=8-00:00:00 fine_tuning_depth.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J fine_tuning_norm -o log-norm_ft-%A.out --time=8-00:00:00 fine_tuning_norm.sh
 #  sbatch --mem 10G --gres=gpu:8 -p part3 -J fine_tuning_norm2 -o log-norm_ft2-%A.out --time=8-00:00:00 fine_tuning_norm2.sh
-  sbatch --mem 10G --gres=gpu:1 -p part3 -J dataviz -o log-dataviz-%A.out --time=8-00:00:00 dataviz.sh
+  sbatch --mem 10G --gres=gpu:1 -p part2   -J dataviz -o log-dataviz-%A.out --time=8-00:00:00 dataviz.sh
 #
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J tr_a -o log-tr_a-%A.out --time=8-00:00:00 variant_a.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part3 -J tr_d -o log-tr_d-%A.out --time=8-00:00:00 variant_d.sh

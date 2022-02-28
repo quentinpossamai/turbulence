@@ -437,7 +437,7 @@ def rmse_model_prediction(name, dataset_name: str):
                 ground_force[2] = cap * drone_prms['m'] * g
             else:
                 mu_r_z = mu * (drone_prms['prop_radius'] / (4 * z)) ** 2
-                ground_force[2] = np.clip(np.sum(motor) ** 2 * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                ground_force[2] = np.clip(np.sum(motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                           a_min=0, a_max=cap * drone_prms['m'] * g)
             return np.concatenate([ground_force, np.zeros(3)]).squeeze()[2]
     else:
