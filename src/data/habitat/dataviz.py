@@ -140,6 +140,7 @@ def plot_fa():
 def plot_model_prediction(name):
     msg = ['nogru', 'all', 'emb', 'fine']
     assert name in msg, f'Name must be in {msg}'
+    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
@@ -171,7 +172,7 @@ def plot_model_prediction(name):
                                              learning_rate=h_prms['lr'],
                                              uav_model=uav_model,
                                              motor_size=h_prms['motor_size'],
-                                             past=h_prms['past'])
+                                             past=h_prms['past']).to(device)
 
     if name == 'all':
         from src.drone_models.residual.all_height import AllHeight as Model
@@ -184,7 +185,7 @@ def plot_model_prediction(name):
                                            learning_rate=h_prms['lr'],
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+                                           past=h_prms['past']).to(device)
 
     elif name == 'emb':
         from src.drone_models.residual.emb_height import EmbHeight as Model
@@ -198,7 +199,7 @@ def plot_model_prediction(name):
                                            learning_rate=h_prms['lr'],
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+                                           past=h_prms['past']).to(device)
     else:
         assert name == 'fine'
         from src.drone_models.residual.fine_tuning import FineTunning as Model
@@ -211,7 +212,7 @@ def plot_model_prediction(name):
                                            learning_rate=h_prms['lr'],
                                            uav_model=uav_model,
                                            motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+                                           past=h_prms['past']).to(device)
 
     model.eval()
 
@@ -221,12 +222,12 @@ def plot_model_prediction(name):
     for scene_number in tqdm(habitat.TEST, desc='scene'):
         flight = index[scene_number]
         for flight_number in tqdm(flight, desc='flight'):
-            state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy())
-            fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy())
-            z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy())
-            motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy())
-            depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy())
-            depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy())
+            state = torch.from_numpy(habitat.load_file('state', scene_number, flight_number).copy()).to(device)
+            fa = torch.from_numpy(habitat.load_file('ground_force', scene_number, flight_number).copy()).to(device)
+            z = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number).copy()).to(device)
+            motor = torch.from_numpy(habitat.load_file('motor', scene_number, flight_number).copy()).to(device)
+            depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number).copy()).to(device)
+            depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number).copy()).to(device)
 
             assert len(fa) == len(motor)
             assert len(fa) + 1 == len(z)
@@ -244,9 +245,9 @@ def plot_model_prediction(name):
                 z_hat = torch.empty(len(z_gt), dtype=torch.float32)
                 z_hat2 = torch.empty(len(z_gt), dtype=torch.float32)
                 for i in tqdm(range(len(z_hat)), desc='prediction'):
-                    output = model(depth_emb[i:i + h_prms['past']])
+                    output = model(depth_emb[i:i + h_prms['past']]).cpu()
                     z_hat[i] = (output * z_std + z_mean)
-                    output2 = model_nogru(depth[i + h_prms['past'] - 1].reshape(1, 480, 640))
+                    output2 = model_nogru(depth[i + h_prms['past'] - 1].reshape(1, 480, 640)).cpu()
                     z_hat2[i] = (output2 * z_std + z_mean)
             print(f'{scene_number} | {flight_number} | '
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
