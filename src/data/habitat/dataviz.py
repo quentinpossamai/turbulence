@@ -287,7 +287,7 @@ def plot_model_prediction(name):
             # plt.show()
             plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
                         f'fa_model_prediction-{scene_number}-{flight_number}.pdf')
-            plt.close(fig)
+            # plt.close(fig)
             return
             cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth'
             scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/train_emb_depth/'
