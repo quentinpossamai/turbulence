@@ -333,16 +333,14 @@ def main():
         assert (run.encoder.state_dict()[e].to(device) == state_dict[f'encoder.{e}']).all()
 
     # Loading head
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
-    model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
     state_dict = torch.load(f'{path}{model_name}', map_location=device)
     for i, e in enumerate(state_dict['state_dict'].keys()):
         run.state_dict()[e].copy_(state_dict['state_dict'][e])
         assert (run.state_dict()[e].to(device) == state_dict['state_dict'][e]).all()
 
     logger.watch(run)
-    # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
-    #                               f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if gpu_count else 0
     # Datasets
     load_depth = True
@@ -372,7 +370,7 @@ def main():
                                           filename='{epoch}-{step}-{val_loss:.2f}',
                                           monitor='val_loss',
                                           mode='min')
-    trainer = pl.Trainer(gpus=gpu_count,
+    trainer = pl.Trainer(gpus=4,
                          logger=logger,
                          deterministic=True,
                          max_epochs=args.max_epochs,
