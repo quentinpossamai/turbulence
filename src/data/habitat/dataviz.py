@@ -269,7 +269,7 @@ def rmse_model_prediction(name, dataset_name: str):
     use_cuda_if_possible = True
     device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
-    msg = ['nogru', 'all', 'emb', 'fine']
+    msg = ['emb_norm', 'nogru', 'all', 'emb', 'fine']
     assert name in msg, f'Name must be in {msg}'
 
     drone_width, drone_height = 0.1, 0.025
@@ -342,8 +342,24 @@ def rmse_model_prediction(name, dataset_name: str):
         if dataset_name == 'euroc_mav':
             print(f'name: {name} | dataset_name: {dataset_name} | Emb not generated')
             return
+    elif name == 'emb_norm':
+        from src.drone_models.residual.emb_height import EmbHeight as Model
+        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+        model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
+        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                           activation=h_prms['activation'],
+                                           embedding=h_prms['embedding'],
+                                           l2=h_prms['l2'],
+                                           learning_rate=h_prms['lr'],
+                                           uav_model=uav_model,
+                                           motor_size=h_prms['motor_size'],
+                                           past=h_prms['past']).to(device)
+        if dataset_name == 'euroc_mav':
+            print(f'name: {name} | dataset_name: {dataset_name} | Emb not generated')
+            return
         else:
-            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, False, True, False)
     else:
         assert name == 'fine'
         # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
@@ -480,7 +496,7 @@ def observe_generated_traj(scene_number, flight_number):
                   'prop_radius': drone_width * 0.1}  # [m]
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
-    simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1 / 20, tf_follow=tf_follow)
+    simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=1 / 20, tf_follow=tf_follow)
 
 
 def histogram():
@@ -555,7 +571,6 @@ def histogram():
     plt.xticks(initial_ticks, [f'{e:.3f}' for e in positions], rotation=-45)
     ax.legend()
 
-
     plt.plot(gt)
     plt.plot(hat)
 
@@ -614,16 +629,58 @@ def euroc_mav_table():
     print()
 
 
+def get_image_from_generated_traj(scene_number, flight_number, idx: list):
+    scene_id = habitat.MP3D_SCENE_LIST[scene_number]
+    scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
+    state = habitat.load_file('state', scene_number, flight_number)
+    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+
+    command = f'rsync -tv remsto:{cluster_scene_path} {scene_path}'
+    if not os.path.isfile(scene_path):
+        print(command)
+        raise (FileNotFoundError('Scene is not in local'))
+        os.system(command)  # if scene not downloaded
+
+    drone_width, drone_height = 0.1, 0.025
+    volumetric_mass = 200
+    g = 9.81
+    m = volumetric_mass * drone_width ** 2 * drone_height
+    drone_prms = {'width': drone_width,  # [m]
+                  'height': drone_height,  # [m]
+                  'm': m,  # [kg]
+                  'kt': m * g / (4 * 150 ** 2),  #
+                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
+                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
+                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
+                  'prop_radius': drone_width * 0.1}  # [m]
+
+    simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
+
+    rgb = []
+    for ind in idx:
+        simulation.agent.transformation = tf_follow[ind]
+        obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+        rgb.append(obs['left_camera'])
+
+    simulation.sim.close(True)
+    return np.stack(rgb, axis=0)
+
+
 def main():
     # plot_fa_generator()
     # plot_fa()
-    # ['nogru', 'all', 'emb', 'fine']
-    # for e in ['fine']:
-    #     rmse_model_prediction(e, 'habitat')
-    # for e in ['fine']:
-    #     rmse_model_prediction(e, 'euroc_mav')
-    # observe_generated_traj(32, 3)
-    histogram()
+    # ['nogru', 'all', 'emb', 'fine', 'emb_norm']
+    for e in ['emb_norm']:
+        rmse_model_prediction(e, 'habitat')
+    for e in ['emb_norm']:
+        rmse_model_prediction(e, 'euroc_mav')
+    # observe_generated_traj(24, 12)
+    # histogram()
     # euroc_mav_table()
 
 

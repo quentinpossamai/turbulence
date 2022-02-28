@@ -360,7 +360,7 @@ class Simulation:
             print(simulation_iteration)
             print(f'Height: {z}')
             has_collided = self.agent.contact_test()
-            print(f'has_collided: {has_collided}')
+            # print(f'has_collided: {has_collided}')
 
             # 4-Display and interactivity
             if camera_rgb:
@@ -375,8 +375,8 @@ class Simulation:
             saved_velocity = (self.agent.linear_velocity, self.agent.angular_velocity)
             self.agent.linear_velocity = magnum.Vector3([0, 0, 0])
             self.agent.angular_velocity = magnum.Vector3([0, 0, 0])
-            print(f"linear_velocity velocity: {self.agent.linear_velocity}")
-            print(f"angular_velocity velocity: {self.agent.angular_velocity}\n\n")
+            # print(f"linear_velocity velocity: {self.agent.linear_velocity}")
+            # print(f"angular_velocity velocity: {self.agent.angular_velocity}\n\n")
 
             # print(f"angular_velocity velocity: {rot_global_flu @ np.array([+0, 0, 1])}\n\n")
 
