@@ -863,8 +863,8 @@ def main():
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'habitat')
-    # for e in ['emb_norm']:
-    #     rmse_model_prediction(e, 'euroc_mav')
+    for e in ['fine_norm']:
+        rmse_model_prediction(e, 'euroc_mav')
 
     # observe_generated_traj(9, 0)
     # histogram()
