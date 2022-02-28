@@ -16,7 +16,6 @@ from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalMo
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
 
-
 plt.style.use('seaborn-deep')
 plt.rcParams.update({"text.usetex": False,
                      "font.family": "serif",
@@ -162,20 +161,19 @@ def plot_model_prediction(name):
                       drone_prms['iz'] / drone_prms['ix']])
     uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
-    if name == 'nogru':
-        from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
-        model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
-                                           activation=h_prms['activation'],
-                                           l2=h_prms['l2'],
-                                           learning_rate=h_prms['lr'],
-                                           uav_model=uav_model,
-                                           motor_size=h_prms['motor_size'],
-                                           past=h_prms['past'])
+    from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+    model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
+    h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+    model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
+                                             activation=h_prms['activation'],
+                                             l2=h_prms['l2'],
+                                             learning_rate=h_prms['lr'],
+                                             uav_model=uav_model,
+                                             motor_size=h_prms['motor_size'],
+                                             past=h_prms['past'])
 
-    elif name == 'all':
+    if name == 'all':
         from src.drone_models.residual.all_height import AllHeight as Model
         path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
@@ -244,9 +242,12 @@ def plot_model_prediction(name):
             with torch.no_grad():
                 # fa_hat = torch.empty(len(fa), dtype=torch.float32) * torch.nan
                 z_hat = torch.empty(len(z_gt), dtype=torch.float32) * torch.nan
+                z_hat2 = torch.empty(len(z_gt), dtype=torch.float32) * torch.nan
                 for i in range(len(z_hat)):
                     output = model(depth_emb[i:i + h_prms['past']])
                     z_hat[i] = (output * z_std + z_mean)
+                    output2 = model_nogru(depth[i + h_prms['past'] - 1])
+                    z_hat2[i] = (output2 * z_std + z_mean)
             print(f'{scene_number} | {flight_number} | '
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
                   f'Real loss {((z_hat - z) ** 2).mean():0.4f}')
@@ -254,15 +255,17 @@ def plot_model_prediction(name):
             fig, ax = plt.subplots(1, 1)
             ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
             ax.plot(xx, z_gt, label='Ground truth', marker=',')
-            ax.plot(xx, z_hat, label='All height', marker=',')
+            ax.plot(xx, z_hat, label='Ours', marker=',')
+            ax.plot(xx, z_hat2, label='No gru', marker=',')
             # ax.plot(fa_hat_a, label='model a')
             ax.grid()
             ax.set_ylabel('Surface distance (m)')  # Surface distance (m)
             ax.set_xlabel('Sample number')
             ax.legend()
             # plt.show()
-            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/model_prediction-{scene_number}-'
-                        f'{flight_number}.pdf')
+            plt.savefig(
+                f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/model_prediction-{scene_number}-'
+                f'{flight_number}.pdf')
 
 
 def rmse_model_prediction(name, dataset_name: str):
@@ -675,45 +678,22 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
         return ground_force[2]
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
-    # from src.drone_models.residual.emb_height2 import EmbHeight as Model
-    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
-    # model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
+    from src.drone_models.residual.emb_height2 import EmbHeight as Model
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
     # from src.drone_models.residual.emb_height import EmbHeight as Model
     # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
     # model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
     #
-    # h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-    # model = Model.load_from_checkpoint(f'{path}{model_name}',
-    #                                    activation=h_prms['activation'],
-    #                                    embedding=h_prms['embedding'],
-    #                                    l2=h_prms['l2'],
-    #                                    learning_rate=h_prms['lr'],
-    #                                    uav_model=None,
-    #                                    motor_size=h_prms['motor_size'],
-    #                                    past=h_prms['past'])
-
-    from src.drone_models.residual.fine_tuning import FineTunning as Model
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
-    model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
     h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
     model = Model.load_from_checkpoint(f'{path}{model_name}',
                                        activation=h_prms['activation'],
+                                       embedding=h_prms['embedding'],
                                        l2=h_prms['l2'],
                                        learning_rate=h_prms['lr'],
                                        uav_model=None,
                                        motor_size=h_prms['motor_size'],
                                        past=h_prms['past'])
-
-    scene_id = habitat.MP3D_SCENE_LIST[scene_number]
-    cluster_depth_path = f"/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/{scene_id}/" \
-                         f"{habitat.FLIGHT}/{flight_number}/depth.npy"
-    depth_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/" \
-                 f"{habitat.FLIGHT}/{flight_number}/depth.npy"
-    command = f'rsync -tv --progress remsto:{cluster_depth_path} {depth_path}'
-    if not os.path.isfile(depth_path):
-        print(command)
-        raise (FileNotFoundError('Depth is not in local'))
-        os.system(command)  # if scene not downloaded
 
     rgb = []
     z = []
@@ -726,11 +706,8 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
             rgb.append(obs['left_camera'])
             z.append(obs['surface_dist'])
             fa.append(_apply(obs['surface_dist'], motor[ind]))
-            norm_emb = habitat.load_file('depth', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
-            norm_emb = torch.from_numpy(norm_emb.copy())
-            norm_emb = f.resized_crop(norm_emb, (480 - 408) // 2, 0, 408, 640, [240, 376])
-            norm_emb = np.clip(norm_emb / 20, 0, 1) * 2 - 1
-            z_hat.append(model(norm_emb).squeeze().item())
+            depth_emb = habitat.load_file('deptph_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
+            z_hat.append(model(depth_emb).squeeze().item())
     simulation.sim.close(True)
 
     return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),
@@ -799,12 +776,13 @@ def predict_good_fa():
 def main():
     # plot_fa_law()
     # plot_fa()
+    plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm']
-    # for e in ['emb_norm']:
+    # for e in ['emb']:
     #     rmse_model_prediction(e, 'habitat')
     # for e in ['emb_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
-    observe_generated_traj(24, 16)
+    # observe_generated_traj(24, 16)
     # histogram()
     # euroc_mav_table()
     # predict_good_fa()
