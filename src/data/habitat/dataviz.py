@@ -270,9 +270,9 @@ def plot_model_prediction(name):
                   f'Error loss wandb emb_height {((((z_hat - z) - z_mean) / z_std) ** 2).mean():0.4f} | '
                   f'Real loss {((z_hat - z) ** 2).mean():0.4f}')
 
-            fa_gt = _apply(z_gt, motor)
-            fa_hat = _apply(z_hat, motor)
-            fa_hat2 = _apply(z_hat2, motor)
+            fa_gt = [_apply(e, motor) for e in z_gt]
+            fa_hat = [_apply(e, motor) for e in z_hat]
+            fa_hat2 = [_apply(e, motor) for e in z_hat2]
 
             fig, ax = plt.subplots(1, 1)
             ax.set_title(f'Scene number: {scene_number} | flight_number: {flight_number}')
