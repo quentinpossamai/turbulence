@@ -14,6 +14,8 @@ import src.data.habitat.data_gen as data_gen
 import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
+import torchvision.transforms.functional as f
+
 
 plt.style.use('seaborn-deep')
 plt.rcParams.update({"text.usetex": False,
@@ -49,7 +51,7 @@ def plot_fa_law():
             ground_force[2] = cap * drone_prms['m'] * g
         else:
             mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
-            ground_force[2] = np.clip(np.sum(_motor) ** 2 * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+            ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                       a_min=0, a_max=cap * drone_prms['m'] * g)
         return ground_force
 
@@ -635,6 +637,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
+    motor = habitat.load_file('motor', scene_number, flight_number)
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
@@ -658,30 +661,153 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
                   'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
                   'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
                   'prop_radius': drone_width * 0.1}  # [m]
+    mu = 1
+    cap = 0.1
+
+    def _apply(_z, _motor):
+        ground_force = np.zeros(3)
+        if _z < np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+            ground_force[2] = cap * drone_prms['m'] * g
+        else:
+            mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
+            ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                      a_min=0, a_max=cap * drone_prms['m'] * g)
+        return ground_force[2]
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
+    # from src.drone_models.residual.emb_height2 import EmbHeight as Model
+    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    # model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
+    # from src.drone_models.residual.emb_height import EmbHeight as Model
+    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+    # model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+    #
+    # h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+    # model = Model.load_from_checkpoint(f'{path}{model_name}',
+    #                                    activation=h_prms['activation'],
+    #                                    embedding=h_prms['embedding'],
+    #                                    l2=h_prms['l2'],
+    #                                    learning_rate=h_prms['lr'],
+    #                                    uav_model=None,
+    #                                    motor_size=h_prms['motor_size'],
+    #                                    past=h_prms['past'])
+
+    from src.drone_models.residual.fine_tuning import FineTunning as Model
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
+    model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
+    h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+    model = Model.load_from_checkpoint(f'{path}{model_name}',
+                                       activation=h_prms['activation'],
+                                       l2=h_prms['l2'],
+                                       learning_rate=h_prms['lr'],
+                                       uav_model=None,
+                                       motor_size=h_prms['motor_size'],
+                                       past=h_prms['past'])
+
+    scene_id = habitat.MP3D_SCENE_LIST[scene_number]
+    cluster_depth_path = f"/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/{scene_id}/" \
+                         f"{habitat.FLIGHT}/{flight_number}/depth.npy"
+    depth_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/" \
+                 f"{habitat.FLIGHT}/{flight_number}/depth.npy"
+    command = f'rsync -tv --progress remsto:{cluster_depth_path} {depth_path}'
+    if not os.path.isfile(depth_path):
+        print(command)
+        raise (FileNotFoundError('Depth is not in local'))
+        os.system(command)  # if scene not downloaded
 
     rgb = []
-    for ind in idx:
-        simulation.agent.transformation = tf_follow[ind]
-        obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
-        rgb.append(obs['left_camera'])
-
+    z = []
+    fa = []
+    z_hat = []
+    with torch.no_grad():
+        for ind in idx:
+            simulation.agent.transformation = tf_follow[ind]
+            obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+            rgb.append(obs['left_camera'])
+            z.append(obs['surface_dist'])
+            fa.append(_apply(obs['surface_dist'], motor[ind]))
+            norm_emb = habitat.load_file('depth', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
+            norm_emb = torch.from_numpy(norm_emb.copy())
+            norm_emb = f.resized_crop(norm_emb, (480 - 408) // 2, 0, 408, 640, [240, 376])
+            norm_emb = np.clip(norm_emb / 20, 0, 1) * 2 - 1
+            z_hat.append(model(norm_emb).squeeze().item())
     simulation.sim.close(True)
-    return np.stack(rgb, axis=0)
+
+    return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),
+            np.stack(z_hat, axis=0).flatten())
+
+
+def predict_good_fa():
+    cap = 0.1
+    mu = 1
+    drone_width, drone_height = 0.1, 0.025
+    volumetric_mass = 200
+    g = 9.81
+    m = volumetric_mass * drone_width ** 2 * drone_height
+    drone_prms = {'width': drone_width,  # [m]
+                  'height': drone_height,  # [m]
+                  'm': m,  # [kg]
+                  'kt': m * g / (4 * 150 ** 2),  #
+                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
+                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
+                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
+                  'prop_radius': drone_width * 0.1}  # [m]
+    theta = np.array([drone_prms['kt'] / drone_prms['m'],
+                      drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
+                      drone_prms['km'] / drone_prms['iz'],
+                      drone_prms['iz'] / drone_prms['ix']])
+
+    def _apply(_z, _motor):
+        ground_force = np.zeros(3)
+        if _z < np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+            ground_force[2] = cap * drone_prms['m'] * g
+        else:
+            mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
+            ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                      a_min=0, a_max=cap * drone_prms['m'] * g)
+        return ground_force
+
+    motor = np.array([150, 150, 150, 150])
+    dataset_name = 'habitat'  # habitat  euroc_mav
+
+    z_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
+    dataset = habitat.HabitatResidualDataset('test', 1, False, False, False, False)
+    data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
+    z_gt_big = []
+    z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
+    fa_mean, fa_std = habitat.HabitatResidualDataset.fa_mean, habitat.HabitatResidualDataset.fa_std
+    for i, batch in tqdm(enumerate(data), total=len(data)):
+        z_gt_big.append(batch['surface_dist'].numpy() * z_std + z_mean)
+
+    for e in [f'hat_all_{dataset_name}.pkl', f'hat_emb_{dataset_name}.pkl', f'hat_fine_{dataset_name}.pkl',
+              f'hat_nogru_{dataset_name}.pkl']:
+        z_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_{e}', 'rb'))
+        if 'all' in e or 'nogru' in e:
+            fa_gt_corrected = np.array([_apply(e, motor) for e in z_gt_big])[:, 2]
+        else:
+            fa_gt_corrected = np.array([_apply(e, motor) for e in z_gt])[:, 2]
+        fa_hat_corrected = np.array([_apply(e, motor) for e in z_hat])[:, 2]
+        loss = np.sqrt(((fa_gt_corrected - fa_hat_corrected) ** 2).mean())
+        print(f'fa{e}  Loss: {loss}')
+
+        pickle.dump(fa_gt_corrected, open(f'{habitat.WD_PATH}data_prediction/fa_gt_corrected', 'wb'))
+        pickle.dump(fa_hat_corrected, open(f'{habitat.WD_PATH}data_prediction/fa_{e}_corrected', 'wb'))
 
 
 def main():
-    # plot_fa_generator()
+    # plot_fa_law()
     # plot_fa()
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm']
-    for e in ['emb_norm']:
-        rmse_model_prediction(e, 'habitat')
-    for e in ['emb_norm']:
-        rmse_model_prediction(e, 'euroc_mav')
-    # observe_generated_traj(24, 12)
+    # for e in ['emb_norm']:
+    #     rmse_model_prediction(e, 'habitat')
+    # for e in ['emb_norm']:
+    #     rmse_model_prediction(e, 'euroc_mav')
+    observe_generated_traj(24, 16)
     # histogram()
     # euroc_mav_table()
+    # predict_good_fa()
 
 
 if __name__ == '__main__':
