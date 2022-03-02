@@ -15,10 +15,37 @@ plt.rcParams.update({"text.usetex": False,
                      "font.sans-serif": ["Computer Modern Roman"]})
 
 xx = np.arange(200, 275)
-rgb1, z1, fa1, z1_hat, z_hat_nogru, motor = dataviz.get_image_from_generated_traj(64, 7, xx)
+# rgb1, z1, fa1, z1_hat, z_hat_nogru = dataviz.get_image_from_generated_traj(64, 7, xx)
 
 # pickle.dump([rgb1, z1, fa1, z1_hat, z_hat_nogru], open(f'{dataviz.habitat.WD_PATH}figure6.pkl', 'wb'))
-[rgb1, z1, fa1, z1_hat, z_hat_nogru] = pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6.pkl', 'wb'))
+[rgb1, z1, fa1, z1_hat, z_hat_nogru] = pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6.pkl', 'rb'))
+
+z_gt = np.array(pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6/z_gt.pkl', 'rb')))
+z_hat = np.array(pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6/z_hat.pkl', 'rb')))
+z_hat2 = np.array(pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6/z_hat2.pkl', 'rb')))
+fa_gt = np.array(pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6/fa_gt.pkl', 'rb')))
+fa_hat = np.array(pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6/fa_hat.pkl', 'rb')))
+fa_hat2 = np.array(pickle.load(open(f'{dataviz.habitat.WD_PATH}figure6/fa_hat2.pkl', 'rb')))
+
+xx = np.arange(215, 275)
+xx2 = np.arange(39, len(fa_gt) + 39)
+fig, ax = plt.subplots(figsize=(8, 3))
+ax.plot(xx2[xx - 39] * 1/20, fa_gt[xx - 39], label='GT')
+ax.plot(xx2[xx - 39] * 1/20, fa_hat[xx - 39], label='Ours')
+ax.plot(xx2[xx - 39] * 1/20, fa_hat2[xx - 39], label='No GRU')
+ax.grid()
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('fa (N)')
+# ax.set_ylim([0.1, 1.2])
+ax.axvline(240 * 1/20, c='black')
+ax.axvline(246 * 1/20, c='black')
+ax.legend()
+plt.subplots_adjust(left=0.1, bottom=0.15, right=0.99, top=0.99, wspace=0., hspace=0.)
+plt.savefig(f'{dataviz.habitat.WD_PATH}figure6.pdf')
+
+
+fig, ax = plt.subplots()
+ax.imshow(rgb1[170 - 200])
 
 drone_width, drone_height = 0.1, 0.025
 volumetric_mass = 200
@@ -51,8 +78,6 @@ def _apply(_z, _motor):
         ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                   a_min=0, a_max=cap * drone_prms['m'] * g)
     return ground_force
-
-def _apply(_z, _motor):
 
 
 fig, ax = plt.subplots()

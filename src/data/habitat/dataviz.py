@@ -10,8 +10,8 @@ from tqdm import tqdm
 from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
-# import src.data.habitat.data_gen as data_gen
-# import src.data.habitat.hatbitat2flu as hatbitat2flu
+import src.data.habitat.data_gen as data_gen
+import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
@@ -312,6 +312,8 @@ def plot_model_prediction(name):
             pickle.dump(fa_hat2, open(f'{habitat.WD_PATH}figure6/fa_hat2.pkl', 'wb'))
             return
     return
+    cluster_scene_path = f'/home/qpossamai/phd/turbulence/figure6/'
+    scene_path = f'~/phd/turbulence/figure6/'
     cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth'
     scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth/'
     command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
@@ -818,10 +820,10 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
             motor.append()
     simulation.sim.close(True)
 
-    return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),
+    return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(),
+            # np.stack(fa, axis=0).flatten(),
             np.stack(z_hat, axis=0).flatten(),
-            np.stack(z_hat_nogru, axis=0).flatten(),
-            )
+            np.stack(z_hat_nogru, axis=0).flatten())
 
 
 def predict_good_fa():
@@ -886,14 +888,14 @@ def predict_good_fa():
 def main():
     # plot_fa_law()
     # plot_fa()
-    plot_model_prediction('emb')
+    # plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'habitat')
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
 
-    # observe_generated_traj(9, 0)
+    observe_generated_traj(24, 16)
     # histogram()
     # euroc_mav_table()
     # predict_good_fa()

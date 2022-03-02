@@ -12,3 +12,8 @@ rsync -rtv --exclude rgb.npy --exclude '*.glb' --exclude '*.navmesh' --exclude '
 
 rsync -atv --progress --include='*.pkl' --exclude='*' remsto:~/phd/turbulence/ ~/phd/turbulence/
 rsync -atv  --include='*.png' --exclude='*' ./ remsto:~/phd/turbulence/
+
+list=$(find . -regextype posix-egrep -regex ".*.pz")
+for f in $list; do echo $f ; done;
+for f in $list; do echo ${f:0:23}${f:24::} ; done;
+for f in $list; do mv $f ${f:0:22}; done;
