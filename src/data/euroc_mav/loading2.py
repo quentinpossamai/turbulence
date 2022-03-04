@@ -6,10 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
+import src.utils.paths as paths
 import torchvision.transforms.functional as f
 
 
 INTERMEDIATE_DATASET_PATH = EurocMAV.INTERMEDIATE_DATASET_PATH
+DATASET_PATH = paths.WD_PATH + "data/euroc_mav/"
 
 
 # INTERMEDIATE_DATASET_PATH = "/Volumes/Samsung_T5/EurocMav/"
@@ -81,7 +83,8 @@ class EurocMAVDatasetHorizon2(Dataset):
                      'ground_force': torch.from_numpy(data_isolated["residual"].astype(np.float32)),
                      'surface_dist': torch.from_numpy(np.array(heights).astype(np.float32)).view(1),
                      'depth': depth,
-                     'flight': flight}
+                     'flight': flight,
+                     'img': data[idx]['cam0']}
 
         return to_return
 

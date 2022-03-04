@@ -41,7 +41,7 @@ ax.axvline(240 * 1/20, c='black')
 ax.axvline(246 * 1/20, c='black')
 ax.legend()
 plt.subplots_adjust(left=0.1, bottom=0.15, right=0.99, top=0.99, wspace=0., hspace=0.)
-plt.savefig(f'{dataviz.habitat.WD_PATH}figure6.pdf')
+plt.savefig(f'{dataviz.habitat.WD_PATH}figure6/figure6.pdf')
 
 
 fig, ax = plt.subplots()

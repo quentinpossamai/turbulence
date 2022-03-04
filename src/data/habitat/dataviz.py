@@ -731,7 +731,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     state = habitat.load_file('state', scene_number, flight_number)
     motor = habitat.load_file('motor', scene_number, flight_number)
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
-    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()[idx]
 
     command = f'rsync -tv --progress remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
@@ -784,17 +784,17 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
                                        motor_size=h_prms['motor_size'],
                                        past=h_prms['past'])
 
-    from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
-    model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
-    h_prms_nogru = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-    model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
-                                             activation=h_prms_nogru['activation'],
-                                             l2=h_prms_nogru['l2'],
-                                             learning_rate=h_prms_nogru['lr'],
-                                             uav_model=None,
-                                             motor_size=h_prms_nogru['motor_size'],
-                                             past=h_prms_nogru['past'])
+    # from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
+    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+    # model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
+    # h_prms_nogru = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
+    # model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
+    #                                          activation=h_prms_nogru['activation'],
+    #                                          l2=h_prms_nogru['l2'],
+    #                                          learning_rate=h_prms_nogru['lr'],
+    #                                          uav_model=None,
+    #                                          motor_size=h_prms_nogru['motor_size'],
+    #                                          past=h_prms_nogru['past'])
 
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
 
@@ -803,27 +803,27 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     fa = []
     z_hat = []
     z_hat_nogru = []
-    motor = []
     with torch.no_grad():
-        for ind in idx:
-            simulation.agent.transformation = tf_follow[ind]
+        for tf in tqdm(tf_follow):
+            simulation.agent.transformation = tf
             obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
             rgb.append(obs['left_camera'])
-            z.append(obs['surface_dist'])
-            fa.append(_apply(obs['surface_dist'], motor[ind]))
-            depth_emb = habitat.load_file('depth_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
-            depth_emb = torch.from_numpy(depth_emb.copy())
-            z_hat.append(model(depth_emb).squeeze().item() * z_std + z_mean)
-            depth = habitat.load_file('depth', scene_number, flight_number)[ind:ind + 1]
-            depth = torch.from_numpy(depth.copy())
-            z_hat_nogru.append(model_nogru(depth).squeeze().item() * z_std + z_mean)
-            motor.append()
+            # z.append(obs['surface_dist'])
+            # fa.append(_apply(obs['surface_dist'], motor[ind]))
+            # depth_emb = habitat.load_file('depth_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
+            # depth_emb = torch.from_numpy(depth_emb.copy())
+            # z_hat.append(model(depth_emb).squeeze().item() * z_std + z_mean)
+            # depth = habitat.load_file('depth', scene_number, flight_number)[ind:ind + 1]
+            # depth = torch.from_numpy(depth.copy())
+            # z_hat_nogru.append(model_nogru(depth).squeeze().item() * z_std + z_mean)
     simulation.sim.close(True)
 
-    return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(),
+    return (np.stack(rgb, axis=0),
+            np.stack(z, axis=0).flatten(),
             # np.stack(fa, axis=0).flatten(),
             np.stack(z_hat, axis=0).flatten(),
-            np.stack(z_hat_nogru, axis=0).flatten())
+            # np.stack(z_hat_nogru, axis=0).flatten()
+            )
 
 
 def predict_good_fa():
