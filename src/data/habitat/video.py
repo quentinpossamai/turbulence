@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 from tqdm import tqdm
 
-import src.utils.paths as paths
+import src.utils.path as paths
 
 plt.rcParams.update({"text.usetex": True,
                      "font.family": "serif",
@@ -72,7 +72,9 @@ def gen_video_euroc():
     shape = [480, 752, 3]
     for i, flight in zip([0, 1, 2], split.keys()):
         saving_path = f'{orga_path}video_euroc{i}.mp4'
-        fps = 10
+        fps = 20
+        if i == 2:
+            fps = 10
         codec = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         video = cv2.VideoWriter(saving_path, codec, float(fps), (shape[1], shape[0]), True)
         print(f'Video destination : {saving_path}')
@@ -90,9 +92,9 @@ def gen_video_euroc():
             ax.imshow(color_frame)
             ax.axis('off')
             # symbol = r'$\hat{d}$'
-            ax.annotate(rf'$f_a$ GT: {fa_gt[j]:0.2f}' + '\n'
-                                                        rf'$f_a$ Cheeseman Approx: {fa_gttest[j]:0.2f}' + '\n'
-                                                                                                          rf'$f_a$ predicted (Ours): {fa_hat[j]:0.2f}',
+            ax.annotate((rf'$f_a$ GT: {fa_gt[j]:0.2f}' + '\n' +
+                         rf'$f_a$ Cheeseman Approx: {fa_gttest[j]:0.2f}' + '\n' +
+                         rf'$f_a$ predicted (Ours): {fa_hat[j]:0.2f}'),
                         (shape[1] - 10, 10), xycoords='data', size=8, ha='right', va='top',
                         bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
             fig.canvas.draw()
@@ -110,22 +112,27 @@ def gen_video_habitat_gru():
     # pickle.dump(rgb, open(f'{dataviz.habitat.WD_PATH}data/habitat/video_gru.pkl', 'wb'))
     rgb = pickle.load(open(f'{dataviz.habitat.WD_PATH}data/habitat/video_gru.pkl', 'rb'))
 
-    # rgb2, _, _ = dataviz.get_image_from_generated_traj(24, 16, np.arange(167, 171))
+    # _, z, fa, z_hat, fa_hat2, z_hat_nogru, fa_hat_nogru = dataviz.get_image_from_generated_traj(24, 16,
+    #                                                                                            np.arange(140, 200))
     rgb2 = pickle.load(open(f'{dataviz.habitat.WD_PATH}data/habitat/video_gru2.pkl', 'rb'))
+    # pickle.dump([_, z, fa, z_hat, fa_hat, z_hat_nogru, fa_hat_nogru],
+    #             open(f'{dataviz.habitat.WD_PATH}data/habitat/video_gru3.pkl', 'wb'))
+    [_, z, fa_gt3, z_hat, fa_hat3, z_hat_nogru, fa_hat_nogru3] = pickle.load(open(f'{dataviz.habitat.WD_PATH}data/habitat/video_gru3.pkl', 'rb'))
 
     # z_gt = np.array(pickle.load(open(f'{paths.WD_PATH}figure6/z_gt.pkl', 'rb')))
     # z_hat = np.array(pickle.load(open(f'{paths.WD_PATH}figure6/z_hat.pkl', 'rb')))
     # z_hat2 = np.array(pickle.load(open(f'{paths.WD_PATH}figure6/z_hat2.pkl', 'rb')))
-    fa_gt = np.array(pickle.load(open(f'{orga_path}figure6/fa_gt.pkl', 'rb')))
-    fa_hat = np.array(pickle.load(open(f'{orga_path}figure6/fa_hat.pkl', 'rb')))
-    fa_hat2 = np.array(pickle.load(open(f'{orga_path}figure6/fa_hat2.pkl', 'rb')))
+    fa_gt2 = np.array(pickle.load(open(f'{orga_path}figure6/fa_gt.pkl', 'rb')))
+    fa_hat2 = np.array(pickle.load(open(f'{orga_path}figure6/fa_hat.pkl', 'rb')))
+    fa_hat_nogru2 = np.array(pickle.load(open(f'{orga_path}figure6/fa_hat2.pkl', 'rb')))
 
     xx = np.arange(215, 275)
-    xx2 = np.arange(39, len(fa_gt) + 39)
+    xx2 = np.arange(39, len(fa_gt2) + 39)
+
     # fig, ax = plt.subplots(figsize=(8, 3))
-    # ax.plot(xx2[xx - 39], fa_gt[xx - 39], label='GT')
-    # ax.plot(xx2[xx - 39], fa_hat[xx - 39], label='Ours')
-    # ax.plot(xx2[xx - 39], fa_hat2[xx - 39], label='No GRU')
+    # ax.plot(xx2[xx - 39], fa_gt2[xx - 39], label='GT')
+    # ax.plot(xx2[xx - 39], fa_hat2[xx - 39], label='Ours')
+    # ax.plot(xx2[xx - 39], fa_hat_nogru2[xx - 39], label='No GRU')
     # ax.grid()
     # ax.set_xlabel('Time (s)')
     # ax.set_ylabel('fa (N)')
@@ -135,22 +142,36 @@ def gen_video_habitat_gru():
     # ax.legend()
     # plt.subplots_adjust(left=0.1, bottom=0.15, right=0.99, top=0.99, wspace=0., hspace=0.)
     # plt.show()
+    #
+    # fig, ax = plt.subplots(figsize=(8, 3))
+    # ax.plot(fa_gt3, label='GT')
+    # ax.plot(fa_hat3, label='Ours')
+    # ax.plot(fa_hat_nogru3, label='No GRU')
+    # ax.grid()
+    # ax.set_xlabel('Time (s)')
+    # ax.set_ylabel('fa (N)')
+    # # ax.set_ylim([0.1, 1.2])
+    # ax.legend()
+    # plt.subplots_adjust(left=0.1, bottom=0.15, right=0.99, top=0.99, wspace=0., hspace=0.)
+    # plt.show()
 
     shape = [480, 640, 3]
     saving_path = f'{dataviz.habitat.WD_PATH}reports/IROS_01_03_2022/graphics/video/video_gru.mp4'
-    fps = 20
+    fps = 10
     codec = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
     video = cv2.VideoWriter(saving_path, codec, float(fps), (shape[1], shape[0]), True)
     print(f'Video destination : {saving_path}')
 
     for j, img in enumerate(tqdm(rgb)):
+        if j < 6:
+            continue
         fig = plt.figure(figsize=(shape[1] / 100., shape[0] / 100.))
         ax = plt.axes([0, 0, 1, 1])
         ax.imshow(img)
         ax.axis('off')
-        ax.annotate((rf'f_a GT: {fa_gt[xx - 39][j]:0.5f}' + '\n'
-                     rf'f_a (Ours): {fa_hat[xx - 39][j]:0.5f}' + '\n'
-                     rf'f_a No GRU: {fa_hat2[xx - 39][j]:0.5f}'),
+        ax.annotate((r'$f_a$' + f' GT: {fa_gt2[xx - 39][j] if j <= 36 else fa_gt3[j]:0.2f}' + '\n' +
+                     r'$\hat{f}_a$' + f' (Ours): {fa_hat2[xx - 39][j] if j <= 39 else fa_hat3[j]:0.2f}' + '\n' +
+                     r'$\hat{f}_a$' + f' No memory: {fa_hat_nogru2[xx - 39][j] if j <= 30 else fa_hat_nogru3[j]:0.2f}'),
                     (shape[1] - 10, 10), xycoords='data', size=8, ha='right', va='top',
                     bbox=dict(boxstyle='round', alpha=0.5, fc='w'))
         fig.canvas.draw()
@@ -164,8 +185,8 @@ def gen_video_habitat_gru():
 
 def main():
     # gen_video_habitat()
-    # gen_video_euroc()
-    gen_video_habitat_gru()
+    gen_video_euroc()
+    # gen_video_habitat_gru()
 
 
 if __name__ == '__main__':

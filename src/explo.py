@@ -1,7 +1,7 @@
 import pickle
 import numpy as np
 
-import src.utils.paths as paths
+import src.utils.path as paths
 
 z_gt = pickle.load(open(f'{paths.WD_PATH}z_gt_nogru_habitat.pkl', 'rb'))
 z_hat = pickle.load(open(f'{paths.WD_PATH}z_hat_nogru_habitat.pkl', 'rb'))

@@ -14,7 +14,7 @@ from tqdm import tqdm
 import src.data.datavis as datavis
 from src.utils import quaternion
 from src.utils.transform import Transform as Tf
-from src.utils.paths import WD_PATH
+from src.utils.path import WD_PATH
 
 # plt.style.use('seaborn')
 
@@ -277,27 +277,13 @@ def process_raw_data(imu_dict, pose_dict, motor_dict, freq):
                            for i in range(4)], axis=-1)
 
     sync = {"t": sync_time, "imu_ang_acc": imu_sync, "motor": motor_sync, "state": state_sync}
-
-    # IMU LIN ACC IN FIXED AND REMOVE GRAVITY
-    rot_fixed_body = Rotation.from_quat(sync['state'][:, 3:7]).as_matrix()
-    imu_lin_acc = (rot_fixed_body @ sync['imu_ang_acc'][:, 3:].reshape((-1, 3, 1))).reshape((-1, 3))
-    imu_lin_acc[:, 2] = imu_lin_acc[:, 2] - 9.81
-    sync['imu_ang_acc'][:, 3:] = imu_lin_acc
-
-    # integrator = scipy.integrate.cumtrapz
-    # dtrans = sync['state'][:, 7:10]
-    # dtrans_imu = np.stack([integrator(sync['imu_ang_acc'][:, 3 + i], sync['t'] * 1e-9,
-    #                                   initial=dtrans[0, i]) for i in range(3)], -1)
-    # trans = sync['state'][:, :3]
-    # trans_imu = np.stack([integrator(dtrans_imu[:, i], sync['t'] * 1e-9,
-    #                                  initial=trans[0, i]) for i in range(3)], -1)
     return sync
 
 
 def main():
     flight_list, flight_dict = get_flight_list()
     all_data = []
-    prog = tqdm(desc='Processing flights', total=len(flight_list))
+    # prog = tqdm(desc='Processing flights', total=len(flight_list))
     for trajectory, dictio in flight_dict.items():
         for orientation, speed_list in dictio.items():
             for speed in speed_list:
@@ -310,8 +296,9 @@ def main():
                 save_location = f'{DATASET_PATH}intermediate/{trajectory}/{orientation}/{speed}/data.pkl'
                 pickle.dump(data, open(f'{save_location}', 'wb'))
                 all_data.append(data)
-                prog.update()
+                # prog.update()
     pickle.dump(all_data, open(f'{DATASET_PATH}intermediate/data.pkl', 'wb'))
+    pickle.dump(all_data, open(f'/Users/quentin/phd/CDC_Observer/Data/Drone/data.pkl', 'wb'))
 
 
 if __name__ == '__main__':

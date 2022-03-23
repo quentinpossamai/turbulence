@@ -9,7 +9,7 @@ import src.data.euroc_mav.loading as euroc
 
 # Models
 from src import metrics
-from src.utils.paths import ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
+from src.utils.path import ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
 
 
 # BLACKBIRD_ANALYSIS_PATH = GENERAL_ANALYSIS_PATH + "blackbird_learned_quadrotor_training/"

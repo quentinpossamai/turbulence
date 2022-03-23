@@ -9,7 +9,7 @@ import torchvision.transforms.functional as f
 
 from typing import Dict, Tuple, Any, Union, List
 
-from src.utils.paths import WD_PATH
+from src.utils.path import WD_PATH
 
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))

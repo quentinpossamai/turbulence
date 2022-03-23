@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
-import src.utils.paths as paths
+import src.utils.path as paths
 from src.learning.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 import src.data.habitat.loading as habitat
 
@@ -149,7 +149,7 @@ def main_habitat():
                 flight_number = flight_number.item()
                 folder = f'{habitat.MP3D_DATA}{habitat.MP3D_SCENE_LIST[sce_num]}/{habitat.FLIGHT}/{flight_number}/' \
                          f'norm_emb/'
-                paths.mkdir_if_not_exist([folder])
+                paths.mkdir([folder])
 
                 # mse_normal = MSE(gt, normal_hat) Habitat data does not have normal GT
                 # gt_transpose = gt.permute(0, 2, 3, 1).reshape(-1, 3)

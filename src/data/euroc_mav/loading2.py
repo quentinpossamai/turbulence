@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-import src.utils.paths as paths
+import src.utils.path as paths
 import torchvision.transforms.functional as f
 
 
@@ -96,7 +96,7 @@ def estimate_cheeseman():
              "V1_03_difficult/"]}
     heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
 
-    from src.utils.paths import WD_PATH
+    from src.utils.path import WD_PATH
     z_hat = pickle.load(open(f'{WD_PATH}z_hat_fine_euroc_mav.pkl', 'rb'))
     fa_hat = pickle.load(open(f'{WD_PATH}fa_hat_fine_euroc_mav.pkl', 'rb'))
 

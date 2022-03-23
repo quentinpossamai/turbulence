@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pickle
 
-import src.utils.paths as paths
+import src.utils.path as paths
 import src.data.euroc_mav.loading as euroc
 import src.data.locobot.loading as locobot
 import src.data.blackbird.loading as blackbird

@@ -1,6 +1,6 @@
 import pickle
 
-from src.utils.paths import WD_PATH
+from src.utils.path import WD_PATH
 
 LOCOBOT_DATA_PATH = f'{WD_PATH}data/locobot/'
 
