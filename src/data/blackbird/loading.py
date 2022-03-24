@@ -6,9 +6,9 @@ import pickle
 
 import scipy.integrate
 import scipy.signal as signal
-from scipy.fft import fft, fftfreq, ifft
 from scipy.spatial.transform import Rotation
 from scipy import interpolate
+from scipy.interpolate import splev, splrep
 from tqdm import tqdm
 
 import src.data.datavis as datavis
@@ -232,24 +232,6 @@ def process_raw_data(imu_dict, pose_dict, motor_dict, freq):
     imu_dict['ang_vel'] = pi_rotation.apply(imu_dict['ang_vel'])
     imu_dict['lin_acc'] = pi_rotation.apply(imu_dict['lin_acc'])
 
-    # COMPUTE STATE DERIVATIVE
-    quat = pose_dict['quat']
-    trans = pose_dict['trans']
-    time = pose_dict['t']
-
-    dquat = np.stack([np.gradient(quat[:, i], (time - time[0]) * 1e-9) for i in range(4)], axis=-1)
-    ang_vel = 2. * quaternion.qmul_np(quat * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
-
-    dtrans = np.stack([np.gradient(trans[:, i], (time - time[0]) * 1e-9) for i in range(3)], axis=-1)
-    state = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
-
-    state_acc = np.stack([np.gradient(dtrans[:, i], (time - time[0]) * 1e-9) for i in range(3)], axis=-1)
-    # datavis.plot_butterworth_comparison(state_acc, dt, False, 1, 2)
-    state_acc = low_pass_butter(state_acc, np.mean(time[1:] - time[:-1]) * 1e-9, order=1, wn=2)
-
-    # put acceleration in body
-    # state_acc = (Rotation.from_quat(quat).as_matrix().transpose(0, 2, 1) @ state_acc.reshape((-1, 3, 1)))[..., 0]
-
     # SYNCHRONISATION
     time0 = pose_dict['t'][0]
     time1 = pose_dict['t'][-1]
@@ -257,18 +239,18 @@ def process_raw_data(imu_dict, pose_dict, motor_dict, freq):
         assert (sorted(time) == time).all()
         time0 = max(time0, time[0])
         time1 = min(time1, time[-1])
-    num = np.round((time1 - time0) * 1e-9 * freq).astype(int)
-    sync_time = np.linspace(time0, time1, num, dtype=np.int)
+    # num = np.round((time1 - time0) * 1e-9 * freq).astype(int)
+    # sync_time = np.linspace(time0, time1, num, dtype=np.int)
+    sync_time = np.arange(time0, time1, np.int(1 / 100 * 1e9))
     dt = np.mean(sync_time[1:] - sync_time[:-1], dtype=np.int) * 1e-9
     std = np.std(sync_time[1:] - sync_time[:-1], dtype=np.int) * 1e-9
     assert (np.sort(sync_time) == sync_time).all()
     assert (np.unique(sync_time) == sync_time).all()
-    assert std / dt < 5e-5
+    assert std / dt == 0
 
-    state_sync = np.stack([interpolate.interp1d(pose_dict['t'], state[:, i], bounds_error=True)(sync_time)
-                           for i in range(13)], axis=-1)
-    state_acc_sync = np.stack([interpolate.interp1d(pose_dict['t'], state_acc[:, i], bounds_error=True)(sync_time)
-                               for i in range(3)], axis=-1)
+    pose = np.concatenate([pose_dict['trans'], pose_dict['quat']], axis=-1)
+    pose_sync = np.stack([interpolate.interp1d(pose_dict['t'], pose[:, i], bounds_error=True)(sync_time)
+                          for i in range(7)], axis=-1)
 
     y = np.concatenate([imu_dict['ang_vel'], imu_dict['lin_acc']], axis=-1)
     imu_sync = np.stack([interpolate.interp1d(imu_dict["t"], y[:, i], bounds_error=True)(sync_time)
@@ -276,14 +258,129 @@ def process_raw_data(imu_dict, pose_dict, motor_dict, freq):
     motor_sync = np.stack([interpolate.interp1d(motor_dict[f't{i}'], motor_dict[f"m{i}"], bounds_error=True)(sync_time)
                            for i in range(4)], axis=-1)
 
-    sync = {"t": sync_time, "imu_ang_acc": imu_sync, "motor": motor_sync, "state": state_sync}
-    return sync
+    sync = {"t": sync_time, "imu_ang_acc": imu_sync, "motor": motor_sync, "pose": pose_sync}
+
+    # COMPUTE STATE DERIVATIVE
+    trans = sync['pose'][:, :3]
+    quat = sync['pose'][:, 3:7]
+    time = (sync['t'] - sync['t'][0]) * 1e-9
+
+    dquat = np.stack([np.gradient(quat[:, i], time) for i in range(4)], axis=-1)
+    ang_vel = 2. * quaternion.qmul_np(quat * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
+
+    rep = [splrep(time, trans[:, i], k=5, s=0.01) for i in range(3)]
+    dtrans = np.stack([splev(time, rep[i], der=1) for i in range(3)], -1)
+    state = np.concatenate([trans, quat, dtrans, ang_vel], axis=1)
+
+    # state_acc = np.stack([splev(time, rep[i], der=2) for i in range(3)], -1)
+    data = {'t': sync['t'], 'imu_ang_acc': sync['imu_ang_acc'], 'motor': sync['motor'], 'state': state}
+    return data
+
+
+import torch
+
+
+def torch_integrate_imu(dt: float, state0: torch.Tensor, imu: torch.Tensor, state, device):
+    """
+    Quaternion integration is not working, tested on (batch, t, val) tensors.
+    So the rest is not tested as quaternion integration is the first step.
+    Last arg 'state' is here only for debugging purposes
+    """
+    # IMU tensor has shape (*, t, val)
+    # state0 tensor has shape (*, val)
+    position0 = state0[..., :3]
+    quaternion0 = state0[..., 3:7]
+    lin_speed0 = state0[..., 7:10]
+    angular_speed0 = state0[..., 10:]
+
+    sensor_ang_vel = imu[..., :3]  # in body
+    sensor_lin_acc = imu[..., 3:]  # in body with g to be removed
+
+    length = imu.shape[:-2]
+
+    # # Imu integrating quat
+    sensor_quat = [quaternion0]
+    zero = torch.zeros(length + (1,), device=device)
+    ang_vel4 = torch.cat([sensor_ang_vel[..., 0, :], zero], dim=-1)
+    previous_dot_quat = 0.5 * qop.qmul(sensor_quat[-1], ang_vel4)
+    for i in range(1, imu.shape[-2]):
+        ang_vel4 = torch.cat([sensor_ang_vel[..., i, :], zero], dim=-1)
+        dot_quat = 0.5 * qop.qmul(sensor_quat[-1], ang_vel4)
+        next_quat = (dot_quat + previous_dot_quat) / 2 * dt + sensor_quat[-1]
+        next_quat = next_quat / torch.norm(next_quat, dim=-1).unsqueeze(-1)
+        previous_dot_quat = dot_quat
+        sensor_quat.append(next_quat)
+    sensor_quat = torch.stack(sensor_quat, dim=-2)
+
+    # Removing g
+    sensor_lin_acc_fixed = qop.qrot(sensor_quat, sensor_lin_acc)
+    sensor_lin_acc_fixed[..., 2] = sensor_lin_acc_fixed[..., 2] - torch.tensor(9.81, device=device)
+
+    plt.plot(state[0, :, 10:])
+    plt.plot(sensor_ang_vel[0])
+
+    plt.plot(state[0, :, 3:7])
+    plt.plot(sensor_quat[0])
+    # Integrating acc
+    # integrator = scipy.integrate.cumtrapz
+    # dtrans = sync['state'][:, 7:10]
+    # dtrans_imu = np.stack([integrator(sync['imu_ang_acc'][:, 3 + i], sync['t'] * 1e-9,
+    #                                   initial=dtrans[0, i]) for i in range(3)], -1)
+    # trans = sync['state'][:, :3]
+    # trans_imu = np.stack([integrator(dtrans_imu[:, i], sync['t'] * 1e-9,
+    #                                  initial=trans[0, i]) for i in range(3)], -1)
+
+    sensor_lin_speed = torch.cat([lin_speed0.unsqueeze(-2),
+                                  torch.cumulative_trapezoid(sensor_lin_acc, dx=dt, dim=-2) + lin_speed0.unsqueeze(
+                                      -2)],
+                                 dim=-2)
+
+    sensor_position = torch.cat([position0.unsqueeze(-2),
+                                 torch.cumulative_trapezoid(sensor_lin_speed, dx=dt, dim=-2) + position0.unsqueeze(
+                                     -2)],
+                                dim=-2)
+
+    next_state = torch.cat([sensor_position, sensor_quat, sensor_lin_speed, sensor_ang_vel], dim=-1)
+
+    integrate_imu_numpy()
+
+    return next_state
+
+
+def integrate_imu_numpy(dt: float, state0: np.ndarray, imu: np.ndarray):
+    """
+    Integration is working
+    """
+    imu_ang_vel = imu[:, :3]
+    imu_lin_acc = imu[:, 3:]
+
+    imu_quat = [state0[3:7]]
+    previous_dot_quat = 0.5 * quaternion.qmul_np(imu_quat[-1], np.concatenate([imu_ang_vel[0], np.zeros(1)]))
+    for i in range(1, len(imu)):
+        dot_quat = 0.5 * quaternion.qmul_np(imu_quat[-1], np.concatenate([imu_ang_vel[i], np.zeros(1)]))
+        next_quat = (dot_quat + previous_dot_quat) / 2 * dt + imu_quat[-1]
+        next_quat = normalize(next_quat)
+        previous_dot_quat = dot_quat
+        imu_quat.append(next_quat)
+    imu_quat = np.stack(imu_quat, 0)
+
+    # Rotating lin_acc and  Removing g
+    rot_fixed_body = Rotation.from_quat(imu_quat).as_matrix()
+    imu_lin_acc = (rot_fixed_body @ imu_lin_acc.reshape((-1, 3, 1))).reshape((-1, 3))
+    imu_lin_acc[:, 2] = imu_lin_acc[:, 2] - 9.81
+
+    # Integrating acc
+    imu_dtrans = state0[7:10] + np.concatenate([np.zeros((1, 3)),
+                                                np.cumsum((imu_lin_acc[1:] + imu_lin_acc[:-1]) / 2 * dt, axis=0)])
+    imu_trans = state0[:3] + np.concatenate([np.zeros((1, 3)),
+                                             np.cumsum((imu_dtrans[1:] + imu_dtrans[:-1]) / 2 * dt, axis=0)])
+    return np.concatenate([imu_trans, imu_quat, imu_dtrans, imu_ang_vel], axis=-1)
 
 
 def main():
     flight_list, flight_dict = get_flight_list()
     all_data = []
-    # prog = tqdm(desc='Processing flights', total=len(flight_list))
+    prog = tqdm(desc='Processing flights', total=len(flight_list))
     for trajectory, dictio in flight_dict.items():
         for orientation, speed_list in dictio.items():
             for speed in speed_list:
@@ -296,7 +393,7 @@ def main():
                 save_location = f'{DATASET_PATH}intermediate/{trajectory}/{orientation}/{speed}/data.pkl'
                 pickle.dump(data, open(f'{save_location}', 'wb'))
                 all_data.append(data)
-                # prog.update()
+                prog.update()
     pickle.dump(all_data, open(f'{DATASET_PATH}intermediate/data.pkl', 'wb'))
     pickle.dump(all_data, open(f'/Users/quentin/phd/CDC_Observer/Data/Drone/data.pkl', 'wb'))
 
