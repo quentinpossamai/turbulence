@@ -36,7 +36,7 @@ def main():
             with torch.no_grad():
                 for i in range(past, len(depth_emb)):
                     z_hat[i - past] = model.forward(depth_emb[i - past: i])
-                z_hat = z_hat * z_std + z_mean
+                z_hat = (z_hat * z_std + z_mean).cpu()
                 loss = (z_gt[past:] - z_hat) ** 2
             assert not torch.isnan(z_hat).any()
             pickle.dump([z_hat, loss], open(f'{habitat.DATA_HABITAT_PATH}scene_datasets/mp3d/'
