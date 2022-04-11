@@ -1,12 +1,14 @@
-/src/data/euroc_mav/depth_estimation/demo/
+.idea
+*.pyc
+*.out
+/data
+/analysis
+/reports
+/models
+
 /src/learning/autoencoder_depth/trained_models
 /src/learning/autoencoder_depth/trained_models/
 /src/learning/autoencoder_depth/logs/
-/analysis
-/data
-/reports
-*.pyc
-*.out
-.idea
+/src/data/euroc_mav/depth_estimation/demo/
 /src/hidden_scripts/
 
