@@ -10,8 +10,8 @@ from tqdm import tqdm
 from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
-# import src.data.habitat.data_gen as data_gen
-# import src.data.habitat.hatbitat2flu as hatbitat2flu
+import src.data.habitat.data_gen as data_gen
+import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
@@ -312,6 +312,8 @@ def plot_model_prediction(name):
             pickle.dump(fa_hat2, open(f'{habitat.WD_PATH}figure6/fa_hat2.pkl', 'wb'))
             return
     return
+    cluster_scene_path = f'/home/qpossamai/phd/turbulence/figure6/'
+    scene_path = f'~/phd/turbulence/figure6/'
     cluster_scene_path = f'/home/qpossamai/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth'
     scene_path = f'~/phd/turbulence/reports/IROS_01_03_2022/graphics/test_emb_depth/'
     command = f'rsync -rtv --progress remsto:{cluster_scene_path} {scene_path}'
@@ -729,7 +731,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     state = habitat.load_file('state', scene_number, flight_number)
     motor = habitat.load_file('motor', scene_number, flight_number)
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
-    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()[idx]
 
     command = f'rsync -tv --progress remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
@@ -800,27 +802,35 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     z = []
     fa = []
     z_hat = []
+    fa_hat = []
     z_hat_nogru = []
-    motor = []
+    fa_hat_nogru = []
+    motor = motor[idx]
     with torch.no_grad():
-        for ind in idx:
-            simulation.agent.transformation = tf_follow[ind]
+        for i, tf in enumerate(tqdm(tf_follow)):
+            ind = idx[i]
+            simulation.agent.transformation = tf
             obs = simulation.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
             rgb.append(obs['left_camera'])
             z.append(obs['surface_dist'])
-            fa.append(_apply(obs['surface_dist'], motor[ind]))
+            fa.append(_apply(obs['surface_dist'], motor[i]))
             depth_emb = habitat.load_file('depth_emb', scene_number, flight_number)[ind - h_prms['past'] + 1:ind + 1]
             depth_emb = torch.from_numpy(depth_emb.copy())
             z_hat.append(model(depth_emb).squeeze().item() * z_std + z_mean)
+            fa_hat.append(_apply(z_hat[-1], motor[i]))
             depth = habitat.load_file('depth', scene_number, flight_number)[ind:ind + 1]
             depth = torch.from_numpy(depth.copy())
             z_hat_nogru.append(model_nogru(depth).squeeze().item() * z_std + z_mean)
-            motor.append()
+            fa_hat_nogru.append(_apply(z_hat_nogru[-1], motor[i]))
     simulation.sim.close(True)
 
-    return (np.stack(rgb, axis=0), np.stack(z, axis=0).flatten(), np.stack(fa, axis=0).flatten(),
+    return (np.stack(rgb, axis=0),
+            np.stack(z, axis=0).flatten(),
+            np.stack(fa, axis=0).flatten(),
             np.stack(z_hat, axis=0).flatten(),
+            np.stack(fa_hat, axis=0).flatten(),
             np.stack(z_hat_nogru, axis=0).flatten(),
+            np.stack(fa_hat_nogru, axis=0).flatten(),
             )
 
 
@@ -886,14 +896,14 @@ def predict_good_fa():
 def main():
     # plot_fa_law()
     # plot_fa()
-    plot_model_prediction('emb')
+    # plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'habitat')
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
 
-    # observe_generated_traj(9, 0)
+    observe_generated_traj(24, 16)
     # histogram()
     # euroc_mav_table()
     # predict_good_fa()

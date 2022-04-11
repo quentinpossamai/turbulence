@@ -6,10 +6,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
+import src.utils.path as paths
 import torchvision.transforms.functional as f
 
 
 INTERMEDIATE_DATASET_PATH = EurocMAV.INTERMEDIATE_DATASET_PATH
+DATASET_PATH = paths.WD_PATH + "data/euroc_mav/"
 
 
 # INTERMEDIATE_DATASET_PATH = "/Volumes/Samsung_T5/EurocMav/"
@@ -81,7 +83,8 @@ class EurocMAVDatasetHorizon2(Dataset):
                      'ground_force': torch.from_numpy(data_isolated["residual"].astype(np.float32)),
                      'surface_dist': torch.from_numpy(np.array(heights).astype(np.float32)).view(1),
                      'depth': depth,
-                     'flight': flight}
+                     'flight': flight,
+                     'img': data[idx]['cam0']}
 
         return to_return
 
@@ -93,7 +96,7 @@ def estimate_cheeseman():
              "V1_03_difficult/"]}
     heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
 
-    from src.utils.paths import WD_PATH
+    from src.utils.path import WD_PATH
     z_hat = pickle.load(open(f'{WD_PATH}z_hat_fine_euroc_mav.pkl', 'rb'))
     fa_hat = pickle.load(open(f'{WD_PATH}fa_hat_fine_euroc_mav.pkl', 'rb'))
 

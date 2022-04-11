@@ -8,7 +8,7 @@ import src.data.euroc_mav.loading as euroc
 from src.vice.vice import ErrorEstimation
 from src.utils.transform import Transform as Tf
 import src.utils.quaternion as quaternion
-from src.utils.paths import mkdir_if_not_exist
+from src.utils.path import mkdir
 
 
 def euroc_mav_pre_processing(flight: str):
@@ -83,7 +83,7 @@ def euroc_mav_pre_processing(flight: str):
         cut_ov[i] = ov_tf_cam0_global[np.abs(img_timestamp - ov_timestamp).argmin()]
 
     # - Saving preprocessing
-    mkdir_if_not_exist([vice_path])
+    mkdir([vice_path])
 
     input_data = {"pose": cut_mc,
                   "imu": cut_ov,

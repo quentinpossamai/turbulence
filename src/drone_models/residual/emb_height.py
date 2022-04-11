@@ -18,7 +18,7 @@ import wandb
 from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
 from src.drone_models.model_structure import Run
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
-from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
+from src.utils.path import mkdir, ANALYSIS_PATH
 
 
 class EmbHeight(pl.LightningModule, Run):
@@ -240,7 +240,7 @@ ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_train
 ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
 
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
-mkdir_if_not_exist([SAVING_PATH])
+mkdir([SAVING_PATH])
 
 
 def main():
@@ -249,7 +249,7 @@ def main():
     residual_model_class = EmbHeight
     name = residual_model_class.__name__
     training_path = f'{SAVING_PATH}{name}/{version}/'
-    mkdir_if_not_exist([training_path])
+    mkdir([training_path])
 
     identifier = f'{name}-{version}'
     identifier = identifier if torch.cuda.is_available() else identifier + 'local'

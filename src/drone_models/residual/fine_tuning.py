@@ -19,7 +19,7 @@ from src.learning.autoencoder_depth.Models.model_CoPhy_like import Encoder
 from src.drone_models.model_structure import Run
 from src.utils.profiler import profiler
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
-from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH, WD_PATH
+from src.utils.path import mkdir, ANALYSIS_PATH, WD_PATH
 
 
 class FineTunning(pl.LightningModule, Run):
@@ -222,7 +222,7 @@ ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_train
 ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
 
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
-mkdir_if_not_exist([SAVING_PATH])
+mkdir([SAVING_PATH])
 
 
 def main():
@@ -232,7 +232,7 @@ def main():
     residual_model_class = FineTunning
     name = residual_model_class.__name__
     training_path = f'{SAVING_PATH}{name}/{version}/'
-    mkdir_if_not_exist([training_path])
+    mkdir([training_path])
 
     identifier = f'{name}-{version}-debug'
     identifier = identifier if torch.cuda.is_available() else identifier + '_local'

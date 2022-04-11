@@ -8,7 +8,7 @@ import numpy as np
 import scipy.integrate as integrate
 
 from src.utils.transform import Transform
-from src.utils.paths import DataFolder, WD_PATH
+from src.utils.path import DataFolder, WD_PATH
 
 
 def main():

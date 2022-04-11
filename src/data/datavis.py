@@ -16,11 +16,12 @@ from tqdm import tqdm
 import src.data.euroc_mav.loading as euroc
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
 from src.drone_models.residual.gru_cnn import GRUCNNResidual
-from src.utils.paths import mkdir_if_not_exist, ANALYSIS_DATA_VIS_EUROC_MAV, ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
+from src.utils.path import mkdir, ANALYSIS_DATA_VIS_EUROC_MAV
 import src.utils.quaternion as quaternion
 
-matplotlib.use('TKAgg')
-mkdir_if_not_exist([ANALYSIS_DATA_VIS_EUROC_MAV])
+# matplotlib.use('TKAgg')
+matplotlib.use('Qt5Agg')
+mkdir([ANALYSIS_DATA_VIS_EUROC_MAV])
 
 
 def plot_y_x():
@@ -125,39 +126,40 @@ def plot_y_x():
     plt.show()
 
 
-def plot_butterworth(quat, den_quat, dt, fc_quat, period, ind, plot_ang_vel):
+def normalize(x):
+    return x / np.linalg.norm(x, axis=-1)[..., np.newaxis]
+
+
+def plot_butterworth_quat(quat, dt, ind, time=None):
     # Butterworth quaternion
     wn_list = range(1, 15)
     n_list = range(1, 15)
-    den_quat_butter = np.zeros([len(n_list)] + [len(wn_list)] + list(quat.shape))
+    quat_butter = np.zeros([len(n_list), len(wn_list)] + list(quat.shape))
+    if time is not None:
+        dquat = np.stack([np.gradient(quat[:, i], time) for i in range(4)], axis=-1)
+        ang_vel = 2. * quaternion.qmul_np(quat * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
+        ang_vel_butter = np.zeros_like(quat_butter[..., :3])
     for n_ind, n in enumerate(n_list):
         for wn_ind, wn in enumerate(wn_list):
-            sos = signal.butter(N=n, Wn=wn, btype='lowpass', fs=1 / period, analog=False, output='sos')
-            # sos = signal.butter(N=n, Wn=wn, btype='lowpass', analog=True, output='sos')
+            sos = signal.butter(N=n, Wn=wn, btype='lowpass', fs=1 / dt, analog=False, output='sos')
             for i in range(4):
-                den_quat_butter[n_ind, wn_ind, :, i] = signal.sosfiltfilt(sos, quat[:, i])
-    den_quat_butter = den_quat_butter / np.linalg.norm(den_quat_butter, axis=-1)[..., np.newaxis]  # Normalize
-    den_dquat_butter = (den_quat_butter[:, :, 1:] - den_quat_butter[:, :, :-1]) / dt.reshape(
-        (1, 1, -1, 1))  # Euler derivative
-    den_ang_vel_butter = 2. * quaternion.qmul_np(
-        den_quat_butter[:, :, 1:] * np.array([-1., -1., -1., 1.]).reshape((1, 1, 1, 4)),
-        den_dquat_butter)[:, :, :, :3]
-
-    dquat = (quat[1:] - quat[:-1]) / dt.reshape((-1, 1))  # Euler derivative
-    ang_vel = 2. * quaternion.qmul_np(quat[1:] * np.array([[-1., -1., -1., 1.]]), dquat)[:, :3]
-
-    den_dquat = (den_quat[1:] - den_quat[:-1]) / dt.reshape((-1, 1))  # Euler derivative
-    den_ang_vel = 2. * quaternion.qmul_np(den_quat[1:] * np.array([[-1., -1., -1., 1.]]), den_dquat)[:, :3]
+                quat_butter[n_ind, wn_ind, :, i] = signal.sosfiltfilt(sos, quat[:, i])
+            quat_butter[n_ind, wn_ind] = normalize(quat_butter[n_ind, wn_ind])
+            if time is not None:
+                dquat_butter = np.stack([np.gradient(quat_butter[n_ind, wn_ind, :, i], time) for i in range(4)],
+                                        axis=-1)
+                computed = 2. * quaternion.qmul_np(
+                    quat_butter[n_ind, wn_ind] * np.array([-1., -1., -1., 1.]).reshape((1, 4)),
+                    dquat_butter)[..., :3]
+                ang_vel_butter[n_ind, wn_ind] = computed
 
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=100)
-    if plot_ang_vel:
+    if time is not None:
         plt.plot(ang_vel[:, ind], label='gt')
-        plt.plot(den_ang_vel[:, ind], label=f'ideal fc_quat={fc_quat}')
-        line = plt.plot(den_ang_vel_butter[0, 0, :, ind], label=f'butter')
+        line = plt.plot(ang_vel_butter[0, 0, :, ind], label=f'butter')
     else:
         plt.plot(quat[:, ind], label='gt')
-        plt.plot(den_quat[:, ind], label=f'ideal fc_quat={fc_quat}')
-        line = plt.plot(den_quat_butter[0, 0, :, ind], label=f'butter')
+        line = plt.plot(quat_butter[0, 0, :, ind], label=f'butter')
     plt.grid()
     plt.legend()
     axcolor = 'lightgoldenrodyellow'
@@ -183,19 +185,19 @@ def plot_butterworth(quat, den_quat, dt, fc_quat, period, ind, plot_ang_vel):
         n_val = int(np.round(n_slider.val))
         wn_val = int(np.round(wn_slider.val))
         print(f'n_val {n_val} | wn_val {wn_val}')
-        if plot_ang_vel:
-            line[0].set_ydata(den_ang_vel_butter[n_val, wn_val, :, ind])
+        if time is not None:
+            line[0].set_ydata(ang_vel_butter[n_val, wn_val, :, ind])
         else:
-            line[0].set_ydata(den_quat_butter[n_val, wn_val, :, ind])
+            line[0].set_ydata(quat_butter[n_val, wn_val, :, ind])
         fig.canvas.draw_idle()
 
     # register the update function with each slider
     n_slider.on_changed(update)
     wn_slider.on_changed(update)
-    print()
+    plt.show()
 
 
-def plot_butterworth_comparison(signal_x, ideal_f, period, do_norm, dt=None):
+def plot_butterworth_comparison(signal_x, period, do_norm, order, wn, time=None):
     def low_pass_filter(fft_coef, fourier_freq, freq_cut):  # Fourier low pass filter
         output = fft_coef.copy()
         output[np.abs(fourier_freq) > freq_cut] = 0
@@ -204,34 +206,26 @@ def plot_butterworth_comparison(signal_x, ideal_f, period, do_norm, dt=None):
     def normalize(x):
         return x / np.linalg.norm(x, axis=-1)[..., np.newaxis]
 
-    # Fourier
-    frequencies = fftfreq(len(signal_x), d=float(period))
-    fft_signal_x = fft(signal_x, axis=0)
-    ideal_signal_x = np.real(ifft(low_pass_filter(fft_signal_x, frequencies, ideal_f), axis=0))
-
-    n_init = 2
-    wn_init = 2.92
+    n_init = order
+    wn_init = wn
     # Butterworth
     sos = signal.butter(N=n_init, Wn=wn_init, btype='lowpass', fs=1 / period, analog=False, output='sos')
     butter_signal_x = signal.sosfiltfilt(sos, signal_x, axis=0)
 
     if do_norm:
-        ideal_signal_x = normalize(ideal_signal_x)
         butter_signal_x = normalize(butter_signal_x)
 
     fig, ax = plt.subplots(1, 1, figsize=(19.2, 10.8), dpi=100)
-    if dt is not None:
+    if time is not None:
+        length = signal_x.shape[1]
         ax.set_title('Differentiation of the signal')
-        diff_signal_x = (signal_x[1:] - signal_x[:-1]) / dt  # Euler derivative
-        diff_ideal_signal_x = (ideal_signal_x[1:] - ideal_signal_x[:-1]) / dt  # Euler derivative
-        diff_butter_signal_x = (butter_signal_x[1:] - butter_signal_x[:-1]) / dt  # Euler derivative
+        diff_signal_x = np.stack([np.gradient(signal_x[:, i], time) for i in range(length)], axis=-1)
+        diff_butter_signal_x = np.stack([np.gradient(butter_signal_x[:, i], time) for i in range(length)], axis=-1)
 
         plt.plot(diff_signal_x, label='gt')
-        plt.plot(diff_ideal_signal_x, label=f'ideal freq={ideal_f}')
         line = plt.plot(diff_butter_signal_x, label=f'butter')
     else:
         plt.plot(signal_x, label='gt')
-        plt.plot(ideal_signal_x, label=f'ideal freq={ideal_f}')
         line = plt.plot(butter_signal_x, label=f'butter with axis')
     plt.grid()
     plt.legend()
@@ -242,14 +236,14 @@ def plot_butterworth_comparison(signal_x, ideal_f, period, do_norm, dt=None):
     n_slider = Slider(ax=ax_n,
                       label="butter order",
                       valmin=1,
-                      valmax=15,
+                      valmax=40,
                       valinit=n_init,
                       orientation="vertical")
     ax_wn = plt.axes([0.15, 0.05, 0.65, 0.03], facecolor=axcolor)
     wn_slider = Slider(ax=ax_wn,
                        label="butter frequency",
                        valmin=0,
-                       valmax=30,
+                       valmax=100,
                        valinit=wn_init,
                        orientation="horizontal")
 
@@ -265,16 +259,22 @@ def plot_butterworth_comparison(signal_x, ideal_f, period, do_norm, dt=None):
 
         if do_norm:
             butter_signal_x = normalize(butter_signal_x)
-
-        if dt is not None:
-            diff_butter_signal_x = (butter_signal_x[1:] - butter_signal_x[:-1]) / dt  # Euler derivative
-            for i, lin in enumerate(line):
-                lin.set_ydata(diff_butter_signal_x[:, i])
+        if time is not None:
+            diff_butter_signal_x = np.stack([np.gradient(butter_signal_x[:, i], time) for i in range(length)], axis=-1)
+            if len(butter_signal_x.shape) == 1:
+                line[0].set_ydata(diff_butter_signal_x)
+            else:
+                for i, lin in enumerate(line):
+                    lin.set_ydata(diff_butter_signal_x[:, i])
         else:
-            for i, lin in enumerate(line):
-                lin.set_ydata(butter_signal_x[:, i])
+            if len(butter_signal_x.shape) == 1:
+                line[0].set_ydata(butter_signal_x)
+            else:
+                for i, lin in enumerate(line):
+                    lin.set_ydata(butter_signal_x[:, i])
         fig.canvas.draw_idle()
 
+    update(1)
     # register the update function with each slider
     n_slider.on_changed(update)
     wn_slider.on_changed(update)
@@ -377,7 +377,7 @@ def residual_video(flight: str, double: bool, norm: bool):
     frame_shape = [1080, 1920, 3]
     dpi = 100
     saving_path = f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}residual_video.mkv'
-    mkdir_if_not_exist([f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}'])
+    mkdir([f'{ANALYSIS_DATA_VIS_EUROC_MAV}{flight}'])
     codec = VideoWriter_fourcc(*'H264')
     video = VideoWriter(saving_path, codec, float(fps), (frame_shape[1], frame_shape[0]), True)  # width, height
     print(f'Video will be saved at : {saving_path}')

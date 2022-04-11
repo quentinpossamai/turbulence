@@ -15,7 +15,7 @@ from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
 from src.drone_models.model_structure import Run
 from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
 import src.utils.layer as layer
-from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
+from src.utils.path import mkdir, ANALYSIS_PATH
 
 
 class VariantA(pl.LightningModule, Run):
@@ -268,7 +268,7 @@ ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_train
 ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
 
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
-mkdir_if_not_exist([SAVING_PATH])
+mkdir([SAVING_PATH])
 
 use_cuda_if_possible = True
 device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
@@ -312,7 +312,7 @@ def main():
     name = residual_model_class.__name__
     version = f'{now}'
     training_path = f'{SAVING_PATH}/{name}/{version}/'
-    mkdir_if_not_exist([training_path])
+    mkdir([training_path])
     pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
     print(f'training_path={training_path}')
     print(f'name={name} | version={version}')

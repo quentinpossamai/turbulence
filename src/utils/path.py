@@ -15,15 +15,14 @@ WD_PATH = os.getcwd() + "/"
 print(f'WD_PATH: {WD_PATH}')
 MODELS_PATH = WD_PATH + "models/"
 ANALYSIS_PATH = WD_PATH + "analysis/"
-ANALYSIS_DATA_VIS_EUROC_MAV = ANALYSIS_PATH + 'data_vis_euroc_mav/'  # euroc_mav.data_vis.py
+ANALYSIS_DATA_VIS_EUROC_MAV = ANALYSIS_PATH + 'data_vis_euroc_mav/'  # euroc_mav.datavis.py
 
 # HABITAT
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 SCENE_PATH = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
 
 
-
-def mkdir_if_not_exist(paths: list):
+def mkdir(paths: list):
     if "steeven" in os.getcwd():
         pass
     else:
@@ -35,7 +34,7 @@ def mkdir_if_not_exist(paths: list):
             pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
 
-mkdir_if_not_exist([MODELS_PATH, ANALYSIS_PATH])
+mkdir([MODELS_PATH, ANALYSIS_PATH])
 
 
 def is_cluster():

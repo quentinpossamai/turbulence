@@ -12,7 +12,7 @@ from typing import Union
 
 # import src.data.euroc_mav.data_vis as data_vis
 from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-from src.utils.paths import WD_PATH, mkdir_if_not_exist
+from src.utils.path import WD_PATH, mkdir
 from src.utils import quaternion
 
 # Path
@@ -21,7 +21,7 @@ RAW_PYTHON_DATASET_PATH = DATASET_PATH + f"raw_python/"
 RAW_DATASET_PATH = DATASET_PATH + f"raw/"
 INTERMEDIATE_DATASET_PATH = DATASET_PATH + f"intermediate/"
 
-mkdir_if_not_exist([DATASET_PATH, RAW_PYTHON_DATASET_PATH, INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
+mkdir([DATASET_PATH, RAW_PYTHON_DATASET_PATH, INTERMEDIATE_DATASET_PATH, RAW_DATASET_PATH])
 
 FLIGHT_LIST = ["V1_01_easy/", "V1_02_medium/", "V1_03_difficult/"]
 # FLIGHT_LIST = ["V2_01_easy/", "V2_02_medium/", "V2_03_difficult/"]

@@ -17,7 +17,7 @@ import os
 from scipy import interpolate
 from tqdm import tqdm
 
-from src.utils.paths import WD_PATH
+from src.utils.path import WD_PATH
 from src.data.euroc_mav.loading import load_flight, FLIGHT_LIST, INTERMEDIATE_DATASET_PATH, TRANS_MEAN
 from src.utils.trajectory import trace_trajectory3d
 import src.utils.quaternion as quaternion

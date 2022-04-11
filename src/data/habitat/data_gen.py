@@ -12,7 +12,7 @@ from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalMo
 from src.data.habitat.generate_reference import generate_reference
 from src.data.habitat.mpc import mpc_controller
 from src.data.habitat.hatbitat2flu import Habitat2FLU
-from src.utils.paths import WD_PATH, mkdir_if_not_exist
+from src.utils.path import WD_PATH, mkdir
 from src.utils.trajectory import trace_trajectory3d
 from src.utils.transform import Transform as Tf
 
@@ -468,7 +468,7 @@ def gen_data(scene_id: Union[str, None], flight_number: int, same_env: bool, plo
     # profiler()
     # Initialise drone
     folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight2/{flight_number}/'
-    mkdir_if_not_exist([folder])
+    mkdir([folder])
 
     drone_width, drone_height = 0.1, 0.025
     volumetric_mass = 200
