@@ -11,6 +11,27 @@ from typing import Dict, Tuple, Any, Union, List
 
 from src.utils.path import WD_PATH
 
+
+def define_drone() -> Dict[str, float]:
+    drone_width, drone_height = 0.1, 0.025
+    volumetric_mass = 200
+    g = 9.81
+    m = volumetric_mass * drone_width ** 2 * drone_height
+    drone_prms = {'width': drone_width,  # [m]
+                  'height': drone_height,  # [m]
+                  'm': m,  # [kg]
+                  'kt': m * g / (4 * 150 ** 2),  #
+                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
+                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
+                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
+                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
+                  'prop_radius': drone_width * 0.1}  # [m]
+    return drone_prms
+
+
+DRONE_PRMS = define_drone()
+
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
 GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
@@ -156,40 +177,6 @@ class HabitatResidualDataset(Dataset):
         return to_return
 
 
-class HabitatNormedDepthDataset(Dataset):
-    def __init__(self):
-        """
-        Len is all the trajectories for all scenes.
-
-        Getitem returns: {
-             'depth': (n, 240, 376), all the depth for the entire trajectory
-
-             'name': scene_number, flight_number}
-        """
-        build_index_valid_flight(False)
-        self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
-
-        self.len = np.sum([1 for scene_traj in self.valid_index.values() for _ in scene_traj.values()])
-        self.path = []
-        i = 0
-        for scene_number, scene_trajectories in self.valid_index.items():
-            for flight_number, traj_len in scene_trajectories.items():
-                self.path.append([scene_number, flight_number])
-                i += 1
-
-    def __len__(self):
-        return self.len
-
-    def __getitem__(self, i):
-        scene_number, flight_number = self.path[i]
-        depth = torch.from_numpy(load_file('depth', scene_number, flight_number))
-        depth_dim = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
-
-        # Divide by 20 because 20 is the ZMAX of CophyLike autoencoder trained on IRS
-        depth_norm = np.clip(depth_dim / 20, 0, 1) * 2 - 1
-        return {'depth': depth_norm, 'name': self.path[i]}
-
-
 def main():
     dataset = HabitatResidualDataset('train', 40, True, False, False, False)
     # dataloader = DataLoader(dataset, batch_size=int(dataset.len), shuffle=False, num_workers=1, pin_memory=True,
@@ -207,7 +194,6 @@ def main():
         for flight_number, len in flight.items():
             num_traj += 1
             num_len += len
-
 
     # from tqdm import tqdm
     # print('Instanciating dataset', flush=True)

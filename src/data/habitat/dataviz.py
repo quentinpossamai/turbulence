@@ -525,7 +525,7 @@ def rmse_model_prediction(name, dataset_name: str):
             fa_gt = batch['ground_force'].cpu().numpy().squeeze()[2] * fa_std + fa_mean
             fa_gt_test = compute_ground_effect(motor, z_gt)
             # if dataset_name == 'habitat':
-                # assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
+            # assert np.isclose(fa_gt, fa_gt_test, atol=1e-8).all()
             fa_hat = compute_ground_effect(motor, z_hat)
             loss = (fa_gt_test - fa_hat) ** 2
             fa_loss[i] = loss
@@ -573,27 +573,12 @@ def observe_generated_traj(scene_number, flight_number):
         print(command)
         raise (FileNotFoundError('Scene is not in local'))
         os.system(command)  # if scene not downloaded
-
-    drone_width, drone_height = 0.1, 0.025
-    volumetric_mass = 200
-    g = 9.81
-    m = volumetric_mass * drone_width ** 2 * drone_height
-    drone_prms = {'width': drone_width,  # [m]
-                  'height': drone_height,  # [m]
-                  'm': m,  # [kg]
-                  'kt': m * g / (4 * 150 ** 2),  #
-                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
-                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
-                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
-                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
-                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
-                  'prop_radius': drone_width * 0.1}  # [m]
-
-    simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
-    simulation.interactive_sim(camera_rgb=True, camera_depth=False, step=1 / 20, tf_follow=tf_follow)
+    simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=habitat.DRONE_PRMS,
+                                     gravity=9.81)
+    simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1 / 20, tf_follow=tf_follow)
 
 
-def histogram():
+def height_fa_histogram():
     dataset = habitat.HabitatResidualDataset('test', 40, False, False, False, False)
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std

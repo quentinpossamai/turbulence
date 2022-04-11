@@ -396,6 +396,9 @@ def main():
                 prog.update()
     pickle.dump(all_data, open(f'{DATASET_PATH}intermediate/data.pkl', 'wb'))
     pickle.dump(all_data, open(f'/Users/quentin/phd/CDC_Observer/Data/Drone/data.pkl', 'wb'))
+    cmd = f'''rsync -rtvP {DATASET_PATH}intermediate/data.pkl 
+              remsto:/storage/Datasets/BlackBird/blackbird/intermediate/data.pkl'''
+    os.system(cmd)
 
 
 if __name__ == '__main__':

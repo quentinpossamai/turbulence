@@ -13,6 +13,18 @@ rsync -rtv --exclude rgb.npy --exclude '*.glb' --exclude '*.navmesh' --exclude '
 rsync -atv --progress --include='*.pkl' --exclude='*' remsto:~/phd/turbulence/ ~/phd/turbulence/
 rsync -atv  --include='*.png' --exclude='*' ./ remsto:~/phd/turbulence/
 
+rsync -avP remsto:~/phd/turbulence/analysis/ ~/phd/turbulence/analysis
+rsync -avP ~/phd/turbulence/analysis remsto:~/phd/turbulence/analysis/
+
+rsync -avP remsto:~/phd/turbulence/models/ ~/phd/turbulence/models
+rsync -avP ~/phd/turbulence/models/ remsto:~/phd/turbulence/models
+
+rsync -avP ~/phd/turbulence/reports/ remsto:~/phd/turbulence/reports
+rsync -avP remsto:~/phd/turbulence/reports/ ~/phd/turbulence/reports
+
+rsync -avP ~/phd/turbulence/data/ remsto:~/phd/turbulence/data
+rsync -avP remsto:~/phd/turbulence/data/ ~/phd/turbulence/data
+
 list=$(find . -regextype posix-egrep -regex ".*.pz")
 for f in $list; do echo $f ; done;
 for f in $list; do echo ${f:0:23}${f:24::} ; done;

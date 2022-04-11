@@ -347,7 +347,8 @@ class Simulation:
         while is_running:
             # 2. Sensors
             rgb_stereo_pair = np.concatenate([obs["left_camera"],
-                                              obs["right_camera"]], axis=1)[..., :3]
+                                              # obs["right_camera"]
+                                              ], axis=1)[..., :3]
             depth_stereo_pair = np.concatenate([obs["left_depth_camera"],
                                                 # obs["right_depth_camera"]
                                                 ], axis=1)
@@ -361,12 +362,17 @@ class Simulation:
             has_collided = self.agent.contact_test()
             # print(f'has_collided: {has_collided}')
 
+            import matplotlib.pyplot as plt
+            plt.title(f'Depth for scene 24 | flight 16 | frame 400')
+            plt.imshow(depth_stereo_pair)
+
+
             # 4-Display and interactivity
             if camera_rgb:
                 cv2.imshow("rgb_stereo_pair", rgb_stereo_pair[..., ::-1])
             if camera_depth:
-                depth_stereo_pair = np.clip(depth_stereo_pair, 0, 10)
-                depth_stereo_pair /= 10.0
+                # depth_stereo_pair = np.clip(depth_stereo_pair, 0, 10)
+                # depth_stereo_pair /= 10.0
                 cv2.imshow("depth_stereo_pair", depth_stereo_pair)
             key_pressed = cv2.waitKey()
 
