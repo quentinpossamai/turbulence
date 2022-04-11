@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pickle
 import torch
+from tqdm import tqdm
 
 import src.data.habitat.loading as habitat
 # from src.drone_models.residual.fine_tuning2 import FineTunning
@@ -26,7 +27,7 @@ def main():
 
     index = habitat.build_index_valid_flight(True)
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
-    for scene_number, traj_dict in index.items():
+    for scene_number, traj_dict in tqdm(index.items()):
         for flight_number, length in traj_dict.items():
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number)).to(device)
             z_gt = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number)).to(device).squeeze()
