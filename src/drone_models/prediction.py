@@ -30,13 +30,13 @@ def main():
     for scene_number, traj_dict in tqdm(index.items()):
         for flight_number, length in traj_dict.items():
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number)).to(device)
-            z_gt = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number)).to(device).squeeze()
+            z_gt = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number)).squeeze()
 
             z_hat = torch.empty(len(z_gt) - past)
             with torch.no_grad():
                 for i in range(past, len(depth_emb)):
-                    z_hat[i - past] = model.forward(depth_emb[i - past: i])
-                z_hat = (z_hat * z_std + z_mean).cpu()
+                    z_hat[i - past] = model.forward(depth_emb[i - past: i]).cpu()
+                z_hat = (z_hat * z_std + z_mean)
                 loss = (z_gt[past:] - z_hat) ** 2
             assert not torch.isnan(z_hat).any()
             pickle.dump([z_hat, loss], open(f'{habitat.DATA_HABITAT_PATH}scene_datasets/mp3d/'
