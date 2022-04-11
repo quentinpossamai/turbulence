@@ -32,7 +32,7 @@ def main():
             depth_emb = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number)).to(device)
             z_gt = torch.from_numpy(habitat.load_file('surface_dist', scene_number, flight_number)).to(device).squeeze()
 
-            z_hat = torch.empty(len(z_gt) - past) * torch.nan
+            z_hat = torch.empty(len(z_gt) - past)
             with torch.no_grad():
                 for i in range(past, len(depth_emb)):
                     z_hat[i - past] = model.forward(depth_emb[i - past: i])
