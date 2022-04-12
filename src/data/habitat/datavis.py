@@ -7,6 +7,7 @@ import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+from typing import List
 
 from src.utils.transform import Transform as Tf
 import src.data.habitat.loading as habitat
@@ -24,36 +25,60 @@ plt.rcParams.update({"text.usetex": False,
 
 
 def plot_fa_law():
-    cap = 0.1
-    mu = 1
-    g = 9.81
     drone_prms = habitat.DRONE_PRMS
 
-    def _apply(_z, _motor):
-        if _z <= np.sqrt(mu) * drone_prms['prop_radius'] / 4:
-            ground_force = cap * drone_prms['m'] * g
+    def _apply(_z, _motor, _mu, _cap, coef):
+        g = 9.81
+        if _z <= np.sqrt(_mu) * drone_prms['prop_radius'] / 4:
+            ground_force = _cap * drone_prms['m'] * g
         else:
-            mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
-            ground_force = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
-                                   a_min=0, a_max=cap * drone_prms['m'] * g)
+            mu_r_z = _mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
+            ground_force = np.clip(coef * np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                   a_min=0, a_max=_cap * drone_prms['m'] * g)
         return ground_force
 
     motor = np.array([150, 150, 150, 150])
-    z = np.linspace(1e-8, 0.4, 1000)
+    z = np.linspace(1e-8, 0.8, 1000)
     fig, ax = plt.subplots(1, 1)
-    mu = 1
-    to_plot = np.array([_apply(e, motor) for e in z])
-    ax.plot(z, to_plot, label=rf'$\mu={mu}$')
-    ax.title('Ground effect')
+
+    from matplotlib.widgets import Slider
+    from matplotlib.lines import Line2D
+
+    mu = 20
+    cap = 0.1
+    coef = 10
+
+    to_plot = np.array([_apply(e, motor, 1, 0.1, 1) for e in z])
+    line: List[Line2D] = ax.plot(z, to_plot, label=rf'Before')
+    to_plot = np.array([_apply(e, motor, mu, cap, coef) for e in z])
+    line: List[Line2D] = ax.plot(z, to_plot, label='After')
+    ax.set_title('Ground effect')
     ax.grid()
     ax.set_ylabel('Ground effect (N)')
     ax.set_xlabel('Surface distance (m)')
     ax.legend()
-    plt.subplots_adjust(left=0.1, bottom=0.09, right=0.99, top=0.95, wspace=0, hspace=0)
 
+    plt.subplots_adjust(left=0.1, bottom=0.19, right=0.99, top=0.95, wspace=0, hspace=0)
 
-    plt
-    # plt.savefig(f'{habitat.WD_PATH}reports/improve/fa_generator.pdf')
+    ax_mu = plt.axes([0.15, 0.06, 0.65, 0.03])
+    mu_slider = Slider(ax=ax_mu, label="mu", valmin=0.01, valmax=20, valinit=mu, orientation="horizontal")
+    ax_cap = plt.axes([0.15, 0.01, 0.65, 0.03])
+    cap_slider = Slider(ax=ax_cap, label="cap", valmin=0, valmax=1, valinit=cap, orientation="horizontal")
+
+    def update(_):
+        mu_val = mu_slider.val
+        cap_val = cap_slider.val
+        _to_plot = np.array([_apply(e, motor, mu_val, cap_val, coef) for e in z])
+        line[0].set_data([z, _to_plot])
+        # ax.set_ylim([-0.003, np.max(_to_plot)])
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
+
+    mu_slider.on_changed(update)
+    cap_slider.on_changed(update)
+    # plt.tight_layout()
+    plt.savefig(f'{habitat.WD_PATH}reports/improve/fa_generator.png')
     plt.show()
 
 
@@ -617,7 +642,7 @@ def observe_traj_pred(scene_number, flight_number):
     ax_z: plt.Axes
 
     if image_mode[0]:
-        line_im2: List[mpl_image.AxesImage] = [ax_im.imshow(im[0])]
+        line_im: List[mpl_image.AxesImage] = [ax_im.imshow(im[0])]
     else:
         line_im: List[mpl_image.AxesImage] = [ax_im.imshow(depth[0], vmax=vmax)]
     line_z_gt: Line2D = ax_z.plot(z_gt, label='z GT')
@@ -684,7 +709,7 @@ def observe_traj_pred(scene_number, flight_number):
     fig.canvas.mpl_connect('key_press_event', on_press)
     fig.canvas.mpl_connect('button_press_event', on_click)
 
-    plt.tight_layout()
+    # plt.tight_layout()
 
     plt.show()
 
