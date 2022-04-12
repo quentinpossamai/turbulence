@@ -32,6 +32,11 @@ def define_drone() -> Dict[str, float]:
 
 DRONE_PRMS = define_drone()
 
+THETA = np.array([DRONE_PRMS['kt'] / DRONE_PRMS['m'],
+                  DRONE_PRMS['kt'] * DRONE_PRMS['l'] / DRONE_PRMS['ix'],
+                  DRONE_PRMS['km'] / DRONE_PRMS['iz'],
+                  DRONE_PRMS['iz'] / DRONE_PRMS['ix']])
+
 DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
 MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
 GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
@@ -49,7 +54,7 @@ FLIGHT = 'flight2'
 def load_file(name: str, scene_number: int, flight_number: int):
     """
     param name: {'stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force', 'depth_emb',
-                 'norm_emb'}
+                 'norm_emb', 'emb_prediction1'}
     param scene_number: In [0, 90]
 
     param flight_number: in Z
@@ -57,9 +62,9 @@ def load_file(name: str, scene_number: int, flight_number: int):
     scene_id = MP3D_SCENE_LIST[scene_number]
     folder = f'{MP3D_DATA}{scene_id}/{FLIGHT}/{flight_number}/'
     assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
-                    'depth_emb', 'norm_emb']
-    if name == 'stats':
-        return pickle.load(open(f'{folder}stats.pkl', 'rb'))
+                    'depth_emb', 'norm_emb', 'emb_prediction1']
+    if name in ['stats', 'emb_prediction1']:
+        return pickle.load(open(f'{folder}{name}.pkl', 'rb'))
     elif name in ['depth_emb', 'norm_emb']:
         return np.load(f'{folder}{name}/{name}.npy', mmap_mode='r', allow_pickle=False)
     else:

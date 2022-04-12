@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import src.data.habitat.dataviz as dataviz
+import src.data.habitat.datavis as dataviz
 
 plt.rcParams.update({"text.usetex": True,
                      "font.family": "serif",

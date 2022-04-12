@@ -1,3 +1,4 @@
+import matplotlib.image
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -23,56 +24,36 @@ plt.rcParams.update({"text.usetex": False,
 
 
 def plot_fa_law():
-    plt.rcParams.update({"text.usetex": True,
-                         "font.family": "serif",
-                         "font.sans-serif": ["Computer Modern Roman"]})
     cap = 0.1
     mu = 1
-    drone_width, drone_height = 0.1, 0.025
-    volumetric_mass = 200
     g = 9.81
-    m = volumetric_mass * drone_width ** 2 * drone_height
-    drone_prms = {'width': drone_width,  # [m]
-                  'height': drone_height,  # [m]
-                  'm': m,  # [kg]
-                  'kt': m * g / (4 * 150 ** 2),  #
-                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
-                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
-                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
-                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
-                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
-                  'prop_radius': drone_width * 0.1}  # [m]
-    theta = np.array([drone_prms['kt'] / drone_prms['m'],
-                      drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
-                      drone_prms['km'] / drone_prms['iz'],
-                      drone_prms['iz'] / drone_prms['ix']])
+    drone_prms = habitat.DRONE_PRMS
 
     def _apply(_z, _motor):
-        ground_force = np.zeros(3)
-        if _z < np.sqrt(mu) * drone_prms['prop_radius'] / 4:
-            ground_force[2] = cap * drone_prms['m'] * g
+        if _z <= np.sqrt(mu) * drone_prms['prop_radius'] / 4:
+            ground_force = cap * drone_prms['m'] * g
         else:
             mu_r_z = mu * (drone_prms['prop_radius'] / (4 * _z)) ** 2
-            ground_force[2] = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
-                                      a_min=0, a_max=cap * drone_prms['m'] * g)
+            ground_force = np.clip(np.sum(_motor ** 2) * drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                   a_min=0, a_max=cap * drone_prms['m'] * g)
         return ground_force
 
-    # # Debug plot
     motor = np.array([150, 150, 150, 150])
-    z = np.linspace(1e-8, 0.1, 1000)
-    plt.rcParams.update({"text.usetex": False,
-                         "font.family": "serif",
-                         "font.sans-serif": ["Computer Modern Roman"]})
-    for mu in [1, 2, 3, 4, 5]:
-        to_plot = np.array([_apply(e, motor) for e in z])[:, 2]
-        plt.plot(z, to_plot, label=f'$\mu={mu}$')
-    plt.title('Ground effect')
-    plt.grid()
-    plt.ylabel('Ground effect (N)')
-    plt.xlabel('Surface distance (m)')
-    plt.legend()
+    z = np.linspace(1e-8, 0.4, 1000)
+    fig, ax = plt.subplots(1, 1)
+    mu = 1
+    to_plot = np.array([_apply(e, motor) for e in z])
+    ax.plot(z, to_plot, label=rf'$\mu={mu}$')
+    ax.title('Ground effect')
+    ax.grid()
+    ax.set_ylabel('Ground effect (N)')
+    ax.set_xlabel('Surface distance (m)')
+    ax.legend()
     plt.subplots_adjust(left=0.1, bottom=0.09, right=0.99, top=0.95, wspace=0, hspace=0)
-    plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/fa_generator.pdf')
+
+
+    plt
+    # plt.savefig(f'{habitat.WD_PATH}reports/improve/fa_generator.pdf')
     plt.show()
 
 
@@ -568,7 +549,8 @@ def observe_generated_traj(scene_number, flight_number):
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
-    command = f'rsync -tv --progress remsto:{cluster_scene_path} {scene_path}'
+    # If scene is not downloaded
+    command = f'rsync -tvP --progress remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
         print(command)
         raise (FileNotFoundError('Scene is not in local'))
@@ -578,7 +560,136 @@ def observe_generated_traj(scene_number, flight_number):
     simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1 / 20, tf_follow=tf_follow)
 
 
-def height_fa_histogram():
+def observe_traj_pred(scene_number, flight_number):
+    index = habitat.build_index_valid_flight(False)
+    assert scene_number in index, 'Scene must have data.'
+    assert flight_number in index[scene_number], 'Trajectory must be valid.'
+
+    if scene_number in habitat.TRAIN:
+        split = 'Train'
+    elif scene_number in habitat.VALID:
+        split = 'Valid'
+    else:
+        assert scene_number in habitat.TEST
+        split = 'Test'
+
+    scene_id = habitat.MP3D_SCENE_LIST[scene_number]
+    scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
+    state = habitat.load_file('state', scene_number, flight_number)
+    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+
+    z_hat_40, loss = habitat.load_file('emb_prediction1', scene_number, flight_number)
+    z_hat_40 = z_hat_40.numpy()
+    past = 40
+    z_gt = habitat.load_file('surface_dist', scene_number, flight_number).squeeze()
+
+    # If scene is not downloaded
+    command = f'rsync -tvP --progress remsto:{cluster_scene_path} {scene_path}'
+    if not os.path.isfile(scene_path):
+        print(command)
+        raise (FileNotFoundError('Scene is not in local'))
+        os.system(command)  # if scene not downloaded
+
+    sim = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=habitat.DRONE_PRMS,
+                              gravity=9.81)
+    from matplotlib.lines import Line2D
+    import matplotlib.image as mpl_image
+    from matplotlib.text import Text
+    # Interactive plot
+    iteration = [0]
+    sim.agent.transformation = tf_follow[iteration[0]]
+    obs = sim.sim.get_sensor_observations(agent_ids=0)
+    im = [obs['left_camera']]
+    depth = [obs['left_depth_camera']]
+    z = [obs['surface_dist'][0]]
+
+    image_mode = [False]
+    vmax = None
+
+    fig, (ax_im, ax_z) = plt.subplots(1, 2, figsize=(12.8, 8))
+    fig: plt.Figure
+    fig.suptitle(f'Scene {scene_number} | flight {flight_number} | split: {split}', fontsize=14)
+
+    ax_im: plt.Axes
+    ax_z: plt.Axes
+
+    if image_mode[0]:
+        line_im2: List[mpl_image.AxesImage] = [ax_im.imshow(im[0])]
+    else:
+        line_im: List[mpl_image.AxesImage] = [ax_im.imshow(depth[0], vmax=vmax)]
+    line_z_gt: Line2D = ax_z.plot(z_gt, label='z GT')
+    line_z_hat: Line2D = ax_z.plot(range(past, len(z_gt)), z_hat_40, label='z hat')
+    line_v: Line2D = ax_z.axvline(iteration[0], c='k')
+
+    ax_z.legend()
+    ax_z.grid()
+    # ax_z.set_ylabel('z')
+    ax_z.set_xlabel('Time (sample #)')
+    title: Text = ax_im.set_title(f'Frame # {iteration[0]}')
+
+    def update_plot():
+        print(f'Frame #: {iteration[0]}')
+        sim.agent.transformation = tf_follow[iteration[0]]
+        # Replace camera
+        s = sim.sim.get_agent(0).state
+        s.sensor_states['surface_dist'].rotation = np.quaternion(np.cos(0.25 * np.pi),
+                                                                 -np.sin(0.25 * np.pi), 0, 0)
+        sim.sim.get_agent(0).set_state(s, False, False)
+
+        obs = sim.sim.get_sensor_observations(agent_ids=0)
+        im[0] = obs['left_camera']
+        depth[0] = obs['left_depth_camera']
+        z[0] = obs['surface_dist'][0]
+        if image_mode[0]:
+            line_im[0].set_data(im[0])
+        else:
+            line_im[0].set_data(depth[0])
+        ax_z.set_xlim([iteration[0] - past, iteration[0] + past])
+        line_v.set_data(([iteration[0], iteration[0]], [0, 1]))
+
+        # ax_im.set_title(f'Frame # {iteration[0]}')
+        title.set_text(f'Frame # {iteration[0]}')
+        fig.canvas.draw()
+
+    def on_press(event):
+        # print('press', event.key)
+        if event.key == 'v':
+            iteration[0] = iteration[0] + 1
+            update_plot()
+        if event.key == 'c':
+            iteration[0] = iteration[0] - 1
+            update_plot()
+        if event.key == 'x':
+            ax_z.set_xlim(0, len(z_gt))
+            fig.canvas.draw()
+        if event.key == 'n':
+            image_mode[0] = not image_mode[0]
+            if image_mode[0]:
+                line_im[0] = ax_im.imshow(im[0])
+                # line_im[0].set_data(im[0])
+            else:
+                line_im[0] = ax_im.imshow(depth[0], vmax=vmax)
+                # line_im[0].set_data(depth[0])
+            fig.canvas.draw()
+
+    def on_click(event):
+        # print('press', event.key)
+        if event.button == 1:  # 1 for left click, 3 for right click,
+            iteration[0] = np.round(event.xdata).astype(int)
+            update_plot()
+
+    fig.canvas.mpl_connect('key_press_event', on_press)
+    fig.canvas.mpl_connect('button_press_event', on_click)
+
+    plt.tight_layout()
+
+    plt.show()
+
+
+def boxplot_pred():
     dataset = habitat.HabitatResidualDataset('test', 40, False, False, False, False)
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
@@ -879,7 +990,7 @@ def predict_good_fa():
 
 
 def main():
-    # plot_fa_law()
+    plot_fa_law()
     # plot_fa()
     # plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
@@ -888,8 +999,9 @@ def main():
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
 
-    observe_generated_traj(24, 16)
-    # histogram()
+    # observe_generated_traj(24, 16)
+    # observe_traj_pred(6, 0)
+    # boxplot_pred()
     # euroc_mav_table()
     # predict_good_fa()
 

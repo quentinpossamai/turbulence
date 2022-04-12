@@ -288,6 +288,7 @@ class Simulation:
                                             viz_navmesh=viz_navmesh)
         self.rigid_obj_mgr.remove_object_by_handle(error_obj_handle, delete_object_node=False)
 
+        # Redefining real agent
         self.agent = self.rigid_obj_mgr.add_object_by_template_handle('my_cube', self.sim.agents[0].scene_node,
                                                                       light_setup_key='0')
 
@@ -366,7 +367,6 @@ class Simulation:
             plt.title(f'Depth for scene 24 | flight 16 | frame 400')
             plt.imshow(depth_stereo_pair)
 
-
             # 4-Display and interactivity
             if camera_rgb:
                 cv2.imshow("rgb_stereo_pair", rgb_stereo_pair[..., ::-1])
@@ -444,8 +444,7 @@ class Simulation:
         else:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
             # TODO change from body to fixe in quadrotor
-            # TODO include np.sum(motor ** 2) !!
-            ground_force[2] = np.clip(np.sum(motor) ** 2 * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+            ground_force[2] = np.clip(np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                       a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
         return np.concatenate([ground_force, np.zeros(3)])
 

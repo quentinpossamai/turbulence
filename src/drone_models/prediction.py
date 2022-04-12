@@ -42,6 +42,8 @@ def main():
             pickle.dump([z_hat, loss], open(f'{habitat.DATA_HABITAT_PATH}scene_datasets/mp3d/'
                                             f'{habitat.MP3D_SCENE_LIST[scene_number]}/flight2/{flight_number}/'
                                             f'emb_prediction1.pkl', 'wb'))
+            plt.plot(z_gt, label='gt')
+            plt.plot(range(past, len(z_gt)), z_hat, label='hat')
 
 
 if __name__ == '__main__':

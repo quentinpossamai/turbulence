@@ -15,7 +15,7 @@ matplotlib.use('TKAgg')
 
 
 def gen_video_habitat():
-    import src.data.habitat.dataviz as dataviz
+    import src.data.habitat.datavis as dataviz
     # rgb1, z1, z1_hat = dataviz.get_image_from_generated_traj(9, 0, np.arange(40, 450))
     # rgb2, z2, z2_hat = dataviz.get_image_from_generated_traj(2, 14, np.arange(40, 250))
     # rgb3, z3, z3_hat = dataviz.get_image_from_generated_traj(6, 0, np.arange(400, 600))
@@ -106,7 +106,7 @@ def gen_video_euroc():
 
 
 def gen_video_habitat_gru():
-    import src.data.habitat.dataviz as dataviz
+    import src.data.habitat.datavis as dataviz
     orga_path = f'{paths.WD_PATH}reports/IROS_01_03_2022/graphics/'
     # rgb, _, _ = dataviz.get_image_from_generated_traj(24, 16, np.arange(140, 200))
     # pickle.dump(rgb, open(f'{dataviz.habitat.WD_PATH}data/habitat/video_gru.pkl', 'wb'))
