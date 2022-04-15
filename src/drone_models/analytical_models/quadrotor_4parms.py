@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Union, Dict, Any
+from typing import Union, Dict, Any, List
 
 import src.utils.quaternion as quaternion
 from src.drone_models.model_structure import Run
@@ -260,64 +260,76 @@ class TorchDynamicalModel(nn.Module, Run):
         return error.mean(), error.reshape(pred_shape), prediction.reshape(pred_shape)
 
 
-class NumpyDynamicalModel:
-    def __init__(self, param: Union[str, Dict[str, Any]], dtype, g: float):
-        """
-        param: "paper", "identification", or dict["permutation", "theta"]
-        theta = np.array([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
+# theta = [kt / m, kt * l / ix, km / iz, iz / ix]
 
-        dtype: Datatype of the model. Can be numpy types.
+# Parameter from blackbird paper
+THETA_BLACKBIRD_PAPER = {'theta': np.array([2.08e-6, 2 ** 0.5 * 3.58e-6, 3.77e-8, 1.40]),
+                         'permutation': [1, 0, 3, 2]}
+# Parameter from blackbird identification
+THETA_BLACKBIRD_IDENTIFICATION = {'theta': np.array([2.1019e-06, 2 ** 0.5 * 4.2478e-06, 2.1783e-06, 2.3617e-01]),
+                                  'permutation': [1, 0, 3, 2]}
+
+
+class DynamicalModel:
+    def __init__(self, param: Dict[str, Any], dtype, g: float, device=None):
+        """
+        param: dict["permutation", "theta"].
+
+        theta = np.array([[kt / m], [kt * l / ix], [km / iz], [iz / ix]]).
+
+        dtype: Datatype of the model. np.float32, np.float64, torch.float32, or torch.float64.
+
+        device: If using dtype torch, the device of the tensor.
         """
         super().__init__()
         self.motor_size = 4
+
+        # Definition of functions depending on the packaged used.
+        if dtype in [torch.float32, torch.float64]:
+            self.torch_mode = True
+            self.farray = lambda x: torch.tensor(x, dtype=self.dtype, device=device)
+            self.fzeros = lambda x: torch.zeros(x, dtype=dtype, device=device)
+            self.fcat = lambda x, dim: torch.cat(x, dim=dim)
+            self.fqrot = lambda q, v: quaternion.qrot(q, v)
+            self.fqmul = lambda q, r: quaternion.qmul(q, r)
+            self.fcross = lambda a, b, dim: torch.cross(a, b, dim=dim)
+            self.fnorm = lambda x: torch.norm(x, dim=-1)
+        else:
+            self.torch_mode = False
+            self.farray = lambda x: np.array(x, dtype=self.dtype)
+            self.fzeros = lambda x: np.zeros(x, dtype=dtype)
+            self.fcat = lambda x, dim: np.concatenate(x, axis=dim)
+            self.fqrot = lambda q, v: quaternion.qrot_np(q, v)
+            self.fqmul = lambda q, r: quaternion.qmul_np(q, r)
+            self.fcross = lambda a, b, dim: np.cross(a, b, axis=dim)
+            self.fnorm = lambda x: np.linalg.norm(x, axis=-1)
+
         self.dtype = dtype
+        self.g = self.farray([0, 0, g])
 
         msg = '''"paper", "identification", or dict["permutation", "theta"]'''
         assert param in ["paper", "identification"] or \
                all([key in ["permutation", "theta"] for key in list(param.keys())]), msg
 
-        self.permutation = [1, 0, 3, 2]
-        if param == "paper":
-            # # Paper parameters from
-            # # Achtelik, M. et al. (2012) ‘Design of a Multi Rotor MAV with regard to Efficiency, Dynamics and
-            # Redundancy’
-            # m = 0.64
-            # # From Akkinapalli et al. ‘Attitude Control of a Multicopter Using L1 Augmented Quaternion Based
-            # Backstepping’
-            # ix = 10.007e-3  # [kg.m2]
-            # iy = 10.2335e-3  # [kg.m2]  # Hypothesis ix == iy nearly confirmed
-            # iz = 8.1e-3  # [kg.m2]
-            # kt = 6.546e-6  # [N.s2.rad-1]
-            # km = 1.2864e-7  # [N.m2.rad-1]
-            # l = 0.215  # [m]
-            # theta = torch.tensor([[kt / m], [kt * l / ix], [km / iz], [iz / ix]])
-            self.theta = np.array([2.08e-6,
-                                   2 ** 0.5 * 3.58e-6,
-                                   3.77e-8,
-                                   1.40], dtype=self.dtype)  # Parameter from blackbird paper
-        elif param == "identification":
-            self.theta = np.array([2.1019e-06,  # kt / m
-                                   2 ** 0.5 * 4.2478e-06,  # kt l / Ix
-                                   2.1783e-06,  # km / Iz
-                                   2.3617e-01], dtype=self.dtype)  # Iz / Ix MSE results
-        else:
-            self.theta = param["theta"]
-            self.permutation = param["permutation"]
-        self.g = np.array([0, 0, g], dtype=self.dtype)
-        self.t3_tensor = np.array([1, 1, self.theta[3]], dtype=self.dtype)
-        self.t12_tensor = np.array([self.theta[1], self.theta[1], self.theta[2]], dtype=self.dtype)
+        self.theta = param["theta"]
+        assert self.theta.dtype == self.dtype
 
-        a = 1 / 2 ** 0.5
-        self.motor_matrix = np.array([[-a, +a, +a, -a],
-                                      [-a, -a, +a, +a],
-                                      [-1, +1, -1, +1],
-                                      [+1, +1, +1, +1]], dtype=self.dtype)
+        self.permutation: List = param["permutation"]
 
-    def forward(self, **kwargs):
+        self.t3_tensor = self.farray([1, 1, self.theta[3]])
+        self.t12_tensor = self.farray([self.theta[1], self.theta[1], self.theta[2]])
+
+        c = 1 / 2 ** 0.5
+        self.motor_matrix = self.farray([[-c, +c, +c, -c],
+                                         [-c, -c, +c, +c],
+                                         [-1, +1, -1, +1],
+                                         [+1, +1, +1, +1]])
+
+    def forward(self, **kwargs) -> Union[torch.tensor, np.ndarray]:
         """
         kwargs: motor: (self.motor_size). t+1
 
-        kwargs: state: (13). t
+        kwargs: state: (19). t
 
         kwargs: dt: (1). t+1 - t
 
@@ -325,41 +337,47 @@ class NumpyDynamicalModel:
 
         :return: (13). next_state t+1
         """
-        # 1.-Input processing
         motor = kwargs['motor']
         state = kwargs['state']
         dt = kwargs['dt']
+
+        pos = state[..., 0:3]
+        quat = state[..., 3:7]
+        lin_vel = state[..., 7:10]
+        ang_vel = state[..., 10:13]
+        lin_acc = state[..., 13:16]
+        ang_acc = state[..., 16:19]
+
         residual = kwargs['residual'] if 'residual' in kwargs else None
         if residual is None:
-            kfa = np.zeros(3)
-            ktaua = np.zeros(3)
+            kfa = self.fzeros(pos.shape)
+            ktaua = self.fzeros(pos.shape)
         else:
-            kfa = residual[:3]
-            ktaua = residual[3:]
-        # Input processing end
-        pos, quat, lin_vel, ang_vel = state[:3], state[3:7], state[7:10], state[10:]
+            kfa = residual[..., :3]
+            ktaua = residual[..., 3:]
 
         motor_torsor = self.motor_dynamic(motor)  # shape = (4)
 
         # Linear PFD
-        thrust = np.concatenate([np.zeros(2), motor_torsor[3:]])
-        next_lin_vel = lin_vel + dt * (quaternion.qrot_np(quat, self.theta[0] * thrust + kfa) - self.g)
+        thrust = self.fcat([self.fzeros(2), motor_torsor[3:]], -1)
+        next_lin_acc = (self.fqrot(quat, self.theta[0] * thrust + kfa) - self.g)   # in fixed
+        next_lin_vel = lin_vel + dt * (lin_acc + next_lin_acc) / 2  # in fixed
 
         # Position
-        next_pos = pos + dt * next_lin_vel
+        next_pos = pos + dt * (lin_vel + next_lin_vel) / 2
 
         # Angular PFD
-        next_ang_vel = ang_vel + dt * (np.cross(self.t3_tensor * ang_vel, ang_vel, axis=0)
-                                       + self.t12_tensor * motor_torsor[:3]
-                                       + ktaua)
+        next_ang_acc = (self.fcross(self.t3_tensor * ang_vel, ang_vel, dim=-1)  # in body
+                        + self.t12_tensor * motor_torsor[:3]
+                        + ktaua)
+        next_ang_vel = ang_vel + dt * (ang_acc + next_ang_acc) / 2  # in body
 
         # Quat
-        next_quat = quat + dt * 0.5 * quaternion.qmul_np(quat, np.concatenate([next_ang_vel,
-                                                                               np.zeros(1, dtype=self.dtype)],
-                                                                              axis=0))
-        next_quat = next_quat / np.linalg.norm(next_quat)
+        next_quat = quat + dt * 0.5 * self.fqmul(quat, self.fcat([(ang_vel + next_ang_vel) / 2,
+                                                                  self.fzeros(1)], dim=-1))
+        next_quat = next_quat / self.fnorm(next_quat)
 
-        return np.concatenate([next_pos, next_quat, next_lin_vel, next_ang_vel], axis=0)
+        return self.fcat([next_pos, next_quat, next_lin_vel, next_ang_vel, next_lin_acc, next_ang_acc], dim=-1)
 
     def motor_dynamic(self, motor: np.ndarray):
         """
@@ -400,33 +418,42 @@ def _test1():
 
 
 def _test2():
-    dtype = torch.float64
-    batch_size = 1000
+    import src.data.habitat.loading as habitat
+    device = 'cpu'
+    for dtype in [np.float32, np.float64, torch.float32, torch.float64]:
+        batch_size = 1000
 
-    model_torch = TorchDynamicalModel(param='identification', dtype=dtype)
-    model_np = NumpyDynamicalModel(param='identification', dtype=float)
+        if dtype in [torch.float32, torch.float64]:
+            theta = torch.from_numpy(habitat.THETA).type(dtype)
+        else:
+            theta = habitat.THETA.astype(dtype)
+        param = {'theta': theta, 'permutation': [0, 1, 2, 3]}
+        model = DynamicalModel(param=param, dtype=dtype, g=9.81, device=device)
+        # model_old = TorchDynamicalModel(param=param, dtype=dtype)
 
-    for i in range(batch_size):
-        state = np.random.randn(13)
-        state[3:7] = state[3:7] / np.linalg.norm(state[3:7])
-        motor = np.random.randn(4)
-        dt = 1 / 20
+        for i in range(batch_size):
+            state = np.random.randn(19)
+            state[3:7] = state[3:7] / np.linalg.norm(state[3:7])
+            motor = np.random.randn(4)
+            dt = 1 / 20
 
-        # Test forward
-        next_state_np = model_np.forward(motor=motor, state=state, dt=dt)
-        next_state_torch = model_torch.forward(motor=torch.from_numpy(motor),
-                                               state=torch.from_numpy(state),
-                                               dt=torch.tensor([dt], dtype=dtype)).numpy()
-        assert np.all(np.isclose(next_state_np, next_state_torch))
+            # Test forward
+            if dtype in [torch.float32, torch.float64]:
+                next_state = model.forward(motor=torch.from_numpy(motor).type(dtype),
+                                           state=torch.from_numpy(state).type(dtype), dt=dt).numpy()
+            else:
+                next_state = model.forward(motor=motor, state=state, dt=dt)
 
-        # Test motor_dynamic
-        motor_torsor_torch = model_torch.motor_dynamic(torch.from_numpy(motor)).numpy()
-        motor_torsor_np = model_np.motor_dynamic(motor)
-        assert np.all(np.isclose(motor_torsor_np, motor_torsor_torch))
+            # model_old.forward(motor=motor, state=state, dt=dt)
+            #
+            # Test motor_dynamic
+            # motor_torsor_torch = model_torch.motor_dynamic(torch.from_numpy(motor)).numpy()
+            # motor_torsor_np = model_np.motor_dynamic(motor)
+            # assert np.all(np.isclose(motor_torsor_np, motor_torsor_torch))
 
 
 def main():
-    _test1()
+    # _test1()
     _test2()
 
 

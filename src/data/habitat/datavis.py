@@ -14,7 +14,7 @@ import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
 import src.data.habitat.data_gen as data_gen
 import src.data.habitat.hatbitat2flu as hatbitat2flu
-from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
+from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
 
@@ -170,7 +170,7 @@ def plot_model_prediction(name):
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']])
-    uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
+    uav_model = DynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
     from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
     path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
@@ -362,7 +362,7 @@ def rmse_model_prediction(name, dataset_name: str):
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']])
-    uav_model = NumpyDynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
+    uav_model = DynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
     if name == 'nogru':
         from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
@@ -1015,7 +1015,7 @@ def predict_good_fa():
 
 
 def main():
-    plot_fa_law()
+    # plot_fa_law()
     # plot_fa()
     # plot_model_prediction('emb')
     # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
@@ -1025,7 +1025,7 @@ def main():
     #     rmse_model_prediction(e, 'euroc_mav')
 
     # observe_generated_traj(24, 16)
-    # observe_traj_pred(6, 0)
+    observe_traj_pred(9, 0)
     # boxplot_pred()
     # euroc_mav_table()
     # predict_good_fa()

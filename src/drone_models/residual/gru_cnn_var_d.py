@@ -18,7 +18,7 @@ import wandb
 import src.utils.layer as layer
 from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
 from src.drone_models.model_structure import Run
-from src.drone_models.analytical_models.quadrotor_4parms import NumpyDynamicalModel
+from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
 from src.utils.path import mkdir, ANALYSIS_PATH
 
 
@@ -338,7 +338,7 @@ def main():
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']], dtype=np.float32)
-    quadrotor = NumpyDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
+    quadrotor = DynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
 
     run = residual_model_class(activation=args.activation,
                                embedding=args.embedding,

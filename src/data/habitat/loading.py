@@ -31,7 +31,7 @@ def define_drone() -> Dict[str, float]:
 
 
 DRONE_PRMS = define_drone()
-
+g = 9.81
 THETA = np.array([DRONE_PRMS['kt'] / DRONE_PRMS['m'],
                   DRONE_PRMS['kt'] * DRONE_PRMS['l'] / DRONE_PRMS['ix'],
                   DRONE_PRMS['km'] / DRONE_PRMS['iz'],
