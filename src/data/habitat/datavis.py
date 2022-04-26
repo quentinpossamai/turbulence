@@ -854,7 +854,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()[idx]
 
-    command = f'rsync -tv --progress remsto:{cluster_scene_path} {scene_path}'
+    command = f'rsync -Ptv  remsto:{cluster_scene_path} {scene_path}'
     if not os.path.isfile(scene_path):
         print(command)
         raise (FileNotFoundError('Scene is not in local'))

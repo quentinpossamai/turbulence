@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 import magnum
 import numpy as np
+import plotly.graph_objects as go
+import plotly.express as px
 from scipy.interpolate import splev, splrep
 import sys
 from tqdm import tqdm
@@ -13,24 +15,98 @@ from typing import Union, Dict
 from src.data.habitat.hatbitat2flu import Habitat2FLU
 from src.utils.transform import Transform, Rotation
 
-# habitat agent and global reference frame are oriented with x-left, y-up and z-backward.
-TF_AGENT__AGENT_FLU = Transform.from_euler_trans(seq='xyz', angles=np.array([-90, 90, 0]), degrees=True,
-                                                 trans=np.zeros(3)).as_matrix()
-TF_AGENT_FLU__AGENT = Transform.from_matrix(TF_AGENT__AGENT_FLU).inv().as_matrix()
+matplotlib.use('Qt5Agg')
+# matplotlib.use('MacOSX')
+# matplotlib.use('TkAgg')
+# matplotlib.use('Qt4Agg')
 
 
-# NOTATION
-# AGENT is the drone body in habitat
-# AGENT_FLU is AGENT but turned in FLU forward left up
-# GLOBAL_FLU is the habitat earth reference frame but turned in flu
-# GLOBAL is the habitat earth reference frame
-
-
-def display_topdown(sim, navmesh_settings_dict, point=None, travel_order=None, entire_path=None):
+def display_topdown(sim, navset_dict):
     navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
-    for key, val in navmesh_settings_dict.items():
+    # for key, val in navset_dict.items():
+    #     setattr(navmesh_settings, key, val)
+    # sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+
+    # Display
+    resolution = 0.05
+    h = sim.get_agent(0).state.position[1]
+    h = 0.134
+    topdown = sim.pathfinder.get_topdown_view(resolution, h)
+    # low, high = sim.pathfinder.get_bounds()
+    # img = np.zeros(list(topdown.shape) + [3], dtype=np.uint8)
+    # img[topdown] = np.array([255, 255, 255], dtype=np.uint8)
+    print(topdown.shape)
+
+    fig, ax = plt.subplots(1, 1, figsize=(13.2, 8), dpi=100)
+    fig: plt.Figure
+    ax: plt.Axes
+    ax.set_title(f'resolution: {resolution} | cell_size: {navset_dict["cell_size"]} |'
+                 f'')
+    ax_img = ax.imshow(topdown, animated=True, cmap='gray')
+    ax.axis('off')
+    plt.subplots_adjust(left=0.01, bottom=0.01, right=0.8, top=0.99)
+    ax_height = plt.axes([0.06, 1 - 0.1, 0.7, 0.02], facecolor='lightgoldenrodyellow')  # left, bottom, width, height
+    h_slider = Slider(ax=ax_height,
+                      label="Height",
+                      valmin=0,
+                      valmax=1.5,
+                      valinit=h,
+                      orientation="horizontal")
+
+    # The function to be called anytime a slider's value changes
+    def _update(_):
+        print(f'h_slider.val: {h_slider.val}', flush=True)
+        _topdown = sim.pathfinder.get_topdown_view(resolution, h_slider.val)
+        # _low, _high = sim.pathfinder.get_bounds()
+        # _img = np.zeros(list(_topdown.shape) + [3], dtype=np.uint8)
+        # _img[_topdown] = np.array([255, 255, 255], dtype=np.uint8)
+        # fig.canvas.restore_region(bg)
+        ax_img.set_data(_topdown)
+        ax.draw_artist(ax_img)
+        fig.canvas.update()  # only usable with Qt5Agg backend
+        # fig.canvas.blit(fig.bbox)
+        fig.canvas.flush_events()
+        print(f'Update done' + 2 * '\n', flush=True)
+
+    def _update_text_box(expression, a):
+        if expression in ['True', 'False']:
+            _val = bool(expression)
+        else:
+            _val = float(expression)
+        print(f'New value: {a} {expression}')
+        setattr(navmesh_settings, a, _val)
+        sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+        _update(None)
+
+    from matplotlib.widgets import TextBox
+    box_axs = []
+    text_boxs = []
+    i = 11
+    for j in list(range(i)) + list(range(i + 1, 16)):
+        key = list(navset_dict.keys())[j]
+        key = (key + '.')[:-1]
+        val = navset_dict[key]
+        # ax_text: plt.Axes = plt.axes([0.96, 1 - 0.05 - 0.05 * j, 0.03, 0.04])  # [left, bottom, width, height]
+        # ax_text.text(0, 0, f'{key}={val}')
+        plt.annotate(f'{key}={val}', [0.8, 1 - 0.05 - 0.05 * j], xycoords='figure fraction', fontsize=10)
+    key = list(navset_dict.keys())[i]
+    key = (key + '.')[:-1]
+    val = navset_dict[key]
+    ax_text = plt.axes([0.96, 1 - 0.05 - 0.05 * i, 0.03, 0.04])  # [left, bottom, width, height]
+    text_boxs.append(TextBox(ax_text, key, val))
+    text_boxs[-1].on_submit(lambda x: _update_text_box(x, key))
+
+    # register the update function with each slider
+    h_slider.on_changed(_update)
+    plt.show()
+
+
+def display_topdown_plotly(sim, navset_dict):
+    navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
+    for key, val in navset_dict.items():
         setattr(navmesh_settings, key, val)
     sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+
     # Display
     resolution = 0.03
     h = sim.get_agent(0).state.position[1]
@@ -39,37 +115,39 @@ def display_topdown(sim, navmesh_settings_dict, point=None, travel_order=None, e
     img = np.zeros(list(topdown.shape) + [3], dtype=np.uint8)
     img[topdown] = np.array([255, 255, 255], dtype=np.uint8)
 
-    # Place points on image
-    if point is not None:
-        point_img = ((point - low) / resolution).astype(int)
-        img[point_img[:, 2], point_img[:, 0]] = np.array([255, 0, 0], dtype=np.uint8)
+    from src.display import DashFig
+    fig_server = DashFig()
+    fig = px.imshow(topdown)
+    fig_server.create_fig(fig, 'Top-down view')
 
-    fig, ax = plt.subplots(1, 1, figsize=(13.2, 8), dpi=100)
-    ax_img = ax.imshow(img)
-    if point is not None:
-        for i, order in enumerate(travel_order[:-1]):
-            ax.text(point_img[order, 0], point_img[order, 2], s=f'{i}', c='r')
+    # The function to be called anytime a slider's value changes
+    def _update(_):
+        print(f'h_slider.val: {h_slider.val}')
+        _topdown = sim.pathfinder.get_topdown_view(resolution, h_slider.val)
+        _low, _high = sim.pathfinder.get_bounds()
+        _img = np.zeros(list(_topdown.shape) + [3], dtype=np.uint8)
+        _img[_topdown] = np.array([255, 255, 255], dtype=np.uint8)
+        ax_img.set_data(_img)
+        fig.canvas.draw()
+        print(f'Update done' + 2 * '\n')
 
-        # Place trajectory on image
-        entire_path_img = ((entire_path - low) / resolution).astype(int)
-        for ind, _ in enumerate(entire_path_img[:-1]):
-            plt.plot(entire_path_img[ind:ind + 2, 0], entire_path_img[ind:ind + 2, 2], c='g')
+    def _update_text_box(expression, a):
+        if expression in ['True', 'False']:
+            _val = bool(expression)
+        else:
+            _val = float(expression)
+        print(f'New value: {a} {expression}')
+        setattr(navmesh_settings, a, _val)
+        sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+        _update(None)
 
-    axcolor = 'lightgoldenrodyellow'
-    ax_wn = plt.axes([0.05, 0.1, 0.0225, 0.83], facecolor=axcolor)
-    h_slider = Slider(ax=ax_wn,
-                      label="Height",
-                      valmin=0,
-                      valmax=1.5,
-                      valinit=0,
-                      orientation="vertical")
-
-    plt.subplots_adjust(left=0.05, bottom=0.05, right=0.8, top=0.95)
-
-    def _update_text_box(expression):
-        print()
-        for key, val in navmesh_settings_dict.items():
-            setattr(navmesh_settings, key, val)
+    def update_text_box2(expression):
+        if expression in ['True', 'False']:
+            _val = bool(expression)
+        else:
+            _val = float(expression)
+        print(f'New value: agent_height {expression}')
+        setattr(navmesh_settings, 'agent_height', _val)
         sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
         _update(None)
 
@@ -77,23 +155,13 @@ def display_topdown(sim, navmesh_settings_dict, point=None, travel_order=None, e
     from matplotlib.text import Text
     box_axs = []
     text_boxs = []
-    for i, (key, val) in enumerate(navmesh_settings_dict.items()):
-        box_axs.append(plt.axes([0.8, 1 - 0.1 - 0.05 * i, 0.1, 0.075]))  # [left, bottom, width, height]
+    for i, (key, val) in enumerate(navset_dict.items()):
+        box_axs.append(plt.axes([0.96, 1 - 0.05 - 0.05 * i, 0.03, 0.04]))  # [left, bottom, width, height]
         text_boxs.append(TextBox(box_axs[-1], key, val))
-        text_boxs[-1].on_submit(_update_text_box)
-
-    # The function to be called anytime a slider's value changes
-    def _update(_):
-        print(h_slider.val)
-        _topdown = sim.pathfinder.get_topdown_view(resolution, h_slider.val)
-        _low, _high = sim.pathfinder.get_bounds()
-        _img = np.zeros(list(_topdown.shape) + [3], dtype=np.uint8)
-        _img[_topdown] = np.array([255, 255, 255], dtype=np.uint8)
-        if point is not None:
-            jj, _, ii = ((point - _low) / resolution).astype(int).T
-            _img[ii, jj] = np.array([255, 0, 0], dtype=np.uint8)
-        ax_img.set_data(_img)
-        fig.canvas.draw_idle()
+        if i == 0:
+            text_boxs[-1].on_submit(update_text_box2)
+        else:
+            text_boxs[-1].on_submit(lambda x: _update_text_box(x, key))
 
     # register the update function with each slider
     h_slider.on_changed(_update)

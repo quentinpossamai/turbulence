@@ -189,7 +189,7 @@ def main():
     a = dataset[0]
     print()
 
-    index = build_index_valid_flight()
+    index = build_index_valid_flight(False)
     num_traj = 0
     num_not_empty = 0
     num_len = 0
