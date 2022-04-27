@@ -101,93 +101,20 @@ def display_topdown(sim, navset_dict):
     plt.show()
 
 
-def display_topdown_plotly(sim, navset_dict):
-    navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
-    for key, val in navset_dict.items():
-        setattr(navmesh_settings, key, val)
-    sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
-
-    # Display
-    resolution = 0.03
-    h = sim.get_agent(0).state.position[1]
-    topdown = sim.pathfinder.get_topdown_view(resolution, h)
-    low, high = sim.pathfinder.get_bounds()
-    img = np.zeros(list(topdown.shape) + [3], dtype=np.uint8)
-    img[topdown] = np.array([255, 255, 255], dtype=np.uint8)
-
-    from src.display import DashFig
-    fig_server = DashFig()
-    fig = px.imshow(topdown)
-    fig_server.create_fig(fig, 'Top-down view')
-
-    # The function to be called anytime a slider's value changes
-    def _update(_):
-        print(f'h_slider.val: {h_slider.val}')
-        _topdown = sim.pathfinder.get_topdown_view(resolution, h_slider.val)
-        _low, _high = sim.pathfinder.get_bounds()
-        _img = np.zeros(list(_topdown.shape) + [3], dtype=np.uint8)
-        _img[_topdown] = np.array([255, 255, 255], dtype=np.uint8)
-        ax_img.set_data(_img)
-        fig.canvas.draw()
-        print(f'Update done' + 2 * '\n')
-
-    def _update_text_box(expression, a):
-        if expression in ['True', 'False']:
-            _val = bool(expression)
-        else:
-            _val = float(expression)
-        print(f'New value: {a} {expression}')
-        setattr(navmesh_settings, a, _val)
-        sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
-        _update(None)
-
-    def update_text_box2(expression):
-        if expression in ['True', 'False']:
-            _val = bool(expression)
-        else:
-            _val = float(expression)
-        print(f'New value: agent_height {expression}')
-        setattr(navmesh_settings, 'agent_height', _val)
-        sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
-        _update(None)
-
-    from matplotlib.widgets import TextBox
-    from matplotlib.text import Text
-    box_axs = []
-    text_boxs = []
-    for i, (key, val) in enumerate(navset_dict.items()):
-        box_axs.append(plt.axes([0.96, 1 - 0.05 - 0.05 * i, 0.03, 0.04]))  # [left, bottom, width, height]
-        text_boxs.append(TextBox(box_axs[-1], key, val))
-        if i == 0:
-            text_boxs[-1].on_submit(update_text_box2)
-        else:
-            text_boxs[-1].on_submit(lambda x: _update_text_box(x, key))
-
-    # register the update function with each slider
-    h_slider.on_changed(_update)
-    plt.show()
-
-
 def generate_reference(sim: habitat_sim.Simulator,
                        rigid_object: habitat_sim.physics.ManagedRigidObject,
                        uniform_speed: float,
                        navmesh_settings_dict: Dict['str', Union[bool, float]],
                        flight_height: float,
                        dt: float,
-                       seed: int,
                        viz_navmesh: bool) -> Union[np.ndarray, bool]:
     # Recomputing the navmesh
-
     sim.navmesh_visualization = viz_navmesh
 
     display_topdown(sim, navmesh_settings_dict)
 
     # Generate 10 random points from the navigable space
     point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
-    # import pickle
-    # from src.utils.paths import WD_PATH, DATA_HABITAT_PATH
-    # point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))
-    # pickle.dump(point, open(f'{DATA_HABITAT_PATH}point.pkl', 'wb'))
 
     # Find the geodesic shortest path between those points
     shortest_path = []

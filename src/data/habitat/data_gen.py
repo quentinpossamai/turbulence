@@ -291,7 +291,6 @@ class Simulation:
                                             navmesh_settings_dict=navmesh_settings_dict,
                                             flight_height=0.1,
                                             dt=dt,
-                                            seed=seed,
                                             viz_navmesh=viz_navmesh)
         self.state_ref = np.concatenate([self.state_ref, np.zeros(len(self.state_ref), 6)], axis=-1)
         self.rigid_obj_mgr.remove_object_by_handle(error_obj_handle, delete_object_node=False)
