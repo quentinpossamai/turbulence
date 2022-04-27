@@ -5,24 +5,6 @@ from typing import Callable
 from src.utils.transform import Transform, Rotation
 
 
-# class LossLog:
-#     def __init__(self):
-#         self.position_loss = []
-#         self.yaw_loss = []
-#         self.angular_speed_loss = []
-#         self.yaw_ref = []
-#
-#     def log(self, position_loss, yaw_loss, angular_speed_loss, yaw_ref):
-#         self.position_loss.append(position_loss)
-#         self.yaw_loss.append(yaw_loss)
-#         self.angular_speed_loss.append(angular_speed_loss)
-#         self.yaw_ref.append(yaw_ref)
-#
-#
-# LOSS_LOGGER = LossLog()
-# MODEL: Callable = None
-
-
 def mpc_controller(model: Callable,
                    state_ref: np.ndarray,
                    state0: np.ndarray,

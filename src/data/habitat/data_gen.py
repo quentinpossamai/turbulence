@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 import src.data.habitat.loading as habitat
 from src.data.habitat.generate_reference_2 import generate_reference
-from src.data.habitat.hatbitat2flu import Habitat2FLU
+from src.data.habitat.hatbitat2flu import Habitat2FLUACC
 from src.data.habitat.mpc import mpc_controller
 from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
 from src.utils.path import WD_PATH, mkdir
@@ -20,7 +20,7 @@ from src.utils.trajectory import trace_trajectory3d
 from src.utils.transform import Transform as Tf
 
 DTYPE = np.float32
-MISSING_DATA = [7, 8, 18, 21, 22, 23, 30, 37, 39, 41, 50, 52, 53, 61, 62, 71, 73, 76, 77, 79, 81, 82]
+SCENE_NUMBER_MISSING_DATA = [7, 8, 18, 21, 22, 23, 30, 37, 39, 41, 50, 52, 53, 61, 62, 71, 73, 76, 77, 79, 81, 82]
 
 # NOTATION
 # AGENT is the drone body in habitat convention
@@ -220,42 +220,59 @@ class Simulation:
                                         g=self.g)
         self.sim: habitat_sim.simulator.Simulator = sim
 
-    def generate_reference_procedurally(self, uniform_speed: float, manual_ref: bool, dt: float, seed: int,
-                                        viz_navmesh: bool):
+        self.optimal_navmesh = {'agent_height': 0.4,  # 1.5
+                                'agent_max_climb': 2.0,  # 0.2
+                                'agent_max_slope': 90.0,  # 45.0
+                                'agent_radius': 0.2,  # 0.1
+                                'cell_height': 0.01,  # 0.2
+                                'cell_size': 0.01,  # 0.05
+                                'detail_sample_dist': 1.0,  # 6.0
+                                'detail_sample_max_error': 0.,  # 1.0
+                                'edge_max_error': 0.01,  # 1.3
+                                'edge_max_len': 12.0,  # 12.0
+                                'filter_ledge_spans': True,  # True,
+                                'filter_low_hanging_obstacles': False,  # True,
+                                'filter_walkable_low_height_spans': False,  # True,
+                                'region_merge_size': 20.0,  # 20.0
+                                'region_min_size': 20.0,  # 20.0
+                                'verts_per_poly': 6.0}  # 6.0
+
+    def generate_reference(self, uniform_speed: float, manual_ref: bool, dt: float, seed: int,
+                           viz_navmesh: bool, folder: str):
         """
 
         :param uniform_speed: The number of step to cut the trajectory.
 
-        :param manual_ref: If true will plot topdown view.
+        :param manual_ref: If true will generate inital point manually else randomly.
 
         :param dt: dt to use for position derivation.
 
         :param seed: Seed of trajectory generation.
 
         :param viz_navmesh: If true rgb camera see the navmesh wireframe.
+
+        :param folder: Folder to save / load the reference.
         """
         # --- Defining a quality navmesh
         self.sim.seed(seed)
-        navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
-        navmesh_settings_dict = {'agent_height': 0.4,  # 1.5
-                                 'agent_max_climb': 2.0,  # 0.2
-                                 'agent_max_slope': 90.0,  # 45.0
-                                 'agent_radius': 0.2,  # 0.1
-                                 'cell_height': 0.01,  # 0.2
-                                 'cell_size': 0.01,  # 0.05
-                                 'detail_sample_dist': 1.0,  # 6.0
-                                 'detail_sample_max_error': 0.,  # 1.0
-                                 'edge_max_error': 0.01,  # 1.3
-                                 'edge_max_len': 12.0,  # 12.0
-                                 'filter_ledge_spans': True,  # True,
-                                 'filter_low_hanging_obstacles': False,  # True,
-                                 'filter_walkable_low_height_spans': False,  # True,
-                                 'region_merge_size': 20.0,  # 20.0
-                                 'region_min_size': 20.0,  # 20.0
-                                 'verts_per_poly': 6.0}  # 6.0
-        for key, val in navmesh_settings_dict.items():
-            setattr(navmesh_settings, key, val)
-        self.sim.recompute_navmesh(self.sim.pathfinder, navmesh_settings=navmesh_settings)
+        # Recomputing the navmesh
+        self.sim.navmesh_visualization = viz_navmesh
+
+        if not manual_ref:
+            navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
+            for key, val in self.optimal_navmesh.items():
+                setattr(navmesh_settings, key, val)
+            self.sim.recompute_navmesh(self.sim.pathfinder, navmesh_settings=navmesh_settings)
+            initial_point = np.stack([self.sim.pathfinder.get_random_navigable_point() for _ in range(10)])
+            flight_height = 0.1
+        else:
+            try:
+                initial_point = pickle.load(open(f'{folder}initial_point_ref.pkl', 'rb'))
+            except FileNotFoundError:
+                initial_point = self.interactive_sim(True, True)
+                pickle.dump(initial_point, open(f'{folder}initial_point_ref.pkl', 'wb'))
+            initial_point = Tf.from_matrix(initial_point).as_trans()
+            flight_height = 0.
 
         # --- Defining an agent to check for errors
         # Habitat does not detect every collision, but filters a part of it.
@@ -285,14 +302,18 @@ class Simulation:
         error_obj.intertia_diagonal = [self.drone_prms['ix'], self.drone_prms['ix'], self.drone_prms['ix']]
         self.error_agent: habitat_sim.physics.ManagedRigidObject = error_obj
 
+        # Convert initially generated point to state reference
         self.state_ref = generate_reference(sim=self.sim,
+                                            initial_point=initial_point,
                                             rigid_object=self.error_agent,
                                             uniform_speed=uniform_speed,
-                                            navmesh_settings_dict=navmesh_settings_dict,
-                                            flight_height=0.1,
+                                            navmesh_settings_dict=self.optimal_navmesh,
+                                            flight_height=flight_height,
                                             dt=dt,
-                                            viz_navmesh=viz_navmesh)
-        self.state_ref = np.concatenate([self.state_ref, np.zeros(len(self.state_ref), 6)], axis=-1)
+                                            db_use_og_path=manual_ref,
+                                            db_plot_navmesh=False,
+                                            db_plot_topdown=False)
+        self.state_ref = np.concatenate([self.state_ref, np.zeros((len(self.state_ref), 6))], axis=-1)
         self.rigid_obj_mgr.remove_object_by_handle(error_obj_handle, delete_object_node=False)
 
         # Redefining drone's agent body
@@ -304,15 +325,15 @@ class Simulation:
         else:
             return True
 
-    def interactive_sim(self, camera_rgb: bool, camera_depth: bool, step: float, tf_follow: np.ndarray = None):
-        cv2.namedWindow("stereo_pair")
+    def interactive_sim(self, camera_rgb: bool, camera_depth: bool, tf_follow: np.ndarray = None):
+        cv2.namedWindow("MP3D Scene")
         # 1. Agent init
         simulation_iteration = 0
         if tf_follow is not None:
             # tf_ref = Tf.from_quat_trans(self.state_ref[:, 3:7], self.state_ref[:, :3]).as_matrix()
             self.agent.transformation = tf_follow[0]
         obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
-
+        point = []
         is_running = True
         while is_running:
             # 2. Sensors
@@ -324,17 +345,13 @@ class Simulation:
                                                 ], axis=1)
             z = obs["surface_dist"][0]
             tf_global_agent = np.array(self.agent.transformation)  # transform origin body
-            rot_global_flu = Tf.from_matrix(tf_global_agent).as_rot_mat() @ Habitat2FLU.rot_hab__flu
+            rot_global_flu = Tf.from_matrix(tf_global_agent).as_rot_mat() @ Habitat2FLUACC.rot_hab__flu
 
             # Plotting sensors
             print(simulation_iteration)
             print(f'Height: {z}')
             has_collided = self.agent.contact_test()
-            # print(f'has_collided: {has_collided}')
-
-            import matplotlib.pyplot as plt
-            plt.title(f'Depth for scene 24 | flight 16 | frame 400')
-            plt.imshow(depth_stereo_pair)
+            print(f'has_collided: {has_collided}')
 
             # 4-Display and interactivity
             if camera_rgb:
@@ -383,21 +400,17 @@ class Simulation:
             # 7. Following the reference
             if key_pressed == ord("v"):
                 simulation_iteration += 1
-                # self.agent.transformation = self.ref_tf_global_agent[simulation_iteration]
                 self.agent.transformation = tf_follow[simulation_iteration]
             if key_pressed == ord('c'):
                 simulation_iteration -= 1
                 self.agent.transformation = tf_follow[simulation_iteration]
 
-            # 8. Resume the dynamic
-            if key_pressed == ord(' '):
-                self.agent.linear_velocity = saved_velocity[0]
-                self.agent.angular_velocity = saved_velocity[1]
-                simulation_iteration += 1
-
-            if tf_follow is not None:
-                if simulation_iteration == len(tf_follow):
-                    break
+            if key_pressed == ord('i'):
+                tf = self.agent.transformation
+                print(f'Point saved: {tf}')
+                point.append(tf)
+            if key_pressed == ord('l'):
+                is_running = False
 
             # 9-Simulating for step seconds
             # self.sim.step_physics(step)
@@ -405,6 +418,7 @@ class Simulation:
             s.sensor_states['surface_dist'].rotation = np.quaternion(np.cos(0.25 * np.pi), -np.sin(0.25 * np.pi), 0, 0)
             self.sim.get_agent(0).set_state(s, False, False)
             obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+        return np.stack(point, axis=0)
 
     def one_step_sim(self, dt: float, state: np.ndarray, motor: np.ndarray,
                      z: float) -> Tuple[np.ndarray, Any, bool, np.ndarray]:
@@ -437,7 +451,7 @@ class Simulation:
         ta_body = rot_body_fixed @ ground_effect[3:]
         residual = np.concatenate([fa_body, ta_body])
         next_state = self.quadrotor.forward(state=state, motor=motor, dt=dt, residual=residual)
-        next_state_hab = Habitat2FLU.state_flu_2_state_habitat(next_state)
+        next_state_hab = Habitat2FLUACC.state_flu_2_state_habitat(next_state)
         trans, quat, linear_velocity, angular_velocity = (next_state_hab[:3], next_state_hab[3:7],
                                                           next_state_hab[7:10], next_state_hab[10:13])
         tf_global__agent = Tf.from_quat_trans(quat=quat, trans=trans).as_matrix()
@@ -456,15 +470,15 @@ class Simulation:
             ground_force[2] = cap * self.drone_prms['m'] * self.g
         else:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
-            ground_force[2] = np.clip(coef, np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+            ground_force[2] = np.clip(coef * np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                       a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
         return np.concatenate([ground_force, np.zeros(3)])
 
 
 def gen_data(scene_number: str, flight_number: int,
+             db_manual: bool,
              db_same_env: bool = False,
-             db_plot_ref: bool = False,
-             db_plot_topdown: bool = False):
+             db_plot_ref: bool = False):
     """
     Generate drone data in habitat with ground effect.
 
@@ -475,13 +489,14 @@ def gen_data(scene_number: str, flight_number: int,
 
     Debug features:
 
+    :param db_manual: Use to generate reference manually.
+
     :param db_same_env: Boolean if False add ground effect physics. If True uses the quadrotor model which is the same
     as the model use for MPC. Useful for debugging.
 
     :param db_plot_ref: Boolean to plot the reference for debugging.
-
-    :param db_plot_topdown: If true will plot topdown view of the habitat scene when generating the trajectory.
     """
+    # Initialize the scene
     scene_id = MP3_SCENE_LIST[scene_number]
     gen_folder = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/flight2/{flight_number}/'
     mkdir([gen_folder])
@@ -494,7 +509,7 @@ def gen_data(scene_number: str, flight_number: int,
     gamma = 1.
     camera_resolution = np.array([480, 640])
 
-    # Building the environment in habitat
+    # Loading the scene in habitat
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     mac_scene_path = f"{WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     if sys.platform != 'darwin':  # local on the macbook
@@ -505,17 +520,15 @@ def gen_data(scene_number: str, flight_number: int,
         if not os.path.isfile(scene_path):  # If the scene does not exist, download it
             print(command)
             raise (FileNotFoundError('Scene is not in local'))
-
     simulation = Simulation(scene_path, camera_resolution, drone_prms, habitat.g)
 
-    has_worked = simulation.generate_reference_procedurally(uniform_speed=1, manual_ref=db_plot_topdown, dt=dt,
-                                                            seed=flight_number, viz_navmesh=False)
+    # Generate reference
+    has_worked = simulation.generate_reference(uniform_speed=1, manual_ref=db_manual, dt=dt, seed=flight_number,
+                                               viz_navmesh=False, folder=gen_folder)
     if not has_worked:
         simulation.sim.close(True)
         pickle.dump({'done': None, 'info': 'no_trajectory'}, open(f'{gen_folder}stats.pkl', 'wb'))
         return False
-
-    # habitat.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
 
     def mpc_model(_state, _u):
         _next_state = simulation.quadrotor.forward(state=_state, motor=_u, dt=dt)
@@ -528,9 +541,10 @@ def gen_data(scene_number: str, flight_number: int,
     simulation.agent.linear_velocity = np.zeros(3)
     simulation.agent.angular_velocity = np.zeros(3)
 
-    state_ref_flu = Habitat2FLU.state_habitat_2_state_flu(simulation.state_ref)
+    state_ref_flu = Habitat2FLUACC.state_habitat_2_state_flu(simulation.state_ref)
     if db_plot_ref:
-        trace_trajectory3d(state_ref_flu[:, :3], state_ref_flu[:, 3:7], pause=1e-4, step=10)
+        # habitat.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
+        trace_trajectory3d(state_ref_flu[:, :3], state_ref_flu[:, 3:7], pause=1e-4, step=1)
 
     # Initializing flight in habitat
     # Sensing
@@ -546,25 +560,25 @@ def gen_data(scene_number: str, flight_number: int,
     time_end = len(simulation.state_ref) - horizon_pred + 1
 
     # First mpc command after it take the previous one for initialisation
-    hover_cmd = np.sqrt(drone_prms['m'] * g / (4 * drone_prms['kt']))
+    hover_cmd = np.sqrt(drone_prms['m'] * habitat.g / (4 * drone_prms['kt']))
     motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
     has_collided = False
     for i in tqdm(range(1, time_end)):
         # Computing command with the controller
-        try:
-            motor_horizon, err = mpc_controller(model=mpc_model,
-                                                state_ref=state_ref_flu[i:i + horizon_pred],
-                                                state0=data_collection['state'][-1],
-                                                u0=motor_horizon,
-                                                horizon_cmd=horizon_cmd,
-                                                horizon_pred=horizon_pred,
-                                                gamma=gamma,
-                                                verbose=False)
-        except ValueError:
-            print(f'Drone diverged', file=sys.stderr, flush=True)
-            simulation.sim.close(True)
-            pickle.dump({'done': None, 'info': 'diverged'}, open(f'{gen_folder}stats.pkl', 'wb'))
-            return False
+        # try:
+        motor_horizon, err = mpc_controller(model=mpc_model,
+                                            state_ref=state_ref_flu[i:i + horizon_pred],
+                                            state0=data_collection['state'][-1],
+                                            u0=motor_horizon,
+                                            horizon_cmd=horizon_cmd,
+                                            horizon_pred=horizon_pred,
+                                            gamma=gamma,
+                                            verbose=False)
+        # except ValueError:
+        #     print(f'Drone diverged', file=sys.stderr, flush=True)
+        #     simulation.sim.close(True)
+        #     pickle.dump({'done': None, 'info': 'diverged'}, open(f'{gen_folder}stats.pkl', 'wb'))
+        #     return False
 
         # Simulating result
         if not db_same_env:
@@ -598,6 +612,11 @@ def gen_data(scene_number: str, flight_number: int,
             next_state = simulation.quadrotor.forward(dt=dt, state=data_collection['state'][-1],
                                                       motor=data_collection['motor'][-1])
             data_collection['state'].append(next_state)
+    state_hab = Habitat2FLUACC.state_flu_2_state_habitat(np.stack(data_collection['state'], axis=0))
+
+    # TODO observe trajectory and correct it
+    simulation.interactive_sim(True, True,
+                               tf_follow=Tf.from_quat_trans(state_hab[:, 3:7], state_hab[:, :3]).as_matrix())
     simulation.sim.close(True)
     data_generated = {}
     for key, val in data_collection.items():
@@ -621,7 +640,10 @@ def gen_data(scene_number: str, flight_number: int,
     return True
 
 
-def main():
+def main1():
+    """
+    Generate data with habitat using Matterport3D dataset with a flying UAV following procedurally generated references.
+    """
     scene_number = 0
     flight_number = 0
     parser = argparse.ArgumentParser(description="Generate drone flight data.")
@@ -635,13 +657,25 @@ def main():
     for scene_number in range(args.scene_start, args.scene_stop):
         for flight_number in range(args.fn_start, args.fn_stop):
             print(f'SCENE_NUMBER={scene_number} | FLIGHT_NUMBER={flight_number}', file=sys.stderr, flush=True)
-            has_worked = gen_data(scene_number=scene_number,
-                                  flight_number=flight_number,
-                                  db_same_env=False,
-                                  db_plot_ref=False,
-                                  db_plot_topdown=False)
+            gen_data(scene_number, flight_number,
+                     db_manual=False,
+                     db_same_env=False,
+                     db_plot_ref=False)
+            print(f'\n' * 20, file=sys.stderr, flush=True)
+
+
+def main2():
+    """
+    Generate data with habitat using Matterport3D dataset with a flying UAV following manually defined reference.
+    """
+    for scene_number in SCENE_NUMBER_MISSING_DATA:
+        for flight_number in range(0, 1):
+            gen_data(scene_number, flight_number,
+                     db_manual=True,
+                     db_same_env=False,
+                     db_plot_ref=False)
             print(f'\n' * 20, file=sys.stderr, flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    main2()
