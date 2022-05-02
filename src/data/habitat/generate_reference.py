@@ -1,3 +1,4 @@
+import matplotlib.text
 from Christofides import christofides
 import habitat_sim
 import matplotlib.pyplot as plt
@@ -7,23 +8,17 @@ import numpy as np
 from scipy.interpolate import splev, splrep
 import sys
 from tqdm import tqdm
-from typing import Union
+from typing import Union, Dict
 
 from src.data.habitat.hatbitat2flu import Habitat2FLU
 from src.utils.transform import Transform, Rotation
 
-# habitat agent and global reference frame are oriented with x-left, y-up and z-backward.
-TF_AGENT__AGENT_FLU = Transform.from_euler_trans(seq='xyz', angles=np.array([-90, 90, 0]), degrees=True,
-                                                 trans=np.zeros(3)).as_matrix()
-TF_AGENT_FLU__AGENT = Transform.from_matrix(TF_AGENT__AGENT_FLU).inv().as_matrix()
+matplotlib.use('Qt5Agg')
 
 
-# NOTATION
-# AGENT is the drone body in habitat
-# AGENT_FLU is AGENT but turned in FLU forward left up
-# GLOBAL_FLU is the habitat earth reference frame but turned in flu
-# GLOBAL is the habitat earth reference frame
-
+# matplotlib.use('MacOSX')
+# matplotlib.use('TkAgg')
+# matplotlib.use('Qt4Agg')
 
 def display_topdown(sim, point, travel_order, entire_path):
     # Display
@@ -85,7 +80,7 @@ def get_orientation_from_position(x_time, x, point, trans_ref, flight_height):
 
     trans_ref = flight_height * z_vect + trans_ref
     tf_global_flu = Transform.from_3_axis_rot_trans(x=x_vect, y=y_vect, z=z_vect, trans=trans_ref).as_matrix()
-    return tf_global_flu @ TF_AGENT_FLU__AGENT
+    return tf_global_flu @ Habitat2FLU.tf_flu__hab  # todo check
 
 
 def polynomial_interpolation(main_point, num_sample, degree, flight_height):
@@ -131,72 +126,168 @@ def polynomial_interpolation(main_point, num_sample, degree, flight_height):
     return ref_tf_global_agent
 
 
+def navmesh_optimization(sim, navset_dict):
+    navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
+    # for key, val in navset_dict.items():
+    #     setattr(navmesh_settings, key, val)
+    # sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+
+    # Display
+    resolution = 0.05
+    h = sim.get_agent(0).state.position[1]
+    print(f'Height {h}', flush=True)
+    topdown = sim.pathfinder.get_topdown_view(resolution, h)
+    # low, high = sim.pathfinder.get_bounds()
+    # img = np.zeros(list(topdown.shape) + [3], dtype=np.uint8)
+    # img[topdown] = np.array([255, 255, 255], dtype=np.uint8)
+    print(topdown.shape)
+
+    fig, ax = plt.subplots(1, 1, figsize=(13.2, 8), dpi=100)
+    fig: plt.Figure
+    ax: plt.Axes
+    ax.set_title(f'resolution: {resolution} | cell_size: {navset_dict["cell_size"]} |'
+                 f'')
+    ax_img = ax.imshow(topdown, animated=True, cmap='gray')
+    ax.axis('off')
+    plt.subplots_adjust(left=0.01, bottom=0.01, right=0.8, top=0.99)
+    ax_height = plt.axes([0.06, 1 - 0.1, 0.7, 0.02], facecolor='lightgoldenrodyellow')  # left, bottom, width, height
+    h_slider = Slider(ax=ax_height,
+                      label="Height",
+                      valmin=0,
+                      valmax=4,
+                      valinit=h,
+                      orientation="horizontal")
+
+    # The function to be called anytime a slider's value changes
+    def _update(_):
+        print(f'h_slider.val: {h_slider.val}', flush=True)
+        _topdown = sim.pathfinder.get_topdown_view(resolution, h_slider.val)
+        # _low, _high = sim.pathfinder.get_bounds()
+        # _img = np.zeros(list(_topdown.shape) + [3], dtype=np.uint8)
+        # _img[_topdown] = np.array([255, 255, 255], dtype=np.uint8)
+        # fig.canvas.restore_region(bg)
+        ax_img.set_data(_topdown)
+        ax.draw_artist(ax_img)
+        fig.canvas.update()  # only usable with Qt5Agg backend
+        # fig.canvas.blit(fig.bbox)
+        fig.canvas.flush_events()
+        print(f'Update done' + 2 * '\n', flush=True)
+
+    def _update_text_box(expression, a):
+        if expression in ['True', 'False']:
+            _val = bool(expression)
+        else:
+            _val = float(expression)
+        print(f'New value: {a} {expression}')
+        setattr(navmesh_settings, a, _val)
+        sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
+        _update(None)
+
+    from matplotlib.widgets import TextBox
+    text_boxs = []
+    i = 11
+    for j in list(range(i)) + list(range(i + 1, 16)):
+        key: str = list(navset_dict.keys())[j]
+        key = (key + '.')[:-1]
+        val = navset_dict[key]
+        # ax_text: plt.Axes = plt.axes([0.96, 1 - 0.05 - 0.05 * j, 0.03, 0.04])  # [left, bottom, width, height]
+        # ax_text.text(0, 0, f'{key}={val}')
+        plt.annotate(f'{key}={val}', [0.8, 1 - 0.05 - 0.05 * j], xycoords='figure fraction', fontsize=10)
+    key = list(navset_dict.keys())[i]
+    key = (key + '.')[:-1]
+    val = navset_dict[key]
+    ax_text = plt.axes([0.96, 1 - 0.05 - 0.05 * i, 0.03, 0.04])  # [left, bottom, width, height]
+    text_boxs.append(TextBox(ax_text, key, val))
+    text_boxs[-1].on_submit(lambda x: _update_text_box(x, key))
+
+    # register the update function with each slider
+    h_slider.on_changed(_update)
+    plt.show()
+
+
 def generate_reference(sim: habitat_sim.Simulator,
+                       initial_point: np.ndarray,
                        rigid_object: habitat_sim.physics.ManagedRigidObject,
                        uniform_speed: float,
-                       navmesh_settings: habitat_sim.nav.NavMeshSettings,
-                       plot_topdown: bool,
+                       navmesh_settings_dict: Dict[str, Union[bool, float]],
                        flight_height: float,
                        dt: float,
-                       seed: int,
-                       viz_navmesh: bool) -> Union[np.ndarray, bool]:
-    # Recomputing the navmesh
-    sim.seed(seed)
-    sim.recompute_navmesh(sim.pathfinder, navmesh_settings=navmesh_settings)
-    sim.navmesh_visualization = viz_navmesh
+                       db_process_initial_point: bool = False,
+                       db_plot_navmesh: bool = False,
+                       db_plot_topdown: bool = False) -> Union[np.ndarray, bool]:
+    """
+    Generate a reference trajectory for the given rigid object.
 
-    # Generate 10 random points from the navigable space
-    point = np.stack([sim.pathfinder.get_random_navigable_point() for _ in range(10)])
-    # import pickle
-    # from src.utils.paths import WD_PATH, DATA_HABITAT_PATH
-    # point = pickle.load(open(f'{DATA_HABITAT_PATH}point.pkl', 'rb'))
-    # pickle.dump(point, open(f'{DATA_HABITAT_PATH}point.pkl', 'wb'))
+    Args:
+        sim: The Simulator instance.
+        initial_point: The initial point of the reference trajectory.
+        rigid_object: The rigid object to detect collisions.
+        uniform_speed: The average speed of the agent.
+        navmesh_settings_dict: The navmesh settings, only used to plot the top-down view to optimize the navmesh.
+        flight_height: The flight height to add to the generated trajectory when sampling it.
+        dt: The dt to compute the reference speed.
+        db_process_initial_point: If it is required to process the initial point, relies on a working navmesh.
+        db_plot_navmesh: Plots the navmesh to optimize it.
+        db_plot_topdown: Plots the top-down view of the trajectory with the navmesh.
 
-    # Find the geodesic shortest path between those points
-    shortest_path = []
-    distance_matrix = np.zeros((len(point), len(point)))
-    for i, p1 in enumerate(point):
-        for j, p2 in enumerate(point):
-            if i == j:
-                continue
-            short_path = habitat_sim.nav.ShortestPath()
-            short_path.requested_start = p1
-            short_path.requested_end = p2
-            sim.pathfinder.find_path(short_path)
-            shortest_path.append((i, j, short_path.geodesic_distance, short_path))
-            if j > i:
-                distance_matrix[i, j] = short_path.geodesic_distance
-    # Check if every point is reachable
-    for t in shortest_path:
-        if t[2] == np.inf:
-            print('Generated points non reachable, change seed', file=sys.stderr, flush=True)
-            return False
+    Returns:
+        The states of the reference trajectory a ndarray of shape (N, 19).
 
-    # Compute the order to navigate between those points
-    tsp_solution = christofides.compute(distance_matrix)
-    travel_order = tsp_solution['Christofides_Solution']
+    """
 
-    # Add points to avoid obstacles. At the end the entire_path can be done by navigating in straight lines to the next
-    # point
-    entire_path = []
-    for i, current_point_idx in enumerate(travel_order[:-1]):
-        next_point_idx = travel_order[i + 1]
-        dist = [dist for dist in shortest_path if current_point_idx == dist[0] and next_point_idx == dist[1]][0]
-        print(f'current_point_idx: {current_point_idx} | next_point_idx: {next_point_idx} | dist: {dist}', flush=True)
-        entire_path = entire_path + dist[3].points
-    entire_path.append(point[travel_order[-1]])
-    entire_path = np.stack(entire_path)
+    if db_plot_navmesh:
+        navmesh_optimization(sim, navmesh_settings_dict)
+    if not db_process_initial_point:
+        # Find the geodesic shortest path between those points
+        point = initial_point
+        shortest_path = []
+        distance_matrix = np.zeros((len(point), len(point)))
+        for i, p1 in enumerate(point):
+            for j, p2 in enumerate(point):
+                if i == j:
+                    continue
+                short_path = habitat_sim.nav.ShortestPath()
+                short_path.requested_start = p1
+                short_path.requested_end = p2
+                sim.pathfinder.find_path(short_path)
+                shortest_path.append((i, j, short_path.geodesic_distance, short_path))
+                if j > i:
+                    distance_matrix[i, j] = short_path.geodesic_distance
+        # Check if every point is reachable
+        for t in shortest_path:
+            if t[2] == np.inf:
+                print('Generated points non reachable, change seed', file=sys.stderr, flush=True)
+                return False
 
-    # Remove duplicates
-    remove_duplicate = []
-    for i, e in enumerate(entire_path[:-1]):
-        if np.any(entire_path[i + 1] != e):
-            remove_duplicate.append(e)
-    remove_duplicate.append(entire_path[-1])
-    entire_path = np.stack(remove_duplicate)
+        # Compute the order to navigate between those points
+        tsp_solution = christofides.compute(distance_matrix)
+        travel_order = tsp_solution['Christofides_Solution']
 
-    if plot_topdown:  # display trajectory
-        display_topdown(sim, point, travel_order, entire_path)
+        # Add points to avoid obstacles. At the end the entire_path can be done by navigating in straight lines to the
+        # next point
+        entire_path = []
+        for i, current_point_idx in enumerate(travel_order[:-1]):
+            next_point_idx = travel_order[i + 1]
+            dist = [dist for dist in shortest_path if current_point_idx == dist[0] and next_point_idx == dist[1]][0]
+            print(f'current_point_idx: {current_point_idx} | next_point_idx: {next_point_idx} | dist: {dist}',
+                  flush=True)
+            entire_path = entire_path + dist[3].points
+        entire_path.append(point[travel_order[-1]])
+        entire_path = np.stack(entire_path)
+
+        # Remove duplicates
+        remove_duplicate = []
+        for i, e in enumerate(entire_path[:-1]):
+            if np.any(entire_path[i + 1] != e):
+                remove_duplicate.append(e)
+        remove_duplicate.append(entire_path[-1])
+        entire_path = np.stack(remove_duplicate)
+    else:
+        entire_path = initial_point
+        travel_order = list(range(len(entire_path)))
+
+    if db_plot_topdown:  # display trajectory
+        display_topdown(sim, initial_point, travel_order, entire_path)
 
     # Sample path to impose a specific speed
     perimeter = np.linalg.norm(entire_path[1:] - entire_path[:-1], axis=1).sum()
@@ -209,12 +300,6 @@ def generate_reference(sim: habitat_sim.Simulator,
         return False
 
     # Check if trajectory collides
-    directions = [np.array([0, 0, -1]),
-                  np.array([0, 0, 1]),
-                  np.array([-1, 0, 0]),
-                  np.array([1, 0, 0]),
-                  np.array([0, 1, 0]),
-                  np.array([0, -1, 0])]
     ref_tf_global_agent = np.zeros_like(ref_tf_global_agent_collidable)
     for i, tf in enumerate(tqdm(ref_tf_global_agent_collidable, desc='Starting generating trajectory')):
         rigid_object.transformation = tf
@@ -223,8 +308,8 @@ def generate_reference(sim: habitat_sim.Simulator,
         while has_collided:
             quat, trans = Transform.from_matrix(tf).as_quat_trans()
             # Debug
-            looking = False
-            while looking:
+            db_looking = False
+            while db_looking:
                 obs = sim.get_sensor_observations(agent_ids=1)  # 1 is the agent_id of the error agent
                 dist = np.array([obs["forward_dist"][0][0],
                                  obs["backward_dist"][0][0],
@@ -267,7 +352,7 @@ def generate_reference(sim: habitat_sim.Simulator,
                     rigid_object.rotate_y_local(magnum.Rad(-20 / 180 * np.pi))
                 if key_pressed == ord("k"):  # Right
                     cv2.destroyAllWindows()
-                    looking = False
+                    db_looking = False
                 if trans[1] > 3:  # 3 meters
                     print('Collision non avoidable in reference, change seed')
                     return False
@@ -277,7 +362,7 @@ def generate_reference(sim: habitat_sim.Simulator,
                     tf = Transform.from_quat_trans(quat, trans).as_matrix()
                     rigid_object.transformation = tf
                     has_collided = rigid_object.contact_test()
-            if has_collided and not looking:
+            if has_collided and not db_looking:
                 dtrans = Rotation.from_quat(quat).as_matrix() @ np.array([0, 0.1, 0])
                 trans = trans + dtrans
                 tf = Transform.from_quat_trans(quat, trans).as_matrix()

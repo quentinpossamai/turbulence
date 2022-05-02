@@ -571,7 +571,7 @@ def observe_generated_traj(scene_number, flight_number):
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
-    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    state_habitat = hatbitat2flu.Habitat2FLUACC.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
     # If scene is not downloaded
@@ -603,7 +603,7 @@ def observe_traj_pred(scene_number, flight_number):
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
-    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    state_habitat = hatbitat2flu.Habitat2FLUACC.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
     z_hat_40, loss = habitat.load_file('emb_prediction1', scene_number, flight_number)
@@ -851,7 +851,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
     motor = habitat.load_file('motor', scene_number, flight_number)
-    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    state_habitat = hatbitat2flu.Habitat2FLUACC.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()[idx]
 
     command = f'rsync -Ptv  remsto:{cluster_scene_path} {scene_path}'

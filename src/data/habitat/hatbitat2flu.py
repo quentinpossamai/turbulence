@@ -227,17 +227,22 @@ class Habitat2FLUACC:
                                         ], axis=-1)
         return state_habitat
 
+
 def _test():
+    """
+    Assert reversibility of the transformation.
+    """
     for i in range(1000):
         state_flu = np.random.randn(19)
         state_flu[3:7] = state_flu[3:7] / np.linalg.norm(state_flu[3:7])
 
-        state_habitat = Habitat2FLU.state_flu_2_state_habitat(state_flu)
-        state_flu_2 = Habitat2FLU.state_habitat_2_state_flu(state_habitat)
+        state_habitat = Habitat2FLUACC.state_flu_2_state_habitat(state_flu)
+        state_flu_2 = Habitat2FLUACC.state_habitat_2_state_flu(state_habitat)
         state_flu_2_minus = np.copy(state_flu_2)
         state_flu_2_minus[3:7] = -state_flu_2[3:7]
         assert np.all(np.isclose(state_flu[..., :19], state_flu_2[..., :19])) or \
                np.all(np.isclose(state_flu[..., :19], state_flu_2_minus[..., :19]))
+    print(f'Reversibility test passed.')
 
 
 def main():

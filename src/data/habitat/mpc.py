@@ -12,26 +12,21 @@ def mpc_controller(model: Callable,
                    horizon_cmd: int,
                    horizon_pred: int,
                    gamma: float,
-                   verbose: bool):
+                   db_verbose: bool):
     """
+    MPC controller for the drone.
 
-    param model:
+    Args:
+        model:
+        state_ref:
+        state0:
+        u0:
+        horizon_cmd:
+        horizon_pred:
+        gamma:
+        db_verbose:
 
-    param state_ref:
-
-    param state0:
-
-    param u0: Shape (horizon, 4)
-
-    param horizon_cmd:
-
-    param horizon_pred:
-
-    param gamma:
-
-    param verbose:
-
-    return:
+    Returns:
 
     """
     assert horizon_pred % horizon_cmd == 0
@@ -42,24 +37,16 @@ def mpc_controller(model: Callable,
         if _horizon_pred - _horizon_cmd > 0:
             _u = np.concatenate([_u, np.stack([_u[-1] for _ in range(_horizon_pred - _horizon_cmd)])])
 
-        # # Option 2
-        # num_repeat = horizon_pred // horizon_cmd
-        # u_tiled = np.zeros((_horizon_pred, 4))
-        # _u = _u.reshape(_horizon_cmd, 4)
-        # for i, cmd in enumerate(_u):
-        #     u_tiled[i*num_repeat:(i+1)*num_repeat] = np.tile(cmd, num_repeat).reshape((num_repeat, 4))
-        # _u = u_tiled
-
         state_hat = [_state]
         for t in range(_horizon_pred):
             next_state = model(state_hat[-1], _u[t])
             state_hat.append(next_state)
-        state_hat = np.stack(state_hat[1:])
+        state_hat = np.stack(state_hat[1:], axis=0)
         return loss(state_ref=_state_ref, state_hat=state_hat, horizon=_horizon_pred, gamma=_gamma)
 
     # Initialize command
-    if verbose:
-        print('MPC starting')
+    if db_verbose:
+        print('MPC starting', flush=True)
     out: scipy.optimize.OptimizeResult = scipy.optimize.minimize(fun=_mpc, x0=u0.flatten(),
                                                                  args=(state0, state_ref, horizon_cmd,
                                                                        horizon_pred, gamma),
@@ -77,7 +64,7 @@ def mpc_controller(model: Callable,
                                                                  )
     u, error_mpc = out.x, out.fun
     u = u.reshape((-1, 4))
-    if verbose:
+    if db_verbose:
         print(f'Finished | mpc_error: {error_mpc} | u: {u} | message: {out.message} \n')
     # u = np.abs(u)
     return u, error_mpc
@@ -89,13 +76,13 @@ def loss(state_ref: np.ndarray, state_hat: np.ndarray, gamma: float, horizon: in
         coefs.append(gamma * coefs[-1])
     coefs = np.stack(coefs)
 
-    position_ref, quat_ref, lin_vel_ref, angular_speed_ref = (state_ref[:, :3], state_ref[:, 3:7],
-                                                              state_ref[:, 7:10], state_ref[:, 10:])
-    position_hat, quat_hat, lin_vel_hat, angular_speed_hat = (state_hat[:, :3], state_hat[:, 3:7],
-                                                              state_hat[:, 7:10], state_hat[:, 10:])
+    position_ref, quat_ref, lin_vel_ref, ang_vel_ref = (state_ref[:, :3], state_ref[:, 3:7],
+                                                        state_ref[:, 7:10], state_ref[:, 10:13])
+    position_hat, quat_hat, lin_vel_hat, ang_vel_hat = (state_hat[:, :3], state_hat[:, 3:7],
+                                                        state_hat[:, 7:10], state_hat[:, 10:13])
 
     # Position loss, shape=(horizon_pred, 3)
-    position_loss = np.mean((position_ref - position_hat) ** 2, axis=1)
+    position_loss = np.mean((position_ref - position_hat) ** 2, axis=-1)
     position_loss = coefs @ position_loss
 
     # Yaw loss
@@ -110,13 +97,14 @@ def loss(state_ref: np.ndarray, state_hat: np.ndarray, gamma: float, horizon: in
     rot_global_drone_hat = Transform.from_quat_trans(quat_hat, position_hat).as_rot_mat()
     vect_hat = rot_global_drone_hat @ np.array([1, 0, 0])
     vect_hat[:, 2] = 0
-    vect_hat / np.linalg.norm(vect_hat, axis=1).reshape((-1, 1))
+    vect_hat = vect_hat / np.linalg.norm(vect_hat, axis=-1).reshape((-1, 1))
+
     vect_ref = Rotation.from_quat(quat_ref).as_matrix() @ np.array([1, 0, 0])
     vect_ref[:, 2] = 0
-    vect_ref / np.linalg.norm(vect_ref, axis=1).reshape((-1, 1))
-    yaw_loss = -np.sum(vect_ref * vect_hat, axis=1)
+    vect_ref = vect_ref / np.linalg.norm(vect_ref, axis=-1).reshape((-1, 1))
+    yaw_loss = -np.sum(vect_ref * vect_hat, axis=-1)
     yaw_loss = coefs @ yaw_loss
 
     # Linear velocity loss
-    lin_vel_loss = coefs @ np.mean((lin_vel_ref - lin_vel_hat) ** 2, axis=1)
+    lin_vel_loss = coefs @ np.mean((lin_vel_ref - lin_vel_hat) ** 2, axis=-1)
     return 1. * position_loss + 0.05 * yaw_loss + 0. * lin_vel_loss
