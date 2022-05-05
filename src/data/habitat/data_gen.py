@@ -65,11 +65,11 @@ class Simulation:
         left_rgb_sensor.resolution = camera_resolution
         left_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.LEFT
 
-        # right rgb camera
-        right_rgb_sensor = habitat_sim.CameraSensorSpec()
-        right_rgb_sensor.uuid = "right_camera"
-        right_rgb_sensor.resolution = camera_resolution
-        right_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT + 1.1 * habitat_sim.geo.BACK
+        # # right rgb camera
+        # right_rgb_sensor = habitat_sim.CameraSensorSpec()
+        # right_rgb_sensor.uuid = "right_camera"
+        # right_rgb_sensor.resolution = camera_resolution
+        # right_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT + 1.1 * habitat_sim.geo.BACK
 
         # left depth camera
         left_depth_sensor = habitat_sim.CameraSensorSpec()
@@ -98,7 +98,7 @@ class Simulation:
         agent_config = habitat_sim.AgentConfiguration()
         agent_config.sensor_specifications = [surface_distance_sensor,
                                               left_rgb_sensor,
-                                              right_rgb_sensor,
+                                              # right_rgb_sensor,
                                               left_depth_sensor,
                                               # right_depth_sensor,
                                               ]
@@ -348,6 +348,8 @@ class Simulation:
             self.agent.transformation = tf_follow[0]
         obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
         point = []
+        inc = 0.1  # increment for the translation
+
         is_running = True
         while is_running:
             # 2. Sensors
@@ -388,14 +390,18 @@ class Simulation:
             # 6-Exploring the scene
             # 6.1. Forward, Backward
             if key_pressed == ord("w"):  # Front
-                self.agent.translate(rot_global_flu @ np.array([+0.1, 0, 0]))
+                self.agent.translate(rot_global_flu @ np.array([+inc, 0, 0]))
             if key_pressed == ord("s"):  # Back
-                self.agent.translate(rot_global_flu @ np.array([-0.1, 0, 0]))
+                self.agent.translate(rot_global_flu @ np.array([-inc, 0, 0]))
             # 6.2 Thrust
             if key_pressed == ord("x"):  # Up
-                self.agent.translate(rot_global_flu @ np.array([0, 0, +0.1]))
+                self.agent.translate(rot_global_flu @ np.array([0, 0, +inc]))
             if key_pressed == ord("z"):  # Down
-                self.agent.translate(rot_global_flu @ np.array([0, 0, -0.1]))
+                self.agent.translate(rot_global_flu @ np.array([0, 0, -inc]))
+            if key_pressed == ord("1"):  # Strafe left
+                self.agent.translate(rot_global_flu @ np.array([0, +inc, 0]))
+            if key_pressed == ord("2"):  # Strafe right
+                self.agent.translate(rot_global_flu @ np.array([0, -inc, 0]))
             # 6.3. Roll
             if key_pressed == ord("q"):  # Left
                 self.agent.rotate_z_local(magnum.Rad(+20 / 180 * np.pi))
@@ -412,12 +418,24 @@ class Simulation:
             if key_pressed == ord("d"):  # Right
                 self.agent.rotate_y_local(magnum.Rad(-20 / 180 * np.pi))
             # 7. Following the reference
-            if key_pressed == ord("v"):
-                simulation_iteration += 1
-                self.agent.transformation = tf_follow[simulation_iteration]
-            if key_pressed == ord('c'):
-                simulation_iteration -= 1
-                self.agent.transformation = tf_follow[simulation_iteration]
+            try:
+                if key_pressed == ord("v"):
+                    simulation_iteration += 1
+                    self.agent.transformation = tf_follow[simulation_iteration]
+                if key_pressed == ord('c'):
+                    simulation_iteration -= 1
+                    self.agent.transformation = tf_follow[simulation_iteration]
+            except TypeError:
+                print(f'No tf_follow')
+            if key_pressed == ord('['):
+                inc = max(inc - 0.1, 0.1)
+                print(f'Now inc is {inc}')
+            if key_pressed == ord(']'):
+                inc = min(inc + 0.1, 2)
+                print(f'Now inc is {inc}')
+            if key_pressed == ord('o'):
+                print(f'Last point will be deleted:')
+                print(point)
 
             if key_pressed == ord('i'):
                 tf = self.agent.transformation
@@ -484,7 +502,7 @@ class Simulation:
             mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
             ground_force[2] = np.clip(coef * np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
                                       a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
-        return 0 * np.concatenate([ground_force, np.zeros(3)])
+        return np.concatenate([ground_force, np.zeros(3)])
 
 
 def gen_data(scene_number: int, flight_number: int,
@@ -556,8 +574,10 @@ def gen_data(scene_number: int, flight_number: int,
 
     state_ref_flu = Habitat2FLU.state_habitat_2_state_flu(simulation.state_ref)
     if db_plot_ref:
-        # habitat.interactive_sim(controller=None, camera_rgb=True, camera_depth=False, step=step)
+        tf_follow = Tf.from_quat_trans(simulation.state_ref[:, 3:7], simulation.state_ref[:, 0:3]).as_matrix()
+        simulation.interactive_sim(True, False, tf_follow)
         trace_trajectory3d(state_ref_flu[:, :3], state_ref_flu[:, 3:7], pause=1e-4, step=1)
+        # os.remove(f'{gen_folder}initial_point_ref.pkl')
 
     # Initializing flight in habitat
     # Sensing
@@ -578,22 +598,22 @@ def gen_data(scene_number: int, flight_number: int,
     has_collided = False
     for i in tqdm(range(1, time_end)):
         # Computing command with the controller
-        # try:
-        motor_horizon, err = mpc_controller(model=mpc_model,
-                                            state_ref=state_ref_flu[i:i + horizon_pred],
-                                            state0=data_collection['state'][-1],
-                                            u0=motor_horizon,
-                                            horizon_cmd=horizon_cmd,
-                                            horizon_pred=horizon_pred,
-                                            gamma=gamma,
-                                            db_verbose=False)
-        print(f'mpc error: {err}')
-        print(f'motor horizon: {motor_horizon}\n\n')
-        # except ValueError:
-        #     print(f'Drone diverged', file=sys.stderr, flush=True)
-        #     simulation.sim.close(True)
-        #     pickle.dump({'done': None, 'info': 'diverged'}, open(f'{gen_folder}stats.pkl', 'wb'))
-        #     return False
+        try:
+            motor_horizon, err = mpc_controller(model=mpc_model,
+                                                state_ref=state_ref_flu[i:i + horizon_pred],
+                                                state0=data_collection['state'][-1],
+                                                u0=motor_horizon,
+                                                horizon_cmd=horizon_cmd,
+                                                horizon_pred=horizon_pred,
+                                                gamma=gamma,
+                                                db_verbose=False)
+            print(f'mpc error: {err}')
+            print(f'motor horizon: {motor_horizon}\n\n')
+        except ValueError:
+            print(f'Drone diverged', file=sys.stderr, flush=True)
+            simulation.sim.close(True)
+            pickle.dump({'done': None, 'info': 'diverged'}, open(f'{gen_folder}stats.pkl', 'wb'))
+            return False
 
         # Simulation result
         if not db_same_env:
@@ -629,7 +649,6 @@ def gen_data(scene_number: int, flight_number: int,
             data_collection['state'].append(next_state)
     state_hab = Habitat2FLU.state_flu_2_state_habitat(np.stack(data_collection['state'], axis=0))
 
-    # TODO observe trajectory and correct it
     simulation.interactive_sim(True, False,
                                tf_follow=Tf.from_quat_trans(state_hab[:, 3:7], state_hab[:, :3]).as_matrix())
     simulation.sim.close(True)
@@ -682,11 +701,12 @@ def main2():
     Generate data with habitat using Matterport3D dataset with a flying UAV following manually defined reference.
     """
     for scene_number in SCENE_NUMBER_MISSING_DATA:
-        scene_number = SCENE_NUMBER_MISSING_DATA[0]
+        scene_number = SCENE_NUMBER_MISSING_DATA[22]
         for flight_number in range(0, 1):
             print(f'Generating data for scene {scene_number} and flight {flight_number}', file=sys.stderr, flush=True)
             gen_data(scene_number, flight_number, db_manual=True)
             print(f'\n' * 20, file=sys.stderr, flush=True)
+            break
 
 
 if __name__ == "__main__":

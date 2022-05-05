@@ -103,6 +103,7 @@ def polynomial_interpolation(main_point, num_sample, degree, flight_height):
         traj_time.append(np.linalg.norm(main_point[i] - main_point[i - 1]))
     traj_time = np.cumsum(traj_time)
     traj_time = traj_time / traj_time[-1]
+    assert (np.unique(traj_time) == traj_time).all()
 
     trans = np.zeros((num_sample, 3))
     for i in range(3):
@@ -284,6 +285,7 @@ def generate_reference(sim: habitat_sim.Simulator,
         entire_path = np.stack(remove_duplicate)
     else:
         entire_path = initial_point
+        # entire_path = np.unique(entire_path, axis=0)
         travel_order = list(range(len(entire_path)))
 
     if db_plot_topdown:  # display trajectory
