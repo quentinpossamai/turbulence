@@ -566,12 +566,32 @@ def rmse_model_prediction(name, dataset_name: str):
 
 
 def observe_generated_traj(scene_number, flight_number):
+    print(f'Observing generated trajectory scene number {scene_number} and flight number {flight_number}')
+    labels = pickle.load(open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'rb'))
+
+    try:  # check if trajectory is labelled
+        assert not np.isnan(labels[scene_number][flight_number]).any()
+        return
+    except KeyError:  # if it does not exist, create it
+        if flight_number != 1:
+            pass
+        else:  # flight_number == 1
+            try:  # if 0 exist, 1 is the same (why I don't know, maybe seed in N*)
+                state1 = habitat.load_file('state', scene_number, flight_number)
+                state0 = habitat.load_file('state', scene_number, 0)
+                assert (state0.shape == state1.shape)
+                assert (state0 == state1).all()
+                labels[scene_number][flight_number] = labels[scene_number][0]
+                return
+            except (FileNotFoundError, AssertionError):  # If 0 does not exist, create 1
+                pass
+
     scene_id = habitat.MP3D_SCENE_LIST[scene_number]
     scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
-    state_habitat = hatbitat2flu.Habitat2FLUACC.state_flu_2_state_habitat(state)
+    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
     # If scene is not downloaded
@@ -580,9 +600,16 @@ def observe_generated_traj(scene_number, flight_number):
         print(command)
         raise (FileNotFoundError('Scene is not in local'))
         os.system(command)  # if scene not downloaded
-    simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=habitat.DRONE_PRMS,
+
+    simulation = data_gen.Simulation(scene_path, camera_resolution=np.array([480, 640]),
+                                     drone_prms=habitat.DRONE_PRMS,
                                      gravity=9.81)
-    simulation.interactive_sim(camera_rgb=True, camera_depth=True, step=1 / 20, tf_follow=tf_follow)
+    label = simulation.interactive_sim(camera_rgb=True, camera_depth=True, tf_follow=tf_follow, return_label=True)
+    labels[scene_number][flight_number] = label
+
+    assert len(label)
+    pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
+    simulation.sim.close(True)
 
 
 def observe_traj_pred(scene_number, flight_number):
@@ -1024,8 +1051,17 @@ def main():
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
 
+    index = habitat.build_index_valid_flight(False)
+    count = 0
+    for e in index.values():
+        count += len(e)
+        assert len(e) != 0  # all scene have a trajectory
+    print(f'Total trajectory: {count}')
+
+    for scene_number, traj in index.items():
+        for flight_number in traj:
+            observe_generated_traj(scene_number, flight_number)
     # observe_generated_traj(24, 16)
-    observe_traj_pred(9, 0)
     # boxplot_pred()
     # euroc_mav_table()
     # predict_good_fa()

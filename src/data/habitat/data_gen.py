@@ -285,7 +285,7 @@ class Simulation:
             try:
                 initial_point = pickle.load(open(f'{folder}initial_point_ref.pkl', 'rb'))
             except FileNotFoundError:
-                initial_point = self.interactive_sim(True, True)
+                initial_point = self.interactive_sim(True, True, None, True)
                 pickle.dump(initial_point, open(f'{folder}initial_point_ref.pkl', 'wb'))
             initial_point = Tf.from_matrix(initial_point).as_trans()
             flight_height = 0.
@@ -339,16 +339,27 @@ class Simulation:
         else:
             return True
 
-    def interactive_sim(self, camera_rgb: bool, camera_depth: bool, tf_follow: np.ndarray = None):
+    def interactive_sim(self, camera_rgb: bool, camera_depth: bool, tf_follow: np.ndarray = None,
+                        return_point: bool = False,
+                        return_label: bool = False):
         cv2.namedWindow("MP3D Scene")
         # 1. Agent init
-        simulation_iteration = 0
+        iteration = 0
         if tf_follow is not None:
             # tf_ref = Tf.from_quat_trans(self.state_ref[:, 3:7], self.state_ref[:, :3]).as_matrix()
             self.agent.transformation = tf_follow[0]
+        if return_point:
+            point = []
+        if return_label and tf_follow is not None:
+            last_iteration = 0
+            label = np.zeros(len(tf_follow)) * np.nan
+
+
         obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
-        point = []
         inc = 0.1  # increment for the translation
+        spd = 1  # speed for tf_follow
+        z_vector = np.array([obs['surface_dist'][0]] * 10, dtype=float).reshape((-1, 1))
+        forward = True
 
         is_running = True
         while is_running:
@@ -360,22 +371,34 @@ class Simulation:
                                                 # obs["right_depth_camera"]
                                                 ], axis=1)
             z = obs["surface_dist"][0]
+            if forward:
+                z_vector[:-1] = z_vector[1:]
+                z_vector[-1] = z
+            else:
+                z_vector[1:] = z_vector[:-1]
+                z_vector[0] = z
             tf_global_agent = np.array(self.agent.transformation)  # transform origin body
             rot_global_flu = Tf.from_matrix(tf_global_agent).as_rot_mat() @ Habitat2FLU.rot_hab__flu
 
-            # Plotting sensors
-            print(simulation_iteration)
-            print(f'Height: {z}')
             has_collided = self.agent.contact_test()
-            print(f'has_collided: {has_collided}')
+            # Printing and plotting sensors
+            # print(iteration)
+            # print(f'Height: {z}')
+            # print(f'has_collided: {has_collided}')
+            # print(f'\n\n')
 
             # 4-Display and interactivity
             if camera_rgb:
-                cv2.imshow("rgb_stereo_pair", rgb_stereo_pair[..., ::-1])
+                cv2.imshow("rgb", rgb_stereo_pair[..., ::-1])
             if camera_depth:
                 depth_stereo_pair = np.clip(depth_stereo_pair, 0, 10)
                 depth_stereo_pair /= 10.0
-                cv2.imshow("depth_stereo_pair", depth_stereo_pair)
+                depth_stereo_pair = np.uint8(depth_stereo_pair * 255)
+                mask = [depth_stereo_pair == 0]
+                depth_stereo_pair = cv2.cvtColor(depth_stereo_pair, cv2.COLOR_GRAY2RGB)
+                depth_stereo_pair[mask] = (0, 0, 255)
+                cv2.imshow("depth", depth_stereo_pair)
+                cv2.imshow('z', z_vector)
             key_pressed = cv2.waitKey()
 
             # 5-Immobilizing the drone
@@ -418,26 +441,52 @@ class Simulation:
             if key_pressed == ord("d"):  # Right
                 self.agent.rotate_y_local(magnum.Rad(-20 / 180 * np.pi))
             # 7. Following the reference
-            try:
-                if key_pressed == ord("v"):
-                    simulation_iteration += 1
-                    self.agent.transformation = tf_follow[simulation_iteration]
-                if key_pressed == ord('c'):
-                    simulation_iteration -= 1
-                    self.agent.transformation = tf_follow[simulation_iteration]
-            except TypeError:
-                print(f'No tf_follow')
+            # try:
+            if key_pressed == ord("v"):
+                iteration = min(len(tf_follow) - 1, iteration + spd)
+                self.agent.transformation = tf_follow[iteration]
+                forward = True
+            if key_pressed == ord('c'):
+                iteration = max(0, iteration - spd)
+                last_iteration = min(last_iteration, iteration)
+                self.agent.transformation = tf_follow[iteration]
+                forward = False
+            if key_pressed == ord('7'):  # no label
+                label[last_iteration:iteration + 1] = 0
+                print(f'Label 0 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            if key_pressed == ord('8'):  # label drone_through_object
+                label[last_iteration:iteration + 1] = 1
+                print(f'Label 1 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            if key_pressed == ord('9'):  # label surface_discontinuity
+                label[last_iteration:iteration + 1] = 2
+                print(f'Label 2 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            if key_pressed == ord('0'):  # label surface_not_smooth
+                label[last_iteration:iteration + 1] = 3
+                print(f'Label 3 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            # except TypeError:
+            #     print(f'No tf_follow')
             if key_pressed == ord('['):
                 inc = max(inc - 0.1, 0.1)
                 print(f'Now inc is {inc}')
             if key_pressed == ord(']'):
                 inc = min(inc + 0.1, 2)
                 print(f'Now inc is {inc}')
-            if key_pressed == ord('o'):
+
+            if key_pressed == ord("u"):
+                spd = max(spd - 1, 1)
+                print(f'Now spd is {spd}')
+            if key_pressed == ord("i"):
+                spd = min(spd + 1, 10)
+                print(f'Now spd is {spd}')
+
+            if key_pressed == ord('n'):
                 print(f'Last point will be deleted:')
                 print(point)
-
-            if key_pressed == ord('i'):
+            if key_pressed == ord('m'):
                 tf = self.agent.transformation
                 print(f'Point saved: {tf}')
                 point.append(tf)
@@ -450,7 +499,11 @@ class Simulation:
             s.sensor_states['surface_dist'].rotation = np.quaternion(np.cos(0.25 * np.pi), -np.sin(0.25 * np.pi), 0, 0)
             self.sim.get_agent(0).set_state(s, False, False)
             obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
-        return np.stack(point, axis=0)
+        if return_label:
+            assert not np.isnan(label).any()
+            return label
+        if return_point:
+            return np.stack(point, axis=0)
 
     def one_step_sim(self, dt: float, state: np.ndarray, motor: np.ndarray,
                      z: float) -> Tuple[np.ndarray, Any, bool, np.ndarray]:
@@ -701,8 +754,8 @@ def main2():
     Generate data with habitat using Matterport3D dataset with a flying UAV following manually defined reference.
     """
     for scene_number in SCENE_NUMBER_MISSING_DATA:
-        scene_number = SCENE_NUMBER_MISSING_DATA[22]
-        for flight_number in range(0, 1):
+        scene_number = SCENE_NUMBER_MISSING_DATA[21]
+        for flight_number in range(1, 2):
             print(f'Generating data for scene {scene_number} and flight {flight_number}', file=sys.stderr, flush=True)
             gen_data(scene_number, flight_number, db_manual=True)
             print(f'\n' * 20, file=sys.stderr, flush=True)

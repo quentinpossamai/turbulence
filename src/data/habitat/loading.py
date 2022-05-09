@@ -88,7 +88,7 @@ def build_index_valid_flight(check_all_file: bool = True):
                     stats = load_file('stats', scene_number, number)
                     if stats['done'] is not None:  # If the drone has flight at least one step
                         mpc_error = load_file('mpc_error', scene_number, number)
-                        if (mpc_error < 5).all() and len(mpc_error) >= 200:  # If controller is not wrong and traj long
+                        if (mpc_error < 5).all() and len(mpc_error) >= 100:  # If controller is not wrong and traj long
                             # enough
                             index[scene_number][number] = len(mpc_error)
         except StopIteration:
