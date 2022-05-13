@@ -582,6 +582,7 @@ def observe_generated_traj(scene_number, flight_number):
                 assert (state0.shape == state1.shape)
                 assert (state0 == state1).all()
                 labels[scene_number][flight_number] = labels[scene_number][0]
+                pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
                 return
             except (FileNotFoundError, AssertionError):  # If 0 does not exist, create 1
                 pass
@@ -607,7 +608,6 @@ def observe_generated_traj(scene_number, flight_number):
     label = simulation.interactive_sim(camera_rgb=True, camera_depth=True, tf_follow=tf_follow, return_label=True)
     labels[scene_number][flight_number] = label
 
-    assert len(label)
     pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
     simulation.sim.close(True)
 

@@ -145,14 +145,16 @@ class AllHeight(pl.LightningModule, Run):
                       state: (batch, 13),
                       depth: (batch, self.past, 480, 640),
                       residual: (batch, 1),
-                      surface_dist: (batch, 1)}
+                      surface_dist: (batch, 1),
+                      label: (batch, self.past, 1)}
 
         return: Loss
         """
         z_hat = self.forward(depth=batch['depth'])
         z_gt = batch["surface_dist"]
-
-        loss = (z_gt - z_hat) ** 2
+        weight_per_batch = 1 - torch.any(batch['label'] == 1, dim=1).float()  # check for valid data
+        # label
+        loss = weight_per_batch * ((z_gt - z_hat) ** 2).squeeze()
         return loss.mean()
 
     def training_step(self, train_batch, batch_idx):
@@ -288,10 +290,10 @@ def main():
     args = parser.parse_args()
 
     # Display entire dataset
-    for name in ['train', 'valid', 'test']:
-        dataset_stats = habitat.HabitatResidualDataset(name, args.past, load_depth=True, load_depth_emb=False,
+    for sub_set_name in ['train', 'valid', 'test']:
+        dataset_stats = habitat.HabitatResidualDataset(sub_set_name, args.past, load_depth=True, load_depth_emb=False,
                                                        load_norm_emb=False, normed_depth=False)
-        print(name)
+        print(sub_set_name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {habitat.MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
         print(f'Data length: | {len(dataset_stats)}')

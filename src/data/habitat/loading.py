@@ -114,7 +114,7 @@ class HabitatResidualDataset(Dataset):
                  load_norm_emb: bool,
                  normed_depth: bool):
         #  False if '/Users/quentin' in WD_PATH else True
-        build_index_valid_flight(False)
+        build_index_valid_flight(False if '/Users/quentin' in WD_PATH else True)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -189,9 +189,12 @@ class HabitatResidualDataset(Dataset):
 
 
 def main():
-    dataset = HabitatResidualDataset('train', 40, True, False, False, False)
-    # dataloader = DataLoader(dataset, batch_size=int(dataset.len), shuffle=False, num_workers=1, pin_memory=True,
-    #                         drop_last=False)
+    dataset = HabitatResidualDataset('train', 10, True, False, False, False)
+    dataloader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=1, pin_memory=True,
+                            drop_last=False)
+    batch = next(iter(dataloader))
+    batch['label']
+    1 - torch.any(batch['label'] == 1, dim=1).float()
     a = dataset[0]
     print()
 
@@ -212,6 +215,13 @@ def main():
     # print('Computing max depth', flush=True)
     # for i in tqdm(range(len(dataset))):
     #     a = dataset[i]
+
+
+def _test():
+    index = build_index_valid_flight(False)
+    for scene_number, traj in index.items():
+        for flight_number, length in traj.items():
+            assert len(LABEL[scene_number][flight_number]) - 1 == length
 
 
 if __name__ == '__main__':
