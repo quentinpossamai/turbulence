@@ -44,6 +44,8 @@ MP3D_DATA = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
 
 SPLIT = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_split.pkl', 'rb'))
 
+LABEL = pickle.load(open(f'{DATA_HABITAT_PATH}labels.pkl', 'rb'))
+
 TRAIN = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_train.pkl', 'rb'))
 VALID = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_valid.pkl', 'rb'))
 TEST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_test.pkl', 'rb'))
@@ -73,8 +75,9 @@ def load_file(name: str, scene_number: int, flight_number: int):
 
 def build_index_valid_flight(check_all_file: bool = True):
     index = {i: {} for i in range(len(MP3D_SCENE_LIST))}
-    to_test = ['depth.npy', 'depth_emb/depth_emb.npy', 'ground_force.npy', 'motor.npy', 'mpc_error.npy',
-               'norm_emb/norm_emb.npy', 'state.npy', 'stats.pkl', 'surface_dist.npy']
+    # 'depth_emb/depth_emb.npy', 'norm_emb/norm_emb.npy'
+    to_test = ['depth.npy', 'ground_force.npy', 'motor.npy', 'mpc_error.npy',
+               'state.npy', 'stats.pkl', 'surface_dist.npy']
     for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
         try:  # Try finding flight folder
             flights = sorted([int(e) for e in next(os.walk(f'{MP3D_DATA}{scene_name}/{FLIGHT}/'))[1]])
@@ -110,7 +113,8 @@ class HabitatResidualDataset(Dataset):
                  load_depth_emb: bool,
                  load_norm_emb: bool,
                  normed_depth: bool):
-        build_index_valid_flight(False if '/Users/quentin' in WD_PATH else True)
+        #  False if '/Users/quentin' in WD_PATH else True
+        build_index_valid_flight(False)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -160,6 +164,7 @@ class HabitatResidualDataset(Dataset):
 
     def __getitem__(self, i) -> Dict[str, torch.FloatTensor]:
         scene_number, flight_number, start, stop = self.path[i]
+        label = LABEL[scene_number][flight_number][start:stop]
         to_return = {'state': torch.from_numpy(load_file('state', scene_number, flight_number)[stop - 1].copy()),
                      'motor': torch.from_numpy(load_file('motor', scene_number, flight_number)[stop - 1].copy()),
                      'ground_force': torch.from_numpy(load_file('ground_force',
@@ -167,8 +172,9 @@ class HabitatResidualDataset(Dataset):
                                                                 flight_number)[stop - 1].copy()),
                      'surface_dist': torch.from_numpy(load_file('surface_dist',
                                                                 scene_number,
-                                                                flight_number)[stop - 1].copy())
-                     }
+                                                                flight_number)[stop - 1].copy()),
+                     'label': torch.from_numpy(label.copy())}
+
         to_return['ground_force'] = (to_return['ground_force'] - self.fa_mean) / self.fa_std
         to_return['surface_dist'] = (to_return['surface_dist'] - self.z_mean) / self.z_std
         for key in self.depth_list:

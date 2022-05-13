@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from typing import Union, Callable, Tuple, Dict
+import sys
 import wandb
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
@@ -62,24 +63,26 @@ class AllHeight(pl.LightningModule, Run):
         self.depth_size = [480, 640]
         self.feature_size = self.motor_size + 13
 
+        # Dropout
+        self.dropout_input = nn.Dropout(0)
+        self.dropout = nn.Dropout(0)
+
         # - emb (embedding) branch
-        # self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
-        # self.emb_input_drop = nn.Dropout(0.)
         self.depth_conv2d_0 = nn.Conv2d(1, 16, (7, 7), 1, 3)
         self.depth_pool_0 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_1 = nn.Conv2d(16, 32, (3, 3), 1)
         self.depth_conv2d_2 = nn.Conv2d(32, 64, (3, 3), 2)
         self.depth_conv2d_3 = nn.Conv2d(64, 64, (3, 3), 1)
-        self.depth_pool_3 = nn.MaxPool2d((2, 2))
+        self.depth_pool_1 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_4 = nn.Conv2d(64, 32, (3, 3), 2)
-        self.depth_pool_4 = nn.MaxPool2d((2, 2))
+        self.depth_pool_2 = nn.MaxPool2d((2, 2))
         self.depth_conv2d_5 = nn.Conv2d(32, 4, (3, 3), 1)
-        self.depth_pool_5 = nn.MaxPool2d((2, 2))
-        self.depth_linear_0 = nn.Linear(in_features=4 * 6 * 8, out_features=128)
+        self.depth_pool_3 = nn.MaxPool2d((2, 2))
+        self.depth_linear_0 = nn.Linear(in_features=4 * 6 * 8, out_features=128)  # 192
         self.depth_linear_1 = nn.Linear(128, 50)
 
         # Time reduction
-        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
+        # self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
         # self.emb_gru_norm = nn.BatchNorm1d(50)
         # self.emb_gru_dropout = nn.Dropout(p=0.)
 
@@ -112,22 +115,27 @@ class AllHeight(pl.LightningModule, Run):
         out = self.activation(self.depth_conv2d_1(out))
         out = self.activation(self.depth_conv2d_2(out))
         out = self.activation(self.depth_conv2d_3(out))
-        out = self.depth_pool_3(out)
+        out = self.depth_pool_1(out)
         out = self.activation(self.depth_conv2d_4(out))
-        out = self.depth_pool_4(out)
+        out = self.depth_pool_2(out)
         out = self.activation(self.depth_conv2d_5(out))
-        out = self.depth_pool_5(out)
-        out = self.activation(self.depth_linear_0(out.reshape((-1, 4 * 6 * 8))))
+        out = self.depth_pool_3(out)
+        out = self.dropout_input(out.reshape((-1, 4 * 6 * 8)))
+        out = self.activation(self.depth_linear_0(out))
+        out = self.dropout(out)
         out = self.activation(self.depth_linear_1(out))
+        out = self.dropout(out)
 
-        out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
+        # out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         # out = out[:, -1, :]  # last hidden states, (*, feature_size)
         emb_out = out  # (batch, feature_size)
 
         # - reg branch
         # out = self.reg_fc_0(sm_out + emb_out)
         out = self.activation(self.reg_linear_0(emb_out))
+        out = self.dropout(out)
         out = self.activation(self.reg_linear_1(out))
+        out = self.dropout(out)
         out = self.reg_linear_out(out)
         return out
 
@@ -254,12 +262,12 @@ def main():
     training_path = f'{SAVING_PATH}{name}/{version}/'
     mkdir([training_path])
 
-    identifier = f'{name}-{version}-debug'
-    identifier = identifier if torch.cuda.is_available() else identifier + '_local'
+    identifier = f'{name}-{version}-raw'
     wandb.init(name=identifier,
                id=identifier,
                project='turbulence_residual',
-               dir=training_path)
+               dir=training_path,
+               mode='online' if sys.platform != 'darwin' else 'disabled')
     logger = WandbLogger(experiment=wandb.run)
 
     use_cuda_if_possible = True
@@ -273,15 +281,15 @@ def main():
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
     parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
-    parser.add_argument('--l2', default=1e-4, type=float, help="Number of past information to take in the model")
+    parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model")
     parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
-    parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
+    parser.add_argument('--past', default=1, type=int, help="Number of past information to take in the model")
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 
     # Display entire dataset
     for name in ['train', 'valid', 'test']:
-        dataset_stats = habitat.HabitatResidualDataset(name, args.past, load_depth=False, load_depth_emb=False,
+        dataset_stats = habitat.HabitatResidualDataset(name, args.past, load_depth=True, load_depth_emb=False,
                                                        load_norm_emb=False, normed_depth=False)
         print(name)
         for scene_number, scene_traj in dataset_stats.index.items():
@@ -313,16 +321,7 @@ def main():
     volumetric_mass = 200
     g = 9.81
     m = volumetric_mass * drone_width ** 2 * drone_height
-    drone_prms = {'width': drone_width,  # [m]
-                  'height': drone_height,  # [m]
-                  'm': m,  # [kg]
-                  'kt': m * g / (4 * 150 ** 2),  #
-                  'km': m * g / (4 * 150 ** 2) * 2 ** 0.5 * drone_width / 2,  #
-                  'l': 2 ** 0.5 * drone_width / 2,  # [m]
-                  'ix': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
-                  'iy': 1 / 3 * (drone_width ** 2 + drone_height ** 2) * m,  # [kg.m2]
-                  'iz': 1 / 3 * (drone_width ** 2 + drone_width ** 2) * m,  # [kg.m2]
-                  'prop_radius': drone_width * 0.1}  # [m]
+    drone_prms = habitat.DRONE_PRMS
     theta = np.array([drone_prms['kt'] / drone_prms['m'],
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],

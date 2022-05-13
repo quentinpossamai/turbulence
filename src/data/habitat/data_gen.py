@@ -528,7 +528,8 @@ class Simulation:
             ground_effect the external perturbation (float)
         """
         # 1. Motor and Ground Effect (gravity is done by habitat)
-        ground_effect = self.compute_ground_effect(motor, z, mu=20, cap=0.1, coef=10)
+        # new fa mu=20, coef=10
+        ground_effect = self.compute_ground_effect(motor, z, mu=1, cap=0.1, coef=1)
         quat = state[3:7]
         rot_body_fixed = Tf.from_quat_trans(quat, np.zeros(3)).as_rot_mat().T
         fa_body = rot_body_fixed @ ground_effect[:3]
@@ -755,8 +756,8 @@ def main2():
     Generate data with habitat using Matterport3D dataset with a flying UAV following manually defined reference.
     """
     for scene_number in SCENE_NUMBER_MISSING_DATA:
-        scene_number = SCENE_NUMBER_MISSING_DATA[21]
-        for flight_number in range(1, 2):
+        # scene_number = SCENE_NUMBER_MISSING_DATA[21]
+        for flight_number in range(0, 1):
             print(f'Generating data for scene {scene_number} and flight {flight_number}', file=sys.stderr, flush=True)
             gen_data(scene_number, flight_number, db_manual=True)
             print(f'\n' * 20, file=sys.stderr, flush=True)
