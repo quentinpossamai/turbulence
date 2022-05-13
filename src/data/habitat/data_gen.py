@@ -391,8 +391,9 @@ class Simulation:
             if camera_rgb:
                 cv2.imshow("rgb", rgb_stereo_pair[..., ::-1])
             if camera_depth:
-                depth_stereo_pair = np.clip(depth_stereo_pair, 0, 10)
-                depth_stereo_pair /= 10.0
+                max_depth = 5
+                depth_stereo_pair = np.clip(depth_stereo_pair, 0, max_depth)
+                depth_stereo_pair /= max_depth
                 depth_stereo_pair = np.uint8(depth_stereo_pair * 255)
                 mask = [depth_stereo_pair == 0]
                 depth_stereo_pair = cv2.cvtColor(depth_stereo_pair, cv2.COLOR_GRAY2RGB)
