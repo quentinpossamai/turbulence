@@ -73,7 +73,7 @@ def _debug_remove_wrong_predict():
 
 
 def main():
-    _debug_remove_wrong_predict()
+    model_predict()
 
 
 if __name__ == '__main__':
