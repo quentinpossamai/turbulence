@@ -5,6 +5,7 @@ cd ~/phd/turbulence/
 ~/anaconda3/envs/turbulence/bin/python -m src.drone_models.residual.all_height\
  --activation relu\
  --batch_size 20\
+ --dropout 0.5\
  --l2 0\
  --lr 1e-5\
  --max_epochs 10000\

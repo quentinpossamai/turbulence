@@ -22,13 +22,15 @@ from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
 from src.utils.path import mkdir, ANALYSIS_PATH
 
 
-class AllHeight(pl.LightningModule, Run):
-    def __init__(self, activation: str, l2: float, lr: float, uav_model: object, motor_size: int, past: int):
+class AllHeight(pl.LightningModule):
+    def __init__(self, activation: str, dropout: float, l2: float, lr: float, motor_size: int,
+                 past: int):
         """
         Model to predict residual f_a = f_aero. Takes motor, state and image from past timesteps.
 
         Args:
             activation: The activation function to use.
+            dropout: The dropout probability.
             l2: Float to penalize weights with l2 loss.
             lr: Learning rate for Adam optimizer.
             uav_model: Model of drone to use for rollout.
@@ -47,15 +49,13 @@ class AllHeight(pl.LightningModule, Run):
         self.motor_size = motor_size
         self.past = past
 
-        self.uav_model = uav_model
-        self.save_hyperparameters('activation', 'l2', 'lr', 'motor_size', 'past',
-                                  ignore=['uav_model'], logger=True)
+        self.save_hyperparameters(logger=True)
         self.depth_size = [480, 640]
         self.feature_size = self.motor_size + 13
 
         # Dropout
-        self.dropout_input = nn.Dropout(0)
-        self.dropout = nn.Dropout(0)
+        # self.dropout_input = nn.Dropout(0)
+        self.dropout = nn.Dropout(dropout)
 
         # - emb (embedding) branch
         self.depth_conv2d_0 = nn.Conv2d(1, 16, (7, 7), 1, 3)
@@ -110,7 +110,8 @@ class AllHeight(pl.LightningModule, Run):
         out = self.depth_pool_2(out)
         out = self.activation(self.depth_conv2d_5(out))
         out = self.depth_pool_3(out)
-        out = self.dropout_input(out.reshape((-1, 4 * 6 * 8)))
+
+        out = self.dropout(out.reshape((-1, 4 * 6 * 8)))
         out = self.activation(self.depth_linear_0(out))
         out = self.dropout(out)
         out = self.activation(self.depth_linear_1(out))
@@ -183,87 +184,6 @@ class AllHeight(pl.LightningModule, Run):
         val_loss = self.loss(z_gt, z_hat, label)
         self.log("val_loss", val_loss)
 
-    def rollout(self, **kwargs):  # TODO
-        """
-        kwargs: motor: (*, past + horizon, motor_size). t+1
-
-        kwargs: state: (*, past + horizon, 13). t
-
-        kwargs: depth_emb: (batch, past+horizon, values=128) t
-
-        kwargs: norm_emb: (batch, past+horizon, values=128) t
-
-        kwargs: embedding: (*, past + horizon, 128 or 256)
-
-        kwargs: dt: (*, past + horizon, 1). t+1 - t
-
-        kwargs: horizon: int
-
-        :return: (*, horizon, 13). state t+1
-        """
-        # Input processing
-        motor = kwargs['motor']
-        state = kwargs['state']
-        dt = kwargs['dt']
-        depth_emb = kwargs['depth_emb']
-        norm_emb = kwargs['norm_emb']
-        horizon = kwargs['horizon']
-
-        time_size = horizon + self.past
-        assert motor.shape[-1] == self.motor_size, f"motor len is not {self.motor_size}"
-        motor_shape = motor.shape
-        motor = motor.reshape(-1, time_size, self.motor_size)
-
-        assert state.shape[-1] == 13, "state len is not 13"
-        state_shape = state.shape
-        state = state.reshape(-1, time_size, 13)
-
-        assert depth_emb.shape[-1] == 128, "depth_emb len is not 128"
-        depth_emb_shape = depth_emb.shape
-        depth_emb = depth_emb.reshape(-1, time_size, 128)
-
-        assert norm_emb.shape[-1] == 128, "norm_emb len is not 128"
-        norm_emb_shape = norm_emb.shape
-        norm_emb = norm_emb.reshape(-1, time_size, 128)
-
-        assert dt.shape[-1] == 1, "dt len is not 1"
-        dt_shape = dt.shape
-        dt = dt.reshape(-1, time_size, 1)
-
-        pred_shape = list(state_shape)
-        pred_shape[-2] = horizon
-
-        assert motor_shape[:-1] == state_shape[:-1]
-        assert motor_shape[:-1] == depth_emb_shape[:-1]
-        assert motor_shape[:-1] == norm_emb_shape[:-1]
-        assert motor_shape[:-1] == dt_shape[:-1]
-        assert time_size == motor_shape[-2]
-        # Input processing end
-
-        next_state_gt = state[:, self.past:]
-
-        with torch.no_grad():
-            self.eval()
-            # Prediction rollout
-            prediction = [state[:, self.past - 1].view(-1, 1, 13)]
-            past_state = state[:, 0:self.past]
-            for i in range(horizon):
-                residual = self.forward(motor=motor[:, i + 1:self.past + i + 1],
-                                        state=past_state,
-                                        depth_emb=depth_emb[:, i:self.past + i],
-                                        norm_emb=norm_emb[:, i:self.past + i],
-                                        dt=dt[:, i + 1:self.past + i + 1])
-                next_state = self.model(motor=motor[:, i + 1],
-                                        state=prediction[-1].view(-1, 13),
-                                        dt=dt[:, i + 1],
-                                        residual=residual).view(-1, 1, 13)
-                prediction.append(next_state)
-                past_state = torch.cat([past_state[:, 1:], next_state], dim=1)
-
-        prediction = torch.cat(prediction, dim=1)[:, 1:]  # First is not a prediction
-        error = ((prediction - next_state_gt) ** 2)
-        return error.mean(), error.reshape(pred_shape), prediction.reshape(pred_shape)
-
 
 ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_training/'
 ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
@@ -300,6 +220,7 @@ def main():
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
     parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
+    parser.add_argument('--dropout', default=0.5, type=float, help='Dropout probability')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model")
     parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
     parser.add_argument('--past', default=1, type=int, help="Number of past information to take in the model")
@@ -322,6 +243,7 @@ def main():
               'name': residual_model_class.__name__,
               'activation': args.activation,
               'batch_size': args.batch_size,
+              'dropout': args.dropout,
               'l2': args.l2,
               'lr': args.lr,
               'motor_size': motor_size,
@@ -335,24 +257,12 @@ def main():
     seed = 0
     seed_everything(seed=seed, workers=True)
 
-    # Drone model for rollout
-    drone_width, drone_height = 0.1, 0.025
-    volumetric_mass = 200
-    g = 9.81
-    m = volumetric_mass * drone_width ** 2 * drone_height
-    drone_prms = habitat.DRONE_PRMS
-    theta = np.array([drone_prms['kt'] / drone_prms['m'],
-                      drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
-                      drone_prms['km'] / drone_prms['iz'],
-                      drone_prms['iz'] / drone_prms['ix']], dtype=np.float32)
-    quadrotor = DynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
-
     run = residual_model_class(activation=args.activation,
+                               dropout=args.dropout,
                                l2=args.l2,
-                               learning_rate=args.lr,
+                               lr=args.lr,
                                motor_size=motor_size,
-                               past=args.past,
-                               uav_model=quadrotor)
+                               past=args.past)
     logger.watch(run)
     # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
     #                               f'checkpoints/epoch=16-step=832.ckpt'
