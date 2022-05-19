@@ -42,8 +42,8 @@ def model_predict():
                 label_traj = torch.from_numpy(labels[scene_number][flight_number]).float().to(device)
                 length = len(depth)
                 label_data = torch.empty(length, h_prms['past']).to(device)
-                loss = (torch.empty(length) * torch.nan).to(device)
-                z_hat = (torch.empty(length, 1) * torch.nan).to(device)
+                loss = (torch.empty(length) * np.nan).to(device)
+                z_hat = (torch.empty(length, 1) * np.nan).to(device)
                 for i in range(h_prms['past'], length + 1):
                     label_data[i - 1] = label_traj[i - h_prms['past']:i]
                     z_hat[i - 1] = model(depth[i - h_prms['past']:i].unsqueeze(0))
