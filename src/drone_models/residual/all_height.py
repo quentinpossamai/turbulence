@@ -23,27 +23,17 @@ from src.utils.path import mkdir, ANALYSIS_PATH
 
 
 class AllHeight(pl.LightningModule, Run):
-    def __init__(self,
-                 activation: str,
-                 l2: float,
-                 learning_rate: float,
-                 uav_model: object,
-                 motor_size: int,
-                 past: int):
+    def __init__(self, activation: str, l2: float, lr: float, uav_model: object, motor_size: int, past: int):
         """
         Model to predict residual f_a = f_aero. Takes motor, state and image from past timesteps.
 
-        param activation: The activation function to use.
-
-        param l2: float to penalize weights with l2 loss.
-
-        param learning_rate: Learning rate for Adam optimizer.
-
-        param uav_model: Model of drone to use for rollout.
-
-        param motor_size: The number of motors.
-
-        param past: The number of past state and motor measures to use.
+        Args:
+            activation: The activation function to use.
+            l2: Float to penalize weights with l2 loss.
+            lr: Learning rate for Adam optimizer.
+            uav_model: Model of drone to use for rollout.
+            motor_size: The number of motors.
+            past: The number of past state and motor measures to use.
         """
         super().__init__()
         self.activation = None
@@ -53,12 +43,12 @@ class AllHeight(pl.LightningModule, Run):
         elif activation == "tanh":
             self.activation = torch.tanh  # torch.tanh or f.relu
         self.l2 = l2
-        self.learning_rate = learning_rate
+        self.learning_rate = lr
         self.motor_size = motor_size
         self.past = past
 
         self.uav_model = uav_model
-        self.save_hyperparameters('activation', 'l2', 'learning_rate', 'motor_size', 'past',
+        self.save_hyperparameters('activation', 'l2', 'lr', 'motor_size', 'past',
                                   ignore=['uav_model'], logger=True)
         self.depth_size = [480, 640]
         self.feature_size = self.motor_size + 13
@@ -82,9 +72,9 @@ class AllHeight(pl.LightningModule, Run):
         self.depth_linear_1 = nn.Linear(128, 50)
 
         # Time reduction
-        # self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
-        # self.emb_gru_norm = nn.BatchNorm1d(50)
-        # self.emb_gru_dropout = nn.Dropout(p=0.)
+        if self.past > 1:
+            self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
+            self.emb_gru_dropout = nn.Dropout(p=0.)
 
         # - reg (regression) branch
         self.reg_linear_0 = nn.Linear(50, 50)
@@ -100,11 +90,11 @@ class AllHeight(pl.LightningModule, Run):
         r"""
         Estimate the residual
 
-        param depth: (*, past, 128 or 256)
+        param depth: (*, 1, 480, 640)
 
         Generally * means batch dimension or more but must exist during training to compute batch_norm.
 
-        return: (*, value=1)
+        return: (*, 1)
         """
         # - Input processing
         assert list(depth.shape[-3:]) == [self.past, 480, 640]
@@ -126,8 +116,9 @@ class AllHeight(pl.LightningModule, Run):
         out = self.activation(self.depth_linear_1(out))
         out = self.dropout(out)
 
-        # out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
-        # out = out[:, -1, :]  # last hidden states, (*, feature_size)
+        if self.past > 1:
+            out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
+            out = out[:, -1, :]  # last hidden states, (*, feature_size)
         emb_out = out  # (batch, feature_size)
 
         # - reg branch
@@ -139,31 +130,57 @@ class AllHeight(pl.LightningModule, Run):
         out = self.reg_linear_out(out)
         return out
 
-    def step(self, batch):
+    def loss(self, z_gt, z_hat, label):
         """
-        param batch: {motor: (batch, 6),
-                      state: (batch, 13),
-                      depth: (batch, self.past, 480, 640),
-                      residual: (batch, 1),
-                      surface_dist: (batch, 1),
-                      label: (batch, self.past, 1)}
+        Args:
+            z_gt: (batch, 1),
+            z_hat: (batch, 1),
+            label: (batch, self.past, 1)
 
-        return: Loss
+        Returns: The loss used by the model.
         """
-        z_hat = self.forward(depth=batch['depth'])
-        z_gt = batch["surface_dist"]
-        weight_per_batch = 1 - torch.any(batch['label'] == 1, dim=1).float()  # check for valid data
-        # label
-        loss = weight_per_batch * ((z_gt - z_hat) ** 2).squeeze()
-        return loss.mean()
+        data_to_use = 1 - torch.any(label == 1, dim=1).float()  # check for valid data,
+        # data with label 1 is invalid
+
+        weight_surface_diff = 1
+        surface_diff = data_to_use * ((label == 2)[:, -1].float() * (weight_surface_diff - 1) + 1)
+
+        weight_noisy_data = 1
+        noisy_data = data_to_use * ((label == 3)[:, -1].float() * (weight_noisy_data - 1) + 1)
+
+        loss = data_to_use * ((z_gt - z_hat) ** 2).squeeze()
+        loss = loss * surface_diff
+        loss = loss * noisy_data
+        return loss
 
     def training_step(self, train_batch, batch_idx):
-        training_loss = self.step(train_batch)
+        """
+        Args:
+            train_batch: {motor: (batch, 6),
+                          state: (batch, 13),
+                          depth: (batch, self.past, 480, 640),
+                          residual: (batch, 1),
+                          label: (batch, self.past, 1)}
+            batch_idx:
+
+        Returns:
+
+        """
+        z_gt = train_batch["surface_dist"]
+        z_hat = self.forward(depth=train_batch['depth'])
+        label = train_batch["label"]
+        training_loss = self.loss(z_gt, z_hat, label).mean()
         self.log("train_loss", training_loss)
         return training_loss
 
     def validation_step(self, val_batch, batch_idx):
-        val_loss = self.step(val_batch)
+        """
+        Cf. training_step docstring.
+        """
+        z_gt = val_batch["surface_dist"]
+        z_hat = self.forward(depth=val_batch['depth'])
+        label = val_batch["label"]
+        val_loss = self.loss(z_gt, z_hat, label)
         self.log("val_loss", val_loss)
 
     def rollout(self, **kwargs):  # TODO

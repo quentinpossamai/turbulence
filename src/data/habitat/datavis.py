@@ -1042,6 +1042,7 @@ def predict_good_fa():
 
 
 def main():
+    pass
     # plot_fa_law()
     # plot_fa()
     # plot_model_prediction('emb')
@@ -1051,16 +1052,16 @@ def main():
     # for e in ['fine_norm']:
     #     rmse_model_prediction(e, 'euroc_mav')
 
-    index = habitat.build_index_valid_flight(False)
-    count = 0
-    for e in index.values():
-        count += len(e)
-        assert len(e) != 0  # all scene have a trajectory
-    print(f'Total trajectory: {count}')
-
-    for scene_number, traj in index.items():
-        for flight_number in traj:
-            observe_generated_traj(scene_number, flight_number)
+    # index = habitat.build_index_valid_flight(False)
+    # count = 0
+    # for e in index.values():
+    #     count += len(e)
+    #     assert len(e) != 0  # all scene have a trajectory
+    # print(f'Total trajectory: {count}')
+    #
+    # for scene_number, traj in index.items():
+    #     for flight_number in traj:
+    #         observe_generated_traj(scene_number, flight_number)
     # observe_generated_traj(24, 16)
     # boxplot_pred()
     # euroc_mav_table()

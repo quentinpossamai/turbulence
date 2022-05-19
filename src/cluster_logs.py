@@ -5,7 +5,7 @@ print(f"CWD: {os.getcwd()}")
 # tb_local_path = "/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/"
 tb_cluster_path = "/home/qpossamai/phd/turbulence/analysis/habitat_residual_training/"
 tb_local_path = "/Users/quentin/phd/turbulence/analysis/habitat_residual_training/"
-os.system(f"rsync -rtv --delete --exclude=.DS_Store remsto:{tb_cluster_path} {tb_local_path}")
+os.system(f"rsync -rtvP --exclude=.DS_Store remsto:{tb_cluster_path} {tb_local_path}")
 # os.system(f"rsync -rtv --exclude=.DS_Store {tb_local_path} remsto:{tb_cluster_path}")
 # os.system(f'ssh remsto /bin/bash << EOF\n'
 #           # f'cd /home/qpossamai &&\n'

@@ -9,7 +9,7 @@ import torchvision.transforms.functional as f
 
 from typing import Dict, Tuple, Any, Union, List
 
-from src.utils.path import WD_PATH
+import src.utils.path as path
 
 
 def define_drone() -> Dict[str, float]:
@@ -37,7 +37,7 @@ THETA = np.array([DRONE_PRMS['kt'] / DRONE_PRMS['m'],
                   DRONE_PRMS['km'] / DRONE_PRMS['iz'],
                   DRONE_PRMS['iz'] / DRONE_PRMS['ix']])
 
-DATA_HABITAT_PATH = f'{WD_PATH}data/habitat/'
+DATA_HABITAT_PATH = f'{path.WD_PATH}data/habitat/'
 MP3D_SCENE_LIST = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_scene_list.pkl', 'rb'))
 GEN_DATA_KEY = ['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force']
 MP3D_DATA = f'{DATA_HABITAT_PATH}scene_datasets/mp3d/'
@@ -71,6 +71,16 @@ def load_file(name: str, scene_number: int, flight_number: int):
         return np.load(f'{folder}{name}/{name}.npy', mmap_mode='r', allow_pickle=False)
     else:
         return np.load(f'{folder}{name}.npy', mmap_mode='r', allow_pickle=False)
+
+
+def save_file(name: str, data: Any, scene_number: int, flight_number: int):
+    scene_id = MP3D_SCENE_LIST[scene_number]
+    general_folder = f'{MP3D_DATA}{scene_id}/{FLIGHT}/{flight_number}/'
+    all_folders = f'{general_folder}{name}.npy'.split('/')
+    folder = '/'.join(all_folders[:-1]) + '/'
+    path.mkdir([folder])
+    name = all_folders[-1]
+    np.save(f'{folder}{name}', data)
 
 
 def build_index_valid_flight(check_all_file: bool = True):
@@ -114,7 +124,7 @@ class HabitatResidualDataset(Dataset):
                  load_norm_emb: bool,
                  normed_depth: bool):
         #  False if '/Users/quentin' in WD_PATH else True
-        build_index_valid_flight(False if '/Users/quentin' in WD_PATH else True)
+        build_index_valid_flight(False if '/Users/quentin' in path.WD_PATH else True)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -193,9 +203,6 @@ def main():
     dataloader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=1, pin_memory=True,
                             drop_last=False)
     batch = next(iter(dataloader))
-    batch['label']
-    1 - torch.any(batch['label'] == 1, dim=1).float()
-    a = dataset[0]
     print()
 
     index = build_index_valid_flight(False)
