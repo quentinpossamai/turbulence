@@ -15,6 +15,7 @@ import src.data.euroc_mav.loading2 as euroc_mav
 import src.data.habitat.data_gen as data_gen
 import src.data.habitat.hatbitat2flu as hatbitat2flu
 from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+import src.utils.path as path
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
 
@@ -613,10 +614,16 @@ def observe_generated_traj(scene_number, flight_number):
 
 
 def observe_traj_pred(scene_number, flight_number):
-    index = habitat.build_index_valid_flight(False)
-    assert scene_number in index, 'Scene must have data.'
-    assert flight_number in index[scene_number], 'Trajectory must be valid.'
+    model_path = f'{path.ANALYSIS_PATH}habitat_residual_training/'
+    model_part_path = 'AllHeight/20220513_154038/'
+    model_ckpt = 'epoch=78-step=894042-val_loss=0.04.ckpt'
+    model_path = f'{model_path}{model_part_path}'
+    name = f'''{model_part_path.replace('/', '_')}{model_ckpt[:-5]}'''
+    past = 1
 
+    color = {0: 'white', 1: 'red', 2: 'green', 3: 'yellow'}
+
+    labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
     if scene_number in habitat.TRAIN:
         split = 'Train'
     elif scene_number in habitat.VALID:
@@ -626,17 +633,23 @@ def observe_traj_pred(scene_number, flight_number):
         split = 'Test'
 
     scene_id = habitat.MP3D_SCENE_LIST[scene_number]
-    scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    scene_path = f"{path.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
-    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
-    state = habitat.load_file('state', scene_number, flight_number)
-    state_habitat = hatbitat2flu.Habitat2FLUACC.state_flu_2_state_habitat(state)
-    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
+    sim = data_gen.Simulation(scene_path, camera_resolution=np.array([480, 640]),
+                              drone_prms=habitat.DRONE_PRMS,
+                              gravity=9.81)
+    label = labels[scene_number][flight_number]
 
-    z_hat_40, loss = habitat.load_file('emb_prediction1', scene_number, flight_number)
-    z_hat_40 = z_hat_40.numpy()
-    past = 40
-    z_gt = habitat.load_file('surface_dist', scene_number, flight_number).squeeze()
+    flight_folder = f'{habitat.get_flight_folder(scene_number, flight_number)}pred/'
+    pred = np.load(f'{flight_folder}{name}.npz')
+
+    loss = pred['loss']
+    z_gt = pred['z_gt']
+    z_hat = pred['z_hat']
+
+    state = habitat.load_file('state', scene_number, flight_number)
+    state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
+    tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
 
     # If scene is not downloaded
     command = f'rsync -tvP --progress remsto:{cluster_scene_path} {scene_path}'
@@ -645,8 +658,6 @@ def observe_traj_pred(scene_number, flight_number):
         raise (FileNotFoundError('Scene is not in local'))
         os.system(command)  # if scene not downloaded
 
-    sim = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=habitat.DRONE_PRMS,
-                              gravity=9.81)
     from matplotlib.lines import Line2D
     import matplotlib.image as mpl_image
     from matplotlib.text import Text
@@ -673,8 +684,15 @@ def observe_traj_pred(scene_number, flight_number):
     else:
         line_im: List[mpl_image.AxesImage] = [ax_im.imshow(depth[0], vmax=vmax)]
     line_z_gt: Line2D = ax_z.plot(z_gt, label='z GT')
-    line_z_hat: Line2D = ax_z.plot(range(past, len(z_gt)), z_hat_40, label='z hat')
+    line_z_hat: Line2D = ax_z.plot(range(past - 1, len(z_gt)), z_hat, label='z hat')
     line_v: Line2D = ax_z.axvline(iteration[0], c='k')
+
+    slices = np.concatenate([np.zeros(1), np.where(np.diff(label) != 0)[0] + 2, np.array([len(label)])])
+    for i in range(len(slices) - 1):
+        start = int(slices[i])
+        end = int(slices[i + 1]) - 1
+        print(start, end)
+        ax_z.axvspan(start - 0.5, end + 0.5, color=color[label[start]], alpha=0.5)
 
     ax_z.legend()
     ax_z.grid()
@@ -699,7 +717,7 @@ def observe_traj_pred(scene_number, flight_number):
             line_im[0].set_data(im[0])
         else:
             line_im[0].set_data(depth[0])
-        ax_z.set_xlim([iteration[0] - past, iteration[0] + past])
+        ax_z.set_xlim([iteration[0] - 40, iteration[0] + 40])
         line_v.set_data(([iteration[0], iteration[0]], [0, 1]))
 
         # ax_im.set_title(f'Frame # {iteration[0]}')
@@ -739,6 +757,7 @@ def observe_traj_pred(scene_number, flight_number):
     # plt.tight_layout()
 
     plt.show()
+    sim.sim.close(True)
 
 
 def boxplot_pred():
@@ -1041,27 +1060,49 @@ def predict_good_fa():
         pickle.dump(fa_hat_corrected, open(f'{habitat.WD_PATH}data_prediction/fa_{e}_corrected', 'wb'))
 
 
-def main():
-    pass
-    # plot_fa_law()
-    # plot_fa()
-    # plot_model_prediction('emb')
-    # ['nogru', 'all', 'emb', 'fine', 'emb_norm', 'fine_norm']
-    # for e in ['fine_norm']:
-    #     rmse_model_prediction(e, 'habitat')
-    # for e in ['fine_norm']:
-    #     rmse_model_prediction(e, 'euroc_mav')
+def analyse_prediction():
+    labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
+    model_path = f'{path.ANALYSIS_PATH}habitat_residual_training/'
+    model_part_path = 'AllHeight/20220513_154038/'
+    model_ckpt = 'epoch=78-step=894042-val_loss=0.04.ckpt'
+    model_path = f'{model_path}{model_part_path}'
+    name = f'''{model_part_path.replace('/', '_')}{model_ckpt[:-5]}'''
+    color = {0: 'white', 1: 'red', 2: 'green', 3: 'yellow'}
 
-    # index = habitat.build_index_valid_flight(False)
-    # count = 0
-    # for e in index.values():
-    #     count += len(e)
-    #     assert len(e) != 0  # all scene have a trajectory
-    # print(f'Total trajectory: {count}')
-    #
-    # for scene_number, traj in index.items():
-    #     for flight_number in traj:
-    #         observe_generated_traj(scene_number, flight_number)
+    scene_number = 0
+    flight_number = 3
+    for scene_number, traj in enumerate(labels):
+        if scene_number in habitat.TRAIN:
+            split = 'train'
+        elif scene_number in habitat.VALID:
+            split = 'val'
+        else:
+            split = 'test'
+        for flight_number, label in traj.items():
+
+            flight_folder = f'{habitat.get_flight_folder(scene_number, flight_number)}pred/'
+            pred = np.load(f'{flight_folder}{name}.npz')
+            loss = pred['loss']
+            z_gt = pred['z_gt']
+            z_hat = pred['z_hat']
+
+            plt.plot(z_gt, label='z_gt')
+            plt.plot(z_hat, label='z_hat')
+            for i, e in enumerate(label):
+                plt.axvspan(i - 0.5, i + 0.5, color=color[e])
+            plt.grid()
+            plt.ylabel('z [m]')
+            plt.xlabel('Time [sample #]')
+            plt.title(f'Scene_number {scene_number} Flight_number {flight_number} split {split}')
+            plt.legend()
+            plt.show()
+
+
+def main():
+    labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
+    for scene_number in habitat.TEST:
+        for flight_number in labels[scene_number]:
+            observe_traj_pred(scene_number, flight_number)
     # observe_generated_traj(24, 16)
     # boxplot_pred()
     # euroc_mav_table()
