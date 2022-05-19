@@ -1071,7 +1071,11 @@ def analyse_prediction():
 
     scene_number = 0
     flight_number = 3
-    for scene_number, traj in enumerate(labels):
+    z_gt_big = []
+    z_hat_big = []
+    label_big = []
+    for scene_number in habitat.TEST:
+        traj = labels[scene_number]
         if scene_number in habitat.TRAIN:
             split = 'train'
         elif scene_number in habitat.VALID:
@@ -1079,23 +1083,33 @@ def analyse_prediction():
         else:
             split = 'test'
         for flight_number, label in traj.items():
-
             flight_folder = f'{habitat.get_flight_folder(scene_number, flight_number)}pred/'
             pred = np.load(f'{flight_folder}{name}.npz')
             loss = pred['loss']
             z_gt = pred['z_gt']
             z_hat = pred['z_hat']
 
-            plt.plot(z_gt, label='z_gt')
-            plt.plot(z_hat, label='z_hat')
-            for i, e in enumerate(label):
-                plt.axvspan(i - 0.5, i + 0.5, color=color[e])
-            plt.grid()
-            plt.ylabel('z [m]')
-            plt.xlabel('Time [sample #]')
-            plt.title(f'Scene_number {scene_number} Flight_number {flight_number} split {split}')
-            plt.legend()
-            plt.show()
+            label_big.append(label)  # todo include past labels
+            z_gt_big.append(z_gt)
+            z_hat_big.append(z_hat)
+    z_gt_big = np.concatenate(z_gt_big, 0)
+    z_hat_big = np.concatenate(z_hat_big, 0)
+    label_big = np.concatenate(label_big, 0)
+    assert np.isnan(z_hat_big).sum() == 0
+
+    # Reject bad label
+
+    loss_none_nogru_raw = ((z_gt_big - z_hat_big) ** 2).mean()
+    loss_none_nogru = ((z_gt_big - z_hat_big) ** 2)[np.where(label_big != 1)[0]].mean()
+
+    # Keep only 0
+    loss_none_nogru_0 = ((z_gt_big - z_hat_big) ** 2)[np.where(label_big == 0)[0]].mean()
+
+    # Keep only 2
+    loss_none_nogru_2 = ((z_gt_big - z_hat_big) ** 2)[np.where(label_big == 2)[0]].mean()
+
+    # Keep only 3
+    loss_none_nogru_3 = ((z_gt_big - z_hat_big) ** 2)[np.where(label_big == 3)[0]].mean()
 
 
 def main():
@@ -1103,10 +1117,8 @@ def main():
     for scene_number in habitat.TEST:
         for flight_number in labels[scene_number]:
             observe_traj_pred(scene_number, flight_number)
-    # observe_generated_traj(24, 16)
-    # boxplot_pred()
-    # euroc_mav_table()
-    # predict_good_fa()
+
+    # analyse_prediction()
 
 
 if __name__ == '__main__':

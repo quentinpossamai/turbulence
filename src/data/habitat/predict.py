@@ -32,6 +32,8 @@ def model_predict():
     model.eval()
 
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std
+    t_z_mean = torch.tensor(z_mean).to(device)
+    t_z_std = torch.tensor(z_std).to(device)
 
     with torch.no_grad():
         for scene_number, traj in tqdm(index.items()):
@@ -43,16 +45,21 @@ def model_predict():
                 length = len(depth)
                 label_data = torch.empty(length, h_prms['past']).to(device)
                 loss = (torch.empty(length) * np.nan).to(device)
+                loss_meter = (torch.empty(length) * np.nan).to(device)
                 z_hat = (torch.empty(length, 1) * np.nan).to(device)
                 for i in range(h_prms['past'], length + 1):
                     label_data[i - 1] = label_traj[i - h_prms['past']:i]
                     z_hat[i - 1] = model(depth[i - h_prms['past']:i].unsqueeze(0))
                 loss[h_prms['past'] - 1:] = model.loss(z_gt[h_prms['past'] - 1:], z_hat[h_prms['past'] - 1:],
                                                        label_data[h_prms['past'] - 1:])
+                loss_meter[h_prms['past'] - 1:] = model.loss(z_gt[h_prms['past'] - 1:] * t_z_std + t_z_mean,
+                                                             z_hat[h_prms['past'] - 1:] * t_z_std + t_z_mean,
+                                                             label_data[h_prms['past'] - 1:])
                 flight_folder = f'{habitat.get_flight_folder(scene_number, flight_number)}pred/'
                 path.mkdir([flight_folder])
                 np.savez(f'{flight_folder}{name}.npz',
                          loss=loss.cpu().numpy(),
+                         loss_meter=loss_meter.cpu().numpy(),
                          z_gt=z_gt.cpu().numpy() * z_std + z_mean,
                          z_hat=z_hat.cpu().numpy() * z_std + z_mean)
 
