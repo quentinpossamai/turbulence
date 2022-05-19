@@ -193,7 +193,7 @@ mkdir([SAVING_PATH])
 
 
 def main():
-    profiler()
+    # profiler()
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     version = f'{now}'
     residual_model_class = AllHeight
