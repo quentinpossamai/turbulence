@@ -61,8 +61,7 @@ def load_file(name: str, scene_number: int, flight_number: int):
 
     param flight_number: in Z
     """
-    scene_id = MP3D_SCENE_LIST[scene_number]
-    folder = f'{MP3D_DATA}{scene_id}/{FLIGHT}/{flight_number}/'
+    folder = get_flight_folder(scene_number, flight_number)
     assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
                     'depth_emb', 'norm_emb', 'emb_prediction1']
     if name in ['stats', 'emb_prediction1']:
@@ -73,14 +72,10 @@ def load_file(name: str, scene_number: int, flight_number: int):
         return np.load(f'{folder}{name}.npy', mmap_mode='r', allow_pickle=False)
 
 
-def save_file(name: str, data: Any, scene_number: int, flight_number: int):
+def get_flight_folder(scene_number: int, flight_number: int):
     scene_id = MP3D_SCENE_LIST[scene_number]
     general_folder = f'{MP3D_DATA}{scene_id}/{FLIGHT}/{flight_number}/'
-    all_folders = f'{general_folder}{name}.npy'.split('/')
-    folder = '/'.join(all_folders[:-1]) + '/'
-    path.mkdir([folder])
-    name = all_folders[-1]
-    np.save(f'{folder}{name}', data)
+    return general_folder
 
 
 def build_index_valid_flight(check_all_file: bool = True):
