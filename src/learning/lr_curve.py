@@ -17,8 +17,8 @@ def main():
     power = torch.linspace(-9, 0, 100)
     lr_test = 10 ** power
     sample_size = 20
-
-    model = model_builder.AllHeight('relu', 0.5, 0, lr_test[0], 4, past)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = model_builder.AllHeight('relu', 0.5, 0, lr_test[0], 4, past).to(device)
     model.train()
     loss_mean = torch.zeros_like(lr_test)
     loss_std = torch.zeros_like(lr_test)
@@ -28,8 +28,9 @@ def main():
         optimizer = model.configure_optimizers()
         for j in range(sample_size):
             batch = train_dataloader.__iter__().__next__()
+            batch = {key: value.to(device) for key, value in batch.items()}
             loss = model.training_step(batch, 1)
-            tmp_loss[j] = loss.item()
+            tmp_loss[j] = loss.cpu().item()
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
