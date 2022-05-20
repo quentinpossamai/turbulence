@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 import src.data.habitat.loading as habitat
 import src.utils.path as path
+from src.drone_models.residual.all_height import get_trained_model
 
 
 def model_predict():
@@ -15,20 +16,8 @@ def model_predict():
     index = habitat.build_index_valid_flight(True)
 
     # Model
-    model_path = f'{path.ANALYSIS_PATH}habitat_residual_training/'
-    model_part_path = 'AllHeight/20220513_154038/'
-    model_ckpt = 'epoch=78-step=894042-val_loss=0.04.ckpt'
-    model_path = f'{model_path}{model_part_path}'
-    name = f'''{model_part_path.replace('/', '_')}{model_ckpt[:-5]}'''
-    from src.drone_models.residual.all_height import AllHeight
-    h_prms = pickle.load(open(f'{model_path}h_prms.pkl', 'rb'))
-    model = AllHeight.load_from_checkpoint(f'{model_path}{model_ckpt}',
-                                           activation=h_prms['activation'],
-                                           l2=h_prms['l2'],
-                                           lr=h_prms['lr'],
-                                           uav_model=None,
-                                           motor_size=h_prms['motor_size'],
-                                           past=h_prms['past']).to(device)
+    model, h_prms, name = get_trained_model('none_raw')
+    model.to(device)
     model.eval()
 
     z_mean, z_std = habitat.HabitatResidualDataset.z_mean, habitat.HabitatResidualDataset.z_std

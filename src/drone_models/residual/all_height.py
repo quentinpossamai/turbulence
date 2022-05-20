@@ -19,7 +19,7 @@ import src.data.habitat.loading as habitat
 from src.drone_models.model_structure import Run
 from src.utils.profiler import profiler
 from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
-from src.utils.path import mkdir, ANALYSIS_PATH
+import src.utils.path as path
 
 
 class AllHeight(pl.LightningModule):
@@ -45,7 +45,7 @@ class AllHeight(pl.LightningModule):
         elif activation == "tanh":
             self.activation = torch.tanh  # torch.tanh or f.relu
         self.l2 = l2
-        self.learning_rate = lr
+        self.lr = lr
         self.motor_size = motor_size
         self.past = past
 
@@ -84,7 +84,7 @@ class AllHeight(pl.LightningModule):
         self.example_input_array = [torch.zeros(2, self.past, 480, 640)]
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l2)
+        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2)
 
     def forward(self, depth: torch.Tensor):
         r"""
@@ -171,7 +171,7 @@ class AllHeight(pl.LightningModule):
         z_hat = self.forward(depth=train_batch['depth'])
         label = train_batch["label"]
         training_loss = self.loss(z_gt, z_hat, label).mean()
-        self.log("train_loss", training_loss)
+        # self.log("train_loss", training_loss)  # todo
         return training_loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -185,11 +185,11 @@ class AllHeight(pl.LightningModule):
         self.log("val_loss", val_loss)
 
 
-ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_training/'
-ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
+ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}euroc_mav_residual_training/'
+ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}habitat_residual_training/'
 
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
-mkdir([SAVING_PATH])
+path.mkdir([SAVING_PATH])
 
 
 def main():
@@ -199,7 +199,7 @@ def main():
     residual_model_class = AllHeight
     name = residual_model_class.__name__
     training_path = f'{SAVING_PATH}{name}/{version}/'
-    mkdir([training_path])
+    path.mkdir([training_path])
 
     identifier = f'{name}-{version}-raw'
     wandb.init(name=identifier,
@@ -226,11 +226,12 @@ def main():
     parser.add_argument('--past', default=1, type=int, help="Number of past information to take in the model")
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
-
     # Display entire dataset
+    check_all_file = False if '/Users/quentin' in path.WD_PATH else True
     for sub_set_name in ['train', 'valid', 'test']:
         dataset_stats = habitat.HabitatResidualDataset(sub_set_name, args.past, load_depth=True, load_depth_emb=False,
-                                                       load_norm_emb=False, normed_depth=False)
+                                                       load_norm_emb=False, normed_depth=False,
+                                                       check_all_file=check_all_file)
         print(sub_set_name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {habitat.MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
@@ -275,7 +276,8 @@ def main():
     train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
                                                            load_depth_emb=load_depth_emb,
                                                            load_norm_emb=load_norm_emb,
-                                                           normed_depth=False),
+                                                           normed_depth=False,
+                                                           check_all_file=check_all_file),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
@@ -285,7 +287,8 @@ def main():
     validation_data = DataLoader(habitat.HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
                                                                 load_depth_emb=load_depth_emb,
                                                                 load_norm_emb=load_norm_emb,
-                                                                normed_depth=False),
+                                                                normed_depth=False,
+                                                                check_all_file=check_all_file),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
@@ -313,6 +316,39 @@ def main():
         trainer.validate(run, dataloaders=validation_data)
     trainer.fit(run, train_data, validation_data)
     print(checkpoint_callback.best_model_path)
+
+
+def get_trained_model(name: str):
+    """
+
+    Args:
+        name:
+        ['none_raw',
+         'none_gru',
+         'depth_gru',
+         'depth_gru_finetune',
+         'norm_gru',
+         'norm_gru_finetune']
+
+    Returns: The strings and path associated to the model.
+    """
+    if name == 'none_raw':
+        model_path = f'{path.ANALYSIS_PATH}habitat_residual_training/'
+        model_part_path = 'AllHeight/20220513_154038/'
+        model_ckpt = 'epoch=78-step=894042-val_loss=0.04.ckpt'
+        model_path = f'{model_path}{model_part_path}'
+        name = f'''{model_part_path.replace('/', '_')}{model_ckpt[:-5]}'''
+        h_prms = pickle.load(open(f'{model_path}h_prms.pkl', 'rb'))
+        model = AllHeight.load_from_checkpoint(f'{model_path}{model_ckpt}',
+                                               activation=h_prms['activation'],
+                                               l2=h_prms['l2'],
+                                               lr=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+    else:
+        raise NotImplemented
+    return model, h_prms, name
 
 
 if __name__ == "__main__":

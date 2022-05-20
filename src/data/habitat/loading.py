@@ -117,9 +117,11 @@ class HabitatResidualDataset(Dataset):
                  load_depth: bool,
                  load_depth_emb: bool,
                  load_norm_emb: bool,
-                 normed_depth: bool):
+                 normed_depth: bool,
+                 check_all_file: bool = True):
         #  False if '/Users/quentin' in WD_PATH else True
-        build_index_valid_flight(False if '/Users/quentin' in path.WD_PATH else True)
+        self.check_all_file = check_all_file
+        build_index_valid_flight(self.check_all_file)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
