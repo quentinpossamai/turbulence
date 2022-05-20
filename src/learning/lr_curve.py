@@ -9,14 +9,14 @@ import src.data.habitat.loading as habitat
 import src.utils.path as path
 
 
-def main():
+def create_lr_tests():
     past = 1
     train_dataset = habitat.HabitatResidualDataset('train', past, True, False, False, False, True)
     train_dataloader = DataLoader(train_dataset, 20, True)
 
     power = torch.linspace(-9, 0, 100)
     lr_test = 10 ** power
-    sample_size = 20
+    sample_size = 1000
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model_builder.AllHeight('relu', 0.5, 0, lr_test[0], 4, past).to(device)
     model.train()
@@ -43,6 +43,23 @@ def main():
     # # plt.yscale('log')
     # plt.savefig('/Users/quentin/Desktop/lr_curve.png')
     # plt.show()
+
+
+def plot_lr_curve():
+    power = torch.linspace(-9, 0, 100)
+    lr_test = 10 ** power
+
+    data = pickle.load(open(f'{path.WD_PATH}lr_curve.pkl', 'rb'))
+    plt.plot(lr_test, data['loss_mean'])
+    plt.plot(lr_test, data['loss_mean'] + data['loss_std'])
+    plt.plot(lr_test, data['loss_mean'] - data['loss_std'])
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.show()
+
+
+def main():
+    plot_lr_curve()
 
 
 if __name__ == '__main__':
