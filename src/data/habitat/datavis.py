@@ -186,7 +186,7 @@ def plot_model_prediction(name):
                                              past=h_prms['past']).to(device)
 
     if name == 'all':
-        from src.drone_models.residual.height_estimator import AllHeight as Model
+        from src.drone_models.residual.height_estimator import HeightEstimator as Model
         path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
@@ -383,7 +383,7 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'all':
-        from src.drone_models.residual.height_estimator import AllHeight as Model
+        from src.drone_models.residual.height_estimator import HeightEstimator as Model
         path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))

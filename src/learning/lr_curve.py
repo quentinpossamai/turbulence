@@ -18,7 +18,7 @@ def create_lr_tests():
     lr_test = 10 ** power
     sample_size = 1000
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model_builder.AllHeight('relu', 0.5, 0, lr_test[0], 4, past).to(device)
+    model = model_builder.HeightEstimator('relu', 0.5, 0, lr_test[0], 4, past).to(device)
     model.train()
     loss_mean = torch.zeros_like(lr_test)
     loss_std = torch.zeros_like(lr_test)

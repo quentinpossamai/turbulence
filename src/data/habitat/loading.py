@@ -195,6 +195,40 @@ class HabitatResidualDataset(Dataset):
         return to_return
 
 
+class HabitatNormedDepthDataset(Dataset):
+    def __init__(self):
+        """
+        Len is all the trajectories for all scenes.
+
+        Getitem returns: {
+             'depth': (n, 240, 376), all the depth for the entire trajectory
+
+             'name': scene_number, flight_number}
+        """
+        build_index_valid_flight(False)
+        self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
+
+        self.len = np.sum([1 for scene_traj in self.valid_index.values() for _ in scene_traj.values()])
+        self.path = []
+        i = 0
+        for scene_number, scene_trajectories in self.valid_index.items():
+            for flight_number, traj_len in scene_trajectories.items():
+                self.path.append([scene_number, flight_number])
+                i += 1
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, i):
+        scene_number, flight_number = self.path[i]
+        depth = torch.from_numpy(load_file('depth', scene_number, flight_number))
+        depth_dim = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
+
+        # Divide by 20 because 20 is the ZMAX of CophyLike autoencoder trained on IRS
+        depth_norm = np.clip(depth_dim / 20, 0, 1) * 2 - 1
+        return {'depth': depth_norm, 'name': self.path[i]}
+
+
 def main():
     dataset = HabitatResidualDataset('train', 10, True, False, False, False)
     dataloader = DataLoader(dataset, batch_size=10, shuffle=True, num_workers=1, pin_memory=True,
