@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 import src.data.habitat.loading as habitat
 import src.utils.path as path
-from src.drone_models.residual.all_height import get_trained_model
+from src.drone_models.residual.height_estimator import get_trained_model
 
 
 def model_predict():

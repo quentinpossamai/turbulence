@@ -79,7 +79,7 @@ def plot_fa_law():
     mu_slider.on_changed(update)
     cap_slider.on_changed(update)
     # plt.tight_layout()
-    plt.savefig(f'{habitat.WD_PATH}reports/improve/fa_generator.png')
+    plt.savefig(f'{path.WD_PATH}reports/improve/fa_generator.png')
     plt.show()
 
 
@@ -129,7 +129,7 @@ def plot_fa():
     ax.set_xlim([0, 1.5])
     # ax.set_ylabel('')
     ax.grid()
-    plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/surface_dist_distribution.pdf')
+    plt.savefig(f'{path.WD_PATH}reports/IROS_01_03_2022/graphics/surface_dist_distribution.pdf')
 
     fig, ax = plt.subplots(1, 1)
     ax.hist(fa, bins='auto')
@@ -138,7 +138,7 @@ def plot_fa():
     ax.set_xlim([0, x])
     # ax.set_ylabel('')
     ax.grid()
-    plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/fa_distribution_all.pdf')
+    plt.savefig(f'{path.WD_PATH}reports/IROS_01_03_2022/graphics/fa_distribution_all.pdf')
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(z)
@@ -174,7 +174,7 @@ def plot_model_prediction(name):
     uav_model = DynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
     from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+    path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
     model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
     h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
     model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -186,8 +186,8 @@ def plot_model_prediction(name):
                                              past=h_prms['past']).to(device)
 
     if name == 'all':
-        from src.drone_models.residual.all_height import AllHeight as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+        from src.drone_models.residual.height_estimator import AllHeight as Model
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -200,7 +200,7 @@ def plot_model_prediction(name):
 
     elif name == 'emb':
         from src.drone_models.residual.emb_height import EmbHeight as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
         model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -214,7 +214,7 @@ def plot_model_prediction(name):
     else:
         assert name == 'fine'
         from src.drone_models.residual.fine_tuning import FineTunning as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_183259/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_183259/'
         model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -293,7 +293,7 @@ def plot_model_prediction(name):
             ax.set_ylabel('z (m)')  # Surface distance (m)
             ax.set_xlabel('Sample number')
             ax.legend()
-            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
+            plt.savefig(f'{path.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
                         f'model_prediction-{scene_number}-{flight_number}.pdf')
             plt.close(fig)
 
@@ -308,15 +308,15 @@ def plot_model_prediction(name):
             ax.set_xlabel('Sample number')
             ax.legend()
             # plt.show()
-            plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
+            plt.savefig(f'{path.WD_PATH}reports/IROS_01_03_2022/graphics/test_emb_depth/'
                         f'fa_model_prediction-{scene_number}-{flight_number}.pdf')
             plt.close(fig)
-            pickle.dump(z_gt, open(f'{habitat.WD_PATH}figure6/z_gt.pkl', 'wb'))
-            pickle.dump(z_hat, open(f'{habitat.WD_PATH}figure6/z_hat.pkl', 'wb'))
-            pickle.dump(z_hat2, open(f'{habitat.WD_PATH}figure6/z_hat2.pkl', 'wb'))
-            pickle.dump(fa_gt, open(f'{habitat.WD_PATH}figure6/fa_gt.pkl', 'wb'))
-            pickle.dump(fa_hat, open(f'{habitat.WD_PATH}figure6/fa_hat.pkl', 'wb'))
-            pickle.dump(fa_hat2, open(f'{habitat.WD_PATH}figure6/fa_hat2.pkl', 'wb'))
+            pickle.dump(z_gt, open(f'{path.WD_PATH}figure6/z_gt.pkl', 'wb'))
+            pickle.dump(z_hat, open(f'{path.WD_PATH}figure6/z_hat.pkl', 'wb'))
+            pickle.dump(z_hat2, open(f'{path.WD_PATH}figure6/z_hat2.pkl', 'wb'))
+            pickle.dump(fa_gt, open(f'{path.WD_PATH}figure6/fa_gt.pkl', 'wb'))
+            pickle.dump(fa_hat, open(f'{path.WD_PATH}figure6/fa_hat.pkl', 'wb'))
+            pickle.dump(fa_hat2, open(f'{path.WD_PATH}figure6/fa_hat2.pkl', 'wb'))
             return
     return
     cluster_scene_path = f'/home/qpossamai/phd/turbulence/figure6/'
@@ -367,7 +367,7 @@ def rmse_model_prediction(name, dataset_name: str):
 
     if name == 'nogru':
         from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
         model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -383,8 +383,8 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'all':
-        from src.drone_models.residual.all_height import AllHeight as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+        from src.drone_models.residual.height_estimator import AllHeight as Model
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -401,7 +401,7 @@ def rmse_model_prediction(name, dataset_name: str):
 
     elif name == 'emb':
         from src.drone_models.residual.emb_height import EmbHeight as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
         model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -419,7 +419,7 @@ def rmse_model_prediction(name, dataset_name: str):
 
     elif name == 'emb_norm':
         from src.drone_models.residual.emb_height2 import EmbHeight as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
         model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -437,10 +437,10 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, False, True, False)
     elif name == 'fine':
         # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
-        # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+        # path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
         from src.drone_models.residual.fine_tuning import FineTunning as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
         model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -458,10 +458,10 @@ def rmse_model_prediction(name, dataset_name: str):
     else:
         assert name == 'fine_norm'
         # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
-        # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+        # path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
         from src.drone_models.residual.fine_tuning2 import FineTunning as Model
-        path = f'{habitat.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
+        path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
         model_name = 'epoch=0-step=6124-val_loss=0.51.ckpt'
         h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
         model = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -542,25 +542,25 @@ def rmse_model_prediction(name, dataset_name: str):
             aquoiilsertcepoint.append(batch['flight'])
 
     if dataset_name == 'euroc_mav':
-        pickle.dump(aquoiilsertcepoint, open(f'{habitat.WD_PATH}aquoiilsertcepoint_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(z_hat_log, open(f'{habitat.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(fa_hat_log, open(f'{habitat.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(z_gt_log, open(f'{habitat.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(fa_gt_log, open(f'{habitat.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
-    pickle.dump(fa_gttest_log, open(f'{habitat.WD_PATH}fa_gttest_{name}_{dataset_name}.pkl', 'wb'))
+        pickle.dump(aquoiilsertcepoint, open(f'{path.WD_PATH}aquoiilsertcepoint_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(z_hat_log, open(f'{path.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_hat_log, open(f'{path.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(z_gt_log, open(f'{path.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_gt_log, open(f'{path.WD_PATH}fa_gt_{name}_{dataset_name}.pkl', 'wb'))
+    pickle.dump(fa_gttest_log, open(f'{path.WD_PATH}fa_gttest_{name}_{dataset_name}.pkl', 'wb'))
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(z_gt_log)
     ax.plot(z_hat_log)
     ax.legend()
-    plt.savefig(f'{habitat.WD_PATH}z_{name}_{dataset_name}.png')
+    plt.savefig(f'{path.WD_PATH}z_{name}_{dataset_name}.png')
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(fa_hat_log)
     ax.plot(fa_gt_log)
     ax.plot(fa_gttest_log)
     ax.legend()
-    plt.savefig(f'{habitat.WD_PATH}fa_{name}_{dataset_name}.png')
+    plt.savefig(f'{path.WD_PATH}fa_{name}_{dataset_name}.png')
     print(f'rmse z_loss: {np.sqrt(z_loss.mean())}')
     print(f'rmse fa_loss: {np.sqrt(fa_loss.mean())}')
     print(f'\n\n')
@@ -572,7 +572,7 @@ def observe_generated_traj(scene_number, flight_number):
 
     try:  # check if trajectory is labelled
         assert not np.isnan(labels[scene_number][flight_number]).any()
-        return
+        # return
     except KeyError:  # if it does not exist, create it
         if flight_number != 1:
             pass
@@ -583,15 +583,15 @@ def observe_generated_traj(scene_number, flight_number):
                 assert (state0.shape == state1.shape)
                 assert (state0 == state1).all()
                 labels[scene_number][flight_number] = labels[scene_number][0]
-                pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
+                # pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
                 return
             except (FileNotFoundError, AssertionError):  # If 0 does not exist, create 1
                 pass
 
     scene_id = habitat.MP3D_SCENE_LIST[scene_number]
-    scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    scene_path = f"{path.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
-    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
+    traj_path = f"{path.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
     state_habitat = hatbitat2flu.Habitat2FLU.state_flu_2_state_habitat(state)
     tf_follow = Tf.from_quat_trans(state_habitat[:, 3:7], state_habitat[:, :3]).as_matrix()
@@ -603,13 +603,15 @@ def observe_generated_traj(scene_number, flight_number):
         raise (FileNotFoundError('Scene is not in local'))
         os.system(command)  # if scene not downloaded
 
-    simulation = data_gen.Simulation(scene_path, camera_resolution=np.array([480, 640]),
+    resolution = np.array([480, 640])
+    resolution = np.array([1080, 1920])
+    simulation = data_gen.Simulation(scene_path, camera_resolution=resolution,
                                      drone_prms=habitat.DRONE_PRMS,
                                      gravity=9.81)
     label = simulation.interactive_sim(camera_rgb=True, camera_depth=True, tf_follow=tf_follow, return_label=True)
     labels[scene_number][flight_number] = label
 
-    pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
+    # pickle.dump(labels, open(f'/Users/quentin/phd/turbulence/data/habitat/labels.pkl', 'wb'))
     simulation.sim.close(True)
 
 
@@ -765,11 +767,11 @@ def boxplot_pred():
     z_mean, z_std = dataset.z_mean, dataset.z_std
     fa_mean, fa_std = dataset.fa_mean, dataset.fa_std
     dataset_name = 'habitat'  # habitat  euroc_mav
-    z_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
-    fa_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gt_fine_{dataset_name}.pkl', 'rb'))
-    z_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_hat_fine_{dataset_name}.pkl', 'rb'))
-    fa_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_hat_fine_{dataset_name}.pkl', 'rb'))
-    fa_gttest = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gttest_fine_{dataset_name}.pkl', 'rb'))
+    z_gt = pickle.load(open(f'{path.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
+    fa_gt = pickle.load(open(f'{path.WD_PATH}data_prediction/fa_gt_fine_{dataset_name}.pkl', 'rb'))
+    z_hat = pickle.load(open(f'{path.WD_PATH}data_prediction/z_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{path.WD_PATH}data_prediction/fa_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_gttest = pickle.load(open(f'{path.WD_PATH}data_prediction/fa_gttest_fine_{dataset_name}.pkl', 'rb'))
 
     fa_or_z = 'z'
     if fa_or_z == 'z':
@@ -797,7 +799,7 @@ def boxplot_pred():
         ax.legend()
         # ax.grid(True)
         plt.subplots_adjust(left=0.11, bottom=0.1, right=0.99, top=0.99, wspace=0.3, hspace=0.3)
-        plt.savefig(f'{habitat.WD_PATH}reports/IROS_01_03_2022/graphics/fa_euroc_prediction.pdf')
+        plt.savefig(f'{path.WD_PATH}reports/IROS_01_03_2022/graphics/fa_euroc_prediction.pdf')
 
         np.sqrt(((gt - fa_gttest) ** 2).mean())
         np.sqrt(((fa_gttest - hat) ** 2).mean())
@@ -840,17 +842,17 @@ def boxplot_pred():
 
 def euroc_mav_table():
     dataset_name = 'euroc_mav'
-    z_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
-    fa_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gt_fine_{dataset_name}.pkl', 'rb'))
-    z_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_hat_fine_{dataset_name}.pkl', 'rb'))
-    fa_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_hat_fine_{dataset_name}.pkl', 'rb'))
-    fa_gttest = pickle.load(open(f'{habitat.WD_PATH}data_prediction/fa_gttest_fine_{dataset_name}.pkl', 'rb'))
+    z_gt = pickle.load(open(f'{path.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
+    fa_gt = pickle.load(open(f'{path.WD_PATH}data_prediction/fa_gt_fine_{dataset_name}.pkl', 'rb'))
+    z_hat = pickle.load(open(f'{path.WD_PATH}data_prediction/z_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{path.WD_PATH}data_prediction/fa_hat_fine_{dataset_name}.pkl', 'rb'))
+    fa_gttest = pickle.load(open(f'{path.WD_PATH}data_prediction/fa_gttest_fine_{dataset_name}.pkl', 'rb'))
 
     dataset = euroc_mav.EurocMAVDatasetHorizon2('test', 40, False, False, False, False)
     print(f'Balise 1')
 
     # flight = [dataset[i]['flight'] for i in tqdm(range(len(dataset)))]
-    flight_path = f'{habitat.WD_PATH}data_prediction/flight.pkl'
+    flight_path = f'{path.WD_PATH}data_prediction/flight.pkl'
     # pickle.dump(flight, open(flight_path, 'wb'))
     flight = pickle.load(open(flight_path, 'rb'))
 
@@ -892,9 +894,9 @@ def euroc_mav_table():
 
 def get_image_from_generated_traj(scene_number, flight_number, idx: list):
     scene_id = habitat.MP3D_SCENE_LIST[scene_number]
-    scene_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
+    scene_path = f"{path.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
     cluster_scene_path = f"/storage/Datasets/3D-Simulator-Datasets/scene_datasets/mp3d/{scene_id}/{scene_id}.glb"
-    traj_path = f"{habitat.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
+    traj_path = f"{path.WD_PATH}data/habitat/scene_datasets/mp3d/{scene_id}/{habitat.FLIGHT}/{flight_number}/"
     state = habitat.load_file('state', scene_number, flight_number)
     motor = habitat.load_file('motor', scene_number, flight_number)
     state_habitat = hatbitat2flu.Habitat2FLUACC.state_flu_2_state_habitat(state)
@@ -935,10 +937,10 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
     # from src.drone_models.residual.emb_height2 import EmbHeight as Model
-    # path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    # path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
     # model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
     from src.drone_models.residual.emb_height import EmbHeight as Model
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+    path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
     model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
     #
     h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
@@ -952,7 +954,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
                                        past=h_prms['past'])
 
     from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+    path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
     model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
     h_prms_nogru = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
     model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
@@ -1036,7 +1038,7 @@ def predict_good_fa():
     motor = np.array([150, 150, 150, 150])
     dataset_name = 'habitat'  # habitat  euroc_mav
 
-    z_gt = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
+    z_gt = pickle.load(open(f'{path.WD_PATH}data_prediction/z_gt_fine_{dataset_name}.pkl', 'rb'))
     dataset = habitat.HabitatResidualDataset('test', 1, False, False, False, False)
     data = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0, pin_memory=False, drop_last=False)
     z_gt_big = []
@@ -1047,7 +1049,7 @@ def predict_good_fa():
 
     for e in [f'hat_all_{dataset_name}.pkl', f'hat_emb_{dataset_name}.pkl', f'hat_fine_{dataset_name}.pkl',
               f'hat_nogru_{dataset_name}.pkl']:
-        z_hat = pickle.load(open(f'{habitat.WD_PATH}data_prediction/z_{e}', 'rb'))
+        z_hat = pickle.load(open(f'{path.WD_PATH}data_prediction/z_{e}', 'rb'))
         if 'all' in e or 'nogru' in e:
             fa_gt_corrected = np.array([_apply(e, motor) for e in z_gt_big])[:, 2]
         else:
@@ -1056,8 +1058,8 @@ def predict_good_fa():
         loss = np.sqrt(((fa_gt_corrected - fa_hat_corrected) ** 2).mean())
         print(f'fa{e}  Loss: {loss}')
 
-        pickle.dump(fa_gt_corrected, open(f'{habitat.WD_PATH}data_prediction/fa_gt_corrected', 'wb'))
-        pickle.dump(fa_hat_corrected, open(f'{habitat.WD_PATH}data_prediction/fa_{e}_corrected', 'wb'))
+        pickle.dump(fa_gt_corrected, open(f'{path.WD_PATH}data_prediction/fa_gt_corrected', 'wb'))
+        pickle.dump(fa_hat_corrected, open(f'{path.WD_PATH}data_prediction/fa_{e}_corrected', 'wb'))
 
 
 def analyse_prediction():
@@ -1113,10 +1115,11 @@ def analyse_prediction():
 
 
 def main():
-    labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
-    for scene_number in habitat.TEST:
-        for flight_number in labels[scene_number]:
-            observe_traj_pred(scene_number, flight_number)
+    observe_generated_traj(0, 3)
+    # labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
+    # for scene_number in habitat.TEST:
+    #     for flight_number in labels[scene_number]:
+    #         observe_traj_pred(scene_number, flight_number)
 
     # analyse_prediction()
 

@@ -23,19 +23,24 @@ import src.utils.path as path
 
 
 class AllHeight(pl.LightningModule):
-    def __init__(self, activation: str, dropout: float, l2: float, lr: float, motor_size: int,
-                 past: int):
+    def __init__(self, activation: str,
+                 dropout: float,
+                 l2: float,
+                 lr: float,
+                 motor_size: int,
+                 past: int,
+                 pre_training: str):
         """
-        Model to predict residual f_a = f_aero. Takes motor, state and image from past timesteps.
+        Model to predict residual z such that f_aero(z, motor). Sequences of depth-maps from past time-steps.
 
         Args:
             activation: The activation function to use.
-            dropout: The dropout probability.
-            l2: Float to penalize weights with l2 loss.
+            dropout: The dropout probability of MLPs hidden layers.
+            l2: Float to penalize all weights with l2 loss.
             lr: Learning rate for Adam optimizer.
-            uav_model: Model of drone to use for rollout.
             motor_size: The number of motors.
-            past: The number of past state and motor measures to use.
+            past: The number of past depth-maps to use.
+            pre_training: The type of pre-training to use.
         """
         super().__init__()
         self.activation = None
@@ -49,14 +54,17 @@ class AllHeight(pl.LightningModule):
         self.motor_size = motor_size
         self.past = past
 
+        assert pre_training in ['none', 'irs_depth', 'irs_normal', 'irs_depth_finetune', 'irs_normal_finetune']
+        self.pre_training = pre_training
+
         self.save_hyperparameters(logger=True)
         self.depth_size = [480, 640]
-        self.feature_size = self.motor_size + 13
 
         # Dropout
         # self.dropout_input = nn.Dropout(0)
         self.dropout = nn.Dropout(dropout)
 
+        if self.pre_training == 'none':
         # - emb (embedding) branch
         self.depth_conv2d_0 = nn.Conv2d(1, 16, (7, 7), 1, 3)
         self.depth_pool_0 = nn.MaxPool2d((2, 2))
@@ -118,9 +126,9 @@ class AllHeight(pl.LightningModule):
         out = self.dropout(out)
 
         if self.past > 1:
-            out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
-            out = out[:, -1, :]  # last hidden states, (*, feature_size)
-        emb_out = out  # (batch, feature_size)
+            out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, self.past, 50)
+            out = out[:, -1, :]  # last hidden states, (*, 50)
+        emb_out = out  # (batch, 50)
 
         # - reg branch
         # out = self.reg_fc_0(sm_out + emb_out)
@@ -150,6 +158,7 @@ class AllHeight(pl.LightningModule):
         noisy_data = data_to_use * ((label == 3)[:, -1].float() * (weight_noisy_data - 1) + 1)
 
         loss = data_to_use * ((z_gt - z_hat) ** 2).squeeze()
+        # todo log all losses in validation to see training improvement
         loss = loss * surface_diff
         loss = loss * noisy_data
         return loss

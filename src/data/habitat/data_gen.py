@@ -226,13 +226,13 @@ class Simulation:
                                 'agent_radius': 0.2,  # 0.1
                                 'cell_height': 0.01,  # 0.2
                                 'cell_size': 0.01,  # 0.05
-                                'detail_sample_dist': 1.0,  # 6.0
-                                'detail_sample_max_error': 0.,  # 1.0
-                                'edge_max_error': 0.01,  # 1.3
+                                'detail_sample_dist': 6.0,  # 6.0
+                                'detail_sample_max_error': 1.,  # 1.0
+                                'edge_max_error': 1.3,  # 1.3    0.01
                                 'edge_max_len': 12.0,  # 12.0
                                 'filter_ledge_spans': True,  # True,
-                                'filter_low_hanging_obstacles': False,  # True,
-                                'filter_walkable_low_height_spans': False,  # True,
+                                'filter_low_hanging_obstacles': True,  # True,
+                                'filter_walkable_low_height_spans': True,  # True,
                                 'region_merge_size': 20.0,  # 20.0
                                 'region_min_size': 20.0,  # 20.0
                                 'verts_per_poly': 6.0}  # 6.0
@@ -712,20 +712,20 @@ def gen_data(scene_number: int, flight_number: int,
         if len(val) != 0:
             data_generated[key] = np.stack(val, axis=0)
 
-    # Saving
-    # dict_keys(['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force'])
-    if not sys.platform == "darwin":  # then saving
-        import time
-        tic = time.time()
-        print(f'Saving', file=sys.stderr, flush=True)
-        if len(data_generated['motor']) == 0:
-            pickle.dump({'done': None, 'info': 'Not enough data'}, open(f'{gen_folder}stats.pkl', 'wb'))
-        for name, array in data_generated.items():
-            np.save(f'{gen_folder}{name}.npy', array.astype(np.float32))
-        info = 'collided' if has_collided else None
-        pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{gen_folder}stats.pkl', 'wb'))
-        print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
-        print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
+    # # Saving
+    # # dict_keys(['state', 'motor', 'mpc_error', 'camera', 'depth', 'surface_dist', 'ground_force'])
+    # if not sys.platform == "darwin":  # then saving
+    #     import time
+    #     tic = time.time()
+    #     print(f'Saving', file=sys.stderr, flush=True)
+    #     if len(data_generated['motor']) == 0:
+    #         pickle.dump({'done': None, 'info': 'Not enough data'}, open(f'{gen_folder}stats.pkl', 'wb'))
+    #     for name, array in data_generated.items():
+    #         np.save(f'{gen_folder}{name}.npy', array.astype(np.float32))
+    #     info = 'collided' if has_collided else None
+    #     pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{gen_folder}stats.pkl', 'wb'))
+    #     print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
+    #     print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
     return True
 
 
@@ -759,7 +759,7 @@ def main2():
         # scene_number = SCENE_NUMBER_MISSING_DATA[21]
         for flight_number in range(0, 1):
             print(f'Generating data for scene {scene_number} and flight {flight_number}', file=sys.stderr, flush=True)
-            gen_data(scene_number, flight_number, db_manual=True)
+            gen_data(scene_number, flight_number, db_manual=False)
             print(f'\n' * 20, file=sys.stderr, flush=True)
             break
 
