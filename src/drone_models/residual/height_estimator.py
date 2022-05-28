@@ -54,18 +54,19 @@ class HeightEstimator(nn.Module):
 
         if embedding_method == 'none':
             self.embedding_layer = lambda x: x
-        if embedding_method == 'cnn':
+        elif embedding_method == 'cnn':
             self.depth_size = [480, 640]
             from src.drone_models.residual.architectures import RawEmbedding
             self.embedding_layer = RawEmbedding(self.activation, embedding_size)
 
-        if self.embedding_method == 'irs_depth':
+        elif self.embedding_method == 'irs_depth':
             self.depth_size = [240, 376]
             from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=1)
             self.embedding_layer = auto_encoder.encoder
 
-        if self.embedding_method == 'irs_normal':
+        else:
+            assert self.embedding_method == 'irs_normal'
             self.depth_size = [240, 376]
             from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=3)
@@ -73,8 +74,6 @@ class HeightEstimator(nn.Module):
 
         from src.drone_models.residual.architectures import RegressionHead
         self.regression_head = RegressionHead(self.activation, embedding_size, 50, self.past, self.dropout)
-
-        self.example_input_array = [torch.zeros(2, self.past, self.depth_size[0], self.depth_size[1])]
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2)

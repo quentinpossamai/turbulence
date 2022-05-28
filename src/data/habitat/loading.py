@@ -80,9 +80,8 @@ def get_flight_folder(scene_number: int, flight_number: int):
 
 def build_index_valid_flight(check_all_file: bool = True):
     index = {i: {} for i in range(len(MP3D_SCENE_LIST))}
-    # 'depth_emb/depth_emb.npy', 'norm_emb/norm_emb.npy'
     to_test = ['depth.npy', 'ground_force.npy', 'motor.npy', 'mpc_error.npy',
-               'state.npy', 'stats.pkl', 'surface_dist.npy']
+               'state.npy', 'stats.pkl', 'surface_dist.npy', 'depth_emb/depth_emb.npy', 'norm_emb/norm_emb.npy']
     for scene_number, scene_name in enumerate(MP3D_SCENE_LIST):
         try:  # Try finding flight folder
             flights = sorted([int(e) for e in next(os.walk(f'{MP3D_DATA}{scene_name}/{FLIGHT}/'))[1]])
