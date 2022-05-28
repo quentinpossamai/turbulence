@@ -213,8 +213,8 @@ def train_valid_height_estimator():
     seed = 0
     random.seed(seed)
     np.random.seed(seed)
-    torch.backends.cudnn.deterministic = False
-    torch.use_deterministic_algorithms(True)
+    # torch.backends.cudnn.deterministic = False
+    # torch.use_deterministic_algorithms(True)
 
     def seed_worker(worker_id):
         worker_seed = torch.initial_seed() % 2 ** 32
