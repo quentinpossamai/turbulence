@@ -6,7 +6,7 @@ cd ~/phd/turbulence/
  --activation relu\
  --batch_size 10\
  --dropout 0.5\
- --epochs 200\
+ --epoch 200\
  --l2 0\
  --lr 1e-5\
  --past 20\
