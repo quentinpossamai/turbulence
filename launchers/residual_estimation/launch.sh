@@ -5,7 +5,7 @@ ssh remsto /bin/bash << EOF
 #  echo "Removing .DS_Store in homedir" &&
   cd ~/phd/turbulence/launchers/residual_estimation/ &&
   git pull github main &&
-#  sbatch --mem 20G --gres=gpu:1 -p part3 -J all_height -o all_height_%A_past.out --time=8-00:00:00 all_height.sh
-sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o lr_curve%A_past.out --time=8-00:00:00 general_script.sh
+#  sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o height_%A.out --time=8-00:00:00 height_estimator.sh
+#  sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o lr_curve%A_past.out --time=8-00:00:00 general_script.sh
 #  sbatch --mem 10G --gres=gpu:1 -p part1 -J predict -o predict_%A.out --time=8-00:00:00 predict.sh
 EOF

@@ -1,28 +1,32 @@
 import torch
 import torch.nn as nn
 
+from typing import Callable
+
 
 class RegressionHead(nn.Module):
-    def __init__(self, in_embedding_size, size, past, dropout):
+    def __init__(self, activation: Callable, in_embedding_size: int, unit_size: int, past: int, dropout: float):
         super(RegressionHead, self).__init__()
+        self.activation = activation
         self.in_embedding_size = in_embedding_size
-        self.size = size
+        self.unit_size = unit_size
         self.past = past
         self.dropout = nn.Dropout(dropout)
 
-        self.emb_reduc_linear = nn.Linear(in_features=self.in_embedding_size, out_features=self.size)
+        self.emb_reduc_linear = nn.Linear(in_features=self.in_embedding_size, out_features=self.unit_size)
         if self.past > 1:
-            self.emb_gru = nn.GRU(input_size=self.size, hidden_size=self.size, num_layers=1, batch_first=True)
-        self.reg_linear_0 = nn.Linear(self.size, self.size)
-        self.reg_linear_1 = nn.Linear(self.size, self.size)
-        self.reg_linear_out = nn.Linear(in_features=self.size, out_features=1)
+            self.emb_gru = nn.GRU(input_size=self.unit_size, hidden_size=self.unit_size, num_layers=1, batch_first=True)
+        self.reg_linear_0 = nn.Linear(self.unit_size, self.unit_size)
+        self.reg_linear_1 = nn.Linear(self.unit_size, self.unit_size)
+        self.reg_linear_out = nn.Linear(in_features=self.unit_size, out_features=1)
 
     def forward(self, out):
         out = self.activation(self.emb_reduc_linear(out))
         out = self.dropout(out)
 
         if self.past > 1:
-            out, _ = self.emb_gru(out.reshape((-1, self.past, self.size)))  # gru output with shape: (*, self.past, 50)
+            out, _ = self.emb_gru(out.reshape((-1, self.past, self.unit_size)))
+            # gru output with shape: (*, self.past, self.unit_size)
             out = out[:, -1, :]  # last hidden states, (*, 50)
         emb_out = out  # (batch, 50)
 
@@ -36,8 +40,9 @@ class RegressionHead(nn.Module):
 
 
 class RawEmbedding(nn.Module):
-    def __init__(self, embedding_size):
+    def __init__(self, activation: Callable, embedding_size: int):
         super(RawEmbedding, self).__init__()
+        self.activation = activation
         self.embedding_size = embedding_size
 
         # - emb (embedding) branch
