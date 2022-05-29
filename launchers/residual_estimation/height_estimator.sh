@@ -9,5 +9,5 @@ cd ~/phd/turbulence/
  --epoch 200\
  --l2 0\
  --lr 5e-5\
- --past 1\
+ --past 20\
  --stage cnn
