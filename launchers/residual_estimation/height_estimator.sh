@@ -10,4 +10,4 @@ cd ~/phd/turbulence/
  --l2 0\
  --lr 5e-5\
  --past 20\
- --stage cnn
+ --stage irs_depth_head
