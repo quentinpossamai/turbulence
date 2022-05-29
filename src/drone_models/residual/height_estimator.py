@@ -293,8 +293,6 @@ def train_valid_height_estimator():
     for epoch_idx in range(args.epoch):
         run.train()
         for batch_idx, batch in enumerate(tqdm(train_data, desc=f'Epoch {epoch_idx}')):
-            optimizer.zero_grad()
-
             model_input = batch[input_key].to(device)
             z_gt = batch['surface_dist'].to(device)
             label = batch['label'].to(device)
@@ -308,6 +306,7 @@ def train_valid_height_estimator():
             running_loss['train_loss3'].append(loss3.detach().cpu().numpy())
             loss.mean().backward()
             optimizer.step()
+            optimizer.zero_grad()
 
             if batch_idx % log_interval == 0 and batch_idx > 0:
                 for key in ['train_loss', 'train_loss0', 'train_loss2', 'train_loss3']:
@@ -335,7 +334,7 @@ def train_valid_height_estimator():
                 wandb.log({key: np.mean(np.concatenate(running_loss[key]))},
                           step=(epoch_idx + 1) * len(train_data))
                 running_loss[key] = []
-            val_loss = np.mean(running_loss['val_loss'])
+            val_loss = np.mean(np.concatenate(running_loss['val_loss']))
             # Saving the weights
             if val_loss < memory:
                 memory = val_loss
