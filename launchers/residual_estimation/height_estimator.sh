@@ -10,4 +10,4 @@ cd ~/phd/turbulence/
  --l2 0\
  --lr 1e-5\
  --past 20\
- --stage irs_depth_head
+ --stage irs_depth_normal
