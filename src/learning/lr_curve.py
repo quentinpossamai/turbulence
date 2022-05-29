@@ -59,7 +59,7 @@ def plot_lr_curve():
 
 
 def main():
-    create_lr_tests()
+    plot_lr_curve()
 
 
 if __name__ == '__main__':

@@ -139,13 +139,13 @@ def train_valid_height_estimator():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use.")
-    parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch.')
+    parser.add_argument('--batch_size', default=10, type=int, help='Size of a batch.')
     parser.add_argument('--dropout', default=0.5, type=float, help='Dropout probability')
-    parser.add_argument('--epoch', default=10, type=int, help='Number of epoch to do.')
+    parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
-    parser.add_argument('--lr', default=1e-5, type=float, help="Learning rate.")
-    parser.add_argument('--past', default=5, type=int, help="Number of past information to take in the model.")
-    parser.add_argument('--stage', default='irs_depth_head', type=str, help="The stage of the model.")
+    parser.add_argument('--lr', default=5e-5, type=float, help="Learning rate.")
+    parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model.")
+    parser.add_argument('--stage', default='irs_normal_head', type=str, help="The stage of the model.")
 
     args = parser.parse_args()
 
@@ -330,11 +330,11 @@ def train_valid_height_estimator():
                 running_loss['val_loss0'].append(loss0.detach().cpu().numpy())
                 running_loss['val_loss2'].append(loss2.detach().cpu().numpy())
                 running_loss['val_loss3'].append(loss3.detach().cpu().numpy())
+            val_loss = np.mean(np.concatenate(running_loss['val_loss']))
             for key in val_log_keys:
                 wandb.log({key: np.mean(np.concatenate(running_loss[key]))},
                           step=(epoch_idx + 1) * len(train_data))
                 running_loss[key] = []
-            val_loss = np.mean(np.concatenate(running_loss['val_loss']))
             # Saving the weights
             if val_loss < memory:
                 memory = val_loss
