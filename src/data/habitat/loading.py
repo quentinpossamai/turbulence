@@ -120,7 +120,7 @@ class HabitatResidualDataset(Dataset):
                  check_all_file: bool = True):
         #  False if '/Users/quentin' in WD_PATH else True
         self.check_all_file = check_all_file
-        build_index_valid_flight(self.check_all_file)
+        self.valid_index: Dict[int, Dict[int, int]] = build_index_valid_flight(self.check_all_file)
 
         assert train_valid_test in ['train', 'valid', 'test']
         self.train_valid_test = train_valid_test
@@ -128,7 +128,6 @@ class HabitatResidualDataset(Dataset):
         assert isinstance(past, int)
         self.past = past
 
-        self.valid_index: Dict[int, Dict[int, int]] = pickle.load(open(f'{DATA_HABITAT_PATH}mp3d_index.pkl', 'rb'))
         if self.train_valid_test == 'train':
             include = TRAIN
         elif self.train_valid_test == 'valid':

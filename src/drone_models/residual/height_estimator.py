@@ -176,7 +176,7 @@ def train_valid_height_estimator():
     use_cuda_if_possible = True
     device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
 
-    print(f'Device used by torch: {device}')
+    print(f'Device used by torch: {device}', flush=True)
 
     # Display entire dataset
     check_all_file = True  # False if '/Users/quentin' in path.WD_PATH else True
@@ -187,8 +187,8 @@ def train_valid_height_estimator():
         print(split_name)
         for scene_number, scene_traj in dataset_stats.index.items():
             print(f'{scene_number} - {habitat.MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
-        print(f'Data length: | {len(dataset_stats)}')
-        print('\n\n')
+        print(f'Data length: | {len(dataset_stats)}', flush=True)
+        print('\n\n', flush=True)
 
     # Analysis parameters
     motor_size = 4
@@ -206,13 +206,14 @@ def train_valid_height_estimator():
               'stage': args.stage}
     pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
     wandb.config.update(h_prms)
-    print(f'training_path={training_path}')
-    print(f'name={name} | version={version}')
+    print(f'training_path={training_path}', flush=True)
+    print(f'name={name} | version={version}', flush=True)
 
     # Reproducibility
     seed = 0
     random.seed(seed)
     np.random.seed(seed)
+
     # torch.backends.cudnn.deterministic = False
     # torch.use_deterministic_algorithms(True)
 
@@ -220,6 +221,7 @@ def train_valid_height_estimator():
         worker_seed = torch.initial_seed() % 2 ** 32
         np.random.seed(worker_seed)
         random.seed(worker_seed)
+
     g = torch.Generator()
     g.manual_seed(seed)
 
@@ -256,7 +258,7 @@ def train_valid_height_estimator():
 
     num_workers = 12 if device == 'gpu' else 0
     # Datasets
-    print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}')
+    print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}', flush=True)
     train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
                                                            load_depth_emb=load_depth_emb,
                                                            load_norm_emb=load_norm_emb,
@@ -315,6 +317,9 @@ def train_valid_height_estimator():
                     running_loss[key] = []
         for key in train_log_keys:
             running_loss[key] = []
+        # Free memory
+        del batch, model_input, z_gt, label, z_hat, loss, loss0, loss2, loss3
+        torch.cuda.empty_cache()
 
         # validate the model
         run.eval()
@@ -339,6 +344,9 @@ def train_valid_height_estimator():
             if val_loss < memory:
                 memory = val_loss
                 torch.save(run.state_dict(), f'{training_path}model.nn')
+        # Free memory
+        del batch, model_input, z_gt, label, z_hat, loss, loss0, loss2, loss3
+        torch.cuda.empty_cache()
 
 
 def get_trained_model(name: str):
