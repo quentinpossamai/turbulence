@@ -10,6 +10,7 @@ from tqdm import tqdm
 import sys
 import wandb
 
+from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 import src.data.habitat.loading as habitat
 import src.utils.path as path
 
@@ -55,20 +56,18 @@ class HeightEstimator(nn.Module):
         if embedding_method == 'none':
             self.embedding_layer = lambda x: x
         elif embedding_method == 'cnn':
-            self.depth_size = [480, 640]
+            self.depth_size = (480, 640)
             from src.drone_models.residual.architectures import RawEmbedding
             self.embedding_layer = RawEmbedding(self.activation, embedding_size)
 
         elif self.embedding_method == 'irs_depth':
-            self.depth_size = [240, 376]
-            from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+            self.depth_size = (240, 376)
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=1)
             self.embedding_layer = auto_encoder.encoder
 
         else:
             assert self.embedding_method == 'irs_normal'
-            self.depth_size = [240, 376]
-            from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+            self.depth_size = (240, 376)
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=3)
             self.embedding_layer = auto_encoder.encoder
 
@@ -88,6 +87,7 @@ class HeightEstimator(nn.Module):
 
         return: (*, 1)
         """
+        input_data = input_data.reshape((-1, 1) + self.depth_size)
         out = self.embedding_layer(input_data)
         out = self.regression_head(out)
         return out
@@ -145,7 +145,7 @@ def train_valid_height_estimator():
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
     parser.add_argument('--lr', default=5e-5, type=float, help="Learning rate.")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model.")
-    parser.add_argument('--stage', default='irs_normal_head', type=str, help="The stage of the model.")
+    parser.add_argument('--stage', default='irs_depth_finetune', type=str, help="The stage of the model.")
 
     args = parser.parse_args()
 
@@ -153,10 +153,11 @@ def train_valid_height_estimator():
     assert args.stage in ['cnn',
                           'irs_depth_head', 'irs_depth_finetune',
                           'irs_normal_head', 'irs_normal_finetune']
-
     embedding_method = args.stage
     if 'irs_depth_head' == args.stage or 'irs_normal_head' == args.stage:
         embedding_method = 'none'  # training only the head. irs embedding is done in autoencoder_depth
+    if 'irs_depth_finetune' == args.stage or 'irs_normal_finetune' == args.stage:
+        embedding_method = args.stage[:-9]
 
     # Logging initialization
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -246,19 +247,37 @@ def train_valid_height_estimator():
         load_depth, load_depth_emb, load_norm_emb, normed_depth = False, False, True, False
     elif h_prms['stage'] == 'irs_depth_finetune':
         input_key = 'depth'
-        run.auto_encoder.load_state_dict(torch.load(f'{path.WD_PATH}models/depth_normal_autoencoder/'
-                                                    f'autoencoder_depth_irs_128.nn'))
+        state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_depth_irs_128.nn'
+        tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=1)
+        tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
+        run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
+        del tmp
+
+        # Loading head
+        state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_depth_head/20220529_210139/model.nn'
+        state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
+        state_dict = {k[16:]: v for k, v in state_dict.items()}
+        run.regression_head.load_state_dict(state_dict)
         load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
     else:
         input_key = 'depth'
-        assert h_prms['stage'] == 'irs_norm_finetune'
-        run.auto_encoder.load_state_dict(torch.load(f'{path.WD_PATH}models/depth_normal_autoencoder/'
-                                                    f'autoencoder_normal_irs_128.nn'))
+        assert h_prms['stage'] == 'irs_normal_finetune'
+        state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_normal_irs_128_irs.nn'
+        tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=3)
+        tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
+        run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
+        del tmp
+        # Loading head
+        state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/model.nn'
+        state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
+        state_dict = {k[16:]: v for k, v in state_dict.items()}
+        run.regression_head.load_state_dict(state_dict)
         load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
 
     num_workers = 12 if device == 'gpu' else 0
     # Datasets
-    print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}', flush=True)
+    print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | '
+          f'load_norm_emb {load_norm_emb} | normed_depth {normed_depth}', flush=True)
     train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
                                                            load_depth_emb=load_depth_emb,
                                                            load_norm_emb=load_norm_emb,
@@ -347,6 +366,8 @@ def train_valid_height_estimator():
         # Free memory
         del batch, model_input, z_gt, label, z_hat, loss, loss0, loss2, loss3
         torch.cuda.empty_cache()
+
+        wandb.log({'epoch': epoch_idx})
 
 
 def get_trained_model(name: str):

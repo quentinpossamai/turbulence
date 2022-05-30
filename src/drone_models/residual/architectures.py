@@ -60,7 +60,7 @@ class RawEmbedding(nn.Module):
                                         out_features=self.embedding_size)
 
     def forward(self, depth):
-        out = self.activation(self.depth_conv2d_0(depth.reshape((-1, 1, 480, 640))))
+        out = self.activation(self.depth_conv2d_0(depth))
         out = self.depth_pool_0(out)
         out = self.activation(self.depth_conv2d_1(out))
         out = self.activation(self.depth_conv2d_2(out))
