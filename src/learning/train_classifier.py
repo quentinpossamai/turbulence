@@ -9,12 +9,12 @@ from torch.utils.data import DataLoader
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 from src.data.euroc_mav.loading import EurocMAVDatasetTurbulence
-# from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-# from src.drone_models.residual.groundthruth import GroundTruth  # Sanity check
-# from src.drone_models.residual.mlp import MLPResidual
-# from src.drone_models.residual.cnn_lightning import CNNResidual
-# from src.drone_models.residual.gru_cnn import GRUCNNResidual
-from src.drone_models.residual.presence_classifier import PresenceClassifier
+# from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
+# from src.drone_model.residual.groundthruth import GroundTruth  # Sanity check
+# from src.drone_model.residual.mlp import MLPResidual
+# from src.drone_model.residual.cnn_lightning import CNNResidual
+# from src.drone_model.residual.gru_cnn import GRUCNNResidual
+from src.drone_model.residual.presence_classifier import PresenceClassifier
 from src.utils.path import mkdir, ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING
 
 mkdir([ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING])

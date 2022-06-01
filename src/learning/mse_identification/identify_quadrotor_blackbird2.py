@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.drone_models.analytical_models.quadrotor_4parms import TorchDynamicalModel
+from src.drone_model.analytical_model.quadrotor_4parms import TorchDynamicalModel
 import src.data.blackbird.loading as blackbird
 from src.utils.quaternion import qrot
 from src.utils.path import ANALYSIS_PATH, mkdir

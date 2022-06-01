@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn.functional import relu
 
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
 
 
 class GroundTruth(nn.Module):

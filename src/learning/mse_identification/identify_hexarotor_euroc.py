@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
 import src.data.euroc_mav.loading as euroc
 from src.utils.quaternion import qrot
 from src.utils.path import ANALYSIS_PATH, mkdir

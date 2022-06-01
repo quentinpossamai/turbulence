@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 import src.utils.path as paths
-from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+from src.drone_model.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 import src.data.habitat.loading as habitat
 
 parser = argparse.ArgumentParser()

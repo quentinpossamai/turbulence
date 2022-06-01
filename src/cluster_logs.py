@@ -16,5 +16,5 @@ os.system(f"rsync -rtvP --exclude=.DS_Store --delete remsto:{tb_cluster_path} {t
 
 tb_cluster_path = "/home/qpossamai/phd/turbulence/"
 tb_local_path = "/Users/quentin/phd/turbulence/"
-os.system(f"rsync -rtvP --exclude=.DS_Store --exclude=data --exclude=analysis --exclude .git --exclude .idea"
-          f" {tb_local_path} remsto:{tb_cluster_path}")
+os.system(f"rsync -rtvPa --exclude=.DS_Store --exclude=data --exclude=analysis --exclude .git --exclude .idea "
+          f"{tb_local_path} remsto:{tb_cluster_path}")

@@ -14,7 +14,7 @@ import src.data.habitat.loading as habitat
 import src.data.euroc_mav.loading2 as euroc_mav
 import src.data.habitat.data_gen as data_gen
 import src.data.habitat.hatbitat2flu as hatbitat2flu
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_model.analytical_model.quadrotor_4parms import DynamicalModel
 import src.utils.path as path
 from src.utils.profiler import profiler
 import torchvision.transforms.functional as f
@@ -173,11 +173,11 @@ def plot_model_prediction(name):
                       drone_prms['iz'] / drone_prms['ix']])
     uav_model = DynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
-    from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-    path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+    from src.drone_model.residual.all_height_no_gru import AllHeightNoGRU as Model
+    wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
     model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
-    h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-    model_nogru = Model.load_from_checkpoint(f'{path}{model_name}',
+    h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+    model_nogru = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                              activation=h_prms['activation'],
                                              l2=h_prms['l2'],
                                              learning_rate=h_prms['lr'],
@@ -186,11 +186,11 @@ def plot_model_prediction(name):
                                              past=h_prms['past']).to(device)
 
     if name == 'all':
-        from src.drone_models.residual.height_estimator import HeightEstimator as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+        from src.drone_model.residual.height_estimator import HeightEstimator as Model
+        wd_path = f'{wd_path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            l2=h_prms['l2'],
                                            learning_rate=h_prms['lr'],
@@ -199,11 +199,11 @@ def plot_model_prediction(name):
                                            past=h_prms['past']).to(device)
 
     elif name == 'emb':
-        from src.drone_models.residual.emb_height import EmbHeight as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+        from src.drone_model.residual.emb_height import EmbHeight as Model
+        wd_path = f'{wd_path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
         model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            embedding=h_prms['embedding'],
                                            l2=h_prms['l2'],
@@ -213,11 +213,11 @@ def plot_model_prediction(name):
                                            past=h_prms['past']).to(device)
     else:
         assert name == 'fine'
-        from src.drone_models.residual.fine_tuning import FineTunning as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_183259/'
+        from src.drone_model.residual.fine_tuning import FineTunning as Model
+        wd_path = f'{wd_path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_183259/'
         model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            l2=h_prms['l2'],
                                            learning_rate=h_prms['lr'],
@@ -366,11 +366,11 @@ def rmse_model_prediction(name, dataset_name: str):
     uav_model = DynamicalModel({'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=9.81)
 
     if name == 'nogru':
-        from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+        from src.drone_model.residual.all_height_no_gru import AllHeightNoGRU as Model
+        wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
         model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            l2=h_prms['l2'],
                                            learning_rate=h_prms['lr'],
@@ -383,11 +383,11 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'all':
-        from src.drone_models.residual.height_estimator import HeightEstimator as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+        from src.drone_model.residual.height_estimator import HeightEstimator as Model
+        wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
         model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            l2=h_prms['l2'],
                                            learning_rate=h_prms['lr'],
@@ -400,11 +400,11 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif name == 'emb':
-        from src.drone_models.residual.emb_height import EmbHeight as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+        from src.drone_model.residual.emb_height import EmbHeight as Model
+        wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
         model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            embedding=h_prms['embedding'],
                                            l2=h_prms['l2'],
@@ -418,11 +418,11 @@ def rmse_model_prediction(name, dataset_name: str):
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
 
     elif name == 'emb_norm':
-        from src.drone_models.residual.emb_height2 import EmbHeight as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+        from src.drone_model.residual.emb_height2 import EmbHeight as Model
+        wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
         model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            embedding=h_prms['embedding'],
                                            l2=h_prms['l2'],
@@ -436,14 +436,14 @@ def rmse_model_prediction(name, dataset_name: str):
         else:
             dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, False, True, False)
     elif name == 'fine':
-        # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
+        # from src.drone_model.residual.fine_tuning2 import FineTunning as Model
         # path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
-        from src.drone_models.residual.fine_tuning import FineTunning as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
+        from src.drone_model.residual.fine_tuning import FineTunning as Model
+        wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
         model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            l2=h_prms['l2'],
                                            learning_rate=h_prms['lr'],
@@ -457,14 +457,14 @@ def rmse_model_prediction(name, dataset_name: str):
 
     else:
         assert name == 'fine_norm'
-        # from src.drone_models.residual.fine_tuning2 import FineTunning as Model
+        # from src.drone_model.residual.fine_tuning2 import FineTunning as Model
         # path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
         # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
-        from src.drone_models.residual.fine_tuning2 import FineTunning as Model
-        path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
+        from src.drone_model.residual.fine_tuning2 import FineTunning as Model
+        wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
         model_name = 'epoch=0-step=6124-val_loss=0.51.ckpt'
-        h_prms = pickle.load(open(f'{path}h_prms.pkl', 'rb'))
-        model = Model.load_from_checkpoint(f'{path}{model_name}',
+        h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+        model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                            activation=h_prms['activation'],
                                            l2=h_prms['l2'],
                                            learning_rate=h_prms['lr'],
@@ -542,7 +542,7 @@ def rmse_model_prediction(name, dataset_name: str):
             aquoiilsertcepoint.append(batch['flight'])
 
     if dataset_name == 'euroc_mav':
-        pickle.dump(aquoiilsertcepoint, open(f'{path.WD_PATH}aquoiilsertcepoint_{name}_{dataset_name}.pkl', 'wb'))
+        pickle.dump(aquoiilsertcepoint, open(f'{wd_path.WD_PATH}aquoiilsertcepoint_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_hat_log, open(f'{path.WD_PATH}z_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(fa_hat_log, open(f'{path.WD_PATH}fa_hat_{name}_{dataset_name}.pkl', 'wb'))
     pickle.dump(z_gt_log, open(f'{path.WD_PATH}z_gt_{name}_{dataset_name}.pkl', 'wb'))
@@ -936,10 +936,10 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
         return ground_force[2]
 
     simulation = data_gen.Simulation(scene_path, camera_resolution=[480, 640], drone_prms=drone_prms, gravity=9.81)
-    # from src.drone_models.residual.emb_height2 import EmbHeight as Model
+    # from src.drone_model.residual.emb_height2 import EmbHeight as Model
     # path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
     # model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
-    from src.drone_models.residual.emb_height import EmbHeight as Model
+    from src.drone_model.residual.emb_height import EmbHeight as Model
     path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
     model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
     #
@@ -953,7 +953,7 @@ def get_image_from_generated_traj(scene_number, flight_number, idx: list):
                                        motor_size=h_prms['motor_size'],
                                        past=h_prms['past'])
 
-    from src.drone_models.residual.all_height_no_gru import AllHeightNoGRU as Model
+    from src.drone_model.residual.all_height_no_gru import AllHeightNoGRU as Model
     path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
     model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
     h_prms_nogru = pickle.load(open(f'{path}h_prms.pkl', 'rb'))

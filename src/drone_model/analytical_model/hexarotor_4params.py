@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 import src.utils.quaternion as quaternion
-from src.drone_models.model_structure import Run
+from src.drone_model.model_structure import Run
 
 
 class DynamicalModel(nn.Module, Run):

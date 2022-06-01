@@ -1,4 +1,4 @@
-from src.drone_models.analytical_models.quadrotor_4parms import TorchDynamicalModel
+from src.drone_model.analytical_model.quadrotor_4parms import TorchDynamicalModel
 from src.metrics import load_blackbird_flights
 import torch
 

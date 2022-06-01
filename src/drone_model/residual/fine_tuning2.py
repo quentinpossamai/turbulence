@@ -16,9 +16,9 @@ import wandb
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 import src.data.habitat.loading as habitat
 from src.learning.autoencoder_depth.Models.model_CoPhy_like import Encoder
-from src.drone_models.model_structure import Run
+from src.drone_model.model_structure import Run
 from src.utils.profiler import profiler
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_model.analytical_model.quadrotor_4parms import DynamicalModel
 from src.utils.path import mkdir, ANALYSIS_PATH, WD_PATH
 
 
@@ -70,7 +70,7 @@ class FineTunning(pl.LightningModule, Run):
         self.emb_linear_0 = nn.Linear(128, 50)
 
         # Time reduction
-        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
+        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
         # self.emb_gru_norm = nn.BatchNorm1d(50)
         # self.emb_gru_dropout = nn.Dropout(p=0.)
 
@@ -333,16 +333,14 @@ def main():
         assert (run.encoder.state_dict()[e].to(device) == state_dict[f'encoder.{e}']).all()
 
     # Loading head
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
-    model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
     state_dict = torch.load(f'{path}{model_name}', map_location=device)
     for i, e in enumerate(state_dict['state_dict'].keys()):
         run.state_dict()[e].copy_(state_dict['state_dict'][e])
         assert (run.state_dict()[e].to(device) == state_dict['state_dict'][e]).all()
 
     logger.watch(run)
-    # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
-    #                               f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if gpu_count else 0
     # Datasets
     load_depth = True
@@ -372,7 +370,7 @@ def main():
                                           filename='{epoch}-{step}-{val_loss:.2f}',
                                           monitor='val_loss',
                                           mode='min')
-    trainer = pl.Trainer(gpus=gpu_count,
+    trainer = pl.Trainer(gpus=8,
                          logger=logger,
                          deterministic=True,
                          max_epochs=args.max_epochs,

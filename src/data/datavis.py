@@ -14,8 +14,8 @@ import torch
 from tqdm import tqdm
 
 import src.data.euroc_mav.loading as euroc
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-from src.drone_models.residual.gru_cnn import GRUCNNResidual
+from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
+from src.drone_model.residual.gru_cnn import GRUCNNResidual
 from src.utils.path import mkdir, ANALYSIS_DATA_VIS_EUROC_MAV
 import src.utils.quaternion as quaternion
 
@@ -316,7 +316,7 @@ def residual_video(flight: str, double: bool, norm: bool):
         mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_depth/default/' \
               '20211018_100951_PresenceClassifier_relu_bs256_depth_l0.0_l0.0_l3_lr1e-06_epch10000_us50_/checkpoints/' \
               'epoch=2063-step=373583.ckpt'
-        from src.drone_models.residual.presence_classifier import PresenceClassifier
+        from src.drone_model.residual.presence_classifier import PresenceClassifier
         classifier = PresenceClassifier.load_from_checkpoint(mlp, motor_size=6)
         classifier.eval()
         with torch.no_grad():

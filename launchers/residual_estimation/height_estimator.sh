@@ -7,7 +7,7 @@ cd ~/phd/turbulence/
  --batch_size 15\
  --dropout 0.5\
  --epoch 200\
- --l2 0\
+ --l2 0.05\
  --lr 5e-5\
  --past 20\
- --stage irs_normal_finetune
+ --stage irs_depth_finetune

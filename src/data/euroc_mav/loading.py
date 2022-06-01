@@ -11,7 +11,7 @@ from torch.utils.data import Dataset
 from typing import Union
 
 # import src.data.euroc_mav.data_vis as data_vis
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
 from src.utils.path import WD_PATH, mkdir
 from src.utils import quaternion
 

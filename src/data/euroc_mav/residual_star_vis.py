@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader
 
 import src.data.euroc_mav.loading as euroc
-from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
 
 
 def plot_residual_torsor(time, residual_torsor, title, xlim: tuple):

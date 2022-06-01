@@ -1,14 +1,232 @@
 import numpy as np
-import pickle
-import torch
 from tqdm import tqdm
 
+import pickle
+import torch
+import torchvision.transforms.functional as f
+from typing import Tuple
+
+from src.drone_model.residual.height_estimator import HeightEstimator
 import src.data.habitat.loading as habitat
+import src.data.euroc_mav.loading2 as euroc_mav
 import src.utils.path as path
-from src.drone_models.residual.height_estimator import get_trained_model
 
 
-def model_predict():
+def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
+    """
+
+    Args:
+        prefix:
+        ['none_raw',
+         'none_gru',
+         'depth_gru',
+         'depth_gru_finetune',
+         'norm_gru',
+         'norm_gru_finetune']
+
+         old: True will load submission models, False will load new models
+
+         dataset_name: The dataset to use to test the model
+
+    Returns: Loaded model, hyper parameter dict and model's name.
+    """
+    if prefix == 'none_raw':
+        if old:
+            from src.drone_model.residual.all_height_no_gru import AllHeightNoGRU as Model
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220224_095722/'
+            model_name = 'epoch=28-step=18936-val_loss=0.57.ckpt'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
+                                               activation=h_prms['activation'],
+                                               l2=h_prms['l2'],
+                                               learning_rate=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+        else:
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_cnn/20220529_210051/'
+            model_name = 'model.nn'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = HeightEstimator(activation=h_prms['activation'],
+                                    dropout=h_prms['dropout'],
+                                    embedding_method=h_prms['embedding_method'],
+                                    l2=h_prms['l2'],
+                                    lr=h_prms['lr'],
+                                    motor_size=h_prms['motor_size'],
+                                    past=h_prms['past'])
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+
+    elif prefix == 'none_gru':
+        if old:
+            from src.drone_model.residual.height_estimator import HeightEstimator as Model
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+            model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
+                                               activation=h_prms['activation'],
+                                               l2=h_prms['l2'],
+                                               learning_rate=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+        else:
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_cnn/20220530_120616/'
+            model_name = 'model.nn'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = HeightEstimator(activation=h_prms['activation'],
+                                    dropout=h_prms['dropout'],
+                                    embedding_method=h_prms['embedding_method'],
+                                    l2=h_prms['l2'],
+                                    lr=h_prms['lr'],
+                                    motor_size=h_prms['motor_size'],
+                                    past=h_prms['past'])
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+
+    elif prefix == 'depth_gru':
+        if old:
+            from src.drone_model.residual.emb_height import EmbHeight as Model
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220223_121251/'
+            model_name = 'epoch=136-step=13425-val_loss=0.50.ckpt'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
+                                               activation=h_prms['activation'],
+                                               embedding=h_prms['embedding'],
+                                               l2=h_prms['l2'],
+                                               learning_rate=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+        else:
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_head/20220529_210139/'
+            model_name = 'model.nn'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = HeightEstimator(activation=h_prms['activation'],
+                                    dropout=h_prms['dropout'],
+                                    embedding_method=h_prms['embedding_method'],
+                                    l2=h_prms['l2'],
+                                    lr=h_prms['lr'],
+                                    motor_size=h_prms['motor_size'],
+                                    past=h_prms['past'])
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+        if dataset_name == 'euroc_mav':
+            print(f'name: {prefix} | dataset_name: {dataset_name} | Emb not generated')
+            return
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, True, False, False)
+
+    elif prefix == 'norm_gru':
+        if old:
+            from src.drone_model.residual.emb_height2 import EmbHeight as Model
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+            model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
+                                               activation=h_prms['activation'],
+                                               embedding=h_prms['embedding'],
+                                               l2=h_prms['l2'],
+                                               learning_rate=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+        else:
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/'
+            model_name = 'model.nn'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = HeightEstimator(activation=h_prms['activation'],
+                                    dropout=h_prms['dropout'],
+                                    embedding_method=h_prms['embedding_method'],
+                                    l2=h_prms['l2'],
+                                    lr=h_prms['lr'],
+                                    motor_size=h_prms['motor_size'],
+                                    past=h_prms['past'])
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+        if dataset_name == 'euroc_mav':
+            print(f'name: {prefix} | dataset_name: {dataset_name} | Emb not generated')
+            return
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], False, False, True, False)
+
+    elif prefix == 'depth_gru_finetune':
+        if old:
+            # from src.drone_model.residual.fine_tuning2 import FineTunning as Model
+            # path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+            # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+            from src.drone_model.residual.fine_tuning import FineTunning as Model
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220226_183121/'
+            model_name = 'epoch=2-step=147017-val_loss=0.48.ckpt'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
+                                               activation=h_prms['activation'],
+                                               l2=h_prms['l2'],
+                                               learning_rate=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+        else:
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220530_134811/'
+            model_name = 'model.nn'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = HeightEstimator(activation=h_prms['activation'],
+                                    dropout=h_prms['dropout'],
+                                    embedding_method=h_prms['embedding_method'],
+                                    l2=h_prms['l2'],
+                                    lr=h_prms['lr'],
+                                    motor_size=h_prms['motor_size'],
+                                    past=h_prms['past'])
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+
+    else:
+        assert prefix == 'norm_gru_finetune'
+        if old:
+            # from src.drone_model.residual.fine_tuning2 import FineTunning as Model
+            # path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220224_183259/'
+            # model_name = 'epoch=0-step=49005-val_loss=0.49.ckpt'
+            from src.drone_model.residual.fine_tuning2 import FineTunning as Model
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/FineTunning/20220228_092516/'
+            model_name = 'epoch=0-step=6124-val_loss=0.51.ckpt'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
+                                               activation=h_prms['activation'],
+                                               l2=h_prms['l2'],
+                                               learning_rate=h_prms['lr'],
+                                               uav_model=None,
+                                               motor_size=h_prms['motor_size'],
+                                               past=h_prms['past'])
+        else:
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_finetune/20220530_134931/'
+            model_name = 'model.nn'
+            h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
+            model = HeightEstimator(activation=h_prms['activation'],
+                                    dropout=h_prms['dropout'],
+                                    embedding_method=h_prms['embedding_method'],
+                                    l2=h_prms['l2'],
+                                    lr=h_prms['lr'],
+                                    motor_size=h_prms['motor_size'],
+                                    past=h_prms['past'])
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+        if dataset_name == 'euroc_mav':
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+        else:
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+
+    suffix = 'old' if old else 'new'
+    name = f'{prefix}_{suffix}'
+    return model, h_prms, name, dataset
+
+
+def model_predict(model, h_prms, name):
     # Data
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
@@ -16,7 +234,6 @@ def model_predict():
     index = habitat.build_index_valid_flight(True)
 
     # Model
-    model, h_prms, name = get_trained_model('none_raw')
     model.to(device)
     model.eval()
 
@@ -27,7 +244,19 @@ def model_predict():
     with torch.no_grad():
         for scene_number, traj in tqdm(index.items()):
             for flight_number in traj:
-                depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number)).float().to(device)
+                if 'none_raw' in name or 'none_gru' in name:
+                    depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number)).float().to(device)
+                elif 'depth_gru_finetune' in name or 'norm_gru_finetune' in name:
+                    depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number)).float().to(device)
+                    depth = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
+
+                    # Divide by 20 because 20 is the ZMAX of CophyLike autoencoder trained on IRS
+                    depth = np.clip(depth / 20, 0, 1) * 2 - 1
+                elif 'depth_gru' in name:
+                    depth = torch.from_numpy(habitat.load_file('depth_emb', scene_number, flight_number)).float().to(device)
+                else:
+                    assert 'norm_gru' in name
+                    depth = torch.from_numpy(habitat.load_file('norm_emb', scene_number, flight_number)).float().to(device)
                 z_gt = (habitat.load_file('surface_dist', scene_number, flight_number) - z_mean) / z_std
                 z_gt = torch.from_numpy(z_gt).float().to(device)
                 label_traj = torch.from_numpy(labels[scene_number][flight_number]).float().to(device)
@@ -68,8 +297,15 @@ def _debug_remove_wrong_predict():
                 print(f'scene_number: {scene_number}, flight_number: {flight_number} already removed')
 
 
+def test_new_model_habitat():
+    # for stage in ['none_raw', 'none_gru', 'depth_gru', 'depth_gru_finetune', 'norm_gru', 'norm_gru_finetune']:
+    stage = 'none_gru'
+    model, h_prms, name, dataset = get_trained_model_and_dataset(stage, False, 'habitat')
+    model_predict(model, h_prms, name)
+
+
 def main():
-    model_predict()
+    test_new_model_habitat()
 
 
 if __name__ == '__main__':

@@ -10,7 +10,7 @@ from tqdm import tqdm
 import sys
 import wandb
 
-from src.drone_models.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+from src.drone_model.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 import src.data.habitat.loading as habitat
 import src.utils.path as path
 
@@ -57,7 +57,7 @@ class HeightEstimator(nn.Module):
             self.embedding_layer = lambda x: x
         elif embedding_method == 'cnn':
             self.depth_size = (480, 640)
-            from src.drone_models.residual.architectures import RawEmbedding
+            from src.drone_model.residual.architectures import RawEmbedding
             self.embedding_layer = RawEmbedding(self.activation, embedding_size)
 
         elif self.embedding_method == 'irs_depth':
@@ -71,7 +71,7 @@ class HeightEstimator(nn.Module):
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=3)
             self.embedding_layer = auto_encoder.encoder
 
-        from src.drone_models.residual.architectures import RegressionHead
+        from src.drone_model.residual.architectures import RegressionHead
         self.regression_head = RegressionHead(self.activation, embedding_size, 50, self.past, self.dropout)
 
     def configure_optimizers(self):
@@ -274,7 +274,7 @@ def train_valid_height_estimator():
         run.regression_head.load_state_dict(state_dict)
         load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
 
-    num_workers = 12 if device == 'gpu' else 0
+    num_workers = 30 if device == 'gpu' else 0
     # Datasets
     print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | '
           f'load_norm_emb {load_norm_emb} | normed_depth {normed_depth}', flush=True)
@@ -368,39 +368,6 @@ def train_valid_height_estimator():
         torch.cuda.empty_cache()
 
         wandb.log({'epoch': epoch_idx})
-
-
-def get_trained_model(name: str):
-    """
-
-    Args:
-        name:
-        ['none_raw',
-         'none_gru',
-         'depth_gru',
-         'depth_gru_finetune',
-         'norm_gru',
-         'norm_gru_finetune']
-
-    Returns: The strings and path associated to the model.
-    """
-    if name == 'none_raw':
-        model_path = f'{path.ANALYSIS_PATH}habitat_residual_training/'
-        model_part_path = 'AllHeight/20220513_154038/'
-        model_ckpt = 'epoch=78-step=894042-val_loss=0.04.ckpt'
-        model_path = f'{model_path}{model_part_path}'
-        name = f'''{model_part_path.replace('/', '_')}{model_ckpt[:-5]}'''
-        h_prms = pickle.load(open(f'{model_path}h_prms.pkl', 'rb'))
-        model = HeightEstimator.load_from_checkpoint(f'{model_path}{model_ckpt}',
-                                                     activation=h_prms['activation'],
-                                                     l2=h_prms['l2'],
-                                                     lr=h_prms['lr'],
-                                                     uav_model=None,
-                                                     motor_size=h_prms['motor_size'],
-                                                     past=h_prms['past'])
-    else:
-        raise NotImplemented
-    return model, h_prms, name
 
 
 def main():

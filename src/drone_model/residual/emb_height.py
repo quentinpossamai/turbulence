@@ -15,26 +15,17 @@ from typing import Union, Callable, Tuple, Dict
 import wandb
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
-import src.utils.layer as layer
 from src.data.habitat.loading import HabitatResidualDataset, MP3D_SCENE_LIST
-from src.drone_models.model_structure import Run
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_model.model_structure import Run
+from src.drone_model.analytical_model.quadrotor_4parms import DynamicalModel
 from src.utils.path import mkdir, ANALYSIS_PATH
 
 
-class VariantD(pl.LightningModule, Run):
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        parser = parent_parser.add_argument_group("VariantA")
-        parser.add_argument('--activation', default="tanh", type=str, help="The activation function to use")
-        parser.add_argument('--embedding', default='depth', type=str, help='Embedding to use.')
-        parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
-        parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
-        return parent_parser
-
+class EmbHeight(pl.LightningModule, Run):
     def __init__(self,
                  activation: str,
                  embedding: str,
+                 l2: float,
                  learning_rate: float,
                  uav_model: object,
                  motor_size: int,
@@ -45,6 +36,8 @@ class VariantD(pl.LightningModule, Run):
         param activation: The activation function to use.
 
         param embedding: 'depth', 'norm' or 'both' to specify which embedding to use.
+
+        param l2: float to penalize weights with l2 loss.
 
         param learning_rate: Learning rate for Adam optimizer.
 
@@ -63,82 +56,68 @@ class VariantD(pl.LightningModule, Run):
             self.activation = torch.tanh  # torch.tanh or f.relu
         assert embedding in ['depth', 'norm', 'both']
         self.embedding = embedding
+        self.l2 = l2
         self.learning_rate = learning_rate
         self.motor_size = motor_size
         self.past = past
 
         self.uav_model = uav_model
-        self.save_hyperparameters('activation', 'embedding', 'learning_rate', 'motor_size', 'past',
+        self.save_hyperparameters('activation', 'embedding', 'l2', 'learning_rate', 'motor_size', 'past',
                                   ignore=['uav_model'], logger=True)
         self.emb_input_size = 128 if self.embedding in ['depth', 'norm'] else 256
         self.feature_size = self.motor_size + 13
 
-        # - sm (state, motor) branch
-        # For the simulation past motor and state is useless
-        self.sm_input_norm = nn.BatchNorm1d(self.feature_size)
-        self.sm_input_drop = nn.Dropout(0.)
-        self.sm_fc_out = layer.FullyConnected(self.activation, 0.2, self.feature_size, 50)
-
         # - emb (embedding) branch
-        self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
-        self.emb_input_drop = nn.Dropout(0.)
-        self.emb_fc_0 = layer.FullyConnected(torch.tanh, 0.2, self.emb_input_size, 50)
+        # self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
+        # self.emb_input_drop = nn.Dropout(0.)
+        self.emb_linear_0 = nn.Linear(self.emb_input_size, 50)
 
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=3, batch_first=True)
-        self.emb_gru_norm = nn.BatchNorm1d(50)
-        self.emb_gru_dropout = nn.Dropout(p=0.2)
+        # self.emb_gru_norm = nn.BatchNorm1d(50)
+        # self.emb_gru_dropout = nn.Dropout(p=0.)
 
         # - reg (regression) branch
-        self.reg_fc_0 = layer.FullyConnected(self.activation, 0.2, 50, 50)
-        self.reg_fc_1 = layer.FullyConnected(self.activation, 0.2, 50, 50)
+        self.reg_linear_0 = nn.Linear(50, 50)
+        self.reg_linear_1 = nn.Linear(50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
-        self.example_input_array = [torch.zeros(2, self.motor_size),
-                                    torch.zeros(2, 13),
-                                    torch.zeros(2, self.past, 128) if self.embedding in ['depth', 'norm']
+        self.example_input_array = [torch.zeros(2, self.past, 128) if self.embedding in ['depth', 'norm']
                                     else torch.zeros(2, self.past, 256)]
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l2)
 
-    def forward(self, motor: torch.Tensor, state: torch.Tensor, emb: torch.Tensor):
+    def forward(self, emb: torch.Tensor):
         r"""
         Estimate the residual
 
-        param motor: (*, 6)
-
-        param state: (*, 13)
-
-        param depth: (*, past, 128 or 256)
+        param emb: (*, past, 128 or 256)
 
         Generally * means batch dimension or more but must exist during training to compute batch_norm.
 
         return: (*, value=1)
         """
         # - Input processing
-        assert motor.shape[-1] == self.motor_size
-        assert state.shape[-1] == 13
         assert emb.shape[-1] in [128, 256] and emb.shape[-2] == self.past
-        assert motor.shape[:-1] == state.shape[:-1] == emb.shape[:-2]
 
-        # - sm branch
-        out = torch.cat([motor, state], dim=-1)
-        out = self.sm_input_norm(out.reshape(-1, self.feature_size))
-        out = self.sm_input_drop(out)
-        sm_out = self.sm_fc_out(out)
+        # # - sm branch
+        # out = torch.cat([motor, state], dim=-1)
+        # out = self.sm_input_norm(out.reshape(-1, self.feature_size))
+        # out = self.sm_input_drop(out)
+        # sm_out = self.sm_fc_out(out)
 
         # - emb branch
         star_shape = list(emb.shape[:-1])
-        out = self.emb_input_drop(self.emb_input_norm(emb.reshape((-1, 128))))
-        out = self.emb_fc_0(out)
+        out = self.activation(self.emb_linear_0(emb.reshape((-1, 128))))
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         out = out[:, -1, :]  # last hidden states, (*, feature_size)
-        emb_out = self.emb_gru_dropout(self.emb_gru_norm(out))  # (batch, feature_size)
+        emb_out = out  # (batch, feature_size)
 
         # - reg branch
-        out = self.reg_fc_0(sm_out + emb_out)
-        out = self.reg_fc_1(out)
+        # out = self.reg_fc_0(sm_out + emb_out)
+        out = self.activation(self.reg_linear_0(emb_out))
+        out = self.activation(self.reg_linear_1(out))
         out = self.reg_linear_out(out)
         return out
 
@@ -146,8 +125,10 @@ class VariantD(pl.LightningModule, Run):
         """
         param batch: {motor: (batch, 6),
                       state: (batch, 13),
-                      depth: (batch, self.past, 480, 640),
-                      residual: (batch, 1)}
+                      depth_emb: (batch, self.past, 128),
+                      norm_emb: (batch, self.past, 128),
+                      residual: (batch, 1),
+                      surface_dist: (batch, 1)}
 
         return: Loss
         """
@@ -158,8 +139,8 @@ class VariantD(pl.LightningModule, Run):
         else:  # == 'both'
             emb = torch.cat([batch['depth_emb'], batch['norm_emb']], dim=-1)
 
-        residual_hat = self.forward(motor=batch['motor'], state=batch['state'], emb=emb)
-        residual_gt = batch["ground_force"][:, 2]
+        residual_hat = self.forward(emb=emb)
+        residual_gt = batch["surface_dist"]
 
         loss = (residual_gt - residual_hat) ** 2
         return loss.mean()
@@ -265,13 +246,15 @@ mkdir([SAVING_PATH])
 def main():
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     version = f'{now}'
-    residual_model_class = VariantD
+    residual_model_class = EmbHeight
     name = residual_model_class.__name__
     training_path = f'{SAVING_PATH}{name}/{version}/'
     mkdir([training_path])
 
-    wandb.init(name=f'{name}-{version}',
-               id=f'{name}-{version}',
+    identifier = f'{name}-{version}'
+    identifier = identifier if torch.cuda.is_available() else identifier + 'local'
+    wandb.init(name=identifier,
+               id=identifier,
                project='turbulence_residual',
                dir=training_path)
     logger = WandbLogger(experiment=wandb.run)
@@ -285,8 +268,12 @@ def main():
 
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
+    parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
     parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
-    parser = residual_model_class.add_model_specific_args(parser)  # Module args
+    parser.add_argument('--embedding', default='depth', type=str, help='Embedding to use.')
+    parser.add_argument('--l2', default=1e-3, type=float, help="Number of past information to take in the model")
+    parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
+    parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 
@@ -307,6 +294,7 @@ def main():
               'activation': args.activation,
               'batch_size': args.batch_size,
               'embedding': args.embedding,
+              'l2': args.l2,
               'lr': args.lr,
               'motor_size': motor_size,
               'max_epochs': args.max_epochs,
@@ -342,6 +330,7 @@ def main():
 
     run = residual_model_class(activation=args.activation,
                                embedding=args.embedding,
+                               l2=args.l2,
                                learning_rate=args.lr,
                                motor_size=motor_size,
                                past=args.past,
@@ -349,7 +338,7 @@ def main():
     logger.watch(run)
     # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
     #                               f'checkpoints/epoch=16-step=832.ckpt'
-    num_workers = 12 if GPU_COUNT else 0
+    num_workers = 12 if GPU_COUNT else 8
     # Datasets
     load_depth = False
     load_depth_emb = True if args.embedding in ['depth', 'both'] else False

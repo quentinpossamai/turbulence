@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import src.drone_models.residual.height_estimator as model_builder
+import src.drone_model.residual.height_estimator as model_builder
 import src.data.habitat.loading as habitat
 import src.utils.path as path
 

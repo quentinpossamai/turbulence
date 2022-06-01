@@ -14,7 +14,7 @@ import src.data.habitat.loading as habitat
 from src.data.habitat.generate_reference import generate_reference
 from src.data.habitat.hatbitat2flu import Habitat2FLU
 from src.data.habitat.mpc import mpc_controller
-from src.drone_models.analytical_models.quadrotor_4parms import DynamicalModel
+from src.drone_model.analytical_model.quadrotor_4parms import DynamicalModel
 from src.utils.path import WD_PATH, mkdir
 from src.utils.trajectory import trace_trajectory3d
 from src.utils.transform import Transform as Tf

@@ -251,7 +251,7 @@ def presence_classification_test(classifier, dataset, train_validation_test):
 
 def main():
     # # EUROC MAV
-    # from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
+    # from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
     # print('Dynamical model paper')
     # model = DynamicalModel(param="paper", dtype=torch.float32)
     # test_model(model=model, past=1, dataset="euroc_mav", train_test_validation="test")
@@ -287,18 +287,18 @@ def main():
     # mlp_symplectic_past = "20210709_093134_MLP_bs_32/82320_weights.pt"
     # weights = torch.load(EUROC_MAV_ANALYSIS_PATH + f"training/{mlp_symplectic_past}")
     # past = 10
-    # model = drone_models.mlp.iii_mlp_past.MLP(motor_size=6, n_past=past)
+    # model = drone_model.mlp.iii_mlp_past.MLP(motor_size=6, n_past=past)
     # model.load_state_dict(weights)
     # model.eval()
     # test_model(model=model, residual_model=None, past=past, dataset="euroc_mav", train_test_validation="test",
     #            mode="normal")
 
     # cnn_residual = "20210803_115051_CNNResidual_bs32_epch10000_lr0.001_h1_p20_us50/567525_weights.pt"
-    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # model = drone_model.analytical_model.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     # past = 20
     # weights = torch.load(ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING +
     # f"training/{cnn_residual}", map_location=torch.device('cpu'))
-    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
+    # residual_model = drone_model.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
     #                                                        device="cpu")
     # residual_model.load_state_dict(weights)
     # residual_model.eval()
@@ -309,11 +309,11 @@ def main():
 
     # cnn_residual = "20210831_120906_CNNResidual_bs128_epch10000_lr0.0001_h1_p20_us50_relu/1241_weights.pt"
     # # cnn_residual = "20210831_120905_CNNResidual_bs128_epch10000_lr0.0001_h1_p10_us50_relu/1787_weights.pt"
-    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # model = drone_model.analytical_model.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     # past = 20
     # weights = torch.load(ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING +
     # f"training/{cnn_residual}", map_location=torch.device('cpu'))
-    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
+    # residual_model = drone_model.residual.cnn.CNNResidual(model=model, past=past, unit_size=50, activation=f.relu,
     #                                                        device="cpu")
     # residual_model.load_state_dict(weights)
     # residual_model.eval()
@@ -324,7 +324,7 @@ def main():
 
     # cnn_residual = "l3/"
     # # cnn_residual = "20210902_120510_CNNResidual_bs128_epch10000_lr0.0001_h1_p60_us50_tanh/9982_weights.pt"
-    # model = drone_models.analytical_models.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
+    # model = drone_model.analytical_model.hexarotor_4params.DynamicalModel(paper=False, dtype=torch.float32)
     # past = 60
     # layer = 3
     # weights = torch.load(ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING +
@@ -332,7 +332,7 @@ def main():
     # for old_key, new_key in [["conv2d1", "conv2d_end"]]:
     #     weights[f"{new_key}.weight"] = weights.pop(f"{old_key}.weight")
     #     weights[f"{new_key}.bias"] = weights.pop(f"{old_key}.bias")
-    # residual_model = drone_models.residual.cnn.CNNResidual(model=model, past=past, unit_size=50,
+    # residual_model = drone_model.residual.cnn.CNNResidual(model=model, past=past, unit_size=50,
     #                                                        activation=torch.tanh,
     #                                                        layer=layer, embedding="None", device="cpu")
     # residual_model.load_state_dict(weights)
@@ -346,8 +346,8 @@ def main():
     # gru_cnn = ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING + "GRUCNNResidual_None/default/"
     # gru_cnn += "20210928_090235_GRUCNNResidual_bs64_epch1000_lr1e-06_h1_p60_us50_tanh_l3_None/checkpoints/"
     # gru_cnn += "epoch=999-step=584999.ckpt"
-    # from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-    # from src.drone_models.residual.gru_cnn import GRUCNNResidual
+    # from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
+    # from src.drone_model.residual.gru_cnn import GRUCNNResidual
     # model = DynamicalModel(param='identification', dtype=torch.float32)
     # past = 60
     # residual_model = GRUCNNResidual.load_from_checkpoint(
@@ -380,7 +380,7 @@ def main():
     # mlp = '/Users/quentin/phd/turbulence/analysis/euroc_mav_residual_training/PresenceClassifier_depth/default/' \
     #       '20211018_100951_PresenceClassifier_relu_bs256_depth_l0.0_l0.0_l3_lr1e-06_epch10000_us50_/checkpoints/' \
     #       'epoch=2063-step=373583.ckpt'
-    # from src.drone_models.residual.presence_classifier import PresenceClassifier
+    # from src.drone_model.residual.presence_classifier import PresenceClassifier
     # residual_model = PresenceClassifier.load_from_checkpoint(mlp, motor_size=6)
     #
     # residual_model.eval()
@@ -393,8 +393,8 @@ def main():
     gru_cnn += "20211031_092433_GRUCNNResidual_tanh_bs256_None_l3_lr1e-06_model-" \
                "DynamicalModel_motor_size6_epch10000_past60_us50_/checkpoints/"
     gru_cnn += "epoch=2112-step=304271.ckpt"
-    from src.drone_models.analytical_models.hexarotor_4params import DynamicalModel
-    from src.drone_models.residual.gru_cnn import GRUCNNResidual
+    from src.drone_model.analytical_model.hexarotor_4params import DynamicalModel
+    from src.drone_model.residual.gru_cnn import GRUCNNResidual
     model = DynamicalModel(param='identification', dtype=torch.float32)
     past = 60
     residual_model = GRUCNNResidual.load_from_checkpoint(

@@ -1,7 +1,7 @@
 import torch
 import argparse
 from Dataloaders.EurocMAVLoader import EurocMavLoader
-from Dataloaders.IRSLoader import IRSLoader
+from Dataloaders.IRSDataset import IRSLoader
 import torch.nn as nn
 from Models.model_CoPhy_like import Autoencoder
 from Models.model_IRS_like import NormNetS
