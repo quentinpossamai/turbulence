@@ -4,7 +4,6 @@ import torch.nn as nn
 from typing import Union, Dict, Any, List
 
 import src.utils.quaternion as quaternion
-from src.drone_model.model_structure import Run
 
 
 # theta = [kt / m, kt * l / ix, km / iz, iz / ix]

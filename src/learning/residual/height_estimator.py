@@ -10,7 +10,7 @@ from tqdm import tqdm
 import sys
 import wandb
 
-from src.drone_model.residual.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+from src.learning.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 import src.data.habitat.loading as habitat
 import src.utils.path as path
 
@@ -55,23 +55,24 @@ class HeightEstimator(nn.Module):
 
         if embedding_method == 'none':
             self.embedding_layer = lambda x: x
+            self.depth_size = (128,)
         elif embedding_method == 'cnn':
-            self.depth_size = (480, 640)
-            from src.drone_model.residual.architectures import RawEmbedding
-            self.embedding_layer = RawEmbedding(self.activation, embedding_size)
+            self.depth_size = (1, 480, 640)
+            from src.learning.residual.architectures import CNNEncoderOld
+            self.embedding_layer = CNNEncoderOld(self.activation, embedding_size)
 
         elif self.embedding_method == 'irs_depth':
-            self.depth_size = (240, 376)
+            self.depth_size = (1, 240, 376)
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=1)
             self.embedding_layer = auto_encoder.encoder
 
         else:
             assert self.embedding_method == 'irs_normal'
-            self.depth_size = (240, 376)
+            self.depth_size = (1, 240, 376)
             auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=3)
             self.embedding_layer = auto_encoder.encoder
 
-        from src.drone_model.residual.architectures import RegressionHead
+        from src.learning.residual.architectures import RegressionHead
         self.regression_head = RegressionHead(self.activation, embedding_size, 50, self.past, self.dropout)
 
     def configure_optimizers(self):
@@ -87,7 +88,7 @@ class HeightEstimator(nn.Module):
 
         return: (*, 1)
         """
-        input_data = input_data.reshape((-1, 1) + self.depth_size)
+        input_data = input_data.reshape((-1,) + self.depth_size)
         out = self.embedding_layer(input_data)
         out = self.regression_head(out)
         return out

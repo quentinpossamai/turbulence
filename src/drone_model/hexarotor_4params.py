@@ -3,10 +3,9 @@ import torch
 import torch.nn as nn
 
 import src.utils.quaternion as quaternion
-from src.drone_model.model_structure import Run
 
 
-class DynamicalModel(nn.Module, Run):
+class DynamicalModel(nn.Module):
     def __init__(self, param, dtype):
         """
         :param param: "paper", "identification", or dict["permutation", "theta"]

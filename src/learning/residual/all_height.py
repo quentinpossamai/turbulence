@@ -15,13 +15,12 @@ import wandb
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 import src.data.habitat.loading as habitat
-from src.drone_model.model_structure import Run
 from src.utils.profiler import profiler
-from src.drone_model.analytical_model.quadrotor_4parms import DynamicalModel
+from src.drone_model.quadrotor_4parms import DynamicalModel
 from src.utils.path import mkdir, ANALYSIS_PATH
 
 
-class AllHeightNoGRU(pl.LightningModule, Run):
+class AllHeight(pl.LightningModule):
     def __init__(self,
                  activation: str,
                  l2: float,
@@ -79,7 +78,7 @@ class AllHeightNoGRU(pl.LightningModule, Run):
         self.depth_linear_1 = nn.Linear(128, 50)
 
         # Time reduction
-        # self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
+        self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
         # self.emb_gru_norm = nn.BatchNorm1d(50)
         # self.emb_gru_dropout = nn.Dropout(p=0.)
 
@@ -120,7 +119,7 @@ class AllHeightNoGRU(pl.LightningModule, Run):
         out = self.activation(self.depth_linear_0(out.reshape((-1, 4 * 6 * 8))))
         out = self.activation(self.depth_linear_1(out))
 
-        # out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
+        out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
         # out = out[:, -1, :]  # last hidden states, (*, feature_size)
         emb_out = out  # (batch, feature_size)
 

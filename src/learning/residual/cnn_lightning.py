@@ -1,9 +1,6 @@
 import torch
 import torch.nn as nn
 from typing import Callable
-
-from src.learning.model_structure import Run
-
 import pytorch_lightning as pl
 
 
@@ -138,7 +135,7 @@ import pytorch_lightning as pl
 #         return error, prediction
 
 
-class CNNResidual(pl.LightningModule, Run):
+class CNNResidual(pl.LightningModule):
     def __init__(self, model,
                  past: int,
                  unit_size: int,

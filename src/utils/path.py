@@ -12,7 +12,7 @@ import time
 from typing import Union, Tuple, List, Iterable
 
 WD_PATH = os.getcwd() + "/"
-print(f'WD_PATH: {WD_PATH}')
+print(f'WD_PATH: {WD_PATH}', flush=True)
 MODELS_PATH = WD_PATH + "models/"
 ANALYSIS_PATH = WD_PATH + "analysis/"
 ANALYSIS_DATA_VIS_EUROC_MAV = ANALYSIS_PATH + 'data_vis_euroc_mav/'  # euroc_mav.datavis.py

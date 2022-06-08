@@ -15,13 +15,13 @@ import wandb
 
 # from src.data.euroc_mav.loading import EurocMAVDatasetHorizon
 import src.data.habitat.loading as habitat
-from src.drone_model.model_structure import Run
+from src.learning.autoencoder_depth.Models.model_CoPhy_like import Encoder
 from src.utils.profiler import profiler
-from src.drone_model.analytical_model.quadrotor_4parms import NumpyDynamicalModel
-from src.utils.paths import mkdir_if_not_exist, ANALYSIS_PATH
+from src.drone_model.quadrotor_4parms import DynamicalModel
+from src.utils.path import mkdir, ANALYSIS_PATH, WD_PATH
 
 
-class AllHeight(pl.LightningModule, Run):
+class FineTunning(pl.LightningModule):
     def __init__(self,
                  activation: str,
                  l2: float,
@@ -59,24 +59,14 @@ class AllHeight(pl.LightningModule, Run):
         self.uav_model = uav_model
         self.save_hyperparameters('activation', 'l2', 'learning_rate', 'motor_size', 'past',
                                   ignore=['uav_model'], logger=True)
-        self.depth_size = [480, 640]
+        self.depth_size = [240, 376]
         self.feature_size = self.motor_size + 13
 
         # - emb (embedding) branch
         # self.emb_input_norm = nn.BatchNorm1d(self.emb_input_size)  # N, past, 128 or 256
         # self.emb_input_drop = nn.Dropout(0.)
-        self.depth_conv2d_0 = nn.Conv2d(1, 16, (7, 7), 1, 3)
-        self.depth_pool_0 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_1 = nn.Conv2d(16, 32, (3, 3), 1)
-        self.depth_conv2d_2 = nn.Conv2d(32, 64, (3, 3), 2)
-        self.depth_conv2d_3 = nn.Conv2d(64, 64, (3, 3), 1)
-        self.depth_pool_3 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_4 = nn.Conv2d(64, 32, (3, 3), 2)
-        self.depth_pool_4 = nn.MaxPool2d((2, 2))
-        self.depth_conv2d_5 = nn.Conv2d(32, 4, (3, 3), 1)
-        self.depth_pool_5 = nn.MaxPool2d((2, 2))
-        self.depth_linear_0 = nn.Linear(in_features=4 * 6 * 8, out_features=128)
-        self.depth_linear_1 = nn.Linear(128, 50)
+        self.encoder = Encoder(128, 1)
+        self.emb_linear_0 = nn.Linear(128, 50)
 
         # Time reduction
         self.emb_gru = nn.GRU(input_size=50, hidden_size=50, num_layers=1, batch_first=True)
@@ -88,7 +78,7 @@ class AllHeight(pl.LightningModule, Run):
         self.reg_linear_1 = nn.Linear(50, 50)
         self.reg_linear_out = nn.Linear(in_features=50, out_features=1)
 
-        self.example_input_array = [torch.zeros(2, self.past, 480, 640)]
+        self.example_input_array = [torch.zeros(4, self.past, 240, 376)]
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.learning_rate, weight_decay=self.l2)
@@ -104,24 +94,14 @@ class AllHeight(pl.LightningModule, Run):
         return: (*, value=1)
         """
         # - Input processing
-        assert list(depth.shape[-3:]) == [self.past, 480, 640]
+        assert list(depth.shape[-3:]) == [self.past, 240, 376]
 
         # - emb branch
-        out = self.activation(self.depth_conv2d_0(depth.reshape((-1, 1, 480, 640))))
-        out = self.depth_pool_0(out)
-        out = self.activation(self.depth_conv2d_1(out))
-        out = self.activation(self.depth_conv2d_2(out))
-        out = self.activation(self.depth_conv2d_3(out))
-        out = self.depth_pool_3(out)
-        out = self.activation(self.depth_conv2d_4(out))
-        out = self.depth_pool_4(out)
-        out = self.activation(self.depth_conv2d_5(out))
-        out = self.depth_pool_5(out)
-        out = self.activation(self.depth_linear_0(out.reshape((-1, 4 * 6 * 8))))
-        out = self.activation(self.depth_linear_1(out))
+        out = self.encoder(depth.reshape((-1, 1, 240, 376)))
+        out = self.activation(self.emb_linear_0(out))
 
         out, _ = self.emb_gru(out.reshape((-1, self.past, 50)))  # gru output with shape: (*, step, feature_size)
-        # out = out[:, -1, :]  # last hidden states, (*, feature_size)
+        out = out[:, -1, :]  # last hidden states, (*, feature_size)
         emb_out = out  # (batch, feature_size)
 
         # - reg branch
@@ -135,7 +115,7 @@ class AllHeight(pl.LightningModule, Run):
         """
         param batch: {motor: (batch, 6),
                       state: (batch, 13),
-                      depth: (batch, self.past, 480, 640),
+                      depth: (batch, self.past, 240, 376),
                       residual: (batch, 1),
                       surface_dist: (batch, 1)}
 
@@ -143,7 +123,6 @@ class AllHeight(pl.LightningModule, Run):
         """
         z_hat = self.forward(depth=batch['depth'])
         z_gt = batch["surface_dist"]
-
         loss = (z_gt - z_hat) ** 2
         return loss.mean()
 
@@ -242,17 +221,17 @@ ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_train
 ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
 
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
-mkdir_if_not_exist([SAVING_PATH])
+mkdir([SAVING_PATH])
 
 
 def main():
     profiler()
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     version = f'{now}'
-    residual_model_class = AllHeight
+    residual_model_class = FineTunning
     name = residual_model_class.__name__
     training_path = f'{SAVING_PATH}{name}/{version}/'
-    mkdir_if_not_exist([training_path])
+    mkdir([training_path])
 
     identifier = f'{name}-{version}-debug'
     identifier = identifier if torch.cuda.is_available() else identifier + '_local'
@@ -272,7 +251,8 @@ def main():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
-    parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
+    parser.add_argument('--batch_size', default=4, type=int, help='Size of a batch')
+    parser.add_argument('--embedding', default='depth', type=str, help='Which autoencoder to load')
     parser.add_argument('--l2', default=1e-4, type=float, help="Number of past information to take in the model")
     parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
     parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
@@ -294,6 +274,7 @@ def main():
     h_prms = {'time_start': now,  # hyperparameters
               'name': residual_model_class.__name__,
               'activation': args.activation,
+              'embedding': args.embedding,
               'batch_size': args.batch_size,
               'l2': args.l2,
               'lr': args.lr,
@@ -327,7 +308,7 @@ def main():
                       drone_prms['kt'] * drone_prms['l'] / drone_prms['ix'],
                       drone_prms['km'] / drone_prms['iz'],
                       drone_prms['iz'] / drone_prms['ix']], dtype=np.float32)
-    quadrotor = NumpyDynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
+    quadrotor = DynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=np.float32, g=g)
 
     run = residual_model_class(activation=args.activation,
                                l2=args.l2,
@@ -335,9 +316,30 @@ def main():
                                motor_size=motor_size,
                                past=args.past,
                                uav_model=quadrotor)
+    if args.embedding == 'depth':
+        model_variant = 'autoencoder_depth_irs_128'
+    else:
+        assert args.embedding == 'norm'
+        model_variant = 'autoencoder_normal_irs_128_irs'
+
+    if 'quentin' in WD_PATH:
+        enc_path = f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/{model_variant}.nn"
+    else:
+        enc_path = f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/{model_variant}.nn"
+    state_dict = torch.load(enc_path, map_location=device)
+    for i, e in enumerate(run.encoder.state_dict().keys()):
+        run.encoder.state_dict()[e].copy_(state_dict[f'encoder.{e}'])
+        assert (run.encoder.state_dict()[e].to(device) == state_dict[f'encoder.{e}']).all()
+
+    # Loading head
+    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
+    state_dict = torch.load(f'{path}{model_name}', map_location=device)
+    for i, e in enumerate(state_dict['state_dict'].keys()):
+        run.state_dict()[e].copy_(state_dict['state_dict'][e])
+        assert (run.state_dict()[e].to(device) == state_dict['state_dict'][e]).all()
+
     logger.watch(run)
-    # args.resume_from_checkpoint = f'{ANALYSIS_PATH}habitat_residual_training/VariantD/20220215_163515/' \
-    #                               f'checkpoints/epoch=16-step=832.ckpt'
     num_workers = 12 if gpu_count else 0
     # Datasets
     load_depth = True
@@ -347,7 +349,7 @@ def main():
     train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
                                                            load_depth_emb=load_depth_emb,
                                                            load_norm_emb=load_norm_emb,
-                                                           normed_depth=False),
+                                                           normed_depth=True),
                             batch_size=args.batch_size,
                             shuffle=True,
                             num_workers=num_workers,
@@ -357,7 +359,7 @@ def main():
     validation_data = DataLoader(habitat.HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
                                                                 load_depth_emb=load_depth_emb,
                                                                 load_norm_emb=load_norm_emb,
-                                                                normed_depth=False),
+                                                                normed_depth=True),
                                  batch_size=args.batch_size,
                                  shuffle=False,
                                  num_workers=num_workers,
@@ -367,7 +369,7 @@ def main():
                                           filename='{epoch}-{step}-{val_loss:.2f}',
                                           monitor='val_loss',
                                           mode='min')
-    trainer = pl.Trainer(gpus=gpu_count,
+    trainer = pl.Trainer(gpus=8,
                          logger=logger,
                          deterministic=True,
                          max_epochs=args.max_epochs,

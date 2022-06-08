@@ -4,21 +4,25 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-import src.drone_model.residual.height_estimator as model_builder
-import src.data.habitat.loading as habitat
 import src.utils.path as path
 
 
 def create_lr_tests():
-    past = 1
-    train_dataset = habitat.HabitatResidualDataset('train', past, True, False, False, False, True)
-    train_dataloader = DataLoader(train_dataset, 20, True)
+    # Change dataset
+    import src.learning.autoencoder_depth.dataloaders.irs_dataset as irs_dataset
+    train_dataset = irs_dataset.IRSDataset('train', ['depth'])
+    train_dataloader = DataLoader(train_dataset, 20, True, pin_memory=True, num_workers=0)
 
-    power = torch.linspace(-9, 0, 100)
+    power = torch.linspace(-9, 0, 50)
     lr_test = 10 ** power
     sample_size = 1000
+
+    # Change model
+    import src.learning.autoencoder_depth.train_autoencoder_depth as auto_encoder
+    model = auto_encoder.EncoderDecoder('relu', 'depth', 128, 0, lr_test[0], 'cnn', 1)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = model_builder.HeightEstimator('relu', 0.5, 0, lr_test[0], 4, past).to(device)
+    model.to(device)
     model.train()
     loss_mean = torch.zeros_like(lr_test)
     loss_std = torch.zeros_like(lr_test)
@@ -29,7 +33,8 @@ def create_lr_tests():
         for j in range(sample_size):
             batch = train_dataloader.__iter__().__next__()
             batch = {key: value.to(device) for key, value in batch.items()}
-            loss = model.training_step(batch, 1)
+            hat = model(batch['depth'])
+            loss = auto_encoder.loss_depth(batch['depth'], hat, 1)['loss_depth']
             tmp_loss[j] = loss.cpu().item()
             loss.backward()
             optimizer.step()
@@ -37,7 +42,7 @@ def create_lr_tests():
         loss_mean[i] = tmp_loss.mean()
         loss_std[i] = tmp_loss.std()
 
-    pickle.dump({'loss_mean': loss_mean, 'loss_std': loss_std}, open(f'{path.WD_PATH}lr_curve.pkl', 'wb'))
+    pickle.dump({'loss_mean': loss_mean, 'loss_std': loss_std}, open(f'{path.WD_PATH}lr_curve_ae.pkl', 'wb'))
     # plt.plot(lr_test, loss_mean)
     # plt.xscale('log')
     # # plt.yscale('log')
@@ -49,7 +54,7 @@ def plot_lr_curve():
     power = torch.linspace(-9, 0, 100)
     lr_test = 10 ** power
 
-    data = pickle.load(open(f'{path.WD_PATH}lr_curve.pkl', 'rb'))
+    data = pickle.load(open(f'{path.WD_PATH}lr_curve_ae.pkl', 'rb'))
     plt.plot(lr_test, data['loss_mean'])
     plt.plot(lr_test, data['loss_mean'] + data['loss_std'])
     plt.plot(lr_test, data['loss_mean'] - data['loss_std'])
@@ -59,7 +64,7 @@ def plot_lr_curve():
 
 
 def main():
-    plot_lr_curve()
+    create_lr_tests()
 
 
 if __name__ == '__main__':

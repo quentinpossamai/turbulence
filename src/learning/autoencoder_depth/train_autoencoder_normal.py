@@ -1,7 +1,7 @@
 import torch
 import argparse
-from Dataloaders.EurocMAVLoader import EurocMavLoader
-from Dataloaders.IRSDataset import IRSDataset
+from dataloaders.euroc_mav_loader import EurocMavLoader
+from dataloaders.irs_dataset import IRSLoader
 import torch.nn as nn
 from Models.model_CoPhy_like import Autoencoder
 from Models.model_IRS_like import NormNetS
@@ -14,11 +14,11 @@ import torch.nn.functional as F
 parser = argparse.ArgumentParser()
 parser.add_argument('--epoch', default=0, type=int)
 parser.add_argument('--lr', default=1e-3, type=float)
-parser.add_argument('--dataset', default="irs", type=str)
+parser.add_argument('--dataset', default="eurocmav", type=str)
 parser.add_argument('--model', default="CoPhy_Like", type=str)
-parser.add_argument('--feature_size', default=512, type=int)
+parser.add_argument('--feature_size', default=256, type=int)
 parser.add_argument('--weight_grad', default=1, type=int)
-parser.add_argument('--name', default='autoencoder_depth_irs_512', type=str)
+parser.add_argument('--name', default='autoencoder_normal_irs_512_irs', type=str)
 
 args = parser.parse_args()
 
@@ -27,20 +27,17 @@ device = torch.device("cuda" if torch.cuda.is_available() and use_cuda else "cpu
 
 MSE = nn.MSELoss()
 
-ZMAX = 7.48
-
 datasets = {'eurocmav': EurocMavLoader, 'irs': IRSLoader}
 models = {'CoPhy_Like': Autoencoder, 'IRS_Like': NormNetS}
 
 
 def evaluate():
-    print(args)
-    dataloader = DataLoader(datasets[args.dataset](split='test'), batch_size=16,
+    dataloader = DataLoader(datasets[args.dataset](split='test'), batch_size=2,
                             shuffle=False,
                             num_workers=0,
                             pin_memory=True)
 
-    model = models[args.model](feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
+    model = models[args.model](feature_size=args.feature_size, in_channel=1, out_channel=3).to(device)
     try:
         state_dict = torch.load(
             f"/home/sjanny/codes/turbulence/src/autoencoder_depth/trained_models/{args.model}/{args.name}.nn",
@@ -52,7 +49,7 @@ def evaluate():
 
     model.load_state_dict(state_dict)
 
-    validate(model, dataloader, viz=True)
+    validate(model, dataloader, viz=False)
 
 
 def vizualize(gt, pred):
@@ -60,18 +57,18 @@ def vizualize(gt, pred):
 
     fig, ax = plt.subplots(1, 3)
 
+    gt = gt[0].numpy().transpose(1, 2, 0)
+    pred = pred["output"][0].numpy().transpose(1, 2, 0)
+
+    gt = (gt + 1) / 2
+    pred = (pred + 1) / 2
+
     for k in range(3):
         ax[k].axis("off")
 
-    gt = gt[0, 0].numpy()
-    pred = pred["output"][0, 0].numpy()
-
-    gt = ((gt + 1) / 2) * ZMAX
-    pred = ((pred + 1) / 2) * ZMAX
-
     ax[0].imshow(gt)
     ax[1].imshow(pred)
-    ax[2].imshow((pred - gt) ** 2)
+    ax[2].imshow(((pred - gt) ** 2).sum(-1))
 
     ax[0].set_title("Ground Truth")
     ax[1].set_title("Reconstruction")
@@ -83,23 +80,26 @@ def vizualize(gt, pred):
 
 def validate(model, dataloader, viz=False, epoch=1000):
     model.eval()
-    l_cost, l_depth, l_grad, l_psnr = [], [], [], []
+    l_cost, l_normal, l_grad, l_psnr, l_cross = [], [], [], [], []
     with torch.no_grad():
         for i, x in enumerate(tqdm(dataloader, desc="Validation")):
-            depthmap = x['depth'].to(device)
+            depthmap = x["depth"].to(device)
+            normal = x['normal'].to(device)
+
             out = model(depthmap)
-            costs = get_loss(depthmap, out)
+            costs = get_loss(normal, out)
             psnr = 10 * torch.log10(4 / costs[1])
 
             l_cost.append(costs[0].detach().cpu().numpy())
-            l_depth.append(costs[1].detach().cpu().numpy())
+            l_normal.append(costs[1].detach().cpu().numpy())
             l_grad.append(costs[2].detach().cpu().numpy())
             l_psnr.append(psnr.detach().cpu().numpy())
+            l_cross.append(costs[-1].detach().cpu().numpy())
 
             if viz == True:
-                vizualize(depthmap, out)
+                vizualize(normal, out)
     print(
-        f"!*  loss : {np.mean(l_cost):.4f},  MSE : {np.mean(l_depth):.4f}, Grad : {np.mean(l_grad):.4f}, PSNR : {np.mean(l_psnr):.2f} dB")
+        f"!*  loss : {np.mean(l_cost):.4f},  MSE : {np.mean(l_normal):.4f}, Grad : {np.mean(l_grad):.4f}, PSNR : {np.mean(l_psnr):.2f} dB, CrossProduct : {np.mean(l_cross)}")
     loss = np.mean(l_cost)
     return loss
 
@@ -107,19 +107,21 @@ def validate(model, dataloader, viz=False, epoch=1000):
 def compute_grad(rgb):
     a = torch.Tensor([[1, 0, -1],
                       [2, 0, -2],
-                      [1, 0, -1]]).view(1, 1, 3, 3).to(device)
+                      [1, 0, -1]]).expand(1, 3, 3, 3).to(device)
     b = torch.Tensor([[1, 2, 1],
                       [0, 0, 0],
-                      [-1, -2, -1]]).view(1, 1, 3, 3).to(device)
+                      [-1, -2, -1]]).expand(1, 3, 3, 3).to(device)
     sobel = (F.conv2d(rgb, a, padding=1) ** 2 + F.conv2d(rgb, b, padding=1) ** 2).squeeze(1)
     return sobel
 
 
 def get_loss(gt, prediction):
-    pred = prediction["output"][:, :, :gt.shape[-2], :gt.shape[-1]]
-    mse_normal = MSE(gt, pred)
-    mse_grad = MSE(compute_grad(gt), compute_grad(pred))
-    return 1000 * mse_normal + args.weight_grad * mse_grad, mse_normal, mse_grad
+    mse_normal = MSE(gt, prediction["output"])
+    mse_grad = MSE(compute_grad(gt), compute_grad(prediction["output"]))
+    gt_transpose = gt.permute(0, 2, 3, 1).reshape(-1, 3)
+    prediction_transpose = prediction["output"].permute(0, 2, 3, 1).reshape(-1, 3)
+    cross_product_loss = torch.sqrt((torch.cross(gt_transpose, prediction_transpose, dim=-1) ** 2).sum(-1)).mean()
+    return 10000 * mse_normal + args.weight_grad * mse_grad, mse_normal, mse_grad, cross_product_loss
 
 
 def main():
@@ -138,7 +140,7 @@ def main():
                                 num_workers=1,
                                 pin_memory=True)
 
-    model = models[args.model](feature_size=args.feature_size, in_channel=1, out_channel=1).to(device)
+    model = Autoencoder(feature_size=args.feature_size, in_channel=1, out_channel=3).to(device)
 
     optim = torch.optim.Adam(model.parameters(), lr=args.lr)
 
@@ -149,9 +151,10 @@ def main():
         print("=== EPOCH ", epoch + 1, " ===")
         for i, x in enumerate(tqdm(train_dataloader, desc="Training")):
             depthmap = x['depth'].to(device)
+            normal = x['normal'].to(device)
 
             out = model(depthmap)
-            costs = get_loss(depthmap, out)
+            costs = get_loss(normal, out)
 
             optim.zero_grad()
             costs[0].backward()

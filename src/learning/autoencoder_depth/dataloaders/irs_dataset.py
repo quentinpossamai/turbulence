@@ -1,4 +1,5 @@
 import os
+import sys
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 
@@ -9,7 +10,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as f
 from tqdm import tqdm
-from typing import Tuple, List
+from typing import List
 
 import src.utils.path as path
 
@@ -33,7 +34,7 @@ class IRSDataset(Dataset):
         """
         assert split in ['train', 'test']
         self.split = split
-        self.irs_path = f'{path.WD_PATH}data/IRS/'
+        self.irs_path = f'{path.WD_PATH}data/irs/'
         self.data_path = f"{self.irs_path}IRSDataset/"
 
         assert len(np.unique(list_to_load)) == len(list_to_load)
@@ -46,6 +47,8 @@ class IRSDataset(Dataset):
         else:
             with open(f'{self.data_path}list/IRSDataset_TEST.list', "r") as file:  # 15638
                 self.index = file.read().split('\n')
+        if sys.platform == 'darwin':
+            self.index = self.index[:10]
 
         self.focal = 480.0  # confirmed by author
         self.sx = 540
@@ -62,23 +65,27 @@ class IRSDataset(Dataset):
 
         def load_rgb(x):
             rgb = cv2.imread(f'{x}')[..., ::-1]
-            assert rgb.shape == (540, 960, 3)
+            # assert rgb.shape == (540, 960, 3)
             rgb = torch.from_numpy(rgb.copy())
             return resized_crop(rgb)
 
         def load_depth(x):
             disparity = cv2.imread(f'{x}', cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
-            assert disparity.shape == (540, 960, 3)
-            assert np.linalg.norm(disparity[..., 0]) == 0
-            assert np.linalg.norm(disparity[..., 2]) == 0
+            # assert disparity.shape == (540, 960, 3)
+            # assert np.linalg.norm(disparity[..., 0]) == 0
+            # assert np.linalg.norm(disparity[..., 1]) != 0
+            # assert np.linalg.norm(disparity[..., 2]) == 0
             disparity = disparity[..., 1]
-            depth = self.baseline * self.focal / disparity
+            mask = disparity == 0
+            with np.errstate(divide='ignore'):
+                depth = self.baseline * self.focal / disparity
+            depth[mask] = 0
             depth = torch.from_numpy(depth.copy()).unsqueeze(-1)
-            return resized_crop(depth).squeeze()
+            return resized_crop(depth)
 
         def load_normal(x):
             normal = cv2.imread(f'{x}', cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
-            assert normal.shape == (540, 960, 3)
+            # assert normal.shape == (540, 960, 3)
             normal = torch.from_numpy(normal.copy())
             normal = resized_crop(normal)
             normal = normal / np.linalg.norm(normal, axis=2, keepdims=True)
@@ -114,7 +121,26 @@ class IRSDataset(Dataset):
 
 
 def _test():
-    dataset = IRSDataset('train', ['left', 'right', 'depth', 'normal'])
+    dataset = IRSDataset('test', ['left', 'right', 'depth', 'normal'])
+    # Download small part of  the dataset locally for debugging
+    for e in dataset.index:
+        img_names = e.rstrip().split()  # from txt to list of 4 images: left, right, disparity, normal
+        map_path = {'left': os.path.join(dataset.irs_path, img_names[0]),
+                    'right': os.path.join(dataset.irs_path, img_names[1]),
+                    'depth': os.path.join(dataset.irs_path, img_names[2]),
+                    'normal': os.path.join(dataset.irs_path, img_names[3])}
+        for e2 in map_path.values():
+
+            in_file = e2.replace('Users/quentin', 'home/qpossamai')
+            out = '/'.join(e2.split('/')[:-1]) + '/'
+            cmd = f'mkdir -p {out}'
+            # print(cmd)
+            os.system(cmd)
+            cmd = f'''rsync -rtvP remsto:{in_file} {out}'''
+            # print(cmd)
+            os.system(cmd)
+    print(f'Done')
+
     import matplotlib.pyplot as plt
     for i in tqdm(range(len(dataset))):
         sample = dataset[i]
