@@ -51,7 +51,7 @@ def create_lr_tests():
 
 
 def plot_lr_curve():
-    power = torch.linspace(-9, 0, 100)
+    power = torch.linspace(-9, 0, 50)
     lr_test = 10 ** power
 
     data = pickle.load(open(f'{path.WD_PATH}lr_curve_ae.pkl', 'rb'))

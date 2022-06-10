@@ -193,9 +193,9 @@ def train_valid_irs_auto_encoder():
         model=h_prms['model'],
         weight_grad=h_prms['weight_grad']
     ).to(device)
-    wandb.watch(run)
+    # wandb.watch(run)
 
-    num_workers = 30 if device == 'cuda' else 0
+    num_workers = 15 if device == 'cuda' else 0
     # Datasets
 
     list_to_load = ['depth']
@@ -278,7 +278,7 @@ def train_valid_irs_auto_encoder():
                     running_loss[f'val_{key}'].append(losses[key].detach().cpu().numpy().reshape(1))
             val_loss = np.mean(np.concatenate(running_loss[f'val_{val_loss_key}']))
             for key in losses:
-                wandb.log({key: np.mean(np.concatenate(running_loss[f'val_{key}']))},
+                wandb.log({f'val_{key}': np.mean(np.concatenate(running_loss[f'val_{key}']))},
                           step=(epoch_idx + 1) * len(train_data))
                 running_loss[key] = []
             # Saving the weights

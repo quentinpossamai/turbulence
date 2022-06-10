@@ -22,3 +22,10 @@ cmd = (f"rsync -avP --exclude .DS_Store --exclude *pyc --exclude __pycache__ --e
        f" {tb_local_path} remsto:{tb_cluster_path}")
 print(f'{cmd}')
 os.system(cmd)
+
+tb_cluster_path = "/home/qpossamai/phd/turbulence/src/"
+tb_local_path = "/Users/quentin/phd/turbulence/src/"
+cmd = (f"rsync -avP --exclude .DS_Store --exclude *pyc --exclude __pycache__ --delete --delete-excluded"  
+       f" {tb_local_path} remsto:{tb_cluster_path}")
+print(f'{cmd}')
+os.system(cmd)

@@ -2,7 +2,7 @@
 cd ~/phd/turbulence/
 ~/anaconda3/envs/turbulence/bin/python -m src.learning.autoencoder_depth.train_autoencoder_depth\
  --activation relu\
- --batch_size 20\
+ --batch_size 160\
  --dataset irs\
  --encoding depth\
  --embedding_size 128\

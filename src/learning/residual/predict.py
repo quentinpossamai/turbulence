@@ -2,6 +2,7 @@ import numpy as np
 from tqdm import tqdm
 
 import pickle
+import sys
 import torch
 import torchvision.transforms.functional as f
 from typing import Tuple
@@ -216,7 +217,7 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                     lr=h_prms['lr'],
                                     motor_size=h_prms['motor_size'],
                                     past=h_prms['past'])
-            model.load_state_dict(torch.load(f'{wd_path}{model_name}'))
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device))
         if dataset_name == 'euroc_mav':
             dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
         else:
@@ -263,10 +264,12 @@ def model_predict(model, h_prms, name):
                 z_gt = torch.from_numpy(z_gt).float().to(device)
                 label_traj = torch.from_numpy(labels[scene_number][flight_number]).float().to(device)
                 length = len(depth)
+
                 label_data = torch.empty(length, h_prms['past']).to(device)
                 loss = (torch.empty(length) * np.nan).to(device)
                 loss_meter = (torch.empty(length) * np.nan).to(device)
                 z_hat = (torch.empty(length, 1) * np.nan).to(device)
+
                 for i in range(h_prms['past'], length + 1):
                     label_data[i - 1] = label_traj[i - h_prms['past']:i]
                     z_hat[i - 1] = model(depth[i - h_prms['past']:i].unsqueeze(0))
@@ -286,15 +289,56 @@ def model_predict(model, h_prms, name):
                          z_hat=z_hat.cpu().numpy() * z_std + z_mean)
 
 
-def test_new_model_habitat():
+def predict():
     # for stage in ['none_raw', 'none_gru', 'depth_gru', 'depth_gru_finetune', 'norm_gru', 'norm_gru_finetune']:
     stage = 'norm_gru_finetune'
     model, h_prms, name, dataset = get_trained_model_and_dataset(stage, False, 'habitat')
     model_predict(model, h_prms, name)
 
 
-def aggregate_error_test():
-    pass
+def test_new_model_habitat():
+    print(f'test_new_model_habitat', flush=True)
+    # for stage in ['none_raw', 'none_gru', 'depth_gru', 'depth_gru_finetune', 'norm_gru', 'norm_gru_finetune']:
+    labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
+    for stage in ['none_raw', 'none_gru', 'depth_gru', 'depth_gru_finetune', 'norm_gru', 'norm_gru_finetune']:
+        model, h_prms, name, dataset = get_trained_model_and_dataset(stage, False, 'habitat')
+
+        old_loss_agg = []
+        new_loss_agg = []
+        loss0_agg = []
+        loss2_agg = []
+        loss3_agg = []
+
+
+        for scene_number in tqdm(habitat.TEST, desc=f'{stage}', file=sys.stdout):
+            for flight_number in labels[scene_number]:
+                flight_folder = f'{habitat.get_flight_folder(scene_number, flight_number)}pred/'
+                file = np.load(f'{flight_folder}{name}.npz')
+                z_gt = file['z_gt']
+                z_hat = file['z_hat']
+
+                label = np.stack([labels[scene_number][flight_number][i-h_prms['past']:i] for i in range(h_prms['past'], len(z_gt) + 1)])
+                data_usable = np.logical_not(np.any(label == 1, axis=1))  # check for valid data, label 1 is invalid data
+                where_is_label0 = np.logical_and(data_usable, (label == 0)[:, -1])
+                where_is_label2 = np.logical_and(data_usable, (label == 2)[:, -1])
+                where_is_label3 = np.logical_and(data_usable, (label == 3)[:, -1])
+
+                old_loss = (z_gt[h_prms['past'] - 1:] - z_hat[h_prms['past'] - 1:]) ** 2
+                old_loss_agg.append(old_loss)
+                new_loss_agg.append(old_loss[data_usable])
+                loss0_agg.append(old_loss[where_is_label0])
+                loss2_agg.append(old_loss[where_is_label2])
+                loss3_agg.append(old_loss[where_is_label3])
+
+
+        print(f'{name}: old loss: {np.mean(np.concatenate(old_loss_agg)):.4e}')
+        print(f'{name}: new loss: {np.mean(np.concatenate(new_loss_agg)):.4e}')
+        print(f'{name}: loss0: {np.mean(np.concatenate(loss0_agg)):.4e}')
+        print(f'{name}: loss2: {np.mean(np.concatenate(loss2_agg)):.4e}')
+        print(f'{name}: loss3: {np.mean(np.concatenate(loss3_agg)):.4e}')
+        print(f'\n\n')
+
+
 
 
 def main():
