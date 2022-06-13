@@ -23,8 +23,10 @@ import src.utils.path as path
 class EncoderDecoder(nn.Module):
     def __init__(self,
                  activation: str,
-                 encoding: str,
                  embedding_size: int,
+                 encoding: str,
+                 encoder_channel: int,
+                 encoder_layer: int,
                  l2: float,
                  lr: float,
                  model: str,
@@ -47,6 +49,8 @@ class EncoderDecoder(nn.Module):
             raise NotImplemented
         assert encoding in ['depth', 'normal']
         self.encoding = encoding
+        self.encoder_channel = encoder_channel
+        self.encoder_layer = encoder_layer
         self.embedding_size = embedding_size
         self.lr = lr
         self.l2 = l2
@@ -58,11 +62,13 @@ class EncoderDecoder(nn.Module):
 
         self.depth_size = (480, 640)
         from src.learning.residual.architectures import CNNEncoder
-        self.encoder = CNNEncoder(embedding_size)
+        self.encoder = CNNEncoder(embedding_size, layer_num=self.encoder_layer, channel_num=self.encoder_channel)
         if self.encoding == 'depth':
-            self.decoder = arch.CNNDecoder(embedding_size, (480, 640, 1))
+            self.decoder = arch.CNNDecoder(embedding_size, layer_num=self.encoder_layer,
+                                           channel_num=self.encoder_channel, out_dim=(480, 640, 1))
         else:
-            self.decoder = arch.CNNDecoder(embedding_size, (480, 640, 3))
+            self.decoder = arch.CNNDecoder(embedding_size, layer_num=self.encoder_layer,
+                                           channel_num=self.encoder_channel, out_dim=(480, 640, 3))
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2)
@@ -91,8 +97,8 @@ def loss_depth(gt, hat, weight_grad):
     device = 'cuda' if torch.cuda.is_available() else "cpu"
     mse = ((gt - hat) ** 2).mean()
     mse_grad = ((compute_grad(gt, device) - compute_grad(hat, device)) ** 2).mean()
-    psnr = 10 * torch.log10(4 / mse)  # Really ? mse_grad ?
-    return {'loss_depth': 1 * mse + weight_grad * mse_grad, 'mse_depth': mse,
+    psnr = 10 * torch.log10(400 / mse)
+    return {'loss_depth': mse + mse_grad / 2000, 'mse_depth': mse,
             'mse_grad_depth': mse_grad, 'psnr_depth': psnr}
 
 
@@ -104,7 +110,7 @@ def loss_normal(gt, prediction, weight_grad):
     prediction_transpose = prediction["output"].permute(0, 2, 3, 1).reshape(-1, 3)
     cross_product_loss = torch.sqrt((torch.cross(gt_transpose, prediction_transpose, dim=-1) ** 2).sum(-1)).mean()
     psnr = 10 * torch.log10(4 / mse_normal)
-    return {'loss_normal': 10000 * mse_normal + weight_grad * mse_grad, 'mse_normal': mse_normal,
+    return {'loss_normal': mse_normal + mse_grad / 2000, 'mse_normal': mse_normal,
             'mse_grad_normal': mse_grad, 'cross_product_normal': cross_product_loss, 'psnr_normal': psnr}
 
 
@@ -118,8 +124,10 @@ def train_valid_irs_auto_encoder():
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use.")
     parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch.')
     parser.add_argument('--dataset', default="irs", type=str)
-    parser.add_argument('--encoding', default='depth', type=str, help='"depth" or "normal" supervision for the decoder')
     parser.add_argument('--embedding_size', default=128, type=int)
+    parser.add_argument('--encoder_channel', default=64, type=int, help='Number of channels in the encoder.')
+    parser.add_argument('--encoder_layer', default=9, type=int, help='Number of layers in the encoder.')
+    parser.add_argument('--encoding', default='depth', type=str, help='"depth" or "normal" supervision for the decoder')
     parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
     parser.add_argument('--lr', default=5e-5, type=float, help="Learning rate.")
@@ -149,25 +157,21 @@ def train_valid_irs_auto_encoder():
 
     print(f'Device used by torch: {device}', flush=True)
 
-    # Analysis parameters
     h_prms = {'time_start': now,  # hyperparameters
               'name': name,
               'activation': args.activation,
               'batch_size': args.batch_size,
               'dataset': args.dataset,
-              'encoding': args.encoding,
               'embedding_size': args.embedding_size,
+              'encoder_channel': args.encoder_channel,
+              'encoder_layer': args.encoder_layer,
+              'encoding': args.encoding,
               'epoch': args.epoch,
               'l2': args.l2,
               'lr': args.lr,
               'model': args.model,
               'weight_grad': args.weight_grad,
               }
-    pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
-    wandb.config.update(h_prms)
-    print(f'training_path={training_path}', flush=True)
-    print(f'name={name} | version={version}', flush=True)
-
     # Reproducibility
     seed = 0
     random.seed(seed)
@@ -184,15 +188,33 @@ def train_valid_irs_auto_encoder():
     g = torch.Generator()
     g.manual_seed(seed)
 
+    h_prms['seed'] = seed
+
     run = EncoderDecoder(
         activation=h_prms['activation'],
-        encoding=h_prms['encoding'],
         embedding_size=h_prms['embedding_size'],
+        encoder_channel=h_prms['encoder_channel'],
+        encoder_layer=h_prms['encoder_layer'],
+        encoding=h_prms['encoding'],
         l2=h_prms['l2'],
         lr=h_prms['lr'],
         model=h_prms['model'],
         weight_grad=h_prms['weight_grad']
     ).to(device)
+
+    parameters = run.parameters()
+    count = 0
+    for param in parameters:
+        count += param.numel()
+    print(f'Total number of parameters {count}', flush=True)
+    h_prms['total_parameters'] = count
+
+    # Analysis parameters
+    pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
+    wandb.config.update(h_prms)
+    print(f'Hyperparameters: {h_prms}', flush=True)
+    print(f'training_path={training_path}', flush=True)
+    print(f'name={name} | version={version}', flush=True)
     # wandb.watch(run)
 
     num_workers = 15 if device == 'cuda' else 0

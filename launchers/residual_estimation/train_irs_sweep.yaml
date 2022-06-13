@@ -1,0 +1,49 @@
+program: src/learning/autoencoder_depth/train_autoencoder_depth.py
+project: turbulence_residual
+method: bayes
+name: train_autoencoder_depth_architecture
+metric:
+  name: val_loss_depth
+  goal: minimize
+parameters:
+  activation:
+    value: 'relu'
+    distribution: constant
+  batch_size:
+    value: 20
+    distribution: constant
+  dataset:
+    value: 'irs'
+    distribution: constant
+  embedding_size:
+    value: 128
+    distribution: constant
+  encoder_channel:
+    values: [32, 64, 128]
+    distribution: categorical
+  encoder_layer:
+    values: [3, 6, 9]
+    distribution: categorical
+  encoding:
+    value: 'depth'
+    distribution: constant
+  epoch:
+    value: 200
+    distribution: constant
+  l2:
+    value: 0
+    distribution: constant
+  lr:
+    value: 1e-5
+    distribution: constant
+  model:
+    value: 'cnn'
+    distribution: constant
+  weight_grad:
+    value: 1
+    distribution: constant
+command:
+  - /home/qpossamai/anaconda3/envs/turbulence/bin/python
+  - -m
+  - src.learning.autoencoder_depth.train_autoencoder_depth
+  - ${args}

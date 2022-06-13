@@ -40,29 +40,75 @@ class RegressionHead(nn.Module):
 
 
 class CNNEncoder(nn.Module):
-    def __init__(self, embedding_size: int):
+    def __init__(self, embedding_size: int, layer_num: int, channel_num: int):
         super(CNNEncoder, self).__init__()
 
         self.embedding_size = embedding_size
+        self.layer_num = layer_num
+        self.ch_num = channel_num  # the maximum channel number  64
 
-        self.encoder_conv = nn.Sequential(
-            # Initial is (batch, 1, 480, 640)
-            nn.Conv2d(1, 16, (7, 7), stride=1, padding=3),  # (batch, 16, 480, 640)
-            nn.ReLU(True),
-            nn.MaxPool2d((2, 2)),  # (batch, 16, 240, 320)
-            nn.Conv2d(16, 32, (3, 3), stride=1, padding=2),  # (batch, 32, 240, 320)
-            nn.ReLU(True),
-            nn.Conv2d(32, 64, (3, 3), stride=2),  # (batch, 64, 120, 160)
-            nn.ReLU(True),
-            nn.Conv2d(64, 64, (3, 3), stride=1, padding=2),  # (batch, 64, 120, 160)
-            nn.ReLU(True),
-            nn.MaxPool2d((2, 2)),  # (batch, 64, 60, 80)
-            nn.Conv2d(64, 32, (3, 3), stride=2),  # (batch, 32, 30, 40)
-            nn.ReLU(True),
-            nn.MaxPool2d((2, 2)),  # (batch, 32, 15, 20)
-            nn.Conv2d(32, 4, (3, 3), stride=2, padding=(0, 1)),  # (batch, 4, 7, 10)
-            nn.ReLU(True),
-        )
+        if self.layer_num == 3:
+            self.encoder_conv = nn.Sequential(
+                # Initial is (batch, 1, 480, 640)
+                nn.Conv2d(1, self.ch_num // 2, (7, 7), stride=2, padding=3),
+                # (batch, ch_num // 2, 240, 320)  # todo check dim
+                nn.ReLU(True),
+                nn.MaxPool2d((2, 2)),  # (batch, ch_num // 2, 120, 160)
+                nn.Conv2d(self.ch_num // 2, self.ch_num, (3, 3), stride=2),
+                # (batch, ch_num, 60, 80)
+                nn.ReLU(True),
+                nn.MaxPool2d((2, 2)),  # (batch, ch_num, 30, 40)
+                nn.Conv2d(self.ch_num, 4, (3, 3), stride=2, padding=(0, 1)),
+                # (batch, 4, 15, 20)
+                nn.ReLU(True),
+                nn.MaxPool2d((2, 2)),  # (batch, 4, 7, 10)  # todo check dim
+            )
+
+        elif self.layer_num == 6:
+            self.encoder_conv = nn.Sequential(
+                # Initial is (batch, 1, 480, 640)
+                nn.Conv2d(1, self.ch_num // 4, (7, 7), stride=1, padding=3),  # (batch, ch_num // 4, 480, 640)
+                nn.ReLU(True),
+                nn.MaxPool2d((2, 2)),  # (batch, ch_num // 4, 240, 320)
+                nn.Conv2d(self.ch_num // 4, self.ch_num // 2, (3, 3), stride=1, padding=2),
+                # (batch, ch_num // 2, 240, 320)
+                nn.ReLU(True),
+                nn.Conv2d(self.ch_num // 2, self.ch_num, (3, 3), stride=2),  # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.Conv2d(self.ch_num, self.ch_num, (3, 3), stride=1, padding=2),  # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.MaxPool2d((2, 2)),  # (batch, ch_num, 60, 80)
+                nn.Conv2d(self.ch_num, self.ch_num // 2, (3, 3), stride=2),  # (batch, ch_num // 2, 30, 40)
+                nn.ReLU(True),
+                nn.MaxPool2d((2, 2)),  # (batch, ch_num // 2, 15, 20)
+                nn.Conv2d(self.ch_num // 2, 4, (3, 3), stride=2, padding=(0, 1)),  # (batch , 4, 7, 10)
+                nn.ReLU(True),
+            )
+
+        else:
+            ch = torch.linspace(4, self.ch_num, 5).long().numpy()
+            assert self.layer_num == 9, "layer_num must be 3 or 6 or 9"
+            self.encoder_conv = nn.Sequential(
+                # Initial is (batch, 1, 480, 640)
+                nn.Conv2d(1, ch[1], (7, 7), stride=1, padding=3),  # (batch, *, 480, 640)
+                nn.ReLU(True),
+                nn.Conv2d(ch[1], ch[2], (3, 3), stride=2),  # (batch, *, 240, 320)
+                nn.ReLU(True),
+                nn.Conv2d(ch[2], ch[3], (3, 3), stride=1, padding=2),  # (batch, *, 240, 320)
+                nn.ReLU(True),
+                nn.Conv2d(ch[3], ch[4], (3, 3), stride=2),  # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.Conv2d(ch[4], ch[4], (3, 3), stride=1, padding=2),  # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.Conv2d(ch[4], ch[3], (3, 3), stride=2),  # (batch, *, 60, 80)
+                nn.ReLU(True),
+                nn.Conv2d(ch[3], ch[2], (3, 3), stride=2),  # (batch, *, 30, 40)
+                nn.ReLU(True),
+                nn.Conv2d(ch[2], ch[1], (3, 3), stride=2),  # (batch, *, 15, 20)
+                nn.ReLU(True),
+                nn.Conv2d(ch[1], ch[0], (3, 3), stride=2, padding=(1, 1)),  # (batch, 4, 7, 10)
+                nn.ReLU(True),
+            )
         self.flatten = nn.Flatten(start_dim=1)
         self.encoder_lin = nn.Sequential(
             nn.Linear(in_features=4 * 7 * 10, out_features=self.embedding_size),  # 280
@@ -71,16 +117,18 @@ class CNNEncoder(nn.Module):
         )
 
     def forward(self, x):
-        x = self.encoder_conv(x)
-        x = self.flatten(x)
-        x = self.encoder_lin(x)
+        x = self.encoder_conv(x)  # (batch, 4, 7, 10)
+        x = self.flatten(x)  # (batch, 280)  `
+        x = self.encoder_lin(x)  # (batch, embedding_size)
         return x
 
 
 class CNNDecoder(nn.Module):
-    def __init__(self, embedding_size: int, out_dim: Tuple[int, int, int]):
+    def __init__(self, embedding_size: int, layer_num: int, channel_num: int, out_dim: Tuple[int, int, int]):
         super(CNNDecoder, self).__init__()
         self.embedding_size = embedding_size
+        self.ch_num = channel_num
+        self.layer_num = layer_num
         self.out_dim = out_dim
 
         # Decoder
@@ -92,28 +140,81 @@ class CNNDecoder(nn.Module):
 
         self.unflatten = nn.Unflatten(dim=1, unflattened_size=(4, 7, 10))
 
-        self.decoder_conv = nn.Sequential(
-            nn.ConvTranspose2d(4, 32, (3, 3), stride=2, padding=(0, 1), output_padding=(0, 1)),  # (batch, 32, 15, 20)
-            nn.ReLU(True),
-            nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, 32, 30, 40)
-            nn.ConvTranspose2d(32, 64, (3, 3), stride=2, padding=1, output_padding=1),  # (batch, 64, 60, 80)
-            nn.ReLU(True),
-            nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, 64, 120, 160)
-            nn.ConvTranspose2d(64, 64, (3, 3), stride=1, padding=1),  # (batch, 64, 120, 160)
-            nn.ReLU(True),
-            nn.ConvTranspose2d(64, 32, (3, 3), stride=2, padding=1, output_padding=1),  # (batch, 32, 240, 320)
-            nn.ReLU(True),
-            nn.ConvTranspose2d(32, 16, (3, 3), stride=1, padding=1),  # (batch, 16, 240, 320)
-            nn.ReLU(True),
-            nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, 16, 480, 640)
-            nn.ConvTranspose2d(16, self.out_dim[2], (7, 7), stride=1, padding=3)  # (batch, self.out_dim[2], 480, 640)
-        )
+        if self.layer_num == 3:
+            self.decoder_conv = nn.Sequential(
+                # Initial is (batch, 4, 7, 10)
+                nn.UpsamplingBilinear2d(size=(15, 20)),  # (batch, 4, 15, 20) # TODO check dim
+                nn.ConvTranspose2d(4, self.ch_num, (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, ch_num, 30, 40)
+                nn.ReLU(True),
+                nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, ch_num, 60, 80)
+                nn.ConvTranspose2d(self.ch_num, self.ch_num // 2, (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, ch_num // 2, 120, 160)
+                nn.ReLU(True),
+                nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, ch_num // 2, 240, 320)
+                nn.ConvTranspose2d(self.ch_num // 2, self.out_dim[2], (7, 7), stride=2, padding=3, output_padding=1),
+                # (batch, self.out_dim[2], 480, 640)
+            )
+        elif self.layer_num == 6:
+            self.decoder_conv = nn.Sequential(
+                # Initial is (batch, 4, 7, 10)
+                nn.ConvTranspose2d(4, self.ch_num // 2, (3, 3), stride=2, padding=(0, 1), output_padding=(0, 1)),
+                # (batch, ch_num // 2, 15, 20)
+                nn.ReLU(True),
+                nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, ch_num // 2, 30, 40)
+                nn.ConvTranspose2d(self.ch_num // 2, self.ch_num, (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, ch_num, 60, 80)
+                nn.ReLU(True),
+                nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, ch_num, 120, 160)
+                nn.ConvTranspose2d(self.ch_num, self.ch_num, (3, 3), stride=1, padding=1),  # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(self.ch_num, self.ch_num // 2, (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, ch_num // 2, 240, 320)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(self.ch_num // 2, self.ch_num // 4, (3, 3), stride=1, padding=1),
+                # (batch, ch_num // 4, 240, 320)
+                nn.ReLU(True),
+                nn.UpsamplingBilinear2d(scale_factor=2),  # (batch, ch_num // 4, 480, 640)
+                nn.ConvTranspose2d(self.ch_num // 4, self.out_dim[2], (7, 7), stride=1, padding=3)
+                # (batch, self.out_dim[2], 480, 640)
+            )
+        else:
+            assert self.layer_num == 9
+            ch = torch.linspace(4, self.ch_num, 5).long().numpy()
+            self.decoder_conv = nn.Sequential(
+                # Initial is (batch, 4, 7, 10)
+                nn.ConvTranspose2d(ch[0], ch[1], (3, 3), stride=2, padding=(0, 1), output_padding=(0, 1)),
+                # (batch, *, 15, 20)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[1], ch[2], (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, *, 30, 40)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[2], ch[3], (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, *, 60, 80)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[3], ch[4], (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[4], ch[4], (3, 3), stride=1, padding=1),  # (batch, ch_num, 120, 160)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[4], ch[3], (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, *, 240, 320)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[3], ch[2], (3, 3), stride=1, padding=1),
+                # (batch, *, 240, 320)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[2], ch[1], (3, 3), stride=2, padding=1, output_padding=1),
+                # (batch, *, 480, 640)
+                nn.ReLU(True),
+                nn.ConvTranspose2d(ch[1], self.out_dim[2], (7, 7), stride=1, padding=3)
+                # (batch, self.out_dim[2], 480, 640)
+            )
 
     def forward(self, x):
         # embedding with shape (batch, feature_size)
-        x = self.decoder_lin(x)  # (batch, 192)
-        x = self.unflatten(x)  # (batch, 4, 6, 9)
-        x = self.decoder_conv(x)  # (batch, 480, 640, self.out_di[-1])
+        x = self.decoder_lin(x)  # (batch, 280)
+        x = self.unflatten(x)  # (batch, 4, 7, 10)
+        x = self.decoder_conv(x)  # (batch, self.out_dim[-1], 480, 640)
         if x.shape[1] == 3:
             x = x / torch.norm(x, dim=1, keepdim=True)
         return x

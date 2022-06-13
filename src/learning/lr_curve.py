@@ -11,7 +11,7 @@ def create_lr_tests():
     # Change dataset
     import src.learning.autoencoder_depth.dataloaders.irs_dataset as irs_dataset
     train_dataset = irs_dataset.IRSDataset('train', ['depth'])
-    train_dataloader = DataLoader(train_dataset, 20, True, pin_memory=True, num_workers=0)
+    train_dataloader = DataLoader(train_dataset, 160, True, pin_memory=True, num_workers=0)
 
     power = torch.linspace(-9, 0, 50)
     lr_test = 10 ** power
@@ -19,7 +19,17 @@ def create_lr_tests():
 
     # Change model
     import src.learning.autoencoder_depth.train_autoencoder_depth as auto_encoder
-    model = auto_encoder.EncoderDecoder('relu', 'depth', 128, 0, lr_test[0], 'cnn', 1)
+    model = auto_encoder.EncoderDecoder(
+        'relu',
+        128,
+        'depth',
+        64,
+        6,
+        0.05,
+        lr_test[0],
+        'cnn',
+        1,
+    )
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -39,8 +49,10 @@ def create_lr_tests():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+            break
         loss_mean[i] = tmp_loss.mean()
         loss_std[i] = tmp_loss.std()
+        break
 
     pickle.dump({'loss_mean': loss_mean, 'loss_std': loss_std}, open(f'{path.WD_PATH}lr_curve_ae.pkl', 'wb'))
     # plt.plot(lr_test, loss_mean)
@@ -65,6 +77,7 @@ def plot_lr_curve():
 
 def main():
     create_lr_tests()
+    # plot_lr_curve()
 
 
 if __name__ == '__main__':

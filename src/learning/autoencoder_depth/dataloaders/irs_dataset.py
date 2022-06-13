@@ -76,12 +76,13 @@ class IRSDataset(Dataset):
             # assert np.linalg.norm(disparity[..., 1]) != 0
             # assert np.linalg.norm(disparity[..., 2]) == 0
             disparity = disparity[..., 1]
-            mask = disparity == 0
+            mask = disparity < 2
             with np.errstate(divide='ignore'):
                 depth = self.baseline * self.focal / disparity
             depth[mask] = 0
             depth = torch.from_numpy(depth.copy()).unsqueeze(-1)
-            return resized_crop(depth)
+            depth = resized_crop(depth)
+            return depth
 
         def load_normal(x):
             normal = cv2.imread(f'{x}', cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)
