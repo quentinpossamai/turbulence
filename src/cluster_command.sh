@@ -1,4 +1,8 @@
 #!/bin/bash
+# Mount cluster
+sshfs remsto:/home/qpossamai/phd/turbulence ./cluster_mount
+umount /Users/quentin/phd/cluster_mount/
+
 #rsync -rtv --exclude rgb.npy --exclude depth.npy --exclude '*.glb' --exclude '*.navmesh' --exclude '*.house' --exclude '*.ply' --delete remsto:/home/qpossamai/phd/turbulence/data/habitat/scene_datasets/mp3d/ ./
 
 cd ~/phd/turbulence/data/habitat/scene_datasets/mp3d/17DRP5sb8fy/flight2/3/

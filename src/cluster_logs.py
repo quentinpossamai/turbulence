@@ -2,8 +2,8 @@ import os
 
 print(f"CWD: {os.getcwd()}")
 # Locally import tensorboard logs and model weights from the cluster and launch it.
-tb_cluster_path = "/home/qpossamai/phd/turbulence/analysis/habitat_residual_training/"
-tb_local_path = "/Users/quentin/phd/turbulence/analysis/habitat_residual_training/"
+tb_cluster_path = "/home/qpossamai/phd/turbulence/analysis/irs_encoder_decoder/"
+tb_local_path = "/Users/quentin/phd/turbulence/analysis/irs_encoder_decoder/"
 os.system(f"rsync -avP --exclude=.DS_Store --delete remsto:{tb_cluster_path} {tb_local_path}")
 
 # os.system(f'ssh remsto /bin/bash << EOF\n'
