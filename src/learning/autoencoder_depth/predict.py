@@ -30,9 +30,12 @@ def get_irs_model(date: str):
         l2=h_prms['l2'],
         lr=h_prms['lr'],
         model=h_prms['model'],
-        weight_grad=h_prms['weight_grad'],
     )
-    model.load_state_dict(torch.load(f'{model_folder}model.nn', map_location=device))
+    try:
+        model.load_state_dict(torch.load(f'{model_folder}model.nn', map_location=device))
+    except FileNotFoundError:  # New weights saving method has been implemented for recent runs.
+        checkpoint = torch.load(f'{model_folder}checkpoint.pt', map_location=device)
+        model.load_state_dict(checkpoint['model'])
     model.to(device)
     model.eval()
     return model, h_prms
@@ -54,8 +57,11 @@ def plot_test_result():
         '20220611_182536',  # 6, 64
         '20220611_182436',  # 3, 32
         '20220611_182353',  # 3, 64
+        '20220615_180545',  # 6, 100 new
+        '20220615_180535',  # 6, 152 new
+        '20220615_180526',  # 6, 128 new
     ]
-    model, h_prms = get_irs_model(model_list[5])
+    model, h_prms = get_irs_model('20220615_180526')
     print(f'h_prms: {h_prms}')
     with torch.no_grad():
         for i, batch in enumerate(test_dataloader):
@@ -65,13 +71,16 @@ def plot_test_result():
             mse = ((depth_gt - depth_hat) ** 2).mean()
             mse_grad = ((auto_encoder.compute_grad(depth_gt, device) -
                          auto_encoder.compute_grad(depth_hat, device)) ** 2).mean()
+            mask = depth_gt != 0
+            mse_normed = (((depth_gt - depth_hat)[mask] / depth_gt[mask]) ** 2).mean()
             depth_hat = depth_hat.squeeze().cpu().numpy()
             depth_gt = depth_gt.squeeze().cpu().numpy()
 
             # analysis
             fig, axs = plt.subplots(1, 2)
             axs[1].set_title(f'MSE: {mse:.4f}\n'
-                             f'MSE Grad: {mse_grad:.0f}')
+                             f'MSE Grad: {mse_grad:.0f}\n'
+                             f'MSE Normed: {mse_normed:.4f}')
             min_d = min(depth_hat.min(), depth_gt.min())
             max_d = max(depth_hat.max(), depth_gt.max())
             axs[0].imshow(depth_gt, vmin=min_d, vmax=max_d)

@@ -30,7 +30,6 @@ class EncoderDecoder(nn.Module):
                  l2: float,
                  lr: float,
                  model: str,
-                 weight_grad: float,
                  ):
         """
         Model to predict residual z such that f_aero(z, motor). Sequences of depth-maps from past time-steps.
@@ -54,7 +53,6 @@ class EncoderDecoder(nn.Module):
         self.embedding_size = embedding_size
         self.lr = lr
         self.l2 = l2
-        self.weight_grad = weight_grad
 
         models = {'CoPhy_Like': Autoencoder, 'IRS_Like': NormNetS, 'cnn': EncoderDecoder}
         assert model in models
@@ -93,7 +91,7 @@ def compute_grad(rgb, device):
     return sobel
 
 
-def loss_depth(gt, hat, weight_grad):
+def loss_depth(gt, hat):
     device = 'cuda' if torch.cuda.is_available() else "cpu"
     mse = ((gt - hat) ** 2).mean()
     mask = gt != 0
@@ -110,7 +108,7 @@ def loss_depth(gt, hat, weight_grad):
     }
 
 
-def loss_normal(gt, prediction, weight_grad):
+def loss_normal(gt, prediction):
     device = 'gpu' if torch.cuda.is_available() else "cpu"
     mse_normal = ((gt - prediction["output"]) ** 2).mean()
     mse_grad = ((compute_grad(gt, device) - compute_grad(prediction["output"], device)) ** 2).mean()
@@ -133,24 +131,24 @@ def train_valid_irs_auto_encoder():
     parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch.')
     parser.add_argument('--dataset', default="irs", type=str)
     parser.add_argument('--embedding_size', default=128, type=int)
-    parser.add_argument('--encoder_channel', default=100, type=int, help='Number of channels in the encoder.')
+    parser.add_argument('--encoder_channel', default=152, type=int, help='Number of channels in the encoder.')
     parser.add_argument('--encoder_layer', default=6, type=int, help='Number of layers in the encoder.')
     parser.add_argument('--encoding', default='depth', type=str, help='"depth" or "normal" supervision for the decoder')
     parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
     parser.add_argument('--lr', default=1e-5, type=float, help="Learning rate.")
     parser.add_argument('--model', default="cnn", type=str, help='CoPhy_Like, IRS_Like or cnn')
-    parser.add_argument('--resume', default='20220613_105714', type=str, help='If training resumes from a checkpoint')
-    parser.add_argument('--weight_grad', default=1, type=int)
+    parser.add_argument('--resume', default='20220615_120420', type=str, help='If training resumes from a checkpoint')
 
     args = parser.parse_args()
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     datasets = {'eurocmav': euroc.EurocMavLoader, 'irs': irs.IRSDataset}
 
     # Logging initialization
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     if args.resume != 'None' and args.resume != 'none':
-        now = args.resume
+        # now = args.resume  # TODO
         resume = True
     else:
         resume = False
@@ -164,11 +162,9 @@ def train_valid_irs_auto_encoder():
                id=identifier,
                project='turbulence_residual',
                dir=training_path,
-               mode='online' if sys.platform != 'darwin' else 'disabled',
-               resume=resume)
-
-    use_cuda_if_possible = True
-    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
+               mode='online' if device == torch.device('cuda') else 'disabled',
+               # resume=resume,  # TODO
+               )
 
     print(f'Device used by torch: {device}', flush=True)
 
@@ -185,8 +181,6 @@ def train_valid_irs_auto_encoder():
               'l2': args.l2,
               'lr': args.lr,
               'model': args.model,
-              'resume': args.resume,
-              'weight_grad': args.weight_grad,
               }
     # Reproducibility
     seed = 0
@@ -215,7 +209,6 @@ def train_valid_irs_auto_encoder():
         l2=h_prms['l2'],
         lr=h_prms['lr'],
         model=h_prms['model'],
-        weight_grad=h_prms['weight_grad']
     ).to(device)
 
     parameters = run.parameters()
@@ -265,23 +258,25 @@ def train_valid_irs_auto_encoder():
         print('Resuming from checkpoint', flush=True)
         model_weights = torch.load(f'{training_path}model.nn', map_location=device)
         run.load_state_dict(model_weights)
-        # epoch = 10
-        # checkpoint = torch.load(f'{training_path}model.nn', map_location=device)
-        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        # epoch = checkpoint['epoch']
-        # loss = checkpoint['loss']
+        epoch = 12  # TODO
+        # checkpoint = torch.load(f'{training_path}checkpoint.pt', map_location=device)
+        # model_state_dict = checkpoint['model']
+        # run.load_state_dict(model_state_dict)
+        # epoch = checkpoint['epoch'] + 1
+        # memory = checkpoint['memory']
+        # optimizer.load_state_dict(checkpoint['optimizer'])
     for epoch_idx in range(epoch, args.epoch):
         run.train()
         for batch_idx, batch in enumerate(tqdm(train_data, desc=f'Epoch {epoch_idx}')):
             depth = batch['depth'].to(device)
             if h_prms['encoding'] == 'depth':
                 hat = run(depth)
-                losses = loss_depth(depth, hat, h_prms['weight_grad'])
+                losses = loss_depth(depth, hat)
                 loss = losses['loss_depth']
             else:
                 normal = batch['normal'].to(device)
                 hat = run(depth)
-                losses = loss_normal(normal, hat, h_prms['weight_grad'])
+                losses = loss_normal(normal, hat)
                 loss = losses['loss_normal']
 
             for key in losses:
@@ -313,12 +308,12 @@ def train_valid_irs_auto_encoder():
                 depth = batch['depth'].to(device)
                 if h_prms['encoding'] == 'depth':
                     hat = run(depth)
-                    losses = loss_depth(depth, hat, h_prms['weight_grad'])
+                    losses = loss_depth(depth, hat)
                     val_loss_key = 'loss_depth'
                 else:
                     normal = batch['normal'].to(device)
                     hat = run(depth)
-                    losses = loss_normal(normal, hat, h_prms['weight_grad'])
+                    losses = loss_normal(normal, hat)
                     val_loss_key = 'loss_normal'
                 for key in losses:
                     if batch_idx == 0:
@@ -334,7 +329,7 @@ def train_valid_irs_auto_encoder():
                 memory = val_loss
                 torch.save({
                     'model': run.state_dict(),
-                    'epoch': epoch_idx,
+                    'epoch': epoch_idx,  # we have finished this epoch_idx
                     'memory': memory,
                     'optimizer': optimizer.state_dict(),
                 }, f'{training_path}checkpoint.pt')

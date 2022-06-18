@@ -5,12 +5,11 @@ cd ~/phd/turbulence/
  --batch_size 2\
  --dataset irs\
  --embedding_size 128\
- --encoder_channel 100\
+ --encoder_channel 128\
  --encoder_layer 6\
- --encoding depth\
+ --encoding norm\
  --epoch 200\
  --l2 0\
  --lr 1e-5\
  --model cnn\
- --resume none\
- --weight_grad 1
+ --resume 20220615_120420

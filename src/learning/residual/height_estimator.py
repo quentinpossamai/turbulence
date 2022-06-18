@@ -20,6 +20,9 @@ class HeightEstimator(nn.Module):
                  dropout: float,
                  embedding_method: str,
                  l2: float,
+                 regression_size: int,
+                 cnn_layer_num: int,
+                 cnn_channel_num: int,
                  lr: float,
                  motor_size: int,
                  past: int,
@@ -48,32 +51,35 @@ class HeightEstimator(nn.Module):
         self.embedding_method = embedding_method
         self.l2 = l2
         self.lr = lr
+        self.regression_size = regression_size
+        self.cnn_layer_num = cnn_layer_num
+        self.cnn_channel_num = cnn_channel_num
         self.motor_size = motor_size
         self.past = past
 
         embedding_size = 128
+        import src.learning.autoencoder_depth.train_autoencoder_depth as arch
 
         if embedding_method == 'none':
             self.embedding_layer = lambda x: x
             self.depth_size = (128,)
-        elif embedding_method == 'cnn':
-            self.depth_size = (1, 480, 640)
-            from src.learning.residual.architectures import CNNEncoderOld
-            self.embedding_layer = CNNEncoderOld(self.activation, embedding_size)
-
-        elif self.embedding_method == 'irs_depth':
-            self.depth_size = (1, 240, 376)
-            auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=1)
-            self.embedding_layer = auto_encoder.encoder
-
         else:
-            assert self.embedding_method == 'irs_normal'
-            self.depth_size = (1, 240, 376)
-            auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=3)
-            self.embedding_layer = auto_encoder.encoder
+            assert embedding_method in ['cnn', 'irs_depth', 'irs_normal']
+            self.depth_size = (1, 480, 640)
+            self.embedding_layer = arch.EncoderDecoder(
+                activation=activation,
+                embedding_size=embedding_size,
+                encoding='depth',  # does not matter if it is depth or normal for encoder
+                encoder_channel=self.cnn_channel_num,
+                encoder_layer=self.cnn_layer_num,
+                l2=self.l2,
+                lr=self.lr,
+                model='cnn',
+            ).encoder
 
         from src.learning.residual.architectures import RegressionHead
-        self.regression_head = RegressionHead(self.activation, embedding_size, 50, self.past, self.dropout)
+        self.regression_head = RegressionHead(self.activation, embedding_size, self.regression_size, self.past,
+                                              self.dropout)
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2)
@@ -140,12 +146,17 @@ def train_valid_height_estimator():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use.")
-    parser.add_argument('--batch_size', default=10, type=int, help='Size of a batch.')
+    parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch.')
     parser.add_argument('--dropout', default=0.5, type=float, help='Dropout probability')
     parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
     parser.add_argument('--lr', default=5e-5, type=float, help="Learning rate.")
+    parser.add_argument('--cnn_layer_num', default=6, type=int, help="Number of layer for the CNN encoder.")
+    parser.add_argument('--cnn_channel_num', default=64, type=int, help="Number of channels for the CNN encoder.")
+    parser.add_argument('--regression_size', default=50, type=int,
+                        help="Number of unit for MLP and hidden_size for GRU.")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model.")
+    parser.add_argument('--resume', default='none', type=str, help='If training resumes from a checkpoint')
     parser.add_argument('--stage', default='irs_depth_finetune', type=str, help="The stage of the model.")
 
     args = parser.parse_args()
@@ -162,6 +173,11 @@ def train_valid_height_estimator():
 
     # Logging initialization
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    if args.resume != 'None' and args.resume != 'none':
+        now = args.resume
+        resume = True
+    else:
+        resume = False
     version = f'{now}'
     residual_model_class = HeightEstimator
     name = f'{residual_model_class.__name__}_{args.stage}'
@@ -202,15 +218,13 @@ def train_valid_height_estimator():
               'embedding_method': embedding_method,
               'l2': args.l2,
               'lr': args.lr,
+              'cnn_layer_num': args.cnn_layer_num,
+              'cnn_channel_num': args.cnn_channel_num,
+              'regression_size': args.regression_size,
               'motor_size': motor_size,
               'epoch': args.epoch,
               'past': args.past,
               'stage': args.stage}
-    pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
-    wandb.config.update(h_prms)
-    print(f'training_path={training_path}', flush=True)
-    print(f'name={name} | version={version}', flush=True)
-
     # Reproducibility
     seed = 0
     random.seed(seed)
@@ -231,6 +245,9 @@ def train_valid_height_estimator():
                                dropout=h_prms['dropout'],
                                l2=h_prms['l2'],
                                lr=h_prms['lr'],
+                               cnn_layer_num=h_prms['cnn_layer_num'],
+                               cnn_channel_num=h_prms['cnn_channel_num'],
+                               regression_size=h_prms['regression_size'],
                                motor_size=h_prms['motor_size'],
                                past=h_prms['past'],
                                embedding_method=h_prms['embedding_method']).to(device)
@@ -248,18 +265,30 @@ def train_valid_height_estimator():
         load_depth, load_depth_emb, load_norm_emb, normed_depth = False, False, True, False
     elif h_prms['stage'] == 'irs_depth_finetune':
         input_key = 'depth'
-        state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_depth_irs_128.nn'
-        tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=1)
-        tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
-        run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
-        del tmp
+        import src.learning.autoencoder_depth.predict as ae_models
+        if h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 128:
+            model, h_prms_ae = ae_models.get_irs_model('20220611_183103')
+            run.embedding_layer.load_state_dict(model.encoder.state_dict())
+        elif h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 64:
+            model, h_prms_ae = ae_models.get_irs_model('20220611_182536')
+            run.embedding_layer.load_state_dict(model.encoder.state_dict())
+        elif h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 32:
+            model, h_prms_ae = ae_models.get_irs_model('20220611_183523')
+            run.embedding_layer.load_state_dict(model.encoder.state_dict())
+        else:
+            raise NotImplementedError
+            state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_depth_irs_128.nn'
+            tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=1)
+            tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
+            run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
+            del tmp
 
         # Loading head
-        state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_depth_head/20220529_210139/model.nn'
-        state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
-        state_dict = {k[16:]: v for k, v in state_dict.items()}
-        run.regression_head.load_state_dict(state_dict)
-        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
+        # state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_depth_head/20220529_210139/model.nn'
+        # state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
+        # state_dict = {k[16:]: v for k, v in state_dict.items()}
+        # run.regression_head.load_state_dict(state_dict)
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, False
     else:
         input_key = 'depth'
         assert h_prms['stage'] == 'irs_normal_finetune'
@@ -268,12 +297,25 @@ def train_valid_height_estimator():
         tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
         run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
         del tmp
-        # Loading head
-        state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/model.nn'
-        state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
-        state_dict = {k[16:]: v for k, v in state_dict.items()}
-        run.regression_head.load_state_dict(state_dict)
-        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
+        # # Loading head
+        # state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/model.nn'
+        # state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
+        # state_dict = {k[16:]: v for k, v in state_dict.items()}
+        # run.regression_head.load_state_dict(state_dict)
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, False
+
+    parameters = run.parameters()
+    count = 0
+    for param in parameters:
+        count += param.numel()
+    print(f'Total number of parameters {count}', flush=True)
+    h_prms['total_parameters'] = count
+
+    pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
+    wandb.config.update(h_prms)
+    print(f'Hyperparameters: {h_prms}', flush=True)
+    print(f'training_path={training_path}', flush=True)
+    print(f'name={name} | version={version}', flush=True)
 
     num_workers = 30 if device == 'gpu' else 0
     # Datasets
@@ -312,7 +354,19 @@ def train_valid_height_estimator():
     for key in train_log_keys + val_log_keys:
         running_loss[key] = []
     optimizer = run.configure_optimizers()
-    for epoch_idx in range(args.epoch):
+    epoch = 0
+
+    if resume:
+        print('Resuming from checkpoint', flush=True)
+        model_weights = torch.load(f'{training_path}model.nn', map_location=device)
+        run.load_state_dict(model_weights)
+        # epoch = 10
+        # checkpoint = torch.load(f'{training_path}model.nn', map_location=device)
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # epoch = checkpoint['epoch']
+        # loss = checkpoint['loss']
+
+    for epoch_idx in range(epoch, args.epoch):
         run.train()
         for batch_idx, batch in enumerate(tqdm(train_data, desc=f'Epoch {epoch_idx}')):
             model_input = batch[input_key].to(device)
@@ -363,7 +417,14 @@ def train_valid_height_estimator():
             # Saving the weights
             if val_loss < memory:
                 memory = val_loss
-                torch.save(run.state_dict(), f'{training_path}model.nn')
+                torch.save({
+                    'model': run.state_dict(),
+                    'epoch': epoch_idx,
+                    'memory': memory,
+                    'optimizer': optimizer.state_dict(),
+                }, f'{training_path}checkpoint.pt')
+                wandb.save(f'{training_path}checkpoint.pt')
+
         # Free memory
         del batch, model_input, z_gt, label, z_hat, loss, loss0, loss2, loss3
         torch.cuda.empty_cache()
