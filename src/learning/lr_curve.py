@@ -61,21 +61,24 @@ def create_lr_tests():
 
 
 def plot_lr_curve():
-    power = torch.linspace(-9, 0, 50)
+    power = torch.linspace(-9, 0, 100)
     lr_test = 10 ** power
 
-    data = pickle.load(open(f'{path.WD_PATH}lr_curve_ae.pkl', 'rb'))
+    data = pickle.load(open(f'{path.WD_PATH}lr_curve_height_estimator.pkl', 'rb'))
     plt.plot(lr_test, data['loss_mean'])
     plt.plot(lr_test, data['loss_mean'] + data['loss_std'])
     plt.plot(lr_test, data['loss_mean'] - data['loss_std'])
     plt.xscale('log')
     plt.yscale('log')
+    plt.grid()
+    plt.xlabel('Learning rate')
+    plt.ylabel('Training Loss')
     plt.show()
 
 
 def main():
-    create_lr_tests()
-    # plot_lr_curve()
+    # create_lr_tests()
+    plot_lr_curve()
 
 
 if __name__ == '__main__':

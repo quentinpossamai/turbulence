@@ -13,6 +13,7 @@ class RegressionHead(nn.Module):
         self.past = past
         self.dropout = nn.Dropout(dropout)
 
+        # TODO progressive regression
         self.emb_reduc_linear = nn.Linear(in_features=self.in_embedding_size, out_features=self.unit_size)
         if self.past > 1:
             self.emb_gru = nn.GRU(input_size=self.unit_size, hidden_size=self.unit_size, num_layers=1, batch_first=True)
