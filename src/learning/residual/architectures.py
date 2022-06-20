@@ -52,7 +52,7 @@ class CNNEncoder(nn.Module):
             self.encoder_conv = nn.Sequential(
                 # Initial is (batch, 1, 480, 640)
                 nn.Conv2d(1, self.ch_num // 2, (7, 7), stride=2, padding=3),
-                # (batch, ch_num // 2, 240, 320)  # todo check dim
+                # (batch, ch_num // 2, 240, 320)
                 nn.ReLU(True),
                 nn.MaxPool2d((2, 2)),  # (batch, ch_num // 2, 120, 160)
                 nn.Conv2d(self.ch_num // 2, self.ch_num, (3, 3), stride=2),
@@ -62,7 +62,7 @@ class CNNEncoder(nn.Module):
                 nn.Conv2d(self.ch_num, 4, (3, 3), stride=2, padding=(0, 1)),
                 # (batch, 4, 15, 20)
                 nn.ReLU(True),
-                nn.MaxPool2d((2, 2)),  # (batch, 4, 7, 10)  # todo check dim
+                nn.MaxPool2d((2, 2)),  # (batch, 4, 7, 10)
             )
 
         elif self.layer_num == 6:
@@ -144,7 +144,7 @@ class CNNDecoder(nn.Module):
         if self.layer_num == 3:
             self.decoder_conv = nn.Sequential(
                 # Initial is (batch, 4, 7, 10)
-                nn.UpsamplingBilinear2d(size=(15, 20)),  # (batch, 4, 15, 20) # TODO check dim
+                nn.UpsamplingBilinear2d(size=(15, 20)),  # (batch, 4, 15, 20)
                 nn.ConvTranspose2d(4, self.ch_num, (3, 3), stride=2, padding=1, output_padding=1),
                 # (batch, ch_num, 30, 40)
                 nn.ReLU(True),
@@ -217,7 +217,7 @@ class CNNDecoder(nn.Module):
         x = self.unflatten(x)  # (batch, 4, 7, 10)
         x = self.decoder_conv(x)  # (batch, self.out_dim[-1], 480, 640)
         if x.shape[1] == 3:
-            x = x / torch.norm(x, dim=1, keepdim=True)
+            x = x / (torch.norm(x, p=2, dim=1, keepdim=True) + 1e-8)
         return x
 
 

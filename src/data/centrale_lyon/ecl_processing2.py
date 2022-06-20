@@ -30,7 +30,6 @@ def data_processing():
     # Load drone_tf_origin
     mc_raw = f.pickle_load_file('.pkl', f.folders['raw_python'][flight_number], 'mc_measure')
     mc = mc_raw[['time', 'pose']].rename({'time': 'pose_time'}, axis=1).reset_index(drop=True)
-    # TODO : tf accuracy ?
     # Vincent input : (0.105, 0, 0, -1.57, 0.0, -2.0943) (convention x, y, z, roll, pitch, yaw)
     drone_d_camera = np.array([0.105, 0, 0])
     drone_rot_camera = Rotation.from_euler('xyz', np.array([-120, 0, -90]), degrees=True).as_quat()
@@ -46,7 +45,7 @@ def data_processing():
     # Time begin at 0
     image['image_time'] = (image['image_time'] - image['image_time'][0])
 
-    # # 4 - ANALYSIS TODO : Synchro
+    # # 4 - ANALYSIS
     # # mc 1 : Finding first synchro the scissors
     # mc_scissors(mc_raw, ind_inf=400, ind_sup=600, saving_path=f.folders['intermediate'][flight_number])
 

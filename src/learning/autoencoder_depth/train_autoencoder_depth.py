@@ -72,21 +72,30 @@ class EncoderDecoder(nn.Module):
         return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x: (batch_size, 1, 480, 640)
         x = x.permute([0, 3, 1, 2])
+        # x: (batch_size, 480, 640, 1)
         x = self.encoder(x)  # (batch_size, embedding_size)
         x = self.decoder(x)  # (batch_size, channel, 480, 640)
         x = x.permute([0, 2, 3, 1])
+        # (batch_size, 480, 640, channel)
         return x
 
 
-def compute_grad(rgb, device):
+def compute_grad(rgb, device, expand=False):
     rgb = rgb.permute([0, 3, 1, 2])
     a = torch.Tensor([[1, 0, -1],
                       [2, 0, -2],
-                      [1, 0, -1]]).view(1, 1, 3, 3).to(device)
+                      [1, 0, -1]]).to(device)
     b = torch.Tensor([[1, 2, 1],
                       [0, 0, 0],
-                      [-1, -2, -1]]).view(1, 1, 3, 3).to(device)
+                      [-1, -2, -1]]).to(device)
+    if expand:
+        a = a.expand(1, 3, 3, 3)
+        b = b.expand(1, 3, 3, 3)
+    else:
+        a = a.view(1, 1, 3, 3)
+        b = b.view(1, 1, 3, 3)
     sobel = (F.conv2d(rgb, a, padding=1) ** 2 + F.conv2d(rgb, b, padding=1) ** 2).squeeze(1)
     return sobel
 
@@ -96,7 +105,7 @@ def loss_depth(gt, hat):
     mse = ((gt - hat) ** 2).mean()
     mask = gt != 0
     mse_normed = (((gt - hat)[mask] / gt[mask]) ** 2).mean()
-    mse_grad = ((compute_grad(gt, device) - compute_grad(hat, device)) ** 2).mean()
+    mse_grad = ((compute_grad(gt, device, expand=False) - compute_grad(hat, device, expand=False)) ** 2).mean()
     psnr = 10 * torch.log10(24 ** 2 / mse)
     return {
         # 'loss_depth': mse + mse_grad / 2000,
@@ -108,13 +117,13 @@ def loss_depth(gt, hat):
     }
 
 
-def loss_normal(gt, prediction):
+def loss_normal(gt, hat):
     device = 'gpu' if torch.cuda.is_available() else "cpu"
-    mse_normal = ((gt - prediction["output"]) ** 2).mean()
-    mse_grad = ((compute_grad(gt, device) - compute_grad(prediction["output"], device)) ** 2).mean()
-    gt_transpose = gt.permute(0, 2, 3, 1).reshape(-1, 3)
-    prediction_transpose = prediction["output"].permute(0, 2, 3, 1).reshape(-1, 3)
-    cross_product_loss = torch.sqrt((torch.cross(gt_transpose, prediction_transpose, dim=-1) ** 2).sum(-1)).mean()
+    mse_normal = ((gt - hat) ** 2).mean()
+    mse_grad = ((compute_grad(gt, device, expand=True) - compute_grad(hat, device, expand=True)) ** 2).mean()
+    gt_flattened = gt.reshape(-1, 3)
+    hat_flattened = hat.reshape(-1, 3)
+    cross_product_loss = torch.sqrt((torch.cross(gt_flattened, hat_flattened, dim=-1) ** 2).sum(-1)).mean()
     psnr = 10 * torch.log10(4 / mse_normal)
     return {'loss_normal': mse_normal + mse_grad / 2000, 'mse_normal': mse_normal,
             'mse_grad_normal': mse_grad, 'cross_product_normal': cross_product_loss, 'psnr_normal': psnr}
@@ -131,14 +140,14 @@ def train_valid_irs_auto_encoder():
     parser.add_argument('--batch_size', default=2, type=int, help='Size of a batch.')
     parser.add_argument('--dataset', default="irs", type=str)
     parser.add_argument('--embedding_size', default=128, type=int)
-    parser.add_argument('--encoder_channel', default=152, type=int, help='Number of channels in the encoder.')
-    parser.add_argument('--encoder_layer', default=6, type=int, help='Number of layers in the encoder.')
-    parser.add_argument('--encoding', default='depth', type=str, help='"depth" or "normal" supervision for the decoder')
+    parser.add_argument('--encoder_channel', default=128, type=int, help='Number of channels in the encoder.')
+    parser.add_argument('--encoder_layer', default=3, type=int, help='Number of layers in the encoder.')
+    parser.add_argument('--encoding', default='normal', type=str, help='"depth" or "normal" supervision for the decoder')
     parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
     parser.add_argument('--lr', default=1e-5, type=float, help="Learning rate.")
     parser.add_argument('--model', default="cnn", type=str, help='CoPhy_Like, IRS_Like or cnn')
-    parser.add_argument('--resume', default='20220615_120420', type=str, help='If training resumes from a checkpoint')
+    parser.add_argument('--resume', default='none', type=str, help='If training resumes from a checkpoint')
 
     args = parser.parse_args()
 
@@ -148,7 +157,7 @@ def train_valid_irs_auto_encoder():
     # Logging initialization
     now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     if args.resume != 'None' and args.resume != 'none':
-        # now = args.resume  # TODO
+        now = args.resume
         resume = True
     else:
         resume = False
@@ -163,7 +172,7 @@ def train_valid_irs_auto_encoder():
                project='turbulence_residual',
                dir=training_path,
                mode='online' if device == torch.device('cuda') else 'disabled',
-               # resume=resume,  # TODO
+               resume=resume
                )
 
     print(f'Device used by torch: {device}', flush=True)
@@ -256,15 +265,12 @@ def train_valid_irs_auto_encoder():
     epoch = 0
     if resume:
         print('Resuming from checkpoint', flush=True)
-        model_weights = torch.load(f'{training_path}model.nn', map_location=device)
-        run.load_state_dict(model_weights)
-        epoch = 12  # TODO
-        # checkpoint = torch.load(f'{training_path}checkpoint.pt', map_location=device)
-        # model_state_dict = checkpoint['model']
-        # run.load_state_dict(model_state_dict)
-        # epoch = checkpoint['epoch'] + 1
-        # memory = checkpoint['memory']
-        # optimizer.load_state_dict(checkpoint['optimizer'])
+        checkpoint = torch.load(f'{training_path}checkpoint.pt', map_location=device)
+        model_state_dict = checkpoint['model']
+        run.load_state_dict(model_state_dict)
+        epoch = checkpoint['epoch'] + 1
+        memory = checkpoint['memory']
+        optimizer.load_state_dict(checkpoint['optimizer'])
     for epoch_idx in range(epoch, args.epoch):
         run.train()
         for batch_idx, batch in enumerate(tqdm(train_data, desc=f'Epoch {epoch_idx}')):
