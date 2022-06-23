@@ -118,7 +118,7 @@ def loss_depth(gt, hat):
 
 
 def loss_normal(gt, hat):
-    device = 'gpu' if torch.cuda.is_available() else "cpu"
+    device = 'cuda' if torch.cuda.is_available() else "cpu"
     mse_normal = ((gt - hat) ** 2).mean()
     mse_grad = ((compute_grad(gt, device, expand=True) - compute_grad(hat, device, expand=True)) ** 2).mean()
     gt_flattened = gt.reshape(-1, 3)

@@ -5,8 +5,8 @@ cd ~/phd/turbulence/
  --batch_size 2\
  --dataset irs\
  --embedding_size 128\
- --encoder_channel 32\
- --encoder_layer 6\
+ --encoder_channel 128\
+ --encoder_layer 9\
  --encoding normal\
  --epoch 200\
  --l2 0\
