@@ -173,17 +173,24 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
-            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220530_134811/'
-            model_name = 'model.nn'
+            # wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220530_134811/'
+            # model_name = 'model.nn'
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220620_154023/'
+            model_name = 'checkpoint.pt'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
-            model = HeightEstimator(activation=h_prms['activation'],
-                                    dropout=h_prms['dropout'],
-                                    embedding_method=h_prms['embedding_method'],
-                                    l2=h_prms['l2'],
-                                    lr=h_prms['lr'],
-                                    motor_size=h_prms['motor_size'],
-                                    past=h_prms['past'])
-            model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device))
+            model = HeightEstimator(
+                activation=h_prms['activation'],
+                dropout=h_prms['dropout'],
+                embedding_method=h_prms['embedding_method'],
+                l2=h_prms['l2'],
+                regression_size=h_prms['regression_size'],
+                cnn_layer_num=h_prms['cnn_layer_num'],
+                cnn_channel_num=h_prms['cnn_channel_num'],
+                lr=h_prms['lr'],
+                motor_size=h_prms['motor_size'],
+                past=h_prms['past'],
+            )
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device)['model'])
         if dataset_name == 'euroc_mav':
             dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
         else:
@@ -246,13 +253,9 @@ def model_predict(model, h_prms, name):
     with torch.no_grad():
         for scene_number, traj in tqdm(index.items()):
             for flight_number in traj:
-                if 'none_raw' in name or 'none_gru' in name:
+                if ('none_raw' in name or 'none_gru' in name or 'depth_gru_finetune' in name
+                        or 'norm_gru_finetune' in name):
                     depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number)).float().to(device)
-                elif 'depth_gru_finetune' in name or 'norm_gru_finetune' in name:
-                    depth = torch.from_numpy(habitat.load_file('depth', scene_number, flight_number)).float().to(device)
-                    depth = f.resized_crop(depth, (480 - 408) // 2, 0, 408, 640, [240, 376])
-                    # Divide by 20 because 20 is the ZMAX of CophyLike autoencoder trained on IRS
-                    depth = torch.clip(depth / 20, 0, 1) * 2 - 1
                 elif 'depth_gru' in name:
                     depth = torch.from_numpy(habitat.load_file('depth_emb', scene_number,
                                                                flight_number)).float().to(device)
@@ -291,7 +294,7 @@ def model_predict(model, h_prms, name):
 
 def predict():
     # for stage in ['none_raw', 'none_gru', 'depth_gru', 'depth_gru_finetune', 'norm_gru', 'norm_gru_finetune']:
-    stage = 'norm_gru_finetune'
+    stage = 'depth_gru_finetune'
     model, h_prms, name, dataset = get_trained_model_and_dataset(stage, False, 'habitat')
     model_predict(model, h_prms, name)
 
@@ -309,7 +312,6 @@ def test_new_model_habitat():
         loss2_agg = []
         loss3_agg = []
 
-
         for scene_number in tqdm(habitat.TEST, desc=f'{stage}', file=sys.stdout):
             for flight_number in labels[scene_number]:
                 flight_folder = f'{habitat.get_flight_folder(scene_number, flight_number)}pred/'
@@ -317,8 +319,10 @@ def test_new_model_habitat():
                 z_gt = file['z_gt']
                 z_hat = file['z_hat']
 
-                label = np.stack([labels[scene_number][flight_number][i-h_prms['past']:i] for i in range(h_prms['past'], len(z_gt) + 1)])
-                data_usable = np.logical_not(np.any(label == 1, axis=1))  # check for valid data, label 1 is invalid data
+                label = np.stack([labels[scene_number][flight_number][i - h_prms['past']:i] for i in
+                                  range(h_prms['past'], len(z_gt) + 1)])
+                data_usable = np.logical_not(
+                    np.any(label == 1, axis=1))  # check for valid data, label 1 is invalid data
                 where_is_label0 = np.logical_and(data_usable, (label == 0)[:, -1])
                 where_is_label2 = np.logical_and(data_usable, (label == 2)[:, -1])
                 where_is_label3 = np.logical_and(data_usable, (label == 3)[:, -1])
@@ -330,7 +334,6 @@ def test_new_model_habitat():
                 loss2_agg.append(old_loss[where_is_label2])
                 loss3_agg.append(old_loss[where_is_label3])
 
-
         print(f'{name}: old loss: {np.mean(np.concatenate(old_loss_agg)):.4e}')
         print(f'{name}: new loss: {np.mean(np.concatenate(new_loss_agg)):.4e}')
         print(f'{name}: loss0: {np.mean(np.concatenate(loss0_agg)):.4e}')
@@ -339,10 +342,9 @@ def test_new_model_habitat():
         print(f'\n\n')
 
 
-
-
 def main():
-    test_new_model_habitat()
+    predict()
+    # test_new_model_habitat()
 
 
 if __name__ == '__main__':

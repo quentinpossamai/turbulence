@@ -290,13 +290,25 @@ def train_valid_height_estimator():
         # run.regression_head.load_state_dict(state_dict)
         load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, False
     else:
+        import src.learning.autoencoder_depth.predict as ae_models
         input_key = 'depth'
         assert h_prms['stage'] == 'irs_normal_finetune'
-        state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_normal_irs_128_irs.nn'
-        tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=3)
-        tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
-        run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
-        del tmp
+        if h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 128:
+            model, h_prms_ae = ae_models.get_irs_model('20220620_173528')
+            run.embedding_layer.load_state_dict(model.encoder.state_dict())
+        elif h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 64:
+            model, h_prms_ae = ae_models.get_irs_model('20220620_173515')
+            run.embedding_layer.load_state_dict(model.encoder.state_dict())
+        elif h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 128:
+            model, h_prms_ae = ae_models.get_irs_model('20220620_173454')
+            run.embedding_layer.load_state_dict(model.encoder.state_dict())
+        else:
+            raise NotImplementedError
+            state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_normal_irs_128_irs.nn'
+            tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=3)
+            tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
+            run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
+            del tmp
         # # Loading head
         # state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/model.nn'
         # state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
