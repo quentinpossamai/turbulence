@@ -46,16 +46,20 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
+            from src.learning.residual.old.height_estimator import HeightEstimator
             wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_cnn/20220529_210051/'
             model_name = 'model.nn'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
-            model = HeightEstimator(activation=h_prms['activation'],
-                                    dropout=h_prms['dropout'],
-                                    embedding_method=h_prms['embedding_method'],
-                                    l2=h_prms['l2'],
-                                    lr=h_prms['lr'],
-                                    motor_size=h_prms['motor_size'],
-                                    past=h_prms['past'])
+            # h_prms = pickle.dump(open(f'{wd_path}h_prms.pkl', 'wb'))
+            model = HeightEstimator(
+                activation=h_prms['activation'],
+                dropout=h_prms['dropout'],
+                embedding_method=h_prms['embedding_method'],
+                l2=h_prms['l2'],
+                lr=h_prms['lr'],
+                motor_size=h_prms['motor_size'],
+                past=h_prms['past'],
+                                    )
             model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device))
         if dataset_name == 'euroc_mav':
             dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
@@ -76,6 +80,7 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
+            from src.learning.residual.old.height_estimator import HeightEstimator
             wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_cnn/20220530_120616/'
             model_name = 'model.nn'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
@@ -107,6 +112,7 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
+            from src.learning.residual.old.height_estimator import HeightEstimator
             wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_head/20220529_210139/'
             model_name = 'model.nn'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
@@ -139,6 +145,7 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
+            from src.learning.residual.old.height_estimator import HeightEstimator
             wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/'
             model_name = 'model.nn'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
@@ -173,6 +180,7 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
+            from src.learning.residual.height_estimator import HeightEstimator
             # wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220530_134811/'
             # model_name = 'model.nn'
             wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220620_154023/'
@@ -214,7 +222,8 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
         else:
-            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_finetune/20220530_134931/'
+            from src.learning.residual.height_estimator import HeightEstimator
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_finetune/TRAINING/'
             model_name = 'model.nn'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
             model = HeightEstimator(activation=h_prms['activation'],
@@ -334,17 +343,17 @@ def test_new_model_habitat():
                 loss2_agg.append(old_loss[where_is_label2])
                 loss3_agg.append(old_loss[where_is_label3])
 
-        print(f'{name}: old loss: {np.mean(np.concatenate(old_loss_agg)):.4e}')
-        print(f'{name}: new loss: {np.mean(np.concatenate(new_loss_agg)):.4e}')
-        print(f'{name}: loss0: {np.mean(np.concatenate(loss0_agg)):.4e}')
-        print(f'{name}: loss2: {np.mean(np.concatenate(loss2_agg)):.4e}')
-        print(f'{name}: loss3: {np.mean(np.concatenate(loss3_agg)):.4e}')
+        print(f'{name}: old loss: {np.mean(np.concatenate(old_loss_agg)) * 10000:.0f}')
+        print(f'{name}: new loss: {np.mean(np.concatenate(new_loss_agg)) * 10000:.0f}')
+        print(f'{name}: loss0: {np.mean(np.concatenate(loss0_agg)) * 10000:.0f}')
+        print(f'{name}: loss2: {np.mean(np.concatenate(loss2_agg)) * 10000:.0f}')
+        print(f'{name}: loss3: {np.mean(np.concatenate(loss3_agg)) * 10000:.0f}')
         print(f'\n\n')
 
 
 def main():
-    predict()
-    # test_new_model_habitat()
+    # predict()
+    test_new_model_habitat()
 
 
 if __name__ == '__main__':

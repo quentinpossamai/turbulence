@@ -1,0 +1,382 @@
+import argparse
+import datetime
+import numpy as np
+import pickle
+import random
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from tqdm import tqdm
+import sys
+import wandb
+
+import src.data.habitat.loading as habitat
+import src.utils.path as path
+
+
+class HeightEstimator(nn.Module):
+    def __init__(self, activation: str,
+                 dropout: float,
+                 embedding_method: str,
+                 l2: float,
+                 lr: float,
+                 motor_size: int,
+                 past: int,
+                 ):
+        """
+        Model to predict residual z such that f_aero(z, motor). Sequences of depth-maps from past time-steps.
+
+        Args:
+            activation: The activation function to use.
+            dropout: The dropout probability of MLPs hidden layers.
+            l2: Float to penalize all weights with l2 loss.
+            lr: Learning rate for Adam optimizer.
+            motor_size: The number of motors.
+            past: The number of past depth-maps to use.
+            embedding_method: The type of pre-training to use.
+        """
+        super().__init__()
+        self.activation = None
+        assert activation in ['relu', 'tanh']
+        if activation == "relu":
+            self.activation = torch.relu  # torch.tanh or f.relu
+        elif activation == "tanh":
+            self.activation = torch.tanh  # torch.tanh or f.relu
+        self.dropout = dropout
+        assert embedding_method in ['none', 'cnn', 'irs_depth', 'irs_normal']
+        self.embedding_method = embedding_method
+        self.l2 = l2
+        self.lr = lr
+        self.motor_size = motor_size
+        self.past = past
+
+        embedding_size = 128
+
+        if embedding_method == 'none':
+            self.embedding_layer = lambda x: x
+        elif embedding_method == 'cnn':
+            self.depth_size = [480, 640]
+            from src.learning.residual.old.architectures import RawEmbedding
+            self.embedding_layer = RawEmbedding(self.activation, embedding_size)
+
+        elif self.embedding_method == 'irs_depth':
+            self.depth_size = [240, 376]
+            from src.learning.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+            auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=1)
+            self.embedding_layer = auto_encoder.encoder
+
+        else:
+            assert self.embedding_method == 'irs_normal'
+            self.depth_size = [240, 376]
+            from src.learning.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
+            auto_encoder = Autoencoder(feature_size=embedding_size, in_channel=1, out_channel=3)
+            self.embedding_layer = auto_encoder.encoder
+
+        from src.learning.residual.old.architectures import RegressionHead
+        self.regression_head = RegressionHead(self.activation, embedding_size, 50, self.past, self.dropout)
+
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.l2)
+
+    def forward(self, input_data: torch.Tensor) -> torch.Tensor:
+        r"""
+        Estimate the residual
+
+        param in_data: depth (*, past, width, height)
+                       embedding (*, past, 128)
+        Generally * means batch dimension or more but must exist during training to compute batch_norm.
+
+        return: (*, 1)
+        """
+        out = self.embedding_layer(input_data)
+        out = self.regression_head(out)
+        return out
+
+    def loss(self, z_gt, z_hat, label):
+        """
+        Args:
+            z_gt: (batch, 1),
+            z_hat: (batch, 1),
+            label: (batch, self.past, 1)
+            label 0: normal data
+            label 1: data to be rejected
+            label 2: surface discontinuity data
+            label 3: noisy data
+
+        Returns: The loss used by the model.
+        """
+        data_usable = torch.logical_not(torch.any(label == 1, dim=1))  # check for valid data, label 1 is invalid data
+        where_is_label0 = torch.logical_and(data_usable, (label == 0)[:, -1])
+        where_is_label2 = torch.logical_and(data_usable, (label == 2)[:, -1])
+        where_is_label3 = torch.logical_and(data_usable, (label == 3)[:, -1])
+
+        weight_label2 = 1
+        weights_label2_array = data_usable.float() + where_is_label2.float() * (weight_label2 - 1)
+
+        weight_label3 = 1
+        weights_label3_array = data_usable.float() + where_is_label3.float() * (weight_label3 - 1)
+
+        initial_loss = ((z_gt - z_hat) ** 2).squeeze()
+        weighted_loss = initial_loss * data_usable
+        weighted_loss = weighted_loss * weights_label2_array
+        weighted_loss = weighted_loss * weights_label3_array
+
+        loss0 = initial_loss[where_is_label0]
+        loss2 = initial_loss[where_is_label2]
+        loss3 = initial_loss[where_is_label3]
+
+        return weighted_loss, loss0, loss2, loss3
+
+
+ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}euroc_mav_residual_training/'
+ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}habitat_residual_training/'
+
+SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
+path.mkdir([SAVING_PATH])
+
+
+def train_valid_height_estimator():
+    # Args are hyperparameters to optimize
+    parser = argparse.ArgumentParser(description='Identify model on data.')
+    parser.add_argument('--activation', default="relu", type=str, help="The activation function to use.")
+    parser.add_argument('--batch_size', default=10, type=int, help='Size of a batch.')
+    parser.add_argument('--dropout', default=0.5, type=float, help='Dropout probability')
+    parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
+    parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
+    parser.add_argument('--lr', default=5e-5, type=float, help="Learning rate.")
+    parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model.")
+    parser.add_argument('--stage', default='irs_normal_head', type=str, help="The stage of the model.")
+
+    args = parser.parse_args()
+
+    # ae training is already done and written elsewhere
+    assert args.stage in ['cnn',
+                          'irs_depth_head', 'irs_depth_finetune',
+                          'irs_normal_head', 'irs_normal_finetune']
+
+    embedding_method = args.stage
+    if 'irs_depth_head' == args.stage or 'irs_normal_head' == args.stage:
+        embedding_method = 'none'  # training only the head. irs embedding is done in autoencoder_depth
+
+    # Logging initialization
+    now = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    version = f'{now}'
+    residual_model_class = HeightEstimator
+    name = f'{residual_model_class.__name__}_{args.stage}'
+    training_path = f'{SAVING_PATH}{name}/{version}/'
+    path.mkdir([training_path])
+
+    identifier = f'{name}_{version}'
+    wandb.init(name=identifier,
+               id=identifier,
+               project='turbulence_residual',
+               dir=training_path,
+               mode='online' if sys.platform != 'darwin' else 'disabled')
+
+    use_cuda_if_possible = True
+    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
+
+    print(f'Device used by torch: {device}')
+
+    # Display entire dataset
+    check_all_file = True  # False if '/Users/quentin' in path.WD_PATH else True
+    for split_name in ['train', 'valid', 'test']:
+        dataset_stats = habitat.HabitatResidualDataset(split_name, args.past, load_depth=False, load_depth_emb=False,
+                                                       load_norm_emb=False, normed_depth=False,
+                                                       check_all_file=check_all_file)
+        print(split_name)
+        for scene_number, scene_traj in dataset_stats.index.items():
+            print(f'{scene_number} - {habitat.MP3D_SCENE_LIST[scene_number]}: {scene_traj}')
+        print(f'Data length: | {len(dataset_stats)}')
+        print('\n\n')
+
+    # Analysis parameters
+    motor_size = 4
+    h_prms = {'time_start': now,  # hyperparameters
+              'name': name,
+              'activation': args.activation,
+              'batch_size': args.batch_size,
+              'dropout': args.dropout,
+              'embedding_method': embedding_method,
+              'l2': args.l2,
+              'lr': args.lr,
+              'motor_size': motor_size,
+              'epoch': args.epoch,
+              'past': args.past,
+              'stage': args.stage}
+    pickle.dump(h_prms, open(f'{training_path}h_prms.pkl', 'wb'))
+    wandb.config.update(h_prms)
+    print(f'training_path={training_path}')
+    print(f'name={name} | version={version}')
+
+    # Reproducibility
+    seed = 0
+    random.seed(seed)
+    np.random.seed(seed)
+    # torch.backends.cudnn.deterministic = False
+    # torch.use_deterministic_algorithms(True)
+
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2 ** 32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+    g = torch.Generator()
+    g.manual_seed(seed)
+
+    run = residual_model_class(activation=h_prms['activation'],
+                               dropout=h_prms['dropout'],
+                               l2=h_prms['l2'],
+                               lr=h_prms['lr'],
+                               motor_size=h_prms['motor_size'],
+                               past=h_prms['past'],
+                               embedding_method=h_prms['embedding_method']).to(device)
+    wandb.watch(run)
+
+    # Load previous weight depending on training stage
+    if h_prms['stage'] == 'cnn':
+        input_key = 'depth'
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, False
+    elif h_prms['stage'] in 'irs_depth_head':
+        input_key = 'depth_emb'
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = False, True, False, False
+    elif h_prms['stage'] == 'irs_normal_head':
+        input_key = 'norm_emb'
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = False, False, True, False
+    elif h_prms['stage'] == 'irs_depth_finetune':
+        input_key = 'depth'
+        run.auto_encoder.load_state_dict(torch.load(f'{path.WD_PATH}models/depth_normal_autoencoder/'
+                                                    f'autoencoder_depth_irs_128.nn'))
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
+    else:
+        input_key = 'depth'
+        assert h_prms['stage'] == 'irs_norm_finetune'
+        run.auto_encoder.load_state_dict(torch.load(f'{path.WD_PATH}models/depth_normal_autoencoder/'
+                                                    f'autoencoder_normal_irs_128.nn'))
+        load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, True
+
+    num_workers = 12 if device == 'gpu' else 0
+    # Datasets
+    print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | load_norm_emb {load_norm_emb}')
+    train_data = DataLoader(habitat.HabitatResidualDataset('train', past=args.past, load_depth=load_depth,
+                                                           load_depth_emb=load_depth_emb,
+                                                           load_norm_emb=load_norm_emb,
+                                                           normed_depth=normed_depth,
+                                                           check_all_file=check_all_file),
+                            batch_size=args.batch_size,
+                            shuffle=True,
+                            num_workers=num_workers,
+                            pin_memory=True,
+                            drop_last=True,
+                            worker_init_fn=seed_worker)
+
+    validation_data = DataLoader(habitat.HabitatResidualDataset('valid', past=args.past, load_depth=load_depth,
+                                                                load_depth_emb=load_depth_emb,
+                                                                load_norm_emb=load_norm_emb,
+                                                                normed_depth=normed_depth,
+                                                                check_all_file=check_all_file),
+                                 batch_size=args.batch_size,
+                                 shuffle=False,
+                                 num_workers=num_workers,
+                                 pin_memory=True,
+                                 drop_last=True,
+                                 worker_init_fn=seed_worker)
+
+    # Train loop
+    memory = np.inf
+    log_interval = 50
+    train_log_keys = ['train_loss', 'train_loss0', 'train_loss2', 'train_loss3']
+    val_log_keys = ['val_loss', 'val_loss0', 'val_loss2', 'val_loss3']
+    running_loss = {}
+    for key in train_log_keys + val_log_keys:
+        running_loss[key] = []
+    optimizer = run.configure_optimizers()
+    for epoch_idx in range(args.epoch):
+        run.train()
+        for batch_idx, batch in enumerate(tqdm(train_data, desc=f'Epoch {epoch_idx}')):
+            model_input = batch[input_key].to(device)
+            z_gt = batch['surface_dist'].to(device)
+            label = batch['label'].to(device)
+
+            z_hat = run(model_input)
+            loss, loss0, loss2, loss3 = run.loss(z_gt, z_hat, label)
+            # Logging
+            running_loss['train_loss'].append(loss.detach().cpu().numpy())
+            running_loss['train_loss0'].append(loss0.detach().cpu().numpy())
+            running_loss['train_loss2'].append(loss2.detach().cpu().numpy())
+            running_loss['train_loss3'].append(loss3.detach().cpu().numpy())
+            loss.mean().backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+            if batch_idx % log_interval == 0 and batch_idx > 0:
+                for key in ['train_loss', 'train_loss0', 'train_loss2', 'train_loss3']:
+                    wandb.log({key: np.mean(np.concatenate(running_loss[key]))},
+                              step=epoch_idx * len(train_data) + batch_idx)
+                    running_loss[key] = []
+        for key in train_log_keys:
+            running_loss[key] = []
+
+        # validate the model
+        run.eval()
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(validation_data):
+                model_input = batch[input_key].to(device)
+                z_gt = batch['surface_dist'].to(device)
+                label = batch['label'].to(device)
+
+                z_hat = run(model_input)
+                loss, loss0, loss2, loss3 = run.loss(z_gt, z_hat, label)
+                running_loss['val_loss'].append(loss.detach().cpu().numpy())
+                running_loss['val_loss0'].append(loss0.detach().cpu().numpy())
+                running_loss['val_loss2'].append(loss2.detach().cpu().numpy())
+                running_loss['val_loss3'].append(loss3.detach().cpu().numpy())
+            val_loss = np.mean(np.concatenate(running_loss['val_loss']))
+            for key in val_log_keys:
+                wandb.log({key: np.mean(np.concatenate(running_loss[key]))},
+                          step=(epoch_idx + 1) * len(train_data))
+                running_loss[key] = []
+            # Saving the weights
+            if val_loss < memory:
+                memory = val_loss
+                torch.save(run.state_dict(), f'{training_path}model.nn')
+
+
+def get_trained_model(name: str):
+    """
+
+    Args:
+        name:
+        ['none_raw',
+         'none_gru',
+         'depth_gru',
+         'depth_gru_finetune',
+         'norm_gru',
+         'norm_gru_finetune']
+
+    Returns: The strings and path associated to the model.
+    """
+    if name == 'none_raw':
+        model_path = f'{path.ANALYSIS_PATH}habitat_residual_training/'
+        model_part_path = 'AllHeight/20220513_154038/'
+        model_ckpt = 'epoch=78-step=894042-val_loss=0.04.ckpt'
+        model_path = f'{model_path}{model_part_path}'
+        name = f'''{model_part_path.replace('/', '_')}{model_ckpt[:-5]}'''
+        h_prms = pickle.load(open(f'{model_path}h_prms.pkl', 'rb'))
+        model = HeightEstimator.load_from_checkpoint(f'{model_path}{model_ckpt}',
+                                                     activation=h_prms['activation'],
+                                                     l2=h_prms['l2'],
+                                                     lr=h_prms['lr'],
+                                                     uav_model=None,
+                                                     motor_size=h_prms['motor_size'],
+                                                     past=h_prms['past'])
+    else:
+        raise NotImplemented
+    return model, h_prms, name
+
+
+def main():
+    train_valid_height_estimator()
+
+
+if __name__ == "__main__":
+    main()

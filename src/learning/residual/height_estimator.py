@@ -156,8 +156,8 @@ def train_valid_height_estimator():
     parser.add_argument('--regression_size', default=50, type=int,
                         help="Number of unit for MLP and hidden_size for GRU.")
     parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model.")
-    parser.add_argument('--resume', default='none', type=str, help='If training resumes from a checkpoint')
     parser.add_argument('--stage', default='irs_depth_finetune', type=str, help="The stage of the model.")
+    parser.add_argument('--resume', default='none', type=str, help='If training resumes from a checkpoint')
 
     args = parser.parse_args()
 
@@ -266,22 +266,17 @@ def train_valid_height_estimator():
     elif h_prms['stage'] == 'irs_depth_finetune':
         input_key = 'depth'
         import src.learning.autoencoder_depth.predict as ae_models
-        if h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 128:
+        if h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 128 and not resume:
             model, h_prms_ae = ae_models.get_irs_model('20220611_183103')
             run.embedding_layer.load_state_dict(model.encoder.state_dict())
-        elif h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 64:
+        elif h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 64 and not resume:
             model, h_prms_ae = ae_models.get_irs_model('20220611_182536')
             run.embedding_layer.load_state_dict(model.encoder.state_dict())
-        elif h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 32:
+        elif h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 32 and not resume:
             model, h_prms_ae = ae_models.get_irs_model('20220611_183523')
             run.embedding_layer.load_state_dict(model.encoder.state_dict())
         else:
             raise NotImplementedError
-            state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_depth_irs_128.nn'
-            tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=1)
-            tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
-            run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
-            del tmp
 
         # Loading head
         # state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_depth_head/20220529_210139/model.nn'
@@ -290,25 +285,21 @@ def train_valid_height_estimator():
         # run.regression_head.load_state_dict(state_dict)
         load_depth, load_depth_emb, load_norm_emb, normed_depth = True, False, False, False
     else:
+        assert h_prms['stage'] == 'irs_normal_finetune'
         import src.learning.autoencoder_depth.predict as ae_models
         input_key = 'depth'
-        assert h_prms['stage'] == 'irs_normal_finetune'
-        if h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 128:
+        if h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 128 and not resume:
             model, h_prms_ae = ae_models.get_irs_model('20220620_173528')
             run.embedding_layer.load_state_dict(model.encoder.state_dict())
-        elif h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 64:
+        elif h_prms['cnn_layer_num'] == 9 and h_prms['cnn_channel_num'] == 64 and not resume:
             model, h_prms_ae = ae_models.get_irs_model('20220620_173515')
             run.embedding_layer.load_state_dict(model.encoder.state_dict())
-        elif h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 128:
+            print(f'Reloading previous weights')
+        elif h_prms['cnn_layer_num'] == 6 and h_prms['cnn_channel_num'] == 128 and not resume:
             model, h_prms_ae = ae_models.get_irs_model('20220620_173454')
             run.embedding_layer.load_state_dict(model.encoder.state_dict())
         else:
-            raise NotImplementedError
-            state_dict_path = f'{path.WD_PATH}models/depth_normal_autoencoder/autoencoder_normal_irs_128_irs.nn'
-            tmp = Autoencoder(feature_size=128, in_channel=1, out_channel=3)
-            tmp.load_state_dict(torch.load(state_dict_path, map_location=device))
-            run.embedding_layer.load_state_dict(tmp.encoder.state_dict())
-            del tmp
+            print(f'No weight reloaded')
         # # Loading head
         # state_dict_path = 'analysis/habitat_residual_training/HeightEstimator_irs_normal_head/20220529_210237/model.nn'
         # state_dict = torch.load(f'{path.WD_PATH}{state_dict_path}', map_location=device)
@@ -329,7 +320,7 @@ def train_valid_height_estimator():
     print(f'training_path={training_path}', flush=True)
     print(f'name={name} | version={version}', flush=True)
 
-    num_workers = 30 if device == 'gpu' else 0
+    num_workers = 15 if device == 'gpu' else 0
     # Datasets
     print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | '
           f'load_norm_emb {load_norm_emb} | normed_depth {normed_depth}', flush=True)
@@ -370,13 +361,12 @@ def train_valid_height_estimator():
 
     if resume:
         print('Resuming from checkpoint', flush=True)
-        model_weights = torch.load(f'{training_path}model.nn', map_location=device)
-        run.load_state_dict(model_weights)
-        # epoch = 10
-        # checkpoint = torch.load(f'{training_path}model.nn', map_location=device)
-        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        # epoch = checkpoint['epoch']
-        # loss = checkpoint['loss']
+        checkpoint = torch.load(f'{training_path}checkpoint.pt', map_location=device)
+        model_state_dict = checkpoint['model']
+        run.load_state_dict(model_state_dict)
+        epoch = checkpoint['epoch'] + 1
+        memory = checkpoint['memory']
+        optimizer.load_state_dict(checkpoint['optimizer'])
 
     for epoch_idx in range(epoch, args.epoch):
         run.train()
