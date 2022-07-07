@@ -17,19 +17,17 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
     """
 
     Args:
-        prefix:
-        ['none_raw',
+        prefix: ['none_raw',
          'none_gru',
          'depth_gru',
          'depth_gru_finetune',
          'norm_gru',
          'norm_gru_finetune']
+        old: True will load submission models, False will load new models
 
-         old: True will load submission models, False will load new models
+        dataset_name: 'euroc_mav' or 'habitat'
 
-         dataset_name: The dataset to use to test the model
-
-    Returns: Loaded model, hyper parameter dict and model's name.
+    Returns: Loaded model, hyperparameter dict and model's name.
     """
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if prefix == 'none_raw':
@@ -200,9 +198,9 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
             )
             model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device)['model'])
         if dataset_name == 'euroc_mav':
-            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
         else:
-            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     else:
         assert prefix == 'norm_gru_finetune'
@@ -223,21 +221,26 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                past=h_prms['past'])
         else:
             from src.learning.residual.height_estimator import HeightEstimator
-            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_finetune/TRAINING/'
-            model_name = 'model.nn'
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_normal_finetune/20220629_222109/'
+            model_name = 'checkpoint.pt'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
-            model = HeightEstimator(activation=h_prms['activation'],
-                                    dropout=h_prms['dropout'],
-                                    embedding_method=h_prms['embedding_method'],
-                                    l2=h_prms['l2'],
-                                    lr=h_prms['lr'],
-                                    motor_size=h_prms['motor_size'],
-                                    past=h_prms['past'])
-            model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device))
+            model = HeightEstimator(
+                activation=h_prms['activation'],
+                dropout=h_prms['dropout'],
+                embedding_method=h_prms['embedding_method'],
+                l2=h_prms['l2'],
+                regression_size=h_prms['regression_size'],
+                cnn_layer_num=h_prms['cnn_layer_num'],
+                cnn_channel_num=h_prms['cnn_channel_num'],
+                lr=h_prms['lr'],
+                motor_size=h_prms['motor_size'],
+                past=h_prms['past'],
+            )
+            model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device)['model'])
         if dataset_name == 'euroc_mav':
-            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
         else:
-            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
+            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     suffix = 'old' if old else 'new'
     name = f'{prefix}_{suffix}'
@@ -285,7 +288,8 @@ def model_predict(model, h_prms, name):
                 for i in range(h_prms['past'], length + 1):
                     label_data[i - 1] = label_traj[i - h_prms['past']:i]
                     z_hat[i - 1] = model(depth[i - h_prms['past']:i].unsqueeze(0))
-                weighted_loss, loss0, loss2, loss3 = model.loss(z_gt[h_prms['past'] - 1:], z_hat[h_prms['past'] - 1:],
+                weighted_loss, loss0, loss2, loss3 = model.loss(z_gt[h_prms['past'] - 1:],
+                                                                z_hat[h_prms['past'] - 1:],
                                                                 label_data[h_prms['past'] - 1:])
                 loss[h_prms['past'] - 1:] = weighted_loss
                 weighted_loss, loss0, loss2, loss3 = model.loss(z_gt[h_prms['past'] - 1:] * t_z_std + t_z_mean,
@@ -301,9 +305,9 @@ def model_predict(model, h_prms, name):
                          z_hat=z_hat.cpu().numpy() * z_std + z_mean)
 
 
-def predict():
+def predict_on_all_dataset():
     # for stage in ['none_raw', 'none_gru', 'depth_gru', 'depth_gru_finetune', 'norm_gru', 'norm_gru_finetune']:
-    stage = 'depth_gru_finetune'
+    stage = 'norm_gru_finetune'
     model, h_prms, name, dataset = get_trained_model_and_dataset(stage, False, 'habitat')
     model_predict(model, h_prms, name)
 
@@ -352,7 +356,7 @@ def test_new_model_habitat():
 
 
 def main():
-    # predict()
+    # predict_on_all_dataset()
     test_new_model_habitat()
 
 
