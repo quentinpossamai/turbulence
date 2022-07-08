@@ -1,0 +1,548 @@
+import numpy as np
+from typing import Dict
+import cv2
+import habitat_sim
+import magnum
+import pickle
+from typing import Tuple, Any
+
+from src.data.habitat.generate_reference import generate_reference
+from src.drone_model.quadrotor_4parms import DynamicalModel
+from src.utils.transform import Transform as Tf
+from src.data.habitat.hatbitat2flu import Habitat2FLU
+
+
+
+class Simulation:
+    def __init__(self, scene_path: str,
+                 camera_resolution: np.ndarray,
+                 drone_prms: Dict[str, float],
+                 gravity: float,
+                 dtype):
+        """
+        Habitat simulation of a quadrotor with ground effect.
+
+        param scene_path: The path to the .glb scene to load.
+
+        param camera_resolution: The resolution of the camera [height, width].
+
+        param drone_prms: Parameters of the drone.
+
+        param gravity: Value of the gravity for the habitat.
+        """
+        self.error_agent = None
+        self.g = gravity
+        self.drone_prms: Dict[str, float] = drone_prms
+
+        # 1-Initializing the habitat and loading the scene
+        backend_cfg = habitat_sim.SimulatorConfiguration()
+        backend_cfg.enable_physics = True
+        backend_cfg.scene_id = scene_path
+
+        # 2-Adding a stereo RGB-D sensors to the drone
+        # left rgb camera
+        left_rgb_sensor = habitat_sim.bindings.CameraSensorSpec()
+        left_rgb_sensor.uuid = "left_camera"  # uuid is used to retrieve the observation
+        left_rgb_sensor.resolution = camera_resolution
+        left_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.LEFT
+
+        # # right rgb camera
+        # right_rgb_sensor = habitat_sim.CameraSensorSpec()
+        # right_rgb_sensor.uuid = "right_camera"
+        # right_rgb_sensor.resolution = camera_resolution
+        # right_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT + 1.1 * habitat_sim.geo.BACK
+
+        # left depth camera
+        left_depth_sensor = habitat_sim.CameraSensorSpec()
+        left_depth_sensor.uuid = "left_depth_camera"
+        left_depth_sensor.resolution = camera_resolution
+        left_depth_sensor.position = 0 * habitat_sim.geo.UP + 0 * habitat_sim.geo.LEFT
+        left_depth_sensor.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # # right depth camera
+        # right_depth_sensor = habitat_sim.CameraSensorSpec()
+        # right_depth_sensor.uuid = "right_depth_camera"
+        # right_depth_sensor.resolution = camera_resolution
+        # right_depth_sensor.position = 0 * habitat_sim.geo.UP + 0 * habitat_sim.geo.RIGHT
+        # right_depth_sensor.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # depth camera
+        surface_distance_sensor = habitat_sim.CameraSensorSpec()
+        surface_distance_sensor.uuid = "surface_dist"
+        surface_distance_sensor.resolution = [1, 1]
+        surface_distance_sensor.orientation = [-90 / 180 * np.pi, 0, 0]
+        surface_distance_sensor.position = 0 * habitat_sim.geo.UP + 0 * habitat_sim.geo.RIGHT
+        surface_distance_sensor.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # 3-Instantiating drone
+        # Connecting the drone to its sensors
+        agent_config = habitat_sim.AgentConfiguration()
+        agent_config.sensor_specifications = [surface_distance_sensor,
+                                              left_rgb_sensor,
+                                              # right_rgb_sensor,
+                                              left_depth_sensor,
+                                              # right_depth_sensor,
+                                              ]
+
+        # Error agent
+        error_rgb_sensor = habitat_sim.CameraSensorSpec()
+        error_rgb_sensor.uuid = "error_camera"
+        error_rgb_sensor.resolution = camera_resolution
+        error_rgb_sensor.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT + 1.1 * habitat_sim.geo.BACK
+
+        dist_resolution = [1, 1]  # [1, 1]
+        # Forward dist
+        forward_dist = habitat_sim.CameraSensorSpec()
+        forward_dist.uuid = "forward_dist"
+        forward_dist.resolution = dist_resolution
+        forward_dist.orientation = [0, 0, 0]
+        forward_dist.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT
+        forward_dist.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # Backward dist
+        backward_dist = habitat_sim.CameraSensorSpec()
+        backward_dist.uuid = "backward_dist"
+        backward_dist.resolution = dist_resolution
+        backward_dist.orientation = [0, 180 / 180 * np.pi, 0]
+        backward_dist.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT
+        backward_dist.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # Left dist
+        left_dist = habitat_sim.CameraSensorSpec()
+        left_dist.uuid = "left_dist"
+        left_dist.resolution = dist_resolution
+        left_dist.orientation = [0, 90 / 180 * np.pi, 0]
+        left_dist.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT
+        left_dist.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # Right dist
+        right_dist = habitat_sim.CameraSensorSpec()
+        right_dist.uuid = "right_dist"
+        right_dist.resolution = dist_resolution
+        right_dist.orientation = [0, -90 / 180 * np.pi, 0]
+        right_dist.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT
+        right_dist.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # Up dist
+        up_dist = habitat_sim.CameraSensorSpec()
+        up_dist.uuid = "up_dist"
+        up_dist.resolution = dist_resolution
+        up_dist.orientation = [90 / 180 * np.pi, 0, 0]
+        up_dist.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT
+        up_dist.sensor_type = habitat_sim.SensorType.DEPTH
+
+        # depth camera
+        down_dist = habitat_sim.CameraSensorSpec()
+        down_dist.uuid = "down_dist"
+        down_dist.resolution = dist_resolution
+        down_dist.orientation = [-90 / 180 * np.pi, 0, 0]
+        down_dist.position = 0 * habitat_sim.geo.UP + 0. * habitat_sim.geo.RIGHT
+        down_dist.sensor_type = habitat_sim.SensorType.DEPTH
+
+        error_agent_config = habitat_sim.AgentConfiguration()
+        error_agent_config.sensor_specifications = [error_rgb_sensor, forward_dist, backward_dist, left_dist,
+                                                    right_dist, up_dist, down_dist]
+
+        # Adding the drone to the habitat
+        sim = habitat_sim.Simulator(habitat_sim.Configuration(backend_cfg, [agent_config, error_agent_config]))
+        sim.set_gravity(np.array([0, -gravity, 0]))
+
+        # 5-Drone agent
+        # Adding a rigid cube as a body to the drone
+        # prim_templates_mgr = sim.get_asset_template_manager()
+        self.obj_templates_mgr: habitat_sim.attributes_managers.ObjectAttributesManager
+        self.obj_templates_mgr = sim.get_object_template_manager()
+        self.rigid_obj_mgr: habitat_sim.physics.RigidObjectManager = sim.get_rigid_object_manager()
+        # obj_templates_mgr.get_file_template_handles()
+
+        # OPTION1: Drone has a cube shape
+        cube_template_handle = self.obj_templates_mgr.get_template_handles('cubeSolid')[0]  # cubeSolid
+        cube_attributes: habitat_sim.attributes.ObjectAttributes
+        cube_attributes = self.obj_templates_mgr.get_template_by_handle(handle=cube_template_handle)
+        cube_dim = [self.drone_prms['width'] / 2, self.drone_prms['height'] / 2, self.drone_prms['width'] / 2]
+        cube_attributes.scale = cube_dim
+        cube_attributes.collision_asset_size = [self.drone_prms['width'] / 4, self.drone_prms['height'] / 4,
+                                                self.drone_prms['width'] / 4]
+        # cube_attributes.bounding_box_collisions = True
+        cube_attributes.linear_damping = 0  # drag
+        cube_attributes.angular_damping = 0  # drag
+        cube_attributes.friction_coefficient = 0
+        cube_attributes.restitution_coefficient = 0
+        self.obj_templates_mgr.register_template(cube_attributes, specified_handle='my_cube')
+        obj: habitat_sim.physics.ManagedRigidObject
+        obj = self.rigid_obj_mgr.add_object_by_template_handle('my_cube', sim.agents[0].scene_node, light_setup_key='0')
+
+        # # OPTION2: Drone has a quadrotor shape
+        # # The loaded drone model is (0.1, 0.02, 0.1) meters of dimension
+        # tmpl_id, = obj_templates_mgr.load_configs(f'{DATA_HABITAT_PATH}drone.object_config.json')
+        # uav_attr: habitat_sim.attributes.ObjectAttributes = obj_templates_mgr.get_template_by_id(tmpl_id)
+        # # uav_dim = [1., 1., 1.]
+        # # uav_attr.scale = uav_dim
+        # # uav_attr.collision_asset_size = uav_dim
+        # obj_templates_mgr.register_template(uav_attr, specified_handle='uav')
+        # obj = rigid_obj_mgr.add_object_by_template_handle('uav', sim.agents[0].scene_node, light_setup_key='0')
+
+        # Drone parameters
+        obj.motion_type = habitat_sim.physics.MotionType.DYNAMIC
+        obj.mass = self.drone_prms['m']
+        obj.intertia_diagonal = [self.drone_prms['ix'], self.drone_prms['iy'], self.drone_prms['iz']]
+        self.agent: habitat_sim.physics.ManagedRigidObject = obj
+
+        self.state_ref = None
+
+        # 5-habitat initialisation
+        # 5.1-Drone model init
+        assert self.drone_prms['ix'] == self.drone_prms['iy']
+        theta = np.array([self.drone_prms['kt'] / self.drone_prms['m'],
+                          self.drone_prms['kt'] * self.drone_prms['l'] / self.drone_prms['ix'],
+                          self.drone_prms['km'] / self.drone_prms['iz'],
+                          self.drone_prms['iz'] / self.drone_prms['ix']], dtype=dtype)
+        self.quadrotor = DynamicalModel(param={'permutation': [0, 1, 2, 3], 'theta': theta}, dtype=dtype,
+                                        g=self.g)
+        self.sim: habitat_sim.simulator.Simulator = sim
+
+        self.optimal_navmesh = {'agent_height': 0.4,  # 1.5
+                                'agent_max_climb': 2.0,  # 0.2
+                                'agent_max_slope': 90.0,  # 45.0
+                                'agent_radius': 0.2,  # 0.1
+                                'cell_height': 0.01,  # 0.2
+                                'cell_size': 0.01,  # 0.05
+                                'detail_sample_dist': 6.0,  # 6.0
+                                'detail_sample_max_error': 1.,  # 1.0
+                                'edge_max_error': 1.3,  # 1.3    0.01
+                                'edge_max_len': 12.0,  # 12.0
+                                'filter_ledge_spans': True,  # True,
+                                'filter_low_hanging_obstacles': True,  # True,
+                                'filter_walkable_low_height_spans': True,  # True,
+                                'region_merge_size': 20.0,  # 20.0
+                                'region_min_size': 20.0,  # 20.0
+                                'verts_per_poly': 6.0}  # 6.0
+
+    def generate_reference(self, uniform_speed: float,
+                           manual_ref: bool,
+                           dt: float,
+                           seed: int,
+                           viz_navmesh: bool,
+                           folder: str,
+                           navmesh_path: str):
+        """
+        Generate a reference trajectory for the drone.
+
+        Args:
+            uniform_speed: The number of step to cut the trajectory.
+            manual_ref: If true will generate inital point manually else randomly.
+            dt: dt to use for position derivation.
+            seed: Seed of trajectory generation.
+            viz_navmesh: If true rgb camera see the navmesh wireframe.
+            folder: Folder to save / load the reference.
+
+        Returns:
+            Update self.state_ref with the generated reference.
+        """
+        # --- Defining a quality navmesh
+        self.sim.seed(seed)
+        # Recomputing the navmesh
+        self.sim.navmesh_visualization = viz_navmesh
+        navmesh_settings: habitat_sim.nav.NavMeshSettings = habitat_sim.NavMeshSettings()
+        navmesh_settings.agent_height = 0.4  # 1.5
+        navmesh_settings.agent_max_climb = 2.0  # 0.2
+        navmesh_settings.agent_max_slope = 87.0  # 45.0
+        navmesh_settings.agent_radius = 0.2  # 0.1
+        navmesh_settings.cell_height = 0.05  # 0.2
+        navmesh_settings.cell_size = 0.10  # 0.05
+        navmesh_settings.detail_sample_dist = 120.0  # 6.0
+        navmesh_settings.detail_sample_max_error = 0.01  # 1.0
+        navmesh_settings.edge_max_error = 0.01  # 1.3
+        navmesh_settings.edge_max_len = 12.0  # 12.0
+        navmesh_settings.filter_ledge_spans = True  # True
+        navmesh_settings.filter_low_hanging_obstacles = False  # True
+        navmesh_settings.filter_walkable_low_height_spans = True  # True
+        navmesh_settings.region_merge_size = 20.0  # 20.0
+        navmesh_settings.region_min_size = 20.0  # 20.0
+        navmesh_settings.verts_per_poly = 6.0  # 6.0
+        self.sim.recompute_navmesh(self.sim.pathfinder, navmesh_settings=navmesh_settings)
+
+        try:
+            initial_point = pickle.load(open(f'{folder}initial_point_ref.pkl', 'rb'))
+            flight_height = 0
+            manual_ref = True
+        except FileNotFoundError:
+            initial_point = np.stack([self.sim.pathfinder.get_random_navigable_point() for _ in range(10)])
+            # # Place points manually
+            # initial_point = self.interactive_sim(True, True, None, True)
+            # pickle.dump(initial_point, open(f'{folder}initial_point_ref.pkl', 'wb'))
+            # initial_point = Tf.from_matrix(initial_point).as_trans()
+            # flight_height = 0.
+
+            # Use automatic placed points
+            initial_point = np.stack([self.sim.pathfinder.get_random_navigable_point() for _ in range(10)])
+            flight_height = 0.1
+            manual_ref = False
+            # navmesh_dict = self.optimal_navmesh
+
+        # --- Defining an agent to check for errors
+        # Habitat does not detect every collision, but filters a part of it.
+        # Remove drone's agent body, called my_cube_:0000
+        obj_handle = self.rigid_obj_mgr.get_object_handles()[0]  # my_cube_:0000
+        self.rigid_obj_mgr.remove_object_by_handle(obj_handle, delete_object_node=False)
+        # Cube body
+        error_template_handle = self.obj_templates_mgr.get_template_handles('cubeSolid')[0]  # cubeSolid
+        error_attributes: habitat_sim.attributes.ObjectAttributes
+        error_attributes = self.obj_templates_mgr.get_template_by_handle(handle=error_template_handle)
+        error_dim = [self.drone_prms['width'], self.drone_prms['width'] * 2, self.drone_prms['width']]
+        error_attributes.scale = error_dim
+        # sphere_attributes.collision_asset_size = cube_dim
+        error_attributes.linear_damping = 0  # drag
+        error_attributes.angular_damping = 0  # drag
+        error_attributes.friction_coefficient = 0
+        error_attributes.restitution_coefficient = 0
+        self.obj_templates_mgr.register_template(error_attributes, specified_handle='error_body')
+        error_obj: habitat_sim.physics.ManagedRigidObject
+        error_obj = self.rigid_obj_mgr.add_object_by_template_handle('error_body', self.sim.agents[1].scene_node,
+                                                                     light_setup_key='1')
+        error_obj_handle = self.rigid_obj_mgr.get_object_handles()[0]  # error_body_:0000
+
+        # Error agent parameters
+        error_obj.motion_type = habitat_sim.physics.MotionType.DYNAMIC
+        error_obj.mass = self.drone_prms['m']
+        error_obj.intertia_diagonal = [self.drone_prms['ix'], self.drone_prms['ix'], self.drone_prms['ix']]
+        self.error_agent: habitat_sim.physics.ManagedRigidObject = error_obj
+
+        # Convert initially generated point to state reference
+        self.state_ref = generate_reference(sim=self.sim,
+                                            initial_point=initial_point,
+                                            rigid_object=self.error_agent,
+                                            uniform_speed=uniform_speed,
+                                            navmesh_settings_dict=None,
+                                            flight_height=flight_height,
+                                            dt=dt,
+                                            db_process_initial_point=manual_ref)
+        self.rigid_obj_mgr.remove_object_by_handle(error_obj_handle, delete_object_node=False)
+
+        # Redefining drone's agent body
+        self.agent = self.rigid_obj_mgr.add_object_by_template_handle('my_cube', self.sim.agents[0].scene_node,
+                                                                      light_setup_key='0')
+
+        if type(self.state_ref) is bool:
+            return False
+        else:
+            return True
+
+    def interactive_sim(self, camera_rgb: bool, camera_depth: bool, tf_follow: np.ndarray = None,
+                        return_point: bool = False,
+                        return_label: bool = False):
+        cv2.namedWindow("MP3D Scene")
+        # 1. Agent init
+        iteration = 0
+        if tf_follow is not None:
+            # tf_ref = Tf.from_quat_trans(self.state_ref[:, 3:7], self.state_ref[:, :3]).as_matrix()
+            self.agent.transformation = tf_follow[0]
+        if return_point:
+            point = []
+        if return_label and tf_follow is not None:
+            last_iteration = 0
+            label = np.zeros(len(tf_follow)) * np.nan
+
+        obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+        inc = 0.1  # increment for the translation
+        spd = 1  # speed for tf_follow
+        z_vector = np.array([obs['surface_dist'][0]] * 10, dtype=float).reshape((-1, 1))
+        forward = True
+
+        is_running = True
+        while is_running:
+            # 2. Sensors
+            rgb_stereo_pair = np.concatenate([obs["left_camera"],
+                                              # obs["right_camera"]
+                                              ], axis=1)[..., :3]
+            depth_stereo_pair = np.concatenate([obs["left_depth_camera"],
+                                                # obs["right_depth_camera"]
+                                                ], axis=1)
+            z = obs["surface_dist"][0]
+            if forward:
+                z_vector[:-1] = z_vector[1:]
+                z_vector[-1] = z
+            else:
+                z_vector[1:] = z_vector[:-1]
+                z_vector[0] = z
+            tf_global_agent = np.array(self.agent.transformation)  # transform origin body
+            rot_global_flu = Tf.from_matrix(tf_global_agent).as_rot_mat() @ Habitat2FLU.rot_hab__flu
+
+            has_collided = self.agent.contact_test()
+            # Printing and plotting sensors
+            # print(iteration)
+            # print(f'Height: {z}')
+            # print(f'has_collided: {has_collided}')
+            # print(f'\n\n')
+
+            # 4-Display and interactivity
+            if camera_rgb:
+                cv2.imshow("rgb", rgb_stereo_pair[..., ::-1])
+            if camera_depth:
+                max_depth = 5
+                depth_stereo_pair = np.clip(depth_stereo_pair, 0, max_depth)
+                depth_stereo_pair /= max_depth
+                depth_stereo_pair = np.uint8(depth_stereo_pair * 255)
+                mask = [depth_stereo_pair == 0]
+                depth_stereo_pair = cv2.cvtColor(depth_stereo_pair, cv2.COLOR_GRAY2RGB)
+                depth_stereo_pair[mask] = np.array([0, 0, 255])
+                cv2.imshow("depth", depth_stereo_pair)
+                cv2.imshow('z', z_vector)
+            key_pressed = cv2.waitKey()
+
+            # 5-Immobilizing the drone
+            saved_velocity = (self.agent.linear_velocity, self.agent.angular_velocity)
+            self.agent.linear_velocity = magnum.Vector3([0, 0, 0])
+            self.agent.angular_velocity = magnum.Vector3([0, 0, 0])
+            # print(f"linear_velocity velocity: {self.agent.linear_velocity}")
+            # print(f"angular_velocity velocity: {self.agent.angular_velocity}\n\n")
+
+            # print(f"angular_velocity velocity: {rot_global_flu @ np.array([+0, 0, 1])}\n\n")
+
+            # 6-Exploring the scene
+            # 6.1. Forward, Backward
+            if key_pressed == ord("w"):  # Front
+                self.agent.translate(rot_global_flu @ np.array([+inc, 0, 0]))
+            if key_pressed == ord("s"):  # Back
+                self.agent.translate(rot_global_flu @ np.array([-inc, 0, 0]))
+            # 6.2 Thrust
+            if key_pressed == ord("x"):  # Up
+                self.agent.translate(rot_global_flu @ np.array([0, 0, +inc]))
+            if key_pressed == ord("z"):  # Down
+                self.agent.translate(rot_global_flu @ np.array([0, 0, -inc]))
+            if key_pressed == ord("1"):  # Strafe left
+                self.agent.translate(rot_global_flu @ np.array([0, +inc, 0]))
+            if key_pressed == ord("2"):  # Strafe right
+                self.agent.translate(rot_global_flu @ np.array([0, -inc, 0]))
+            # 6.3. Roll
+            if key_pressed == ord("q"):  # Left
+                self.agent.rotate_z_local(magnum.Rad(+20 / 180 * np.pi))
+            if key_pressed == ord("e"):  # Right
+                self.agent.rotate_z_local(magnum.Rad(-20 / 180 * np.pi))
+            # 6.4. Pitch
+            if key_pressed == ord("r"):  # Up
+                self.agent.rotate_x_local(magnum.Rad(+20 / 180 * np.pi))
+            if key_pressed == ord("f"):  # Down
+                self.agent.rotate_x_local(magnum.Rad(-20 / 180 * np.pi))
+            # 6.5. Yaw
+            if key_pressed == ord("a"):  # Left
+                self.agent.rotate_y_local(magnum.Rad(+20 / 180 * np.pi))
+            if key_pressed == ord("d"):  # Right
+                self.agent.rotate_y_local(magnum.Rad(-20 / 180 * np.pi))
+            # 7. Following the reference
+            # try:
+            if key_pressed == ord("v"):
+                iteration = min(len(tf_follow) - 1, iteration + spd)
+                self.agent.transformation = tf_follow[iteration]
+                forward = True
+            if key_pressed == ord('c'):
+                iteration = max(0, iteration - spd)
+                last_iteration = min(last_iteration, iteration)
+                self.agent.transformation = tf_follow[iteration]
+                forward = False
+            if key_pressed == ord('7'):  # no label
+                label[last_iteration:iteration + 1] = 0
+                print(f'Label 0 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            if key_pressed == ord('8'):  # label drone_through_object
+                label[last_iteration:iteration + 1] = 1
+                print(f'Label 1 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            if key_pressed == ord('9'):  # label surface_discontinuity
+                label[last_iteration:iteration + 1] = 2
+                print(f'Label 2 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            if key_pressed == ord('0'):  # label surface_not_smooth
+                label[last_iteration:iteration + 1] = 3
+                print(f'Label 3 for [{last_iteration}, {iteration}]')
+                last_iteration = iteration
+            # except TypeError:
+            #     print(f'No tf_follow')
+            if key_pressed == ord('['):
+                inc = max(inc - 0.1, 0.1)
+                print(f'Now inc is {inc}')
+            if key_pressed == ord(']'):
+                inc = min(inc + 0.1, 2)
+                print(f'Now inc is {inc}')
+
+            if key_pressed == ord("u"):
+                spd = max(spd - 1, 1)
+                print(f'Now spd is {spd}')
+            if key_pressed == ord("i"):
+                spd = min(spd + 1, 10)
+                print(f'Now spd is {spd}')
+
+            if key_pressed == ord('n'):
+                print(f'Last point will be deleted:')
+                print(point)
+            if key_pressed == ord('m'):
+                tf = self.agent.transformation
+                print(f'Point saved: {tf}')
+                point.append(tf)
+            if key_pressed == ord('l'):
+                is_running = False
+
+            # 9-Simulating for step seconds
+            # self.sim.step_physics(step)
+            s = self.sim.get_agent(0).state
+            s.sensor_states['surface_dist'].rotation = np.quaternion(np.cos(0.25 * np.pi), -np.sin(0.25 * np.pi), 0, 0)
+            self.sim.get_agent(0).set_state(s, False, False)
+            obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+        if return_label:
+            assert not np.isnan(label).any()
+            return label
+        if return_point:
+            return np.stack(point, axis=0)
+
+    def one_step_sim(self, dt: float, state: np.ndarray, motor: np.ndarray,
+                     z: float) -> Tuple[np.ndarray, Any, bool, np.ndarray]:
+        """
+        Take a drone state and a motor command at time t_i and return the new state and drone sensors' output at time
+        t_i+1.
+        All inputs and outputs are in FLU.
+
+        Args:
+            dt: t_i+1 - t_i. The duration where all state and motor output will be considered constant (Trapezoidal
+                integration scheme).
+            state: The initial state of the drone at time t_i.
+            motor: The command to apply on the drone at time t_i to compute t_i+1.
+            z: The distance of the drone to a surface below him at time t_i. Used to compute vertical ground effect
+               force.
+
+        Returns:
+            next state at time t_i+1 (np.ndarray 19)
+            obs a collection of sensors observations at time t_i+1 (dict[str, val])
+            if the drone has collided (bool)
+            ground_effect the external perturbation (float)
+        """
+        # 1. Motor and Ground Effect (gravity is done by habitat)
+        # new fa mu=20, coef=10
+        ground_effect = self.compute_ground_effect(motor, z, mu=1, cap=0.1, coef=1)
+        quat = state[3:7]
+        rot_body_fixed = Tf.from_quat_trans(quat, np.zeros(3)).as_rot_mat().T
+        fa_body = rot_body_fixed @ ground_effect[:3]
+        ta_body = rot_body_fixed @ ground_effect[3:]
+        residual = np.concatenate([fa_body, ta_body])
+        next_state = self.quadrotor.forward(state=state, motor=motor, dt=dt, residual=residual)
+        next_state_hab = Habitat2FLU.state_flu_2_state_habitat(next_state)
+        trans, quat, linear_velocity, angular_velocity = (next_state_hab[:3], next_state_hab[3:7],
+                                                          next_state_hab[7:10], next_state_hab[10:13])
+        tf_global__agent = Tf.from_quat_trans(quat=quat, trans=trans).as_matrix()
+        self.agent.transformation = tf_global__agent
+        self.agent.linear_velocity = linear_velocity
+        self.agent.angular_velocity = angular_velocity
+
+        # 2-Sensing
+        obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone
+        has_collided = self.agent.contact_test()
+        return next_state, obs, has_collided, ground_effect
+
+    def compute_ground_effect(self, motor: np.ndarray, z: float, mu: float, cap: float, coef: float) -> np.ndarray:
+        ground_force = np.zeros(3)
+        if z <= np.sqrt(mu) * self.drone_prms['prop_radius'] / 4:
+            ground_force[2] = cap * self.drone_prms['m'] * self.g
+        else:
+            mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
+            ground_force[2] = np.clip(coef * np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                      a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
+        return np.concatenate([ground_force, np.zeros(3)])

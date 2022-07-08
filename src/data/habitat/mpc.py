@@ -2,33 +2,56 @@ import numpy as np
 import scipy.optimize
 import scipy.interpolate
 from typing import Callable
+import torch
+
 from src.utils.transform import Transform, Rotation
 
 
-def mpc_controller(model: Callable,
+def mpc_controller(sim,
                    state_ref: np.ndarray,
                    state0: np.ndarray,
                    u0: np.ndarray,
                    horizon_cmd: int,
                    horizon_pred: int,
                    gamma: float,
+                   estimate_fa: bool,
                    db_verbose: bool):
     """
     MPC controller for the drone.
 
     Args:
-        model:
+        sim:
         state_ref:
         state0:
         u0:
         horizon_cmd:
         horizon_pred:
         gamma:
+        estimate_fa:
         db_verbose:
-
-    Returns:
-
     """
+
+    def model_raw(_state, _u):
+        _next_state = sim.quadrotor.forward(state=_state, motor=_u, dt=dt)
+        return _next_state
+
+    _z_estimator, _, _, _ = predict.get_trained_model_and_dataset('norm_gru_finetune', False, 'habitat')
+    _z_estimator.eval()
+    _z_estimator.to(device)
+
+    def model_fa(_state, _u, _depth):
+        """
+        Model for MPC using a ground effect estimator.
+        Args:
+            _state: (13)
+            _u: (4)
+            _depth: (20, 480, 640)
+        """
+        with torch.no_grad():
+            _zt = _z_estimator(_depth)
+            _fa = sim.compute_ground_effect(_u, _zt, mu=1, cap=0.1, coef=1)
+        _next_state = sim.quadrotor.forward(state=_state, motor=_u, dt=dt, residual=_fa)
+        return _next_state
     assert horizon_pred % horizon_cmd == 0
 
     def _mpc(_u, _state, _state_ref, _horizon_cmd, _horizon_pred, _gamma):

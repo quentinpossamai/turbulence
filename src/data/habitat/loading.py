@@ -55,14 +55,15 @@ FLIGHT = 'flight2'
 
 def load_file(name: str, scene_number: int, flight_number: int):
     """
-    param name: {'stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force', 'depth_emb',
+    param name: {'stats', 'state_ref',
+     'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force', 'depth_emb',
                  'norm_emb', 'emb_prediction1'}
     param scene_number: In [0, 90]
 
     param flight_number: in Z
     """
     folder = get_flight_folder(scene_number, flight_number)
-    assert name in ['stats', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
+    assert name in ['stats', 'state_ref', 'state', 'motor', 'mpc_error', 'rgb', 'depth', 'surface_dist', 'ground_force',
                     'depth_emb', 'norm_emb', 'emb_prediction1']
     if name in ['stats', 'emb_prediction1']:
         return pickle.load(open(f'{folder}{name}.pkl', 'rb'))

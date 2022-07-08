@@ -347,11 +347,17 @@ def test_new_model_habitat():
                 loss2_agg.append(old_loss[where_is_label2])
                 loss3_agg.append(old_loss[where_is_label3])
 
-        print(f'{name}: old loss: {np.mean(np.concatenate(old_loss_agg)) * 10000:.0f}')
-        print(f'{name}: new loss: {np.mean(np.concatenate(new_loss_agg)) * 10000:.0f}')
-        print(f'{name}: loss0: {np.mean(np.concatenate(loss0_agg)) * 10000:.0f}')
-        print(f'{name}: loss2: {np.mean(np.concatenate(loss2_agg)) * 10000:.0f}')
-        print(f'{name}: loss3: {np.mean(np.concatenate(loss3_agg)) * 10000:.0f}')
+        # print(f'{name}: old loss: {np.mean(np.concatenate(old_loss_agg)) * 10000:.0f}')
+        # print(f'{name}: new loss: {np.mean(np.concatenate(new_loss_agg)) * 10000:.0f}')
+        # print(f'{name}: loss0: {np.mean(np.concatenate(loss0_agg)) * 10000:.0f}')
+        # print(f'{name}: loss2: {np.mean(np.concatenate(loss2_agg)) * 10000:.0f}')
+        # print(f'{name}: loss3: {np.mean(np.concatenate(loss3_agg)) * 10000:.0f}')
+
+        print(f'{name}: old loss: {np.sqrt(np.mean(np.concatenate(old_loss_agg))) * 10000:.0f}')
+        print(f'{name}: new loss: {np.sqrt(np.mean(np.concatenate(new_loss_agg))) * 10000:.0f}')
+        print(f'{name}: loss0: {np.sqrt(np.mean(np.concatenate(loss0_agg))) * 10000:.0f}')
+        print(f'{name}: loss2: {np.sqrt(np.mean(np.concatenate(loss2_agg))) * 10000:.0f}')
+        print(f'{name}: loss3: {np.sqrt(np.mean(np.concatenate(loss3_agg))) * 10000:.0f}')
         print(f'\n\n')
 
 

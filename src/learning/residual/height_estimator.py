@@ -132,7 +132,7 @@ class HeightEstimator(nn.Module):
         loss2 = initial_loss[where_is_label2]
         loss3 = initial_loss[where_is_label3]
 
-        return weighted_loss, loss0, loss2, loss3
+        return loss2, loss0, loss2, loss3
 
 
 ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}euroc_mav_residual_training/'
