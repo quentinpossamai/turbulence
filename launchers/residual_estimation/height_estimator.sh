@@ -11,5 +11,5 @@ cd ~/phd/turbulence/
  --cnn_channel_num 64\
  --regression_size 50\
  --past 20\
- --stage irs_normal_finetune
-# --resume 20220701_222109
+ --stage irs_normal_finetune\
+ --resume 20220629_222109

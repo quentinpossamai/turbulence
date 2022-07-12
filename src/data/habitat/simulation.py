@@ -339,8 +339,8 @@ class Simulation:
             self.agent.transformation = tf_follow[0]
         if return_point:
             point = []
+        last_iteration = 0
         if return_label and tf_follow is not None:
-            last_iteration = 0
             label = np.zeros(len(tf_follow)) * np.nan
 
         obs = self.sim.get_sensor_observations(agent_ids=0)  # 0 is the agent_id of the drone

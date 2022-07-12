@@ -60,7 +60,7 @@ class EurocMAVDatasetHorizon2(Dataset):
         data_isolated["flight"] = flight
 
         depth = []
-        for i in range(idx - (self.past - 1) * 10, idx + 10, 10):
+        for i in np.arange(idx - (self.past - 1) * 10, idx + 10, 10):
             t = data['t'][i]
             depth.append(np.load(
                 INTERMEDIATE_DATASET_PATH + 'depth_iros_test/' + flight + str(t).replace('.', '_') + '.npy'))
@@ -96,8 +96,8 @@ def estimate_cheeseman():
     heights = pickle.load(open(INTERMEDIATE_DATASET_PATH + "depth_iros_test/height.pkl", 'rb'))
 
     from src.utils.path import WD_PATH
-    z_hat = pickle.load(open(f'{WD_PATH}z_hat_fine_euroc_mav.pkl', 'rb'))
-    fa_hat = pickle.load(open(f'{WD_PATH}fa_hat_fine_euroc_mav.pkl', 'rb'))
+    z_hat = pickle.load(open(f'{WD_PATH}analysis/habitat_prediction/z_hat_fine_euroc_mav.pkl', 'rb'))
+    fa_hat = pickle.load(open(f'{WD_PATH}analysis/habitat_prediction/fa_hat_fine_euroc_mav.pkl', 'rb'))
 
     fa, n = [], []
     for key in heights.keys():

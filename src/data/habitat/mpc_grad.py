@@ -77,9 +77,9 @@ def mpc_controller(sim: data_gen.Simulation,
     if db_verbose:
         print('MPC starting', flush=True)
     # Backprop parameters
-    lr = 1
+    lr = 1e-1
     betas = (0.9, 0.999)
-    niter = 100
+    niter = 1000
 
     u = u0.clone().requires_grad_(True)
     optimizer = torch.optim.Adam(params=[u], lr=lr, betas=betas)
@@ -100,34 +100,16 @@ def mpc_controller(sim: data_gen.Simulation,
                     log_mpc_loss[key].append(mpc_loss[key].item())
             log_u.append(u.clone().detach().cpu().numpy())
     u_out = u.clone().detach().cpu().numpy()
-    if db_analysis:
+    if db_analysis and False:
         for key in log_mpc_loss:
             log_mpc_loss[key] = np.stack(log_mpc_loss[key])  # (niter)
         log_u = np.stack(log_u)  # (niter + 1, horizon_cmd, 4)
-        if False:
-            fig, axs = plt.subplots(4, 2, figsize=(10, 10))
-            axs[0, 0].plot(log_u[:, 0, 0])
-            axs[0, 1].plot(log_u[:, 0, 1])
-            axs[1, 0].plot(log_u[:, 0, 2])
-            axs[1, 1].plot(log_u[:, 0, 3])
-
-            axs[2, 0].plot(log_mpc_loss['loss'])
-            axs[2, 0].set_ylabel('MPC loss')
-            # axs[2, 0].set_yscale('log')
-
-            axs[2, 1].plot(log_mpc_loss['position_loss'])
-            axs[2, 1].set_ylabel('Position loss')
-            axs[2, 1].set_yscale('log')
-
-            axs[3, 0].plot(log_mpc_loss['yaw_loss'])
-            axs[3, 0].set_xlabel('Iteration')
-
-            axs[3, 1].plot(log_mpc_loss['u_loss'])
-            axs[3, 1].set_xlabel('Iteration')
-            plt.tight_layout()
-            plt.show()
+        aff(log_u, log_mpc_loss, -1)
     if db_verbose:
         print(f'''Finished | mpc_error: {mpc_loss['loss'].item()} | u: {u_out}''')
+
+    if mpc_loss['position_loss'].item() > 0.01:  # Meaning 0.1 m of error !
+        print('Warning: position loss is too high!')
     return u_out, mpc_loss['position_loss'].item(), mpc_loss['yaw_loss'].item(), mpc_loss['u_loss'].item()
 
 
@@ -172,8 +154,33 @@ def loss(state_ref: torch.Tensor, state_hat: torch.Tensor, u, gamma: float, hori
 
     # Linear velocity loss
     lin_vel_loss = coefs @ torch.mean((lin_vel_ref - lin_vel_hat) ** 2, dim=-1)
-    return {'loss': 1. * position_loss + 0.5 * yaw_loss + 0. * lin_vel_loss + 1e-2 * u_loss,
+    return {'loss': 1. * position_loss + 0.1 * yaw_loss + 0. * lin_vel_loss + 1e-4 * u_loss,
             'position_loss': position_loss,
             'yaw_loss': yaw_loss,
             'lin_vel_loss': lin_vel_loss,
             'u_loss': u_loss}
+
+def aff(log_u, log_mpc_loss, ind):
+    fig, axs = plt.subplots(4, 2, figsize=(10, 10))
+    axs[0, 0].plot(log_u[:, ind, 0])
+    axs[0, 1].plot(log_u[:, ind, 1])
+    axs[1, 0].plot(log_u[:, ind, 2])
+    axs[1, 1].plot(log_u[:, ind, 3])
+
+    axs[2, 0].plot(log_mpc_loss['loss'])
+    axs[2, 0].set_ylabel('MPC loss')
+    # axs[2, 0].set_yscale('log')
+
+    axs[2, 1].plot(log_mpc_loss['position_loss'])
+    axs[2, 1].set_ylabel('Position loss')
+    axs[2, 1].set_yscale('log')
+
+    axs[3, 0].plot(log_mpc_loss['yaw_loss'])
+    axs[3, 0].set_ylabel('Yaw loss')
+    axs[3, 0].set_xlabel('Iteration')
+
+    axs[3, 1].plot(log_mpc_loss['u_loss'])
+    axs[3, 1].set_ylabel('u loss')
+    axs[3, 1].set_xlabel('Iteration')
+    plt.tight_layout()
+    plt.show()
