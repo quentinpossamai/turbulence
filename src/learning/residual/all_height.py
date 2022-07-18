@@ -140,11 +140,33 @@ class AllHeight(pl.LightningModule):
 
         return: Loss
         """
-        z_hat = self.forward(depth=batch['depth'])
-        z_gt = batch["surface_dist"]
+        z_hat = self.forward(depth=batch['depth']).squeeze()
+        z_gt = batch["surface_dist"].squeeze()
+        label = batch['label']
 
-        loss = (z_gt - z_hat) ** 2
-        return loss.mean()
+        data_usable = torch.logical_not(torch.any(label == 1, dim=1))  # check for valid data, label 1 is invalid data
+        where_is_label0 = torch.logical_and(data_usable, (label == 0)[:, -1])
+        where_is_label2 = torch.logical_and(data_usable, (label == 2)[:, -1])
+        where_is_label3 = torch.logical_and(data_usable, (label == 3)[:, -1])
+
+        initial_loss = ((z_gt - z_hat) ** 2)
+
+        loss0 = initial_loss[where_is_label0]
+        loss2 = initial_loss[where_is_label2]
+        loss3 = initial_loss[where_is_label3]
+
+        weight_label2 = 1
+        weights_label2_array = data_usable.float() + where_is_label2.float() * (weight_label2 - 1)
+
+        weight_label3 = 1
+        weights_label3_array = data_usable.float() + where_is_label3.float() * (weight_label3 - 1)
+
+        initial_loss = ((z_gt - z_hat) ** 2).squeeze()
+        weighted_loss = initial_loss * data_usable
+        weighted_loss = weighted_loss * weights_label2_array
+        weighted_loss = weighted_loss * weights_label3_array
+
+        return weighted_loss.mean()
 
     def training_step(self, train_batch, batch_idx):
         training_loss = self.step(train_batch)
@@ -190,10 +212,10 @@ def main():
     # Args are hyperparameters to optimize
     parser = argparse.ArgumentParser(description='Identify model on data.')
     parser.add_argument('--activation', default="relu", type=str, help="The activation function to use")
-    parser.add_argument('--batch_size', default=20, type=int, help='Size of a batch')
+    parser.add_argument('--batch_size', default=320, type=int, help='Size of a batch')
     parser.add_argument('--l2', default=1e-4, type=float, help="Number of past information to take in the model")
     parser.add_argument('--lr', default=1e-6, type=float, help="Learning rate")
-    parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model")
+    parser.add_argument('--past', default=1, type=int, help="Number of past information to take in the model")
     parser = pl.Trainer.add_argparse_args(parser)  # Trainer args accelerator, max_epochs
     args = parser.parse_args()
 

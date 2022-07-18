@@ -39,15 +39,16 @@ class Encoder(nn.Module):
     def __init__(self, feature_size, channel):
         super(Encoder, self).__init__()
         self.net = nn.Sequential(
-            Block(channel, 16, kernel_size=(7, 7), stride=1, padding=3),
-            Block(16, 32, kernel_size=(3, 3), stride=1),
-            Block(32, 64, kernel_size=(3, 3), stride=2),
-            Block(64, 64, kernel_size=(3, 3), stride=1),
-            Block(64, 32, kernel_size=(3, 3), stride=2),
-            Block(32, 4, kernel_size=(3, 3), stride=1),
+            # (batch_size * past, 1, 240, 376)
+            Block(channel, 16, kernel_size=(7, 7), stride=1, padding=3),  # (batch_size * past, 16, 240, 376)
+            Block(16, 32, kernel_size=(3, 3), stride=1),   # (batch_size * past, 32, 240, 376)
+            Block(32, 64, kernel_size=(3, 3), stride=2),  # (batch_size * past, 64, 120, 188)
+            Block(64, 64, kernel_size=(3, 3), stride=1),  # (batch_size * past, 64, 120, 188)
+            Block(64, 32, kernel_size=(3, 3), stride=2),  # (batch_size * past, 32, 60, 94)
+            Block(32, 4, kernel_size=(3, 3), stride=1),  # (batch_size * past, 4, 60, 94)
         )
-
-        self.linear = nn.Linear(4 * 60 * 94, feature_size)
+        # Flatten (batch_size * past, 22560)
+        self.linear = nn.Linear(4 * 60 * 94, feature_size)  # (batch_size * past, 128)
 
     def forward(self, x):
         x = self.net(x)  # [B, 128, 28, 28]

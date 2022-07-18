@@ -18,7 +18,7 @@ import src.data.habitat.loading as habitat
 from src.learning.autoencoder_depth.Models.model_CoPhy_like import Encoder
 from src.utils.profiler import profiler
 from src.drone_model.quadrotor_4parms import DynamicalModel
-from src.utils.path import mkdir, ANALYSIS_PATH, WD_PATH
+import src.utils.path as path
 
 
 class FineTunning(pl.LightningModule):
@@ -136,11 +136,11 @@ class FineTunning(pl.LightningModule):
         self.log("val_loss", val_loss)
 
 
-ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}euroc_mav_residual_training/'
-ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{ANALYSIS_PATH}habitat_residual_training/'
+ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}euroc_mav_residual_training/'
+ANALYSIS_HABITAT_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}habitat_residual_training/'
 
 SAVING_PATH = ANALYSIS_HABITAT_RESIDUAL_TRAINING
-mkdir([SAVING_PATH])
+path.mkdir([SAVING_PATH])
 
 
 def main():
@@ -150,14 +150,15 @@ def main():
     residual_model_class = FineTunning
     name = residual_model_class.__name__
     training_path = f'{SAVING_PATH}{name}/{version}/'
-    mkdir([training_path])
+    path.mkdir([training_path])
 
     identifier = f'{name}-{version}-debug'
     identifier = identifier if torch.cuda.is_available() else identifier + '_local'
     wandb.init(name=identifier,
                id=identifier,
                project='turbulence_residual',
-               dir=training_path)
+               dir=training_path,
+               mode='disabled')
     logger = WandbLogger(experiment=wandb.run)
 
     use_cuda_if_possible = True
@@ -241,7 +242,7 @@ def main():
         assert args.embedding == 'norm'
         model_variant = 'autoencoder_normal_irs_128_irs'
 
-    if 'quentin' in WD_PATH:
+    if 'quentin' in path.WD_PATH:
         enc_path = f"/Users/quentin/phd/turbulence/models/depth_normal_autoencoder/{model_variant}.nn"
     else:
         enc_path = f"/storage/Datasets/BlackBird/euroc_mav/depth_normal_autoencoder/{model_variant}.nn"
@@ -251,9 +252,9 @@ def main():
         assert (run.encoder.state_dict()[e].to(device) == state_dict[f'encoder.{e}']).all()
 
     # Loading head
-    path = f'{habitat.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
+    model_path = f'{path.WD_PATH}analysis/habitat_residual_training/EmbHeight/20220227_200520/'
     model_name = 'epoch=90-step=8917-val_loss=0.54.ckpt'
-    state_dict = torch.load(f'{path}{model_name}', map_location=device)
+    state_dict = torch.load(f'{model_path}{model_name}', map_location=device)
     for i, e in enumerate(state_dict['state_dict'].keys()):
         run.state_dict()[e].copy_(state_dict['state_dict'][e])
         assert (run.state_dict()[e].to(device) == state_dict['state_dict'][e]).all()
@@ -288,7 +289,7 @@ def main():
                                           filename='{epoch}-{step}-{val_loss:.2f}',
                                           monitor='val_loss',
                                           mode='min')
-    trainer = pl.Trainer(gpus=8,
+    trainer = pl.Trainer(gpus=1 if gpu_count else 0,
                          logger=logger,
                          deterministic=True,
                          max_epochs=args.max_epochs,

@@ -91,7 +91,7 @@ class CNNEncoder(nn.Module):
             assert self.layer_num == 9, "layer_num must be 3 or 6 or 9"
             self.encoder_conv = nn.Sequential(
                 # Initial is (batch, 1, 480, 640)
-                nn.Conv2d(1, ch[1], (7, 7), stride=1, padding=3),  # (batch, *, 480, 640)
+                nn.Conv2d(in_channels=1, out_channels=ch[1], kernel_size=(7, 7), stride=1, padding=3),  # (batch, *, 480, 640)
                 nn.ReLU(True),
                 nn.Conv2d(ch[1], ch[2], (3, 3), stride=2),  # (batch, *, 240, 320)
                 nn.ReLU(True),

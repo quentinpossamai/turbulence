@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import sys
 import wandb
+import nvidia_smi
+import os
 
 from src.learning.autoencoder_depth.Models.model_CoPhy_like import Autoencoder
 import src.data.habitat.loading as habitat
@@ -132,7 +134,7 @@ class HeightEstimator(nn.Module):
         loss2 = initial_loss[where_is_label2]
         loss3 = initial_loss[where_is_label3]
 
-        return loss2, loss0, loss2, loss3
+        return weighted_loss, loss0, loss2, loss3
 
 
 ANALYSIS_EUROC_MAV_RESIDUAL_TRAINING = f'{path.ANALYSIS_PATH}euroc_mav_residual_training/'
@@ -150,16 +152,30 @@ def train_valid_height_estimator():
     parser.add_argument('--dropout', default=0.5, type=float, help='Dropout probability')
     parser.add_argument('--epoch', default=200, type=int, help='Number of epoch to do.')
     parser.add_argument('--l2', default=0, type=float, help="Number of past information to take in the model.")
-    parser.add_argument('--lr', default=5e-5, type=float, help="Learning rate.")
-    parser.add_argument('--cnn_layer_num', default=6, type=int, help="Number of layer for the CNN encoder.")
+    parser.add_argument('--lr', default=7e-6, type=float, help="Learning rate.")
+    parser.add_argument('--cnn_layer_num', default=9, type=int, help="Number of layer for the CNN encoder.")
     parser.add_argument('--cnn_channel_num', default=64, type=int, help="Number of channels for the CNN encoder.")
     parser.add_argument('--regression_size', default=50, type=int,
                         help="Number of unit for MLP and hidden_size for GRU.")
-    parser.add_argument('--past', default=20, type=int, help="Number of past information to take in the model.")
-    parser.add_argument('--stage', default='irs_depth_finetune', type=str, help="The stage of the model.")
+    parser.add_argument('--past', default=40, type=int, help="Number of past information to take in the model.")
+    parser.add_argument('--stage', default='irs_normal_finetune', type=str, help="The stage of the model.")
     parser.add_argument('--resume', default='none', type=str, help='If training resumes from a checkpoint')
 
     args = parser.parse_args()
+
+    use_cuda_if_possible = True
+    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
+    log_interval = 50
+    seed = 0
+    motor_size = 4
+    num_workers = 15 if device == 'gpu' else 0
+
+    if device == 'cuda':
+        nvidia_smi.nvmlInit()
+        gpu_num = int(os.environ['CUDA_VISIBLE_DEVICES'])
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(gpu_num)
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+
 
     # ae training is already done and written elsewhere
     assert args.stage in ['cnn',
@@ -191,9 +207,6 @@ def train_valid_height_estimator():
                dir=training_path,
                mode='online' if sys.platform != 'darwin' else 'disabled')
 
-    use_cuda_if_possible = True
-    device = torch.device('cuda' if torch.cuda.is_available() and use_cuda_if_possible else 'cpu')
-
     print(f'Device used by torch: {device}', flush=True)
 
     # Display entire dataset
@@ -209,7 +222,6 @@ def train_valid_height_estimator():
         print('\n\n', flush=True)
 
     # Analysis parameters
-    motor_size = 4
     h_prms = {'time_start': now,  # hyperparameters
               'name': name,
               'activation': args.activation,
@@ -226,7 +238,6 @@ def train_valid_height_estimator():
               'past': args.past,
               'stage': args.stage}
     # Reproducibility
-    seed = 0
     random.seed(seed)
     np.random.seed(seed)
 
@@ -320,7 +331,6 @@ def train_valid_height_estimator():
     print(f'training_path={training_path}', flush=True)
     print(f'name={name} | version={version}', flush=True)
 
-    num_workers = 15 if device == 'gpu' else 0
     # Datasets
     print(f'Load depth {load_depth} | load_depth_emb {load_depth_emb} | '
           f'load_norm_emb {load_norm_emb} | normed_depth {normed_depth}', flush=True)
@@ -350,7 +360,6 @@ def train_valid_height_estimator():
 
     # Train loop
     memory = np.inf
-    log_interval = 50
     train_log_keys = ['train_loss', 'train_loss0', 'train_loss2', 'train_loss3']
     val_log_keys = ['val_loss', 'val_loss0', 'val_loss2', 'val_loss3']
     running_loss = {}
@@ -382,6 +391,10 @@ def train_valid_height_estimator():
             running_loss['train_loss0'].append(loss0.detach().cpu().numpy())
             running_loss['train_loss2'].append(loss2.detach().cpu().numpy())
             running_loss['train_loss3'].append(loss3.detach().cpu().numpy())
+            if device == 'cuda' and batch_idx % log_interval == 0:
+                print(f'Train - Memory used - total: {info.total / 1024 ** 3:.4f} Gio | '
+                      f'free {info.free / 1024 ** 3:.4f} Gio | used {info.used / 1024 ** 3:.4f}', flush=True)
+
             loss.mean().backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -411,6 +424,11 @@ def train_valid_height_estimator():
                 running_loss['val_loss0'].append(loss0.detach().cpu().numpy())
                 running_loss['val_loss2'].append(loss2.detach().cpu().numpy())
                 running_loss['val_loss3'].append(loss3.detach().cpu().numpy())
+
+                if device == 'cuda' and batch_idx == 0:
+                    print(f'Valid - Memory used - total: {info.total / 1024 ** 3:.4f} Gio | '
+                          f'free {info.free / 1024 ** 3:.4f} Gio | used {info.used / 1024 ** 3:.4f}', flush=True)
+
             val_loss = np.mean(np.concatenate(running_loss['val_loss']))
             for key in val_log_keys:
                 wandb.log({key: np.mean(np.concatenate(running_loss[key]))},

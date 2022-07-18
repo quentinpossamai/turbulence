@@ -3,8 +3,8 @@ ssh remsto /bin/bash << EOF
 #  find . -name ".DS_Store" -delete &&
 #  echo "Removing .DS_Store in homedir" &&
   cd ~/phd/turbulence/launchers/residual_estimation/ &&
-  sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o irs_normal_finetune_%A.out --time=8-00:00:00 height_estimator.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part1 -J predict -o predict_all_%A.out --time=8-00:00:00 predict.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part3 -J general -o ae_lr_curve_%A.out --time=8-00:00:00 general_script.sh
-#  sbatch --mem 10G --gres=gpu:1 -p part1 -J ae_training -o ae_training_%A.out --time=8-00:00:00 ae_irs.sh
+  sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o euroc_mav_validation_%A.out --time=8-00:00:00 euroc_mav_validation.sh
+#  sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o all_height_%A.out --time=8-00:00:00 all_height.sh
+#  sbatch --mem 20G --gres=gpu:1 -p part3 -J exec -o irs_normal_finetune_%A.out --time=8-00:00:00 height_estimator.sh
+
 EOF
