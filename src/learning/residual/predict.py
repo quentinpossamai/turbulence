@@ -69,10 +69,10 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
     elif prefix == 'none_gru':
         if old:
             from src.learning.residual.all_height import AllHeight as Model
-            # wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
-            # model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
-            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220716_153129/'
-            model_name = 'epoch=79-step=56559-val_loss=0.04.ckpt'
+            wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220223_170234/'
+            model_name = 'epoch=21-step=14365-val_loss=0.51.ckpt'
+            # wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/AllHeight/20220716_153129/'
+            # model_name = 'epoch=132-step=94030-val_loss=0.04.ckpt'
             h_prms = pickle.load(open(f'{wd_path}h_prms.pkl', 'rb'))
             model = Model.load_from_checkpoint(f'{wd_path}{model_name}',
                                                activation=h_prms['activation'],
@@ -181,6 +181,10 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                                                uav_model=None,
                                                motor_size=h_prms['motor_size'],
                                                past=h_prms['past'])
+            if dataset_name == 'euroc_mav':
+                dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, True)
+            else:
+                dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, True)
         else:
             from src.learning.residual.height_estimator import HeightEstimator
             # wd_path = f'{path.WD_PATH}analysis/habitat_residual_training/HeightEstimator_irs_depth_finetune/20220530_134811/'
@@ -201,10 +205,10 @@ def get_trained_model_and_dataset(prefix: str, old: bool, dataset_name: str):
                 past=h_prms['past'],
             )
             model.load_state_dict(torch.load(f'{wd_path}{model_name}', map_location=device)['model'])
-        if dataset_name == 'euroc_mav':
-            dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
-        else:
-            dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
+            if dataset_name == 'euroc_mav':
+                dataset = euroc_mav.EurocMAVDatasetHorizon2('test', h_prms['past'], True, False, False, False)
+            else:
+                dataset = habitat.HabitatResidualDataset('test', h_prms['past'], True, False, False, False)
 
     elif prefix == 'irs_normal_finetune':
         if old:

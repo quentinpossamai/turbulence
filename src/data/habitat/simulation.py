@@ -264,6 +264,7 @@ class Simulation:
 
         try:
             initial_point = pickle.load(open(f'{folder}initial_point_ref.pkl', 'rb'))
+            initial_point = Tf.from_matrix(initial_point).as_trans()
             flight_height = 0
             manual_ref = True
         except FileNotFoundError:

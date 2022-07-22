@@ -64,13 +64,12 @@ def cheeseman_identified(motor, surface_dist):
 def euroc_mav_validation(name: str, old: bool):
     # Create torch device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model, h_prms, name, dataset = predict.get_trained_model_and_dataset('none_gru', True, 'euroc_mav')
+    model, h_prms, _, dataset = predict.get_trained_model_and_dataset(name, old, 'euroc_mav')
     model.to(device)
 
     model.eval()
     pred_dict = {"V1_01_easy/": [], "V1_02_medium/": [], "V1_03_difficult/": []}
-    # pred_dict = pickle.load(open(f'{path.WD_PATH}analysis/euroc_mav_validation/pred_dict_euroc_mav.pkl', 'rb'))
-    for i in tqdm(range(len(dataset))):
+    for i in tqdm(range(len(dataset)), desc=f'pred_dict_euroc_mav__{name}_{old}.pkl'):
         # Loading data
         data = dataset[i]
         fa_gt = (data['ground_force'] * fa_std + fa_mean).numpy()[2:3]

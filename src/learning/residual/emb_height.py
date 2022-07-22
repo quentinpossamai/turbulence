@@ -138,11 +138,33 @@ class EmbHeight(pl.LightningModule):
         else:  # == 'both'
             emb = torch.cat([batch['depth_emb'], batch['norm_emb']], dim=-1)
 
-        residual_hat = self.forward(emb=emb)
-        residual_gt = batch["surface_dist"]
+        z_hat = self.forward(emb).squeeze()
+        z_gt = batch["surface_dist"].squeeze()
+        label = batch['label']
 
-        loss = (residual_gt - residual_hat) ** 2
-        return loss.mean()
+        data_usable = torch.logical_not(torch.any(label == 1, dim=1))  # check for valid data, label 1 is invalid data
+        where_is_label0 = torch.logical_and(data_usable, (label == 0)[:, -1])
+        where_is_label2 = torch.logical_and(data_usable, (label == 2)[:, -1])
+        where_is_label3 = torch.logical_and(data_usable, (label == 3)[:, -1])
+
+        initial_loss = ((z_gt - z_hat) ** 2)
+
+        loss0 = initial_loss[where_is_label0]
+        loss2 = initial_loss[where_is_label2]
+        loss3 = initial_loss[where_is_label3]
+
+        weight_label2 = 1
+        weights_label2_array = data_usable.float() + where_is_label2.float() * (weight_label2 - 1)
+
+        weight_label3 = 1
+        weights_label3_array = data_usable.float() + where_is_label3.float() * (weight_label3 - 1)
+
+        initial_loss = ((z_gt - z_hat) ** 2).squeeze()
+        weighted_loss = initial_loss * data_usable
+        weighted_loss = weighted_loss * weights_label2_array
+        weighted_loss = weighted_loss * weights_label3_array
+
+        return weighted_loss.mean()
 
     def training_step(self, train_batch, batch_idx):
         training_loss = self.step(train_batch)

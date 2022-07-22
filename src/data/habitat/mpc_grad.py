@@ -10,7 +10,7 @@ import src.data.habitat.data_gen as data_gen
 import src.utils.quaternion as quaternion
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-z_estimator, _, _, _ = predict.get_trained_model_and_dataset('norm_gru_finetune', False, 'habitat')
+z_estimator, _, _, _ = predict.get_trained_model_and_dataset('irs_normal_finetune', False, 'habitat')
 z_estimator.to(DEVICE)
 z_estimator.eval()
 

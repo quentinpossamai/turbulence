@@ -11,6 +11,7 @@ import src.data.habitat.data_gen as data_gen
 from src.data.habitat.simulation import Simulation
 import src.data.habitat.loading as habitat
 import src.data.habitat.mpc_grad as mpc_grad
+import src.data.habitat.mpc as mpc
 from src.utils.transform import Transform as Tf
 from src.data.habitat.hatbitat2flu import Habitat2FLU
 
@@ -21,16 +22,24 @@ def control_test():
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
+    # for scene_number in habitat.TEST:
+    #     print(f'scene_number={scene_number} | labels={labels[scene_number].keys()}')
 
     for scene_number in habitat.TEST:
+        scene_number = 73
         for flight_number in labels[scene_number]:
             scene_id = habitat.MP3D_SCENE_LIST[scene_number]
             scene_path = f'{habitat.DATA_HABITAT_PATH}scene_datasets/mp3d/{scene_id}/'
             # Initialise drone
             drone_prms = habitat.DRONE_PRMS
+            gradient_descent = False
+            if gradient_descent:
+                horizon_cmd = 40
+                horizon_pred = 40
+            else:
+                horizon_cmd = 1
+                horizon_pred = 20
             dt = 1 / 20
-            horizon_cmd = 40
-            horizon_pred = 40
             gamma = 1.
             camera_resolution = np.array([480, 640])
 
@@ -47,13 +56,13 @@ def control_test():
                                        viz_navmesh=False, folder=source_folder,
                                        navmesh_path=f'{scene_path}.navmesh')
 
-                # sim.interactive_sim(True, False,
-                #                     tf_follow=Tf.from_quat_trans(sim.state_ref[:, 3:7],
-                #                                                  sim.state_ref[:, :3]).as_matrix())
                 np.save(f'{source_folder}state_ref.npy', sim.state_ref)
             else:
                 print(f'Loading reference for {scene_id} {flight_number}', flush=True)
                 sim.state_ref = np.load(f'{source_folder}state_ref.npy')
+            # sim.interactive_sim(True, False,
+            #                     tf_follow=Tf.from_quat_trans(sim.state_ref[:, 3:7],
+            #                                                  sim.state_ref[:, :3]).as_matrix())
 
             sim.agent.transformation = Tf.from_quat_trans(sim.state_ref[0, 3:7], sim.state_ref[0, :3]).as_matrix()
             sim.agent.linear_velocity = np.zeros(3)
@@ -75,23 +84,40 @@ def control_test():
             hover_cmd = np.sqrt(drone_prms['m'] * habitat.g / (4 * drone_prms['kt']))
             motor_horizon = np.repeat(hover_cmd, horizon_cmd * 4).reshape((horizon_cmd, 4))
 
-            has_collided = False
+            def mpc_model(_state, _u):
+                _next_state = sim.quadrotor.forward(state=_state, motor=_u, dt=dt)
+                return _next_state
+
+            has_collided = True
             for i in range(1, time_end):
                 # Computing command with the controller
                 # try:
-                motor_horizon, pos_err, yaw_err, u_err = mpc_grad.mpc_controller(sim=sim,
-                                                                                 state_ref=state_ref_flu[
-                                                                                           i:i + horizon_pred],
-                                                                                 state0=data_collection['state'][-1],
-                                                                                 u0=motor_horizon,
-                                                                                 depth=np.stack(
-                                                                                     data_collection['depth'][-20:]),
-                                                                                 horizon_cmd=horizon_cmd,
-                                                                                 horizon_pred=horizon_pred,
-                                                                                 gamma=gamma,
-                                                                                 estimate_fa=False,
-                                                                                 db_verbose=False,
-                                                                                 db_analysis=True)
+                if gradient_descent:
+                    motor_horizon, pos_err, yaw_err, u_err = mpc_grad.mpc_controller(sim=sim,
+                                                                                     state_ref=state_ref_flu[
+                                                                                               i:i + horizon_pred],
+                                                                                     state0=data_collection['state'][-1],
+                                                                                     u0=motor_horizon,
+                                                                                     depth=np.stack(
+                                                                                         data_collection['depth'][-20:]),
+                                                                                     horizon_cmd=horizon_cmd,
+                                                                                     horizon_pred=horizon_pred,
+                                                                                     gamma=gamma,
+                                                                                     estimate_fa=False,
+                                                                                     db_verbose=False,
+                                                                                     db_analysis=True)
+                else:
+                    motor_horizon, err = mpc.mpc_controller(model=mpc_model,
+                                                            state_ref=state_ref_flu[i:i + horizon_pred],
+                                                            state0=data_collection['state'][-1],
+                                                            u0=motor_horizon,
+                                                            horizon_cmd=horizon_cmd,
+                                                            horizon_pred=horizon_pred,
+                                                            gamma=gamma,
+                                                            db_verbose=False)
+                    pos_err = 0
+                    yaw_err = 0
+                    u_err = 0
                 print(f'mpc position error: {pos_err:.4f} | yaw error: {yaw_err:.3f} | u error: {u_err:.1f} | '
                       f'min {np.min(motor_horizon):.1f} | max {np.max(motor_horizon):.1f}')
                 # except ValueError:
@@ -120,7 +146,7 @@ def control_test():
                 data_collection['mpc_yaw_error'].append(yaw_err)  # t to compute t+1
                 data_collection['mpc_u_error'].append(u_err)  # t to compute t+1
                 data_collection['ground_force'].append(ground_effect)  # t used to compute t+1
-                data_collection['depth'].append(obs['left_depth_camera'])  # t+1
+                # data_collection['depth'].append(obs['left_depth_camera'])  # t+1
                 data_collection['surface_dist'].append(obs['surface_dist'][0])  # t+1
                 data_collection['state'].append(next_state_flu)  # t+1
                 data_collection['state_ref'].append(state_ref_flu[i])  # t+1
@@ -155,8 +181,10 @@ def control_test():
                 for name, array in data_generated.items():
                     np.save(f'{source_folder}{name}.npy', array.astype(np.float32))
                 info = 'collided' if has_collided else None
-                pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'}, open(f'{source_folder}stats.pkl', 'wb'))
-                print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr, flush=True)
+                pickle.dump({'done': i + 1, 'length': time_end, 'info': f'{info}'},
+                            open(f'{source_folder}stats.pkl', 'wb'))
+                print(f'Progress: {i + 1} | Max_length: {time_end} | has_collided: {has_collided}', file=sys.stderr,
+                      flush=True)
                 print(f'Time without compression: {time.time() - tic}s', file=sys.stderr, flush=True)
 
 
