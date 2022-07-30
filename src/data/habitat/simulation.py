@@ -217,6 +217,9 @@ class Simulation:
                                 'region_merge_size': 20.0,  # 20.0
                                 'region_min_size': 20.0,  # 20.0
                                 'verts_per_poly': 6.0}  # 6.0
+        self.mu = 100  # 1
+        self.cap = 50  # 0.1
+        self.coef = 10000  # 1
 
     def generate_reference(self, uniform_speed: float,
                            manual_ref: bool,
@@ -518,7 +521,7 @@ class Simulation:
         """
         # 1. Motor and Ground Effect (gravity is done by habitat)
         # new fa mu=20, coef=10
-        ground_effect = self.compute_ground_effect(motor, z, mu=1, cap=0.1, coef=1)
+        ground_effect = self.compute_ground_effect(motor, z)
         quat = state[3:7]
         rot_body_fixed = Tf.from_quat_trans(quat, np.zeros(3)).as_rot_mat().T
         fa_body = rot_body_fixed @ ground_effect[:3]
@@ -538,12 +541,12 @@ class Simulation:
         has_collided = self.agent.contact_test()
         return next_state, obs, has_collided, ground_effect
 
-    def compute_ground_effect(self, motor: np.ndarray, z: float, mu: float, cap: float, coef: float) -> np.ndarray:
+    def compute_ground_effect(self, motor: np.ndarray, z: float) -> np.ndarray:
         ground_force = np.zeros(3)
-        if z <= np.sqrt(mu) * self.drone_prms['prop_radius'] / 4:
-            ground_force[2] = cap * self.drone_prms['m'] * self.g
+        if z <= np.sqrt(self.mu) * self.drone_prms['prop_radius'] / 4:
+            ground_force[2] = self.cap * self.drone_prms['m'] * self.g
         else:
-            mu_r_z = mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
-            ground_force[2] = np.clip(coef * np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
-                                      a_min=0, a_max=cap * self.drone_prms['m'] * self.g)
+            mu_r_z = self.mu * (self.drone_prms['prop_radius'] / (4 * z)) ** 2
+            ground_force[2] = np.clip(self.coef * np.sum(motor ** 2) * self.drone_prms['kt'] * mu_r_z / (1 - mu_r_z),
+                                      a_min=0, a_max=self.cap * self.drone_prms['m'] * self.g)
         return np.concatenate([ground_force, np.zeros(3)])

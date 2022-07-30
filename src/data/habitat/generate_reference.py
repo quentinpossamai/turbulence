@@ -13,7 +13,8 @@ from typing import Union, Dict
 from src.data.habitat.hatbitat2flu import Habitat2FLU
 from src.utils.transform import Transform, Rotation
 
-matplotlib.use('Qt5Agg')
+if sys.platform == 'darwin':
+    matplotlib.use('Qt5Agg')
 
 
 # matplotlib.use('MacOSX')

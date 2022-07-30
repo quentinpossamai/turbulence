@@ -38,17 +38,17 @@ def plot_fa_law():
                                    a_min=0, a_max=_cap * drone_prms['m'] * g)
         return ground_force
 
-    motor = np.array([150, 150, 150, 150])
-    z = np.linspace(1e-8, 0.8, 1000)
-    fig, ax = plt.subplots(1, 1)
-
     from matplotlib.widgets import Slider
     from matplotlib.lines import Line2D
 
-    mu = 20
+    mu = 1
     cap = 0.1
-    coef = 10
+    coef = 1
 
+    motor = np.array([150, 150, 150, 150])
+    z = np.linspace(1e-8, 0.8, 1000)
+
+    fig, ax = plt.subplots(1, 1)
     to_plot = np.array([_apply(e, motor, 1, 0.1, 1) for e in z])
     line: List[Line2D] = ax.plot(z, to_plot, label=rf'Before')
     to_plot = np.array([_apply(e, motor, mu, cap, coef) for e in z])
@@ -58,18 +58,19 @@ def plot_fa_law():
     ax.set_ylabel('Ground effect (N)')
     ax.set_xlabel('Surface distance (m)')
     ax.legend()
-
-    plt.subplots_adjust(left=0.1, bottom=0.19, right=0.99, top=0.95, wspace=0, hspace=0)
-
-    ax_mu = plt.axes([0.15, 0.06, 0.65, 0.03])
-    mu_slider = Slider(ax=ax_mu, label="mu", valmin=0.01, valmax=20, valinit=mu, orientation="horizontal")
-    ax_cap = plt.axes([0.15, 0.01, 0.65, 0.03])
-    cap_slider = Slider(ax=ax_cap, label="cap", valmin=0, valmax=1, valinit=cap, orientation="horizontal")
+    plt.subplots_adjust(left=0.1, bottom=0.23, right=0.99, top=0.95, wspace=0, hspace=0)
+    ax_mu = plt.axes([0.15, 0.1, 0.65, 0.03])
+    mu_slider = Slider(ax=ax_mu, label="mu", valmin=0.01, valmax=100, valinit=mu, orientation="horizontal")
+    ax_cap = plt.axes([0.15, 0.05, 0.65, 0.03])
+    cap_slider = Slider(ax=ax_cap, label="cap", valmin=0, valmax=50, valinit=cap, orientation="horizontal")
+    ax_coef = plt.axes([0.15, 0.01, 0.65, 0.03])
+    coef_slider = Slider(ax=ax_coef, label="coef", valmin=0, valmax=10000, valinit=cap, orientation="horizontal")
 
     def update(_):
         mu_val = mu_slider.val
         cap_val = cap_slider.val
-        _to_plot = np.array([_apply(e, motor, mu_val, cap_val, coef) for e in z])
+        coef_val = coef_slider.val
+        _to_plot = np.array([_apply(e, motor, mu_val, cap_val, coef_val) for e in z])
         line[0].set_data([z, _to_plot])
         # ax.set_ylim([-0.003, np.max(_to_plot)])
         ax.relim()
@@ -78,8 +79,9 @@ def plot_fa_law():
 
     mu_slider.on_changed(update)
     cap_slider.on_changed(update)
+    coef_slider.on_changed(update)
     # plt.tight_layout()
-    plt.savefig(f'{path.WD_PATH}reports/improve/fa_generator.png')
+    # plt.savefig(f'{path.WD_PATH}reports/improve/fa_generator.png')
     plt.show()
 
 
@@ -1125,6 +1127,7 @@ def analyse_prediction():
 
 
 def main():
+    plot_fa_law()
     # observe_generated_traj(0, 3)
     # labels = pickle.load(open(f'{habitat.DATA_HABITAT_PATH}labels.pkl', 'rb'))
     # for scene_number in habitat.TEST:
@@ -1135,7 +1138,7 @@ def main():
     # for name in ['nogru', 'all', 'emb', 'emb_norm', 'fine', 'fine_norm']:
     # for name in ['nogru', 'all', 'fine', 'fine_norm']:
     #     rmse_model_prediction(name, 'euroc_mav')
-    boxplot_pred()
+    # boxplot_pred()
 
 
 if __name__ == '__main__':
